@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send: sendMessage, h, onState, hourLabel } = /** @type {any} */ (globalThis).DripUI;
+  const { send: sendMessage, h, onState, hourLabel, pausePlayer } = /** @type {any} */ (globalThis).DripUI;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -44,9 +44,14 @@
     if (theaterTimer !== null) clearInterval(theaterTimer);
     theaterTimer = null;
     const id = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
-    if (!id || theaterHandled.has(id)) return;
+    if (!state || !id || theaterHandled.has(id) || (locked && !inGrace())) return;
     const deadline = performance.now() + 10000;
     function attempt() {
+      if (locked && !inGrace()) {
+        if (theaterTimer !== null) clearInterval(theaterTimer);
+        theaterTimer = null;
+        return;
+      }
       const currentId = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
       const page = document.querySelector(SEL.watchPage);
       const button = /** @type {HTMLElement | null} */ (page?.querySelector(SEL.theaterButton));
@@ -90,7 +95,7 @@
       disconnected = true;
       graceId = '';
       stopRun();
-      video?.pause();
+      pausePlayer(video);
       clearInterval(tickTimer);
       clearInterval(statusTimer);
       showDisconnected();
@@ -130,7 +135,7 @@
 
   function onPlay() {
     if (disconnected || (locked && !inGrace())) {
-      video?.pause();
+      pausePlayer(video);
       if (disconnected) showDisconnected();
       else showLock();
       return;
@@ -177,12 +182,16 @@
     if (!locked) {
       graceId = '';
       hideLock();
+      if (!theaterHandled.has(id)) defaultTheater();
       return;
     }
-    if (inGrace()) return;
+    if (inGrace()) {
+      if (!theaterHandled.has(id)) defaultTheater();
+      return;
+    }
     // Storage may arrive before our tick response. Only that response can grant grace.
     if (deferLock && state.settings.graceMode) return;
-    if (video && !video.paused) video.pause();
+    pausePlayer(video);
     if (clockActive() && id) showLock();
   }
 
@@ -191,14 +200,14 @@
     if (pendingTick) {
       if (performance.now() - pendingTick.startedAt >= 5000) {
         attach();
-        video?.pause();
+        pausePlayer(video);
       }
       return;
     }
     attach();
     // drip hides the miniplayer (early.css), so a video that drops into it gets paused rather than playing unseen.
     // The main player playing off /watch means the miniplayer, however YouTube marks it.
-    if (location.pathname !== '/watch' && video && !video.paused) video.pause();
+    if (location.pathname !== '/watch' && video) pausePlayer(video);
     const id = videoId();
     if (!clockActive() || !id) {
       takePlayed();
@@ -223,7 +232,7 @@
         pendingTick = null;
       }
     }
-    if (locked && video && !video.paused && !inGrace()) video.pause();
+    if (locked && !inGrace()) pausePlayer(video);
     renderPill();
   }
 
@@ -244,10 +253,12 @@
   let lockMessage = '';
   let reasonText = '';
   let lockView = '';
+  let lockVideoId = '';
 
   function hideLock() {
     if (disconnected) return;
     lockView = '';
+    lockVideoId = '';
     reasonText = '';
     document.getElementById('drip-lock')?.remove();
     reasonOpen = false;
@@ -293,6 +304,7 @@
     const view = JSON.stringify([videoId(), state.tokens.watch, needLeft, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage]);
     if (existing && lockView === view) return;
     lockView = view;
+    lockVideoId = videoId();
     const active = document.activeElement;
     const oldReason = existing?.querySelector('textarea');
     const focused = !!oldReason && active === oldReason;
@@ -371,7 +383,7 @@
     defaultTheater();
     const id = videoId();
     if (graceId !== id) graceId = '';
-    hideLock();
+    if (id !== lockVideoId) hideLock();
     refreshStatus();
   });
   const tickTimer = setInterval(tick, 1000);
