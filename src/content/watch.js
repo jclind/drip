@@ -13,6 +13,7 @@
     watchPage: 'ytd-watch-flexy',
     theaterAttr: 'theater',
     theaterButton: '.ytp-size-button',
+    autoplayToggle: '.ytp-autonav-toggle-button[aria-checked="true"]',
     ads: '#movie_player.ad-showing, #movie_player.ad-interrupting',
     app: 'ytd-app',
     miniplayerAttr: 'miniplayer-is-active',
@@ -65,6 +66,12 @@
     }
     theaterTimer = setInterval(attempt, 250);
     attempt();
+  }
+
+  /** Keeps YouTube's autoplay switch off, so a finished video doesn't roll into the next one (decision Q2). */
+  function autoplayOff() {
+    const toggle = /** @type {HTMLElement | null} */ (document.querySelector(SEL.autoplayToggle));
+    toggle?.click();
   }
 
   function miniplayerActive() {
@@ -205,6 +212,7 @@
       return;
     }
     attach();
+    autoplayOff();
     // drip hides the miniplayer (early.css), so a video that drops into it gets paused rather than playing unseen.
     // The main player playing off /watch means the miniplayer, however YouTube marks it.
     if (location.pathname !== '/watch' && video) pausePlayer(video);
