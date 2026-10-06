@@ -40,3 +40,11 @@ ytd-miniplayer,
 #watch-page-skeleton #related {
   display: none !important;
 }
+
+/* Shorts: the shelves on home, search, and channel pages, and the sidebar links. /shorts/ URLs redirect in redirect.js. */
+ytd-reel-shelf-renderer,
+ytd-rich-shelf-renderer[is-shorts],
+ytd-guide-entry-renderer:has(a[title="Shorts"]),
+ytd-mini-guide-entry-renderer[aria-label="Shorts"] {
+  display: none !important;
+}

@@ -36,3 +36,7 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 ## Feel
 
 - Start each YouTube page dimmed or blank and fade the content in once it has loaded, so navigation feels calm instead of choppy. Jesse has seen another extension do a slow fade from dim. Raised 2026-10-06.
+
+## Feed choice
+
+- A toggle on the token page for where the next reveal comes from: home recommendations, subscriptions, or Explore. It would turn the `feedSource` setting (Q5) into a per-reveal choice. Step 4 builds the pool by feed source, so this is a small change after it. Raised 2026-10-06.
