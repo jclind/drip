@@ -9,7 +9,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | # | Decision |
 |---|---|
 | Q1 | Personal for now, may publish later. Keep code clean enough to publish. |
-| Q2 | Block home, watch-page sidebar, end screens, autoplay, Shorts. Search stays, minus the injected "discover" shelves. |
+| Q2 | Block home, watch-page sidebar, end screens, autoplay, Shorts. Search stays, minus the injected "discover" shelves. Playlists and mixes keep playing on their own (Jesse, 2026-10-06). |
 | Q3 | Out of time means hard stop: pause and overlay. "Finish the current video" grace mode is a setting, off by default. |
 | Q4 | Daily allowance only. Tasks are in IDEAS.md. The whole extension runs on the honor system. |
 | Q5 | Feed source setting: YouTube home feed (default) or subscriptions. |
@@ -45,6 +45,10 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 - `src/background.js` is the only writer. Everything else sends it a message. It runs messages one at a time through a promise queue, so two tabs can't overwrite each other.
 - Every message starts with `rollDay(state, now)`, so the day resets lazily. A laptop asleep at 4am still resets correctly on the next read.
 - `src/content/` replaces the home page and runs the watch clock. `src/popup/` and `src/options/` are extension pages.
+
+### Feed source
+
+With the feed source set to subscriptions, a reveal loads `/feed/subscriptions` in a hidden same-origin frame on the token page and reads its grid with the same selectors as the home grid. YouTube only fills a feed that's in view, so the frame sits on screen at opacity 0. Nothing new from the feed gives `pool-empty` and spends no token. The first version was tested on air only against the home feed, because air's account has no subscriptions.
 
 ### The clock with several tabs
 
