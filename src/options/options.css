@@ -40,6 +40,10 @@ select {
   box-sizing: border-box;
 }
 
+select {
+  width: auto;
+}
+
 input[type="checkbox"] {
   width: 18px;
   height: 18px;

@@ -129,8 +129,9 @@ function renderLog() {
         h('tbody', {}, ...rows),
       ),
     ),
-    reasons.length > 0 &&
-      h('ul', { class: 'reasons' }, ...reasons.map((r) => h('li', {}, `${r.day}: ${r.title || r.videoId}, "${r.reason}"`))),
+    ...(reasons.length > 0
+      ? [h('ul', { class: 'reasons' }, ...reasons.map((r) => h('li', {}, `${r.day}: ${r.title || r.videoId}, "${r.reason}"`)))]
+      : []),
   );
 }
 
