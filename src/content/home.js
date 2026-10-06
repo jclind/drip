@@ -149,6 +149,8 @@
   }
 
   let revealing = false;
+  /** A source change still saving. Reveal waits for it, so it reads the feed that was just picked. */
+  let sourceSaving = Promise.resolve();
 
   async function onReveal() {
     if (revealing) return;
@@ -157,10 +159,13 @@
       await reveal();
     } finally {
       revealing = false;
+      // Re-enable the source toggle.
+      render();
     }
   }
 
   async function reveal() {
+    await sourceSaving;
     message = '';
     if (state && state.settings.feedSource === 'subscriptions') {
       message = 'Checking your subscriptions…';
@@ -170,6 +175,15 @@
     message = '';
     const res = absorb(await send({ type: 'reveal', candidates: pool }));
     if (res && !res.ok) message = errorText(res.error);
+    render();
+  }
+
+  /** @param {'home' | 'subscriptions'} source */
+  async function onSource(source) {
+    if (revealing || !state || state.settings.feedSource === source) return;
+    message = '';
+    sourceSaving = send({ type: 'updateSettings', changes: { feedSource: source } }).then(absorb);
+    await sourceSaving;
     render();
   }
 
@@ -213,6 +227,22 @@
         h('button', { class: 'drip-btn drip-primary', onclick: () => onResolve('watch') }, 'Watch'),
         h('button', { class: 'drip-btn', onclick: () => onResolve('save') }, 'Save'),
         h('button', { class: 'drip-btn', onclick: () => onResolve('pass') }, 'Pass'),
+      ),
+    );
+  }
+
+  /**
+   * Where the next reveal comes from. The choice is the feedSource setting, so it stays until changed.
+   * @param {string} current
+   */
+  function sourceToggle(current) {
+    const options = /** @type {const} */ ([['home', 'Home'], ['subscriptions', 'Subscriptions']]);
+    return h(
+      'div',
+      { class: 'drip-source', role: 'group', 'aria-label': 'Reveal from' },
+      h('span', { class: 'drip-meta' }, 'Reveal from'),
+      ...options.map(([value, label]) =>
+        h('button', { class: 'drip-chip', 'aria-pressed': String(value === current), disabled: revealing, onclick: () => onSource(value) }, label),
       ),
     );
   }
@@ -264,6 +294,7 @@
         !state.current && h('button', { class: 'drip-btn drip-primary', onclick: onReveal, disabled: state.tokens.rec < 1 }, 'Reveal next video · 1 rec'),
         h('button', { class: 'drip-btn', onclick: onAddTime, disabled: state.tokens.watch < 1 }, `Add ${s.minutesPerToken} min · 1 watch`),
       ),
+      !state.current && sourceToggle(s.feedSource),
       message && h('div', { class: 'drip-message' }, message),
       state.current && card(state.current),
       backlogList(),
