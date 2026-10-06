@@ -3,7 +3,22 @@
 
 (function () {
   // YouTube selectors. These break when YouTube changes its markup.
-  const SEL = { video: '#movie_player video.html5-main-video' };
+  const SEL = {
+    video: '#movie_player video.html5-main-video',
+    player: '#movie_player',
+    playButton: '#movie_player .ytp-play-button',
+  };
+
+  // Keep behavior identical to DripUI.pausePlayer in common.js, which loads later.
+  /** @param {HTMLVideoElement | null} video */
+  function pausePlayer(video) {
+    const player = document.querySelector(SEL.player);
+    if (player?.classList.contains('playing-mode')) {
+      const button = /** @type {HTMLElement | null} */ (document.querySelector(SEL.playButton));
+      button?.click();
+    }
+    if (video && !video.paused) video.pause();
+  }
 
   /** @type {any} */
   let state;
@@ -39,7 +54,7 @@
     pausedWhileUnknown = null;
     if (!id) return;
     const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
-    if (locked) video?.pause();
+    if (locked) pausePlayer(video);
     else if (pending && pending.id === id && pending.video === video) {
       // Only undo our temporary pause, once. Autoplay can still reject playback.
       video.play().catch(() => {});
@@ -53,8 +68,8 @@
     if (videoId() !== decisionId) decide();
     if (locked === null) {
       pausedWhileUnknown = { video: target, id: videoId() };
-      target.pause();
-    } else if (locked) target.pause();
+      pausePlayer(target);
+    } else if (locked) pausePlayer(target);
   }, true);
 
   document.addEventListener('yt-navigate-finish', decide);

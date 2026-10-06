@@ -2,6 +2,22 @@
 // Helpers shared by home.js and watch.js. Content scripts share one global scope, so this sets globalThis.DripUI.
 
 (function () {
+  // YouTube selectors. These break when YouTube changes its markup.
+  const SEL = {
+    player: '#movie_player',
+    playButton: '#movie_player .ytp-play-button',
+  };
+
+  /** @param {HTMLVideoElement | null} video */
+  function pausePlayer(video) {
+    const player = document.querySelector(SEL.player);
+    if (player?.classList.contains('playing-mode')) {
+      const button = /** @type {HTMLElement | null} */ (document.querySelector(SEL.playButton));
+      button?.click();
+    }
+    if (video && !video.paused) video.pause();
+  }
+
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
 
@@ -65,5 +81,5 @@
     return `/watch?v=${encodeURIComponent(id)}`;
   }
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl };
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, pausePlayer };
 })();
