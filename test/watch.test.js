@@ -69,15 +69,31 @@ class FakeVideo {
  * @param {ReturnType<typeof makeWorld>} world
  * @param {string} videoId
  */
-function makeTab(world, videoId) {
+function makeTab(world, videoId, { hasPage = false, theater = false, ready = false } = {}) {
   const video = new FakeVideo();
   const root = new FakeElement('html');
   const body = new FakeElement('body');
   /** @type {Record<string, Function[]>} */
   const docHandlers = {};
   const location = { pathname: '/watch', search: `?v=${videoId}` };
-  /** @type {Function[]} */
-  const intervals = [];
+  /** @type {Map<number, Function>} */
+  const intervals = new Map();
+  let nextInterval = 0;
+  // The watch page and its theater button. Like YouTube on a full load, a click before the player is ready does nothing,
+  // and a click that lands changes the layout a moment later, not during the click.
+  // These flags exist before watch.js loads, because it looks for the page while it starts.
+  const player = { hasPage, ready };
+  const page = new FakeElement('ytd-watch-flexy');
+  page.toggleAttribute('theater', theater);
+  const theaterButton = {
+    clicks: 0,
+    click() {
+      this.clicks++;
+      if (player.ready) setImmediate(() => page.toggleAttribute('theater'));
+    },
+  };
+  /** @param {string} sel */
+  page.querySelector = (sel) => (sel === '.ytp-size-button' ? theaterButton : null);
   const document = {
     documentElement: root,
     body,
@@ -86,7 +102,11 @@ function makeTab(world, videoId) {
     /** @param {string} tag */
     createElement: (tag) => new FakeElement(tag),
     /** @param {string} sel */
-    querySelector: (sel) => (sel === '#movie_player video.html5-main-video' && !tab.noPlayer ? video : null),
+    querySelector: (sel) => {
+      if (sel === '#movie_player video.html5-main-video') return tab.noPlayer ? null : video;
+      if (sel === 'ytd-watch-flexy') return player.hasPage ? page : null;
+      return null;
+    },
     /** @param {string} id */
     /** @param {string} id @returns {any} */
     getElementById: (id) => body.all().find((el) => el.id === id) || null,
@@ -102,8 +122,8 @@ function makeTab(world, videoId) {
     performance: { now: () => world.now },
     Date: class extends Date { static now() { return world.epoch + world.now; } },
     CustomEvent: class { /** @param {string} type */ constructor(type) { this.type = type; } },
-    setInterval: (/** @type {Function} */ fn) => { intervals.push(fn); return intervals.length; },
-    clearInterval: () => {},
+    setInterval: (/** @type {Function} */ fn) => { intervals.set(++nextInterval, fn); return nextInterval; },
+    clearInterval: (/** @type {number} */ id) => { intervals.delete(id); },
     chrome: {
       runtime: { id: 'drip', sendMessage: (/** @type {any} */ msg) => world.handle(msg), getManifest: () => ({ version: '0.1.0' }) },
       storage: { onChanged: { addListener: (/** @type {Function} */ fn) => world.listeners.push(fn) } },
@@ -116,14 +136,15 @@ function makeTab(world, videoId) {
   }
   const tab = {
     noPlayer: false,
+    player, page, theaterButton,
     /** Runs every timer once, as one second passing would. */
-    second: async () => { for (const fn of intervals) await fn(); await settle(); },
+    second: async () => { for (const fn of [...intervals.values()]) await fn(); await settle(); },
     broken: () => document.getElementById('drip-broken'),
     video, root, body, location,
     pill: () => document.getElementById('drip-pill'),
     locked: () => !!document.getElementById('drip-lock'),
     /** Runs watch.js's 1-second tick. */
-    tick: async () => { await /** @type {Function} */ (intervals.find((fn) => fn.name === 'tick'))(); await settle(); },
+    tick: async () => { await /** @type {Function} */ ([...intervals.values()].find((fn) => fn.name === 'tick'))(); await settle(); },
     /** @param {string} id */
     navigate: async (id) => {
       document.dispatchEvent({ type: 'yt-navigate-start' });
@@ -363,4 +384,55 @@ test('a player that comes back and then goes missing again drops the lock again 
   for (let i = 0; i < 12; i++) { world.advance(1); await tab.second(); }
   assert.equal(tab.locked(), false);
   assert.ok(tab.root.hasAttribute('data-drip-broken'));
+});
+
+/** A funded tab whose watch page and theater button exist from the start, as on a full page load. */
+function theaterSetup(theaterOn = false) {
+  const world = makeWorld();
+  world.state.watchSecondsLeft = 900;
+  const tab = makeTab(world, 'aaa', { hasPage: true, theater: theaterOn });
+  return { world, tab };
+}
+
+test('a theater click YouTube ignores on a full load is tried again until theater mode is on (Q26)', async () => {
+  const { world, tab } = theaterSetup();
+  await settle();
+  assert.equal(tab.theaterButton.clicks, 1, 'clicked as soon as the button was there');
+  assert.equal(tab.page.hasAttribute('theater'), false, 'too early, so YouTube ignored it');
+  tab.player.ready = true;
+  world.advance(1.5);
+  await tab.second();
+  assert.equal(tab.theaterButton.clicks, 2);
+  assert.ok(tab.page.hasAttribute('theater'));
+  for (let i = 0; i < 12; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.theaterButton.clicks, 2, 'stops once theater mode is on, so it never turns it back off');
+  assert.ok(tab.page.hasAttribute('theater'));
+});
+
+test('a player that is ready at once gets one click, not a second one that turns theater back off', async () => {
+  const world = makeWorld();
+  world.state.watchSecondsLeft = 900;
+  const tab = makeTab(world, 'aaa', { hasPage: true, ready: true });
+  await settle();
+  for (let i = 0; i < 3; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.theaterButton.clicks, 1);
+  assert.ok(tab.page.hasAttribute('theater'));
+});
+
+test('a page already in theater mode gets no click', async () => {
+  const { world, tab } = theaterSetup(true);
+  await settle();
+  for (let i = 0; i < 3; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.theaterButton.clicks, 0);
+  assert.ok(tab.page.hasAttribute('theater'));
+});
+
+test('a player that never takes the click is left alone after 10 seconds', async () => {
+  const { world, tab } = theaterSetup();
+  await settle();
+  for (let i = 0; i < 10; i++) { world.advance(1); await tab.second(); }
+  const clicks = tab.theaterButton.clicks;
+  assert.ok(clicks > 1 && clicks <= 8, `${clicks} clicks in 10 seconds`);
+  for (let i = 0; i < 10; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.theaterButton.clicks, clicks);
 });
