@@ -23,7 +23,8 @@ test('API contains every contract name, and defaults are frozen', () => {
     'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'addBacklog',
     'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
-    'isLoosening', 'updateSettings', 'cancelPending', 'formatMinutes',
+    'isLoosening', 'updateSettings', 'cancelPending', 'formatMinutes', 'cleanVideo',
+    'logDays', 'redirectTarget', 'earlyLocked',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
@@ -149,7 +150,7 @@ test('reveal skips seen and backlog ids and selects the first qualifying video',
   state.backlog = [video('saved')];
   const chosen = video('new');
   assert.deepEqual(D.reveal(state, [video('seen'), video('saved'), chosen, video('later')]), { ok: true, video: chosen });
-  assert.strictEqual(state.current, chosen);
+  assert.deepEqual(state.current, chosen);
   assert.equal(state.tokens.rec, 9);
   assert.equal(D.logDay(state).recSpent, 1);
   assert.deepEqual(state.seen, ['seen', 'new']);
@@ -492,4 +493,58 @@ test('chargeTick zero tick between paid ticks does not suppress playback', () =>
   assert.equal(clock.lastChargeEnd, time(5) + 10000);
   assert.equal(state.watchSecondsLeft, 80);
   assert.equal(D.logDay(state).watchedSec, 20);
+});
+
+// Finding 14 in AUDIT.md: a tightened cap is a hard limit at once (Q6, Q11).
+test('tightening the rollover cap or a daily allowance clamps balances now', () => {
+  const state = fresh();
+  state.tokens = { watch: 8, rec: 20 };
+  D.updateSettings(state, { rolloverDays: 1 });
+  assert.deepEqual(state.tokens, { watch: 4, rec: 10 });
+  D.updateSettings(state, { watchTokensPerDay: 3, recTokensPerDay: 2 });
+  assert.deepEqual(state.tokens, { watch: 3, rec: 2 });
+});
+
+test('loosening a cap leaves balances alone until the reset', () => {
+  const state = fresh();
+  state.tokens = { watch: 1, rec: 1 };
+  D.updateSettings(state, { rolloverDays: 5, watchTokensPerDay: 10 });
+  assert.deepEqual(state.tokens, { watch: 1, rec: 1 });
+});
+
+// Finding 16: a card action names the video it was shown for.
+test('resolveCurrent refuses an action for a card that is no longer current', () => {
+  const state = fresh();
+  D.reveal(state, [video('a')]);
+  refusesUnchanged(state, () => D.resolveCurrent(state, 'save', 'old'), 'stale-card');
+  assert.equal(D.resolveCurrent(state, 'save', 'a').ok, true);
+  assert.deepEqual(state.backlog.map(v => v.id), ['a']);
+});
+
+test('resolveCurrent refuses an unknown action and keeps the card', () => {
+  const state = fresh();
+  D.reveal(state, [video('a')]);
+  refusesUnchanged(state, () => D.resolveCurrent(state, /** @type {any} */ ('eat')), 'bad-action');
+});
+
+test('hydrate drops malformed backlog entries and bad numbers from storage', () => {
+  const now = time(5);
+  const state = D.hydrate({ day: '2026-10-05', backlog: [undefined, {}, { id: 'ok' }], current: {}, tokens: { watch: 'x', rec: -1 }, watchSecondsLeft: NaN, seen: [1, 'a'], unlocked: [null, 'b'] }, now);
+  assert.deepEqual(state.backlog, [{ id: 'ok', title: '', channel: '', length: '' }]);
+  assert.equal(state.current, null);
+  assert.deepEqual(state.tokens, { watch: 4, rec: 10 });
+  assert.equal(state.watchSecondsLeft, 0);
+  assert.deepEqual(state.seen, ['a']);
+  assert.deepEqual(state.unlocked, ['b']);
+});
+
+test('chargeTick places held-back time where it was played, so it does not overlap newer time', () => {
+  const state = fresh();
+  state.watchSecondsLeft = 100;
+  const clock = { lastChargeEnd: 0 };
+  const now = time(5, 12);
+  D.chargeTick(state, clock, now, 3, 'b', 0);
+  D.chargeTick(state, clock, now, 3, 'a', 3000);
+  assert.equal(state.watchSecondsLeft, 94);
+  assert.equal(clock.lastChargeEnd, now);
 });

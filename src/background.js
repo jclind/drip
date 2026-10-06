@@ -4,7 +4,8 @@
 importScripts('lib/state.js');
 
 /** @type {any} */
-const Drip = /** @type {any} */ (globalThis).Drip;
+// var, not const: these page scripts share one type-check program, and only var may be declared twice.
+var Drip = /** @type {any} */ (globalThis).Drip;
 const KEY = 'drip';
 
 /** End of the last stretch of watching we charged for, in ms. See DESIGN.md, "The clock with several tabs". */
@@ -14,7 +15,23 @@ const clock = { lastChargeEnd: 0 };
 let queue = Promise.resolve();
 
 /**
- * Runs fn on the current state, saves it, and returns fn's result. Calls run one at a time.
+ * JSON with object keys sorted. chrome.storage hands objects back with sorted keys, so plain JSON.stringify would
+ * see a change in every read.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const obj = /** @type {Record<string, unknown>} */ (value);
+    return `{${Object.keys(obj).sort().filter((k) => obj[k] !== undefined).map((k) => `${JSON.stringify(k)}:${stableJson(obj[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * Runs fn on the current state, saves it if it changed, and returns fn's result. Calls run one at a time.
+ * Every save wakes the storage listeners in every YouTube tab, so a call that changes nothing doesn't save.
  * @template T
  * @param {(state: any, now: number) => T} fn
  * @returns {Promise<T>}
@@ -25,8 +42,18 @@ function withState(fn) {
     const stored = await chrome.storage.local.get(KEY);
     const state = Drip.hydrate(stored[KEY], now);
     Drip.rollDay(state, now);
+    const before = stableJson(stored[KEY]);
+    const chargedUntil = clock.lastChargeEnd;
     const result = fn(state, now);
-    await chrome.storage.local.set({ [KEY]: state });
+    if (stableJson(state) !== before) {
+      try {
+        await chrome.storage.local.set({ [KEY]: state });
+      } catch (err) {
+        // The charge didn't stick, so the tab's resent time must be charged again.
+        clock.lastChargeEnd = chargedUntil;
+        throw err;
+      }
+    }
     return result;
   });
   queue = run.catch(() => {});
@@ -47,13 +74,13 @@ function handle(msg, state, now) {
     case 'reveal':
       return Drip.reveal(state, Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'resolve':
-      return Drip.resolveCurrent(state, msg.action);
+      return Drip.resolveCurrent(state, msg.action, typeof msg.videoId === 'string' ? msg.videoId : undefined);
     case 'addBacklog':
       return Drip.addBacklog(state, msg.video);
     case 'removeBacklog':
       return Drip.removeBacklog(state, msg.id);
     case 'tick':
-      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, msg.videoId) };
+      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, msg.videoId, msg.ago) };
     case 'status':
       return { ok: true, ...Drip.watchStatus(state, msg.videoId) };
     case 'needThis':
@@ -67,12 +94,20 @@ function handle(msg, state, now) {
   }
 }
 
+// A new install opens the welcome page once. Updates don't.
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('src/welcome/welcome.html') });
+});
+
 // Development only: dev/reload.html on localhost asks for a reload after a code change.
 // Open YouTube tabs pause and ask for a refresh when this happens, so it can't be used to dodge the clock.
 // It can also read state, change settings, and send ticks. A fake tick can hide real playback and a reload can drop
 // an unsent tick, so the route only works in a checkout that has the gitignored file dev/ENABLED. Real installs don't.
 const DEV_TYPES = ['get', 'updateSettings', 'tick'];
-const devEnabled = fetch(chrome.runtime.getURL('dev/ENABLED')).then((r) => r.ok).catch(() => false);
+// A store build has no externally_connectable entry (bin/build-release removes it), so it doesn't look for the file.
+const devEnabled = chrome.runtime.getManifest().externally_connectable
+  ? fetch(chrome.runtime.getURL('dev/ENABLED')).then((r) => r.ok).catch(() => false)
+  : Promise.resolve(false);
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   if (!msg || !sender.origin || new URL(sender.origin).hostname !== 'localhost') return;
   devEnabled.then((on) => {

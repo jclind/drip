@@ -2,6 +2,9 @@
 // Guard the main player's first play before the watch clock and overlay load.
 
 (function () {
+  /** @type {any} */
+  const Drip = /** @type {any} */ (globalThis).Drip;
+
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
     video: '#movie_player video.html5-main-video',
@@ -39,7 +42,11 @@
     document.documentElement.toggleAttribute('data-drip-hold', hold);
   }
 
-  function decide() {
+  /**
+   * @param {boolean} [fromStorage] A balance change while the page is open. With grace mode on, pausing a video that's
+   *   already playing is watch.js's job then, because only it knows whether that video has grace.
+   */
+  function decide(fromStorage = false) {
     const id = videoId();
     if (id !== decisionId) pausedWhileUnknown = null;
     decisionId = id;
@@ -48,22 +55,16 @@
       setHold(!!id);
       return;
     }
-    const resetHour = state?.settings?.resetHour ?? 4;
-    const date = new Date(Date.now() - resetHour * 3600000);
-    const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const expired = typeof state?.day === 'string' && state.day < today;
-    const seconds = expired ? 0 : state?.watchSecondsLeft ?? 0;
-    // A reset also clears yesterday's unlocks. Grace belongs to watch.js.
-    const unlocked = !expired && Array.isArray(state?.unlocked) && state.unlocked.includes(id);
-    locked = !state?.settings?.graceMode && seconds <= 0 && !unlocked;
+    // Grace is watch.js's call, for a video already playing when time ran out. It marks that video on <html>.
+    locked = Drip.earlyLocked(state, Date.now(), id) && document.documentElement.getAttribute('data-drip-grace') !== id;
     setHold(!!id && locked);
 
     const pending = pausedWhileUnknown;
     pausedWhileUnknown = null;
     if (!id) return;
     const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
-    if (locked) pausePlayer(video);
-    else if (pending && pending.id === id && pending.video === video) {
+    if (locked && !(fromStorage && state?.settings?.graceMode)) pausePlayer(video);
+    else if (!locked && pending && pending.id === id && pending.video === video) {
       // Only undo our temporary pause, once. Autoplay can still reject playback.
       video.play().catch(() => {});
     }
@@ -80,13 +81,15 @@
     } else if (locked) pausePlayer(target);
   }, true);
 
-  document.addEventListener('yt-navigate-finish', decide);
+  document.addEventListener('yt-navigate-finish', () => decide());
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.drip) return;
+    const first = !storageKnown;
     state = changes.drip.newValue;
     storageKnown = true;
-    decide();
+    decide(!first);
   });
+  document.addEventListener('drip-grace', () => decide(true));
   decide();
   chrome.storage.local.get('drip').then((stored) => {
     // A newer storage event must win over the initial snapshot.

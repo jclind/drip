@@ -2,7 +2,8 @@
 // Settings with the next-day rule, plus the last 7 days of the log.
 
 /** @type {any} */
-const Drip = /** @type {any} */ (globalThis).Drip;
+// var, not const: these page scripts share one type-check program, and only var may be declared twice.
+var Drip = /** @type {any} */ (globalThis).Drip;
 
 /** @type {{ key: string, label: string, hint: string, type: 'number' | 'checkbox' | 'select', min?: number, max?: number, options?: [string, string][] }[]} */
 const FIELDS = [
@@ -101,8 +102,7 @@ function renderPending() {
 
 function renderLog() {
   /** @type {string[]} */
-  const days = [];
-  for (let i = 0; i < 7; i++) days.push(Drip.addDays(state.day, -i));
+  const days = Drip.logDays(state.day);
   const rows = days.map((day) => {
     const d = state.log[day];
     const cells = d
@@ -169,7 +169,29 @@ async function cancel(key) {
   render();
 }
 
+/** Whether the form still shows what was last rendered, so a live update won't wipe an edit in progress. */
+function formUntouched() {
+  return FIELDS.every((f) => {
+    const el = /** @type {HTMLInputElement} */ ($(f.key));
+    return (f.type === 'checkbox' ? el.checked : el.value) === renderedValues[f.key];
+  });
+}
+
 $('save').addEventListener('click', save);
+
+// Another tab or the day reset changed the state. Keep the log and pending list current.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.drip || !state) return;
+  const before = JSON.stringify([state.settings, state.pending]);
+  state = Drip.hydrate(changes.drip.newValue, Date.now());
+  // Rebuild the form and the pending list, which have buttons, only when they changed. A button replaced mid-click
+  // loses the click.
+  if (JSON.stringify([state.settings, state.pending]) !== before) {
+    if (formUntouched()) renderForm();
+    renderPending();
+  }
+  renderLog();
+});
 
 chrome.runtime.sendMessage({ type: 'get' }).then((res) => {
   absorb(res);

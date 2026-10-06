@@ -3,6 +3,7 @@
   "name": "drip",
   "version": "0.1.0",
   "description": "One recommendation at a time, paid for with tokens.",
+  "minimum_chrome_version": "111",
   "permissions": ["storage"],
   "background": {
     "service_worker": "src/background.js"
@@ -39,12 +40,12 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["src/content/early.js"],
+      "js": ["src/lib/state.js", "src/content/early.js"],
       "run_at": "document_start"
     },
     {
       "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*", "https://www.youtube-nocookie.com/*"],
-      "js": ["src/content/redirect.js"],
+      "js": ["src/lib/state.js", "src/content/redirect.js"],
       "run_at": "document_start"
     },
     {

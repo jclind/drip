@@ -2,7 +2,8 @@
 // Balances and minutes left. Spending happens on YouTube, not here.
 
 /** @type {any} */
-const Drip = /** @type {any} */ (globalThis).Drip;
+// var, not const: these page scripts share one type-check program, and only var may be declared twice.
+var Drip = /** @type {any} */ (globalThis).Drip;
 
 /** @param {any} state */
 function show(state) {
@@ -15,4 +16,8 @@ function show(state) {
 
 chrome.runtime.sendMessage({ type: 'get' }).then((res) => {
   if (res && res.state) show(res.state);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.drip) show(Drip.hydrate(changes.drip.newValue, Date.now()));
 });

@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel, watchUrl } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, hourLabel, watchUrl, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -139,6 +139,8 @@
         return `No rec tokens left. More at ${reset}.`;
       case 'no-watch-tokens':
         return `No watch tokens left. More at ${reset}.`;
+      case 'stale-card':
+        return 'That card changed in another tab.';
       case 'pool-empty':
         return state && state.settings.feedSource === 'subscriptions'
           ? 'Nothing new from your subscriptions. No token spent.'
@@ -173,6 +175,14 @@
     }
     const pool = await readCandidates();
     message = '';
+    // No videos at all, not just none new: the grid's markup changed (Q25).
+    const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
+    if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
+      reportBroken('grid', SEL.item);
+      message = errorText('pool-empty');
+      render();
+      return;
+    }
     const res = absorb(await send({ type: 'reveal', candidates: pool }));
     if (res && !res.ok) message = errorText(res.error);
     render();
@@ -194,10 +204,11 @@
     render();
   }
 
-  /** @param {'watch' | 'save' | 'pass'} action */
-  async function onResolve(action) {
+  /** @param {'watch' | 'save' | 'pass'} action @param {string} videoId The card the button was on. */
+  async function onResolve(action, videoId) {
     message = '';
-    const res = absorb(await send({ type: 'resolve', action }));
+    const res = absorb(await send({ type: 'resolve', action, videoId }));
+    if (res && !res.ok) message = errorText(res.error);
     if (action === 'watch' && res && res.ok) {
       location.assign(watchUrl(res.video.id));
       return;
@@ -217,16 +228,16 @@
     return h(
       'div',
       { class: 'drip-card' },
-      h('a', { class: 'drip-thumb', href: watchUrl(video.id), onclick: (/** @type {Event} */ e) => { e.preventDefault(); onResolve('watch'); } },
+      h('a', { class: 'drip-thumb', href: watchUrl(video.id), onclick: (/** @type {Event} */ e) => { e.preventDefault(); onResolve('watch', video.id); } },
         h('img', { src: `https://i.ytimg.com/vi/${encodeURIComponent(video.id)}/hqdefault.jpg`, alt: '' })),
       h('div', { class: 'drip-card-title' }, video.title),
       meta && h('div', { class: 'drip-meta' }, meta),
       h(
         'div',
         { class: 'drip-row' },
-        h('button', { class: 'drip-btn drip-primary', onclick: () => onResolve('watch') }, 'Watch'),
-        h('button', { class: 'drip-btn', onclick: () => onResolve('save') }, 'Save'),
-        h('button', { class: 'drip-btn', onclick: () => onResolve('pass') }, 'Pass'),
+        h('button', { class: 'drip-btn drip-primary', onclick: () => onResolve('watch', video.id) }, 'Watch'),
+        h('button', { class: 'drip-btn', onclick: () => onResolve('save', video.id) }, 'Save'),
+        h('button', { class: 'drip-btn', onclick: () => onResolve('pass', video.id) }, 'Pass'),
       ),
     );
   }
@@ -301,19 +312,43 @@
     );
   }
 
+  let rendered = '';
+
+  /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
     const root = document.getElementById('drip-home');
-    if (root) root.replaceChildren(view());
+    if (!root) return;
+    const key = JSON.stringify([state && [
+      Drip.formatMinutes(state.watchSecondsLeft), state.tokens, state.current, state.backlog,
+      state.settings.feedSource, state.settings.minutesPerToken, state.settings.resetHour,
+    ], message, revealing, disconnected]);
+    if (root.firstChild && key === rendered) return;
+    rendered = key;
+    root.replaceChildren(view());
   }
+
+  let refreshing = false;
 
   /** Puts the drip page into the home browse page if it isn't there yet. */
   function mount() {
     if (location.pathname !== '/') return;
     const browse = document.querySelector(SEL.homeBrowse);
     if (!browse) return;
-    if (browse.querySelector('#drip-home')) return;
+    if (browse.querySelector('#drip-home')) {
+      // A page left open past the reset asks once for the new day's balances.
+      if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
+        refreshing = true;
+        send({ type: 'get' }).then((res) => {
+          absorb(res);
+          refreshing = false;
+          render();
+        });
+      }
+      return;
+    }
     const target = browse.querySelector(SEL.mount) || browse;
     target.prepend(h('div', { id: 'drip-home' }));
+    rendered = '';
     render();
     send({ type: 'get' }).then((res) => {
       absorb(res);
@@ -325,6 +360,7 @@
     state = next;
     render();
   });
+  watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
   document.addEventListener('yt-navigate-finish', mount);
   setInterval(mount, 500);
   mount();
