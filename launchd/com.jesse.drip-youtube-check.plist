@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Weekly check of drip's YouTube selectors (bin/check-youtube). This is the repo copy. The installed one in
+     ~/Library/LaunchAgents has the real DISCORD_WEBHOOK_URL, which never goes in the repo. -->
+<dict>
+  <key>Label</key>
+  <string>com.jesse.drip-youtube-check</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/jesse/programming-projects/drip/bin/check-youtube</string>
+    <string>--post</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>1</integer>
+    <key>Hour</key>
+    <integer>7</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DISCORD_WEBHOOK_URL</key>
+    <string></string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/jesse/Library/Logs/drip-youtube-check.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/jesse/Library/Logs/drip-youtube-check.log</string>
+</dict>
+</plist>
