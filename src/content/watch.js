@@ -94,7 +94,12 @@
     function attempt() {
       if (locked && !inGrace()) return stop();
       const currentId = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
-      if (disconnected || currentId !== id || performance.now() >= deadline) return stop();
+      if (disconnected || currentId !== id) return stop();
+      if (performance.now() >= deadline) {
+        // Once it has clicked, giving up is final. Otherwise every state update during playback would start a new loop.
+        if (clickedAt > -Infinity) theaterHandled.add(id);
+        return stop();
+      }
       const page = document.querySelector(SEL.watchPage);
       const button = /** @type {HTMLElement | null} */ (page?.querySelector(SEL.theaterButton));
       if (!page || !button) return;

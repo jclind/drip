@@ -427,12 +427,14 @@ test('a page already in theater mode gets no click', async () => {
   assert.ok(tab.page.hasAttribute('theater'));
 });
 
-test('a player that never takes the click is left alone after 10 seconds', async () => {
+test('a player that never takes the click is left alone after 10 seconds, even while it plays (Codex)', async () => {
   const { world, tab } = theaterSetup();
   await settle();
+  // Playback sends ticks, and each reply calls applyStatus. That must not start the clicking over.
+  await tab.video.play();
   for (let i = 0; i < 10; i++) { world.advance(1); await tab.second(); }
   const clicks = tab.theaterButton.clicks;
   assert.ok(clicks > 1 && clicks <= 8, `${clicks} clicks in 10 seconds`);
-  for (let i = 0; i < 10; i++) { world.advance(1); await tab.second(); }
+  for (let i = 0; i < 20; i++) { world.advance(1); await tab.second(); }
   assert.equal(tab.theaterButton.clicks, clicks);
 });
