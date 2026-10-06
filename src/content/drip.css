@@ -216,3 +216,26 @@
   background: var(--drip-bg);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
 }
+
+/* YouTube animates navigation with View Transitions. During one, Chrome paints snapshots of the page, and drip's
+   overlay vanished into them for about half a second (traced on the MacBook, 2026-10-06). Naming the overlay and
+   pill gives each its own layer above the snapshot, and turning off their animation keeps them still. */
+#drip-lock {
+  view-transition-name: drip-lock;
+}
+
+#drip-pill {
+  view-transition-name: drip-pill;
+}
+
+::view-transition-group(drip-lock),
+::view-transition-group(drip-pill),
+::view-transition-new(drip-lock),
+::view-transition-new(drip-pill) {
+  animation: none;
+}
+
+::view-transition-old(drip-lock),
+::view-transition-old(drip-pill) {
+  display: none;
+}
