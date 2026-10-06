@@ -69,3 +69,22 @@ ytd-search [data-drip-over],
 ytd-search ytd-continuation-item-renderer[data-drip-hold] {
   display: none !important;
 }
+
+/* Fade each page in (fade.js). Hidden instantly, shown with a slow fade. The animation is a failsafe, so the page
+   still appears after 3 seconds if fade.js doesn't run. Skipped for people who ask for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-drip-shown]) ytd-app {
+    opacity: 0;
+    transition: none;
+    animation: drip-failsafe 1ms 3s forwards;
+  }
+
+  html[data-drip-shown] ytd-app {
+    opacity: 1;
+    transition: opacity 0.8s ease-out;
+  }
+
+  @keyframes drip-failsafe {
+    to { opacity: 1; }
+  }
+}
