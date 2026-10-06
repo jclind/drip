@@ -158,7 +158,7 @@ function makeWorld() {
           world.failTicks--;
           return { ok: false, error: 'Error: write failed' };
         }
-        result = { ok: true, ...D.chargeTick(world.state, world.clock, now, msg.seconds, msg.videoId) };
+        result = { ok: true, ...D.chargeTick(world.state, world.clock, now, msg.seconds, msg.videoId, msg.ago) };
       } else if (msg.type === 'status') result = { ok: true, ...D.watchStatus(world.state, msg.videoId) };
       else if (msg.type === 'spendWatch') result = D.spendWatch(world.state);
       else result = { ok: true };
@@ -245,6 +245,18 @@ test("time played before a navigation is charged to the video it played on (find
   assert.ok(Math.abs((byVideo.aaa || 0) - 3) < 0.01, JSON.stringify(byVideo));
   assert.ok(Math.abs((byVideo.bbb || 0) - 3) < 0.01, JSON.stringify(byVideo));
   assert.ok(Math.abs(world.state.watchSecondsLeft - 897) < 0.01, `left ${world.state.watchSecondsLeft}`);
+});
+
+test('paid time held back across a navigation is charged in full, not merged with the next video (Codex)', async () => {
+  const { world, tab } = await setup();
+  await play(world, tab, 3);
+  await tab.navigate('bbb');
+  await tab.video.play();
+  await play(world, tab, 3);
+  tab.video.pause();
+  await tab.tick();
+  await tab.tick();
+  assert.ok(Math.abs(world.state.watchSecondsLeft - 894) < 0.01, `left ${world.state.watchSecondsLeft}`);
 });
 
 test('a tick the worker refuses is sent again, not lost (finding 17)', async () => {

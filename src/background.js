@@ -79,7 +79,7 @@ function handle(msg, state, now) {
     case 'removeBacklog':
       return Drip.removeBacklog(state, msg.id);
     case 'tick':
-      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, msg.videoId) };
+      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, msg.videoId, msg.ago) };
     case 'status':
       return { ok: true, ...Drip.watchStatus(state, msg.videoId) };
     case 'needThis':

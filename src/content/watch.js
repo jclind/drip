@@ -42,7 +42,7 @@
   /**
    * Played time measured but not yet charged, oldest first, one entry per video. It goes to the worker every
    * SEND_EVERY seconds, at once when it would use up the balance, and whenever playback stops or the video changes.
-   * @type {{id: string, seconds: number}[]}
+   * @type {{id: string, seconds: number, endedAt: number}[]}
    */
   const unsent = [];
   const SEND_EVERY = 5;
@@ -171,9 +171,12 @@
   function bank() {
     const seconds = takePlayed();
     if (seconds <= 0 || !runId) return;
+    const endedAt = performance.now();
     const last = unsent[unsent.length - 1];
-    if (last && last.id === runId) last.seconds += seconds;
-    else unsent.push({ id: runId, seconds });
+    if (last && last.id === runId) {
+      last.seconds += seconds;
+      last.endedAt = endedAt;
+    } else unsent.push({ id: runId, seconds, endedAt });
   }
 
   /** Seconds played since the last call. */
@@ -304,7 +307,7 @@
     const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && playing), startedAt: performance.now() };
     pendingTick = request;
     try {
-      const res = await send({ type: 'tick', seconds, videoId: id });
+      const res = await send({ type: 'tick', seconds, videoId: id, ago: Math.round(performance.now() - entry.endedAt) });
       if (res && res.ok && !disconnected) {
         entry.seconds -= seconds;
         if (entry.seconds <= 0.001 && unsent[0] === entry) unsent.shift();

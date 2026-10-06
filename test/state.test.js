@@ -537,3 +537,14 @@ test('hydrate drops malformed backlog entries and bad numbers from storage', () 
   assert.deepEqual(state.seen, ['a']);
   assert.deepEqual(state.unlocked, ['b']);
 });
+
+test('chargeTick places held-back time where it was played, so it does not overlap newer time', () => {
+  const state = fresh();
+  state.watchSecondsLeft = 100;
+  const clock = { lastChargeEnd: 0 };
+  const now = time(5, 12);
+  D.chargeTick(state, clock, now, 3, 'b', 0);
+  D.chargeTick(state, clock, now, 3, 'a', 3000);
+  assert.equal(state.watchSecondsLeft, 94);
+  assert.equal(clock.lastChargeEnd, now);
+});

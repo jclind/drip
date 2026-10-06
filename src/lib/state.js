@@ -242,14 +242,21 @@
    * @param {number} now
    * @param {number} seconds
    * @param {string} videoId
+   * @param {number} [agoMs] How long before now the playback ended. A tab sends time it held back, for a video it
+   *   already left, after newer playback, so the intervals mustn't be assumed to end now.
    */
-  function chargeTick(state, clock, now, seconds, videoId) {
+  function chargeTick(state, clock, now, seconds, videoId, agoMs = 0) {
+    const ago = Math.min(Math.max(Number(agoMs) || 0, 0), 3600000);
+    now -= ago;
     seconds = Math.min(Math.max(Number(seconds) || 0, 0), 3600);
     if (seconds === 0) return watchStatus(state, videoId);
     if (state.unlocked.includes(videoId)) {
       logDay(state).watchedSec += seconds;
       return watchStatus(state, videoId);
     }
+    // Held-back time that ended before the marker arrived late, after newer time. Charge it in full and leave the
+    // marker where it is.
+    if (ago > 0 && clock.lastChargeEnd > now) return charge(state, seconds, videoId);
     if (clock.lastChargeEnd > now) clock.lastChargeEnd = 0;
     const start = Math.max(clock.lastChargeEnd, now - seconds * 1000);
     clock.lastChargeEnd = Math.max(clock.lastChargeEnd, now);

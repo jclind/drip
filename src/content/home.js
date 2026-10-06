@@ -310,10 +310,10 @@
   function render() {
     const root = document.getElementById('drip-home');
     if (!root) return;
-    const key = JSON.stringify(state && [
+    const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.tokens, state.current, state.backlog,
       state.settings.feedSource, state.settings.minutesPerToken, state.settings.resetHour,
-    ].concat([message, revealing, disconnected]));
+    ], message, revealing, disconnected]);
     if (root.firstChild && key === rendered) return;
     rendered = key;
     root.replaceChildren(view());
