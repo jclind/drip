@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send: sendMessage, h, onState, hourLabel, pausePlayer } = /** @type {any} */ (globalThis).DripUI;
+  const { send: sendMessage, h, onState, hourLabel, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -35,6 +35,8 @@
   let graceId = '';
   let lastVideoId = '';
   let disconnected = false;
+  /** Set when watchFor gave up finding the player. Cleared once attach() finds one. */
+  let playerBroken = false;
   /** @type {{id: string, paid: boolean, startedAt: number} | null} */
   let pendingTick = null;
   /** The video the running stretch of playback belongs to. */
@@ -229,6 +231,7 @@
     }
     video = el;
     if (!video) return;
+    playerBroken = false;
     video.addEventListener('playing', onPlay);
     for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopAndBank);
     video.addEventListener('ended', onEnded);
@@ -382,7 +385,7 @@
   }
 
   function showLock() {
-    if (!state || disconnected) return;
+    if (!state || disconnected || playerBroken) return;
     const s = state.settings;
     const needLeft = Math.max(0, s.needThisPerDay - state.unlocked.length);
     const canBuy = state.tokens.watch > 0;
@@ -488,6 +491,11 @@
     if (graceId !== id) setGrace('');
     if (id !== lockVideoId) hideLock();
     refreshStatus();
+  });
+  // No player means YouTube's markup changed. drip fails open (Q25): the lock would only cover a page it can't control.
+  watchFor('player', SEL.video, (/** @type {string} */ path) => path === '/watch', () => {
+    playerBroken = true;
+    hideLock();
   });
   const tickTimer = setInterval(tick, 1000);
   const statusTimer = setInterval(() => { if (locked) refreshStatus(); }, 30000);

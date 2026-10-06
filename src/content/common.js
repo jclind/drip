@@ -81,5 +81,64 @@
     return `/watch?v=${encodeURIComponent(id)}`;
   }
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, pausePlayer };
+  // When YouTube changes its markup, drip fails open (Q25): nothing locks, and a banner says what broke.
+  const BROKEN = {
+    player: "drip can't find YouTube's video player, so it isn't counting minutes on this page.",
+    home: "drip can't find YouTube's home page, so your tokens aren't showing.",
+    grid: "drip can't read YouTube's recommendations, so Reveal can't pick a video. No token was spent.",
+    search: "drip can't find the search results, so it isn't limiting them.",
+  };
+  /** @type {Set<string>} */
+  const brokenSeen = new Set();
+
+  /**
+   * Shows the "drip is broken here" banner, once per kind of break per page load.
+   * @param {keyof typeof BROKEN} what
+   * @param {string} selector The selector that matched nothing, for the report.
+   */
+  function reportBroken(what, selector) {
+    if (brokenSeen.has(what)) return;
+    brokenSeen.add(what);
+    const details = [
+      `drip ${chrome.runtime.getManifest().version}`,
+      `broken: ${what}`,
+      `selector: ${selector}`,
+      `page: ${location.pathname}`,
+      `browser: ${navigator.userAgent}`,
+      `when: ${new Date().toISOString()}`,
+    ].join('\n');
+    const copy = h('button', { class: 'drip-btn', onclick: () => {
+      navigator.clipboard.writeText(details).then(() => { copy.textContent = 'Copied'; }, () => { copy.textContent = 'Copy failed'; });
+    } }, 'Copy details');
+    const banner = h('div', { id: 'drip-broken', class: 'drip-ui', role: 'status' },
+      h('div', {}, BROKEN[what], ' YouTube probably changed its page, and drip needs an update.'),
+      h('div', { class: 'drip-row' }, copy, h('button', { class: 'drip-btn', onclick: () => banner.remove() }, 'Dismiss')));
+    document.getElementById('drip-broken')?.remove();
+    document.body.append(banner);
+  }
+
+  /**
+   * Reports a break when `selector` matches nothing for 10 seconds straight on a page where it should.
+   * @param {keyof typeof BROKEN} what
+   * @param {string} selector
+   * @param {(pathname: string) => boolean} onPage
+   * @param {() => void} [onBroken] Called once when the break is reported.
+   */
+  function watchFor(what, selector, onPage, onBroken) {
+    let missingSince = 0;
+    document.addEventListener('yt-navigate-start', () => { missingSince = 0; });
+    setInterval(() => {
+      if (!onPage(location.pathname) || document.querySelector(selector)) {
+        missingSince = 0;
+        return;
+      }
+      if (!missingSince) missingSince = Date.now();
+      else if (Date.now() - missingSince >= 10000 && !brokenSeen.has(what)) {
+        reportBroken(what, selector);
+        onBroken?.();
+      }
+    }, 1000);
+  }
+
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, pausePlayer, reportBroken, watchFor };
 })();

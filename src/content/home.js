@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel, watchUrl } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, hourLabel, watchUrl, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -175,6 +175,14 @@
     }
     const pool = await readCandidates();
     message = '';
+    // No videos at all, not just none new: the grid's markup changed (Q25).
+    const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
+    if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
+      reportBroken('grid', SEL.item);
+      message = errorText('pool-empty');
+      render();
+      return;
+    }
     const res = absorb(await send({ type: 'reveal', candidates: pool }));
     if (res && !res.ok) message = errorText(res.error);
     render();
@@ -352,6 +360,7 @@
     state = next;
     render();
   });
+  watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
   document.addEventListener('yt-navigate-finish', mount);
   setInterval(mount, 500);
   mount();
