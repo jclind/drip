@@ -26,4 +26,4 @@ One recommendation at a time, paid for with tokens. A daily allowance for YouTub
 
 1. Bump `version` in `manifest.json` to 1.0.0.
 2. `bin/build-release`, then load `dist/drip-1.0.0.zip` unzipped in Chrome and run `test/BROWSER.md`.
-3. Put `PRIVACY.md` at a public URL and fill in the contact email.
+3. Put `PRIVACY.md` at a public URL. The contact email is `apps@jesselind.com` (forwards to Jesse's Gmail through ImprovMX), and the developer account should use it too.

@@ -12,8 +12,8 @@ What it stores, all on your computer:
 
 What it reads: the YouTube pages you open, to replace the home page, run the watch clock, and read video titles. It runs on youtube.com only.
 
-If drip shows that it's broken, its banner can put a report together: the drip version, the page path, the part of YouTube it couldn't find, your browser version, and the time. Copy details puts that on your clipboard. Send report opens an email to CONTACT EMAIL in your own mail app with that text filled in, and nothing is sent until you send that email yourself.
+If drip shows that it's broken, its banner can put a report together: the drip version, the page path, the part of YouTube it couldn't find, your browser version, and the time. Copy details puts that on your clipboard. Send report opens an email to apps@jesselind.com in your own mail app with that text filled in, and nothing is sent until you send that email yourself.
 
 Removing drip from Chrome deletes everything it stored.
 
-Questions: CONTACT EMAIL.
+Questions: apps@jesselind.com.

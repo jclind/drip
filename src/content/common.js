@@ -91,7 +91,7 @@
   /** @type {Set<string>} */
   const brokenSeen = new Set();
   // Where "Send report" emails go (Q25). Empty hides the button. Keep it the same as the store listing's contact.
-  const REPORT_EMAIL = '';
+  const REPORT_EMAIL = 'apps@jesselind.com';
 
   /**
    * Shows the "drip is broken here" banner, once per kind of break per page load.
