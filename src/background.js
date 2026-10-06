@@ -67,6 +67,15 @@ function handle(msg, state, now) {
   }
 }
 
+// Development only: dev/reload.html on localhost asks for a reload after a code change.
+// Open YouTube tabs pause and ask for a refresh when this happens, so it can't be used to dodge the clock.
+chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === 'devReload' && sender.origin && new URL(sender.origin).hostname === 'localhost') {
+    sendResponse({ ok: true });
+    setTimeout(() => chrome.runtime.reload(), 100);
+  }
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   withState((state, now) => ({ result: handle(msg, state, now), state }))
     .then(({ result, state }) => sendResponse({ ...result, state }))

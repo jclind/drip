@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>drip dev reload</title>
+  </head>
+  <body style="font-family: system-ui, sans-serif; padding: 24px">
+    <p>Serve this folder with <code>python3 -m http.server 8077</code> from the repo root, then open
+      <code>http://localhost:8077/dev/reload.html?id=EXTENSION_ID</code>. It asks drip to reload itself, so a
+      code change goes live without a trip to chrome://extensions. Refresh YouTube tabs afterwards.</p>
+    <button id="go">Reload drip</button>
+    <pre id="out"></pre>
+    <script>
+      const id = new URLSearchParams(location.search).get('id');
+      const out = document.getElementById('out');
+      document.getElementById('go').addEventListener('click', () => {
+        if (!id || !window.chrome || !chrome.runtime) {
+          out.textContent = 'Missing ?id= or chrome.runtime is not exposed to this page.';
+          return;
+        }
+        chrome.runtime.sendMessage(id, { type: 'devReload' }, (res) => {
+          out.textContent = chrome.runtime.lastError ? 'Sent. ' + chrome.runtime.lastError.message : JSON.stringify(res);
+        });
+      });
+    </script>
+  </body>
+</html>
