@@ -1,9 +1,12 @@
 // @ts-check
 // Top-level players must go through the watch clock. Embeds on other sites stay free.
 // Shorts become ordinary watch pages, so the clock and the lock apply to them too.
-// The subscriptions, Explore, and trending feeds go to the home page, where the token page lives (decision Q16).
+// The subscriptions and Explore feeds and pages go to the home page, where the token page lives (decision Q16).
 
 (function () {
+  // Subscriptions, Explore, and its topic pages (decision Q16). The two channel ids are Shopping and Music, which YouTube
+  // links as channels (checked on the MacBook 2026-10-06). Other channel pages stay.
+  const FEEDS = /^\/(?:channel\/(?:UCkYQyvc_i9hXEo4xic9Hh2g|UC-9-kyTW8ZkZNDHQJ6FgpwQ)|feed\/(?:subscriptions|explore|trending|storefront|courses_destination|news_destination|music_destination)|gaming|shopping|podcasts|playables|hype|courses|learning|fashion|news|sports|music|live)\/?$/;
   if (window.top !== window) return;
   const url = new URL(location.href);
   if (url.hostname === 'm.youtube.com') {
@@ -24,24 +27,36 @@
     location.replace(target.href);
     return;
   }
-  redirectShort();
-  redirectFeed();
-  // Clicking a Short inside YouTube doesn't reload the page, so check after each in-page navigation too.
-  document.addEventListener('yt-navigate-finish', () => {
-    redirectShort();
-    redirectFeed();
-  });
+  redirectPath(location.pathname);
+  // Clicks inside YouTube don't reload the page. Catch the click, so the Short or feed never paints, and check
+  // after each in-page navigation too, for links that don't come from a click.
+  document.addEventListener('click', onClick, true);
+  document.addEventListener('yt-navigate-finish', () => redirectPath(location.pathname));
 
-  function redirectFeed() {
-    if (location.hostname !== 'www.youtube.com') return;
-    if (/^\/feed\/(?:subscriptions|explore|trending)\/?$/.test(location.pathname)) location.replace('https://www.youtube.com/');
+  /** Where a path should go instead, or '' to leave it alone. */
+  function redirectTarget(/** @type {string} */ pathname) {
+    const short = /^\/shorts\/([^/]+)\/?$/.exec(pathname);
+    if (short) return `https://www.youtube.com/watch?v=${encodeURIComponent(short[1])}`;
+    if (FEEDS.test(pathname)) return 'https://www.youtube.com/';
+    return '';
   }
 
-  function redirectShort() {
-    const short = /^\/shorts\/([^/]+)\/?$/.exec(location.pathname);
-    if (!short || location.hostname !== 'www.youtube.com') return;
-    const target = new URL('https://www.youtube.com/watch');
-    target.searchParams.set('v', short[1]);
-    location.replace(target.href);
+  function redirectPath(/** @type {string} */ pathname) {
+    if (location.hostname !== 'www.youtube.com') return;
+    const target = redirectTarget(pathname);
+    if (target) location.replace(target);
+  }
+
+  function onClick(/** @type {MouseEvent} */ event) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    if (!link) return;
+    const url = new URL(/** @type {HTMLAnchorElement} */ (link).href, location.href);
+    if (url.hostname !== 'www.youtube.com') return;
+    const target = redirectTarget(url.pathname);
+    if (!target) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    location.assign(target);
   }
 })();

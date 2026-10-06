@@ -48,3 +48,11 @@ ytd-guide-entry-renderer:has(a[title="Shorts"]),
 ytd-mini-guide-entry-renderer[aria-label="Shorts"] {
   display: none !important;
 }
+
+/* The sidebar's Explore section. Its pages redirect to the token page in redirect.js. Matched by its links, since the title is translated. */
+ytd-guide-section-renderer:has(a[href="/gaming"]),
+ytd-guide-section-renderer:has(a[href="/feed/trending"]),
+ytd-guide-section-renderer:has(a[href="/shopping"]),
+ytd-guide-section-renderer:has(a[href^="/feed/storefront"]) {
+  display: none !important;
+}
