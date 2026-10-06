@@ -4,8 +4,9 @@
 // The subscriptions and Explore feeds and pages go to the home page, where the token page lives (decision Q16).
 
 (function () {
-  // Subscriptions, Explore, and its topic pages (decision Q16). Channel pages stay.
-  const FEEDS = /^\/(?:feed\/(?:subscriptions|explore|trending|storefront|courses_destination|news_destination|music_destination)|gaming|shopping|podcasts|playables|hype|courses|learning|fashion|news|sports|music|live)\/?$/;
+  // Subscriptions, Explore, and its topic pages (decision Q16). The two channel ids are Shopping and Music, which YouTube
+  // links as channels (checked on the MacBook 2026-10-06). Other channel pages stay.
+  const FEEDS = /^\/(?:channel\/(?:UCkYQyvc_i9hXEo4xic9Hh2g|UC-9-kyTW8ZkZNDHQJ6FgpwQ)|feed\/(?:subscriptions|explore|trending|storefront|courses_destination|news_destination|music_destination)|gaming|shopping|podcasts|playables|hype|courses|learning|fashion|news|sports|music|live)\/?$/;
   if (window.top !== window) return;
   const url = new URL(location.href);
   if (url.hostname === 'm.youtube.com') {
