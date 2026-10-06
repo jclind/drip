@@ -69,11 +69,24 @@ function handle(msg, state, now) {
 
 // Development only: dev/reload.html on localhost asks for a reload after a code change.
 // Open YouTube tabs pause and ask for a refresh when this happens, so it can't be used to dodge the clock.
-// It can also read state and change settings, which go through the same next-day rule, so nothing loosens early.
-// 'tick' only ever drains minutes.
+// It can also read state, change settings, and send ticks. A fake tick can hide real playback and a reload can drop
+// an unsent tick, so the route only works in a checkout that has the gitignored file dev/ENABLED. Real installs don't.
 const DEV_TYPES = ['get', 'updateSettings', 'tick'];
+const devEnabled = fetch(chrome.runtime.getURL('dev/ENABLED')).then((r) => r.ok).catch(() => false);
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   if (!msg || !sender.origin || new URL(sender.origin).hostname !== 'localhost') return;
+  devEnabled.then((on) => {
+    if (on) handleDev(msg, sendResponse);
+    else sendResponse({ ok: false, error: 'dev-off' });
+  });
+  return true;
+});
+
+/**
+ * @param {any} msg
+ * @param {(res: any) => void} sendResponse
+ */
+function handleDev(msg, sendResponse) {
   if (msg.type === 'devReload') {
     sendResponse({ ok: true });
     setTimeout(() => chrome.runtime.reload(), 100);
@@ -81,9 +94,10 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
     withState((state, now) => ({ result: handle(msg, state, now), state }))
       .then(({ result, state }) => sendResponse({ ...result, state }))
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
-    return true;
+  } else {
+    sendResponse({ ok: false, error: 'unknown-message' });
   }
-});
+}
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   withState((state, now) => ({ result: handle(msg, state, now), state }))
