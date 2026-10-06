@@ -149,6 +149,8 @@
   }
 
   let revealing = false;
+  /** A source change still saving. Reveal waits for it, so it reads the feed that was just picked. */
+  let sourceSaving = Promise.resolve();
 
   async function onReveal() {
     if (revealing) return;
@@ -163,6 +165,7 @@
   }
 
   async function reveal() {
+    await sourceSaving;
     message = '';
     if (state && state.settings.feedSource === 'subscriptions') {
       message = 'Checking your subscriptions…';
@@ -179,7 +182,8 @@
   async function onSource(source) {
     if (revealing || !state || state.settings.feedSource === source) return;
     message = '';
-    absorb(await send({ type: 'updateSettings', changes: { feedSource: source } }));
+    sourceSaving = send({ type: 'updateSettings', changes: { feedSource: source } }).then(absorb);
+    await sourceSaving;
     render();
   }
 
