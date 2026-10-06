@@ -28,9 +28,12 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. |
 | Q19 | Background audio counts like any watching. `music.youtube.com` is out of scope. |
 | Q20 | "I need this one" on the overlay: typed reason, unlocks that one video for the day without draining minutes, 2 per day, every use logged. |
-| Q21 | Log per day: seconds watched, tokens spent, reveals saved or passed, "I need this" reasons. Keep 90 days. Show today plus 7 days. |
+| Q21 | Log per day: seconds watched, tokens spent, reveals saved or passed, "I need this" reasons. Keep 90 days. Show today plus the 7 days before it, 8 rows, so today sits next to the same weekday last week (Claude's pick, Jesse deferred, 2026-10-06). |
 | Q22 | Popup shows balances and minutes left, plus a Settings link. No spend buttons. |
 | Q23 | v1 is the core loop. The rest of the blocking is step 2. |
+| Q24 | 1.0 is a build that works for a stranger installing it from the Chrome Web Store. Visual design comes after, with Jesse. `RELEASE-PLAN.md` has the steps (Jesse, 2026-10-06). |
+| Q25 | When YouTube's markup changes and drip can't find the player or the home grid, it fails open: videos play without the clock. drip tells the user it's broken and offers to send a report, which the user sees and confirms first. A check on air finds the break on its own too (Jesse, 2026-10-06). |
+| Q26 | Finishing a video that's in the backlog removes it from the backlog. Each new video opens in theater mode. Kept as they are for now (Jesse, 2026-10-06). |
 
 ## v1 and step 2 (both done)
 
