@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <!-- Weekly check of drip's YouTube selectors (bin/check-youtube). This is the repo copy. The installed one in
-     ~/Library/LaunchAgents has the real DISCORD_WEBHOOK_URL, which never goes in the repo. -->
+     ~/Library/LaunchAgents has the real DISCORD_WEBHOOK_URL, which never goes in the repo, and the Discord user id a
+     failure pings. -->
 <dict>
   <key>Label</key>
   <string>com.jesse.drip-youtube-check</string>
@@ -24,6 +25,8 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>DISCORD_WEBHOOK_URL</key>
+    <string></string>
+    <key>DISCORD_MENTION_USER_ID</key>
     <string></string>
   </dict>
   <key>StandardOutPath</key>
