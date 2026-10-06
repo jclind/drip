@@ -27,6 +27,15 @@ ytd-watch-flexy ytd-watch-next-secondary-results-renderer,
   display: none !important;
 }
 
+/* Comments stay hidden until "Show comments" (comments.js) sets the attribute, for that video only. The panel is
+   where they open in fullscreen and narrow windows. The quick action is the player's fullscreen Comments button,
+   matched by its English label (checked 2026-10-06). */
+html:not([data-drip-comments-shown]) ytd-watch-flexy #below ytd-comments#comments,
+html:not([data-drip-comments-shown]) ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-comments-section"],
+html:not([data-drip-comments-shown]) .ytp-fullscreen-quick-actions toggle-button-view-model:has(button[aria-label="Comments"]) {
+  display: none !important;
+}
+
 /* The miniplayer keeps a video going while you browse. watch.js pauses it when it opens. */
 ytd-miniplayer,
 .ytdMiniplayerComponentHost {

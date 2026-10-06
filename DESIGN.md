@@ -23,7 +23,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q13 | The reveal card offers Watch, Save, Pass. Pass is free and final. |
 | Q14 | Backlog videos cost no rec token. Save button on watch pages and search results. Backlog is a text list (title, channel, length), no thumbnails. |
 | Q15 | Search: remove injected shelves, stop at 10 results, free "more" button. |
-| Q16 | Replace subscriptions and Explore with the token page. Channel pages, comments, and the bell stay as they are. |
+| Q16 | Replace subscriptions and Explore with the token page. Channel pages and the bell stay as they are. Watch page comments are hidden behind a "Show comments" button that lasts for that video (Jesse, 2026-10-06). |
 | Q17 | Name: `drip` (tentative). |
 | Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. |
 | Q19 | Background audio counts like any watching. `music.youtube.com` is out of scope. |
@@ -44,7 +44,7 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 - `src/lib/state.js` holds all the rules as pure functions over a plain state object. It's a classic script that sets `globalThis.Drip`, so the service worker (`importScripts`), extension pages (`<script>`), content scripts (manifest list), and Node tests (`require`) all load the same file.
 - `src/background.js` is the only writer. Everything else sends it a message. It runs messages one at a time through a promise queue, so two tabs can't overwrite each other.
 - Every message starts with `rollDay(state, now)`, so the day resets lazily. A laptop asleep at 4am still resets correctly on the next read.
-- `src/content/` replaces the home page and runs the watch clock. `src/popup/` and `src/options/` are extension pages.
+- `src/content/` replaces the home page and runs the watch clock. `comments.js` adds the "Show comments" button, and the CSS that hides comments is in `early.css`. `src/popup/` and `src/options/` are extension pages.
 
 ### Feed source
 

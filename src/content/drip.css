@@ -278,6 +278,10 @@
   margin-top: 8px;
 }
 
+#drip-show-comments {
+  margin: 24px 0;
+}
+
 #drip-more {
   text-align: center;
   padding: 24px 0 48px;
