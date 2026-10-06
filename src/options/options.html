@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>drip settings</title>
+    <link rel="stylesheet" href="../pages.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>drip</h1>
+      <p class="muted">
+        Changes that make limits stricter apply now. Changes that loosen them wait for the next day reset.
+      </p>
+
+      <section>
+        <h2>Settings</h2>
+        <form id="settings"></form>
+        <div class="row">
+          <button class="primary" id="save" type="button">Save</button>
+          <span class="muted" id="result" role="status"></span>
+        </div>
+        <div id="pending"></div>
+      </section>
+
+      <section>
+        <h2>Last 7 days</h2>
+        <div id="log"></div>
+      </section>
+
+      <footer>
+        <button class="link" id="reload" type="button">Reload extension</button>
+        <span class="muted">for development, after a code change</span>
+      </footer>
+    </main>
+    <script src="../lib/state.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

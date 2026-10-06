@@ -1,0 +1,72 @@
+/* Shared by the popup and the settings page. */
+
+:root {
+  --text: #0f0f0f;
+  --muted: #606060;
+  --bg: #ffffff;
+  --chip: rgba(0, 0, 0, 0.05);
+  --chip-hover: rgba(0, 0, 0, 0.1);
+  --line: rgba(0, 0, 0, 0.1);
+  --note: #8a5a00;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #f1f1f1;
+    --muted: #aaaaaa;
+    --bg: #0f0f0f;
+    --chip: rgba(255, 255, 255, 0.1);
+    --chip-hover: rgba(255, 255, 255, 0.2);
+    --line: rgba(255, 255, 255, 0.15);
+    --note: #f0b54a;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: "Roboto", "Arial", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.note {
+  color: var(--note);
+  font-size: 13px;
+}
+
+button {
+  font: inherit;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--chip);
+  border: 0;
+  border-radius: 18px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--chip-hover);
+}
+
+button.primary,
+button.primary:hover {
+  color: var(--bg);
+  background: var(--text);
+}
+
+button.link {
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: underline;
+}

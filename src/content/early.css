@@ -1,0 +1,19 @@
+/* Loaded at document_start so the home grid never paints. home.js still reads it. */
+
+/* The grid stays in the DOM, parked off screen, so YouTube keeps filling it. */
+ytd-browse[page-subtype="home"] ytd-rich-grid-renderer {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 1280px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+
+ytd-browse[page-subtype="home"] #chips-wrapper,
+ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer {
+  display: none !important;
+}

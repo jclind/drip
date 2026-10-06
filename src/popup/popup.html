@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>drip</title>
+    <link rel="stylesheet" href="../pages.css" />
+    <style>
+      body {
+        width: 240px;
+        padding: 16px;
+      }
+      .time {
+        font-size: 24px;
+        font-weight: 500;
+      }
+      .tokens {
+        margin: 2px 0 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="time" id="time">…</div>
+    <div class="muted tokens" id="tokens"></div>
+    <button class="link" id="settings">Settings</button>
+    <script src="../lib/state.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

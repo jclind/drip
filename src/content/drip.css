@@ -1,0 +1,217 @@
+/* drip's own UI on YouTube. Colors come from YouTube's theme variables, so light and dark both work. */
+
+#drip-home,
+#drip-lock,
+#drip-pill {
+  --drip-text: var(--yt-spec-text-primary, #0f0f0f);
+  --drip-muted: var(--yt-spec-text-secondary, #606060);
+  --drip-bg: var(--yt-spec-base-background, #fff);
+  --drip-chip: var(--yt-spec-badge-chip-background, rgba(0, 0, 0, 0.05));
+  --drip-chip-hover: var(--yt-spec-button-chip-background-hover, rgba(0, 0, 0, 0.1));
+  --drip-line: var(--yt-spec-10-percent-layer, rgba(0, 0, 0, 0.1));
+  font-family: "Roboto", "Arial", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--drip-text);
+}
+
+#drip-home {
+  max-width: 520px;
+  margin: 72px auto 96px;
+  padding: 0 16px;
+}
+
+.drip-balances {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.drip-time {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.drip-meta {
+  color: var(--drip-muted);
+  font-size: 13px;
+}
+
+.drip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.drip-btn {
+  font: inherit;
+  font-weight: 500;
+  color: var(--drip-text);
+  background: var(--drip-chip);
+  border: 0;
+  border-radius: 18px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.drip-btn:hover:not(:disabled) {
+  background: var(--drip-chip-hover);
+}
+
+.drip-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.drip-primary,
+.drip-primary:hover:not(:disabled) {
+  color: var(--drip-bg);
+  background: var(--drip-text);
+}
+
+.drip-message {
+  margin-top: 12px;
+  color: var(--drip-muted);
+}
+
+.drip-card {
+  margin-top: 28px;
+}
+
+.drip-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--drip-chip);
+}
+
+.drip-card-title {
+  margin: 12px 0 2px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.drip-card .drip-row {
+  margin-top: 12px;
+}
+
+.drip-backlog {
+  margin-top: 36px;
+  border-top: 1px solid var(--drip-line);
+  padding-top: 16px;
+}
+
+.drip-backlog summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.drip-backlog ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.drip-backlog li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--drip-line);
+}
+
+.drip-backlog li a {
+  color: var(--drip-text);
+  text-decoration: none;
+}
+
+.drip-backlog li a:hover {
+  text-decoration: underline;
+}
+
+.drip-backlog li .drip-meta {
+  grid-column: 1;
+}
+
+.drip-backlog .drip-x {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font: inherit;
+  font-size: 18px;
+  color: var(--drip-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.drip-empty {
+  margin-top: 8px;
+}
+
+#drip-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.drip-lock-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 400px;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--drip-bg);
+}
+
+.drip-lock-title {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.drip-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drip-reason textarea {
+  font: inherit;
+  color: var(--drip-text);
+  background: var(--drip-chip);
+  border: 1px solid var(--drip-line);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.drip-link {
+  color: var(--drip-muted);
+  font-size: 13px;
+}
+
+#drip-pill {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 22px;
+  background: var(--drip-bg);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+}

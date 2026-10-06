@@ -1,0 +1,103 @@
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0 0 4px;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 32px 0 12px;
+}
+
+form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px 16px;
+  align-items: center;
+}
+
+form label {
+  display: flex;
+  flex-direction: column;
+}
+
+input[type="number"],
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--chip);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  width: 110px;
+  box-sizing: border-box;
+}
+
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  justify-self: start;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+#pending ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+#pending li {
+  margin: 4px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  text-align: right;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+th {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.reasons {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+footer {
+  margin-top: 48px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
