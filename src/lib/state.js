@@ -209,6 +209,25 @@
     return watchStatus(state, videoId);
   }
 
+  /**
+   * Charges only paid playback not already covered by another tab.
+   * @param {State} state
+   * @param {{lastChargeEnd: number}} clock
+   * @param {number} now
+   * @param {number} seconds
+   * @param {string} videoId
+   */
+  function chargeTick(state, clock, now, seconds, videoId) {
+    seconds = Math.min(Math.max(Number(seconds) || 0, 0), 3600);
+    if (state.unlocked.includes(videoId)) {
+      logDay(state).watchedSec += seconds;
+      return watchStatus(state, videoId);
+    }
+    const start = Math.max(clock.lastChargeEnd, now - seconds * 1000);
+    clock.lastChargeEnd = Math.max(clock.lastChargeEnd, now);
+    return charge(state, Math.max(0, (now - start) / 1000), videoId);
+  }
+
   /** @param {State} state @param {string} videoId */
   function watchStatus(state, videoId) {
     const unlocked = state.unlocked.includes(videoId);
@@ -297,7 +316,7 @@
   globalThis.Drip = {
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, addBacklog,
-    removeBacklog, charge, watchStatus, needThis, cleanSettings,
+    removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, formatMinutes,
   };
 })();

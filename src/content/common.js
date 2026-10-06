@@ -6,15 +6,16 @@
   const Drip = /** @type {any} */ (globalThis).Drip;
 
   /**
-   * Sends a message to the service worker. Resolves to null if the extension was reloaded under this page.
+   * Sends a message to the service worker. Reports an invalid extension context separately from other failures.
    * @param {object} msg
    * @returns {Promise<any>}
    */
   async function send(msg) {
     try {
       return await chrome.runtime.sendMessage(msg);
-    } catch {
-      return null;
+    } catch (err) {
+      const disconnected = !chrome.runtime?.id || /extension context invalidated/i.test(String(err));
+      return { ok: false, error: disconnected ? 'disconnected' : 'send-failed' };
     }
   }
 

@@ -47,7 +47,7 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 
 ### The clock with several tabs
 
-Each tab measures how long its video played since its last tick and sends that as `seconds`. The worker keeps `lastChargeEnd` in memory and charges only the part of `[now - seconds, now]` that comes after `lastChargeEnd`. Two tabs playing together still cost about one second per second, and a background tab whose timer Chrome throttled to once a minute still pays for the whole minute. A restarted worker forgets `lastChargeEnd`, which can overcharge one tick when two tabs play. That's acceptable.
+Each tab measures how long its video played since its last tick and sends that as `seconds`. The worker keeps a plain `clock = { lastChargeEnd: 0 }` in memory and calls `chargeTick(state, clock, now, seconds, videoId)`. It clamps each tick to 0..3600 seconds. Unlocked videos log their full clamped watched time without reading or changing the clock. Paid videos charge only the part of `[now - seconds * 1000, now]` after `clock.lastChargeEnd`, then advance that end to `now`, never backwards. Two paid tabs playing together still cost about one second per second, and a background tab whose timer Chrome throttled still pays for up to an hour. Unlocked playback never suppresses another tab's paid time. A restarted worker forgets the clock, which can overcharge one tick when two paid tabs play. That's acceptable.
 
 ## State API
 
@@ -96,6 +96,7 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, needThis: [{ videoId
 - `resolveCurrent(state, action)` with action `'watch'`, `'save'`, or `'pass'`. Save adds to the backlog and counts `saved`. Pass counts `passed`. All three clear `current` and return `{ ok: true, video }`. Error `'no-current'`.
 - `addBacklog(state, video)` adds the video unless its id is already there (then still `ok`). `removeBacklog(state, id)` removes it. Neither touches tokens.
 - `charge(state, seconds, videoId)` adds `seconds` to the log's `watchedSec`. Unless `videoId` is unlocked, it subtracts from `watchSecondsLeft`, never below 0. Returns `watchStatus`.
+- `chargeTick(state, clock, now, seconds, videoId)` clamps seconds to 0..3600. Unlocked videos log those seconds and return `watchStatus` without touching the clock. Otherwise it advances `clock.lastChargeEnd` to at least `now` and returns `charge` for only the interval after the previous end.
 - `watchStatus(state, videoId)` returns `{ secondsLeft, unlocked, locked }`, where `locked` means 0 seconds left and the video isn't unlocked.
 - `needThis(state, videoId, title, reason, now)` unlocks the video for today and logs the reason. Errors, in order: `'reason-required'` if the trimmed reason is under 3 characters, `'need-this-limit'` if `unlocked.length >= needThisPerDay`. Unlocking a video that's already unlocked is `ok` and doesn't count again.
 - `cleanSettings(changes)` returns only known keys with valid values. Integers get rounded and clamped to their range, `graceMode` becomes a boolean, `feedSource` must be one of the two values or is dropped.

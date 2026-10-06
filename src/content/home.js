@@ -25,6 +25,7 @@
   let state = null;
   let backlogOpen = false;
   let message = '';
+  let disconnected = false;
 
   /**
    * @param {Element} root
@@ -73,6 +74,7 @@
 
   /** @param {any} res */
   function absorb(res) {
+    if (res && res.error === 'disconnected') disconnected = true;
     if (res && res.state) state = res.state;
     return res;
   }
@@ -173,6 +175,7 @@
   }
 
   function view() {
+    if (disconnected) return h('div', { class: 'drip-message' }, 'drip was updated. Refresh this page.');
     if (!state) return h('div', { class: 'drip-meta' }, 'Loading…');
     const s = state.settings;
     return h(

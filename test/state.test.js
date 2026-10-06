@@ -22,7 +22,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'addBacklog',
-    'removeBacklog', 'charge', 'watchStatus', 'needThis', 'cleanSettings',
+    'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'formatMinutes',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
@@ -409,4 +409,74 @@ test('formatMinutes displays zero, sub-minute time, and whole minutes rounded do
   assert.equal(D.formatMinutes(30), 'under 1 min');
   assert.equal(D.formatMinutes(60), '1 min');
   assert.equal(D.formatMinutes(2550), '42 min');
+});
+
+
+test('chargeTick merges paid tabs ticking half a second apart', () => {
+  const state = fresh();
+  state.watchSecondsLeft = 100;
+  const clock = { lastChargeEnd: time(5) };
+  for (let i = 1; i <= 10; i++) {
+    D.chargeTick(state, clock, time(5) + i * 1000, 1, 'a');
+    D.chargeTick(state, clock, time(5) + i * 1000 + 500, 1, 'b');
+  }
+  assert.equal(state.watchSecondsLeft, 89.5);
+  assert.equal(D.logDay(state).watchedSec, 10.5);
+  assert.equal(clock.lastChargeEnd, time(5) + 10500);
+});
+
+for (const order of [['free', 'paid'], ['paid', 'free']]) {
+  test(`chargeTick charges paid playback in full with order ${order.join(' then ')}`, () => {
+    const state = fresh();
+    state.unlocked.push('free');
+    state.watchSecondsLeft = 100;
+    const clock = { lastChargeEnd: time(5) - 10000 };
+    for (const id of order) D.chargeTick(state, clock, time(5), 10, id);
+    assert.equal(state.watchSecondsLeft, 90);
+    assert.equal(D.logDay(state).watchedSec, 20);
+    assert.equal(clock.lastChargeEnd, time(5));
+  });
+}
+
+test('chargeTick never reads or changes the clock for unlocked videos', () => {
+  const state = fresh();
+  state.unlocked.push('free');
+  const clock = {
+    get lastChargeEnd() { throw new Error('Clock was read'); },
+    set lastChargeEnd(value) { throw new Error('Clock was written'); },
+  };
+  assert.deepEqual(D.chargeTick(state, clock, time(5), 10, 'free'), { secondsLeft: 0, unlocked: true, locked: false });
+  assert.equal(D.logDay(state).watchedSec, 10);
+});
+
+test('chargeTick charges a throttled 180-second tick in full', () => {
+  const state = fresh();
+  state.watchSecondsLeft = 900;
+  const clock = { lastChargeEnd: 0 };
+  assert.deepEqual(D.chargeTick(state, clock, time(5), 180, 'a'), { secondsLeft: 720, unlocked: false, locked: false });
+  assert.equal(D.logDay(state).watchedSec, 180);
+});
+
+test('chargeTick clamps to 3600 seconds and ignores negative seconds', () => {
+  for (const id of ['paid', 'free']) {
+    const state = fresh();
+    state.unlocked.push('free');
+    state.watchSecondsLeft = 5000;
+    const clock = { lastChargeEnd: 0 };
+    D.chargeTick(state, clock, time(5), 7200, id);
+    assert.equal(state.watchSecondsLeft, id === 'paid' ? 1400 : 5000);
+    assert.equal(D.logDay(state).watchedSec, 3600);
+    D.chargeTick(state, clock, time(5) + 1000, -10, id);
+    assert.equal(D.logDay(state).watchedSec, 3600);
+  }
+});
+
+test('chargeTick never moves the paid clock backwards', () => {
+  const state = fresh();
+  state.watchSecondsLeft = 100;
+  const clock = { lastChargeEnd: time(5) + 1000 };
+  D.chargeTick(state, clock, time(5), 10, 'paid');
+  assert.equal(clock.lastChargeEnd, time(5) + 1000);
+  assert.equal(state.watchSecondsLeft, 100);
+  assert.equal(D.logDay(state).watchedSec, 0);
 });

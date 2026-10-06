@@ -5,11 +5,12 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel } = /** @type {any} */ (globalThis).DripUI;
+  const { send: sendMessage, h, onState, hourLabel } = /** @type {any} */ (globalThis).DripUI;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
     video: '#movie_player video.html5-main-video',
+    ads: '#movie_player.ad-showing, #movie_player.ad-interrupting',
     app: 'ytd-app',
     miniplayerAttr: 'miniplayer-is-active',
     title: 'ytd-watch-metadata h1, h1.ytd-watch-metadata',
@@ -25,16 +26,52 @@
   let locked = false;
   /** Video allowed to finish after time ran out, when grace mode is on. */
   let graceId = '';
+  let lastVideoId = '';
+  let disconnected = false;
+  /** @type {{id: string, paid: boolean} | null} */
+  let pendingTick = null;
+
+  function miniplayerActive() {
+    const app = document.querySelector(SEL.app);
+    return !!(app && app.hasAttribute(SEL.miniplayerAttr));
+  }
 
   function videoId() {
-    if (location.pathname !== '/watch') return '';
-    return new URLSearchParams(location.search).get('v') || '';
+    const id = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
+    if (id) lastVideoId = id;
+    return id || (miniplayerActive() ? lastVideoId : '');
   }
 
   /** The clock runs on watch pages and in the miniplayer. */
   function clockActive() {
-    const app = document.querySelector(SEL.app);
-    return location.pathname === '/watch' || !!(app && app.hasAttribute(SEL.miniplayerAttr));
+    return location.pathname === '/watch' || miniplayerActive();
+  }
+
+  function inGrace() {
+    return !!graceId && graceId === videoId();
+  }
+
+  /** @param {object} msg */
+  async function send(msg) {
+    if (disconnected) return { ok: false, error: 'disconnected' };
+    const res = await sendMessage(msg);
+    if (res && res.error === 'disconnected') {
+      disconnected = true;
+      graceId = '';
+      stopRun();
+      video?.pause();
+      clearInterval(tickTimer);
+      clearInterval(statusTimer);
+      showDisconnected();
+    }
+    return res;
+  }
+
+  function showDisconnected() {
+    const panel = h('div', { class: 'drip-lock-panel' }, 'drip was updated. Refresh this page.');
+    const existing = document.getElementById('drip-lock');
+    if (existing) existing.replaceChildren(panel);
+    else document.body.append(h('div', { id: 'drip-lock' }, panel));
   }
 
   function startRun() {
@@ -61,15 +98,17 @@
   }
 
   function onPlay() {
-    if (locked && graceId !== videoId()) {
+    if (disconnected || (locked && !inGrace())) {
       video?.pause();
-      showLock();
+      if (disconnected) showDisconnected();
+      else showLock();
       return;
     }
     startRun();
   }
 
   function onEnded() {
+    if (document.querySelector(SEL.ads)) return;
     stopRun();
     const id = videoId();
     if (id && state && state.backlog.some((/** @type {any} */ v) => v.id === id)) send({ type: 'removeBacklog', id });
@@ -94,50 +133,65 @@
     video.addEventListener('playing', onPlay);
     for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopRun);
     video.addEventListener('ended', onEnded);
-    if (!video.paused) startRun();
+    if (!video.paused) onPlay();
   }
 
-  /** @param {any} status */
-  function applyStatus(status) {
+  /** @param {any} status @param {boolean} [deferLock] */
+  function applyStatus(status, deferLock = false) {
+    if (disconnected) return;
     const id = videoId();
-    const wasLocked = locked;
+    if (state && state.settings.graceMode === false) graceId = '';
     locked = !!status.locked;
     if (!locked) {
       graceId = '';
       hideLock();
       return;
     }
-    if (!wasLocked && state && state.settings.graceMode && video && !video.paused && id) graceId = id;
-    if (graceId && graceId === id) return;
+    if (inGrace()) return;
+    // Storage may arrive before our tick response. Only that response can grant grace.
+    if (deferLock && state.settings.graceMode) return;
     if (video && !video.paused) video.pause();
     if (clockActive() && id) showLock();
   }
 
   async function tick() {
+    if (disconnected || pendingTick) return;
     attach();
     const id = videoId();
-    if (!clockActive()) {
+    if (!clockActive() || !id) {
       takePlayed();
       hideLock();
       return;
     }
     const seconds = takePlayed();
     if (seconds > 0) {
-      const res = await send({ type: 'tick', seconds, videoId: id });
-      if (res && res.ok) {
-        state = res.state;
-        applyStatus(res);
+      const before = state && Drip.watchStatus(state, id);
+      const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && video && !video.paused) };
+      pendingTick = request;
+      try {
+        const res = await send({ type: 'tick', seconds, videoId: id });
+        if (res && res.ok && !disconnected) {
+          state = res.state;
+          if (id === videoId()) {
+            if (request.paid && res.locked && state.settings.graceMode && video && !video.paused) graceId = id;
+            applyStatus(res);
+          } else applyStatus(Drip.watchStatus(state, videoId()));
+        } else if (state) applyStatus(Drip.watchStatus(state, videoId()));
+      } finally {
+        pendingTick = null;
       }
     }
-    if (locked && video && !video.paused && graceId !== id) video.pause();
+    if (locked && video && !video.paused && !inGrace()) video.pause();
     renderPill();
   }
 
   async function refreshStatus() {
-    const res = await send({ type: 'status', videoId: videoId() });
-    if (res && res.ok) {
+    if (disconnected) return;
+    const id = videoId();
+    const res = await send({ type: 'status', videoId: id });
+    if (res && res.ok && !disconnected) {
       state = res.state;
-      applyStatus(res);
+      applyStatus(Drip.watchStatus(state, videoId()));
     }
     renderPill();
   }
@@ -146,8 +200,13 @@
 
   let reasonOpen = false;
   let lockMessage = '';
+  let reasonText = '';
+  let lockView = '';
 
   function hideLock() {
+    if (disconnected) return;
+    lockView = '';
+    reasonText = '';
     document.getElementById('drip-lock')?.remove();
     reasonOpen = false;
     lockMessage = '';
@@ -155,10 +214,10 @@
 
   async function onAddTime() {
     const res = await send({ type: 'spendWatch' });
+    if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
-      locked = false;
-      hideLock();
+      applyStatus(Drip.watchStatus(state, videoId()));
       video?.play();
     } else {
       lockMessage = 'No watch tokens left.';
@@ -170,11 +229,12 @@
   async function onNeedThis(reason) {
     const id = videoId();
     const title = document.querySelector(SEL.title)?.textContent?.trim() || '';
+    if (!id) return;
     const res = await send({ type: 'needThis', videoId: id, title, reason });
+    if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
-      locked = false;
-      hideLock();
+      applyStatus(Drip.watchStatus(state, videoId()));
       video?.play();
       return;
     }
@@ -183,12 +243,22 @@
   }
 
   function showLock() {
-    if (!state) return;
+    if (!state || disconnected) return;
     const s = state.settings;
     const needLeft = Math.max(0, s.needThisPerDay - state.unlocked.length);
     const canBuy = state.tokens.watch > 0;
+    const existing = document.getElementById('drip-lock');
+    const view = JSON.stringify([videoId(), state.tokens.watch, needLeft, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage]);
+    if (existing && lockView === view) return;
+    lockView = view;
+    const active = document.activeElement;
+    const oldReason = existing?.querySelector('textarea');
+    const focused = !!oldReason && active === oldReason;
+    const selectionStart = oldReason?.selectionStart ?? 0;
+    const selectionEnd = oldReason?.selectionEnd ?? 0;
     /** @type {HTMLTextAreaElement} */
-    const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?' }));
+    const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', oninput: (/** @type {Event} */ e) => { reasonText = /** @type {HTMLTextAreaElement} */ (e.target).value; } }));
+    reason.value = reasonText;
     const panel = h(
       'div',
       { class: 'drip-lock-panel' },
@@ -196,16 +266,18 @@
       h('div', { class: 'drip-meta' }, `watch tokens ${state.tokens.watch} · unlocks left today ${needLeft}`),
       lockMessage && h('div', { class: 'drip-message' }, lockMessage),
       canBuy && h('button', { class: 'drip-btn drip-primary', onclick: onAddTime }, `Add ${s.minutesPerToken} min · 1 watch`),
-      needLeft > 0 && !reasonOpen && h('button', { class: 'drip-btn', onclick: () => { reasonOpen = true; showLock(); } }, 'I need this one'),
+      needLeft > 0 && !reasonOpen && h('button', { class: 'drip-btn', onclick: () => { reasonOpen = true; showLock(); document.querySelector('#drip-lock textarea')?.focus(); } }, 'I need this one'),
       needLeft > 0 && reasonOpen && h('div', { class: 'drip-reason' }, reason,
         h('button', { class: 'drip-btn drip-primary', onclick: () => onNeedThis(reason.value) }, 'Unlock this video')),
       !canBuy && needLeft === 0 && h('div', { class: 'drip-meta' }, `Done for today. Tokens come back at ${hourLabel(s.resetHour)}.`),
       h('a', { class: 'drip-link', href: '/' }, 'Back to drip home'),
     );
-    const existing = document.getElementById('drip-lock');
     if (existing) existing.replaceChildren(panel);
     else document.body.append(h('div', { id: 'drip-lock' }, panel));
-    if (reasonOpen) reason.focus();
+    if (focused && reasonOpen && needLeft > 0) {
+      reason.focus();
+      reason.setSelectionRange(selectionStart, selectionEnd);
+    }
   }
 
   // The pill with minutes left and the Save button.
@@ -217,7 +289,10 @@
     const secs = video && Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
     const length = secs ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '';
     const res = await send({ type: 'addBacklog', video: { id, title, channel, length } });
-    if (res && res.ok) state = res.state;
+    if (res && res.ok && !disconnected) {
+      state = res.state;
+      applyStatus(Drip.watchStatus(state, videoId()));
+    }
     renderPill();
   }
 
@@ -243,14 +318,20 @@
   }
 
   onState((next) => {
+    if (disconnected) return;
     state = next;
+    const id = videoId();
+    applyStatus(Drip.watchStatus(state, id), !!(pendingTick && pendingTick.id === id && pendingTick.paid));
     renderPill();
   });
   document.addEventListener('yt-navigate-finish', () => {
-    graceId = '';
+    if (disconnected) return;
+    const id = videoId();
+    if (graceId !== id) graceId = '';
     hideLock();
     refreshStatus();
   });
-  setInterval(tick, 1000);
+  const tickTimer = setInterval(tick, 1000);
+  const statusTimer = setInterval(() => { if (locked) refreshStatus(); }, 30000);
   refreshStatus();
 })();

@@ -24,6 +24,8 @@ const FIELDS = [
 
 /** @type {any} */
 let state = null;
+/** @type {Record<string, string | boolean>} */
+const renderedValues = {};
 
 /** @param {string} id */
 function $(id) {
@@ -74,6 +76,8 @@ function renderForm() {
       else if (f.type === 'select')
         input = h('select', { id: f.key }, ...(f.options || []).map(([v, label]) => h('option', { value: v, selected: v === value }, label)));
       else input = h('input', { type: 'number', id: f.key, min: f.min, max: f.max, step: 1, value });
+      const control = /** @type {HTMLInputElement} */ (input);
+      renderedValues[f.key] = f.type === 'checkbox' ? control.checked : control.value;
       return [h('label', { for: f.key }, f.label, h('span', { class: 'muted' }, f.hint)), input];
     }),
   );
@@ -147,9 +151,15 @@ async function save() {
   const changes = {};
   for (const f of FIELDS) {
     const el = /** @type {HTMLInputElement} */ ($(f.key));
+    const value = f.type === 'checkbox' ? el.checked : el.value;
+    if (value === renderedValues[f.key]) continue;
     if (f.type === 'checkbox') changes[f.key] = el.checked;
     else if (f.type === 'select') changes[f.key] = el.value;
     else if (el.value !== '') changes[f.key] = Number(el.value);
+  }
+  if (Object.keys(changes).length === 0) {
+    $('result').textContent = 'Nothing changed.';
+    return;
   }
   const res = absorb(await chrome.runtime.sendMessage({ type: 'updateSettings', changes }));
   const applied = res && res.applied ? Object.keys(res.applied).length : 0;
@@ -166,7 +176,6 @@ async function cancel(key) {
 }
 
 $('save').addEventListener('click', save);
-$('reload').addEventListener('click', () => chrome.runtime.reload());
 
 chrome.runtime.sendMessage({ type: 'get' }).then((res) => {
   absorb(res);

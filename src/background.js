@@ -8,7 +8,7 @@ const Drip = /** @type {any} */ (globalThis).Drip;
 const KEY = 'drip';
 
 /** End of the last stretch of watching we charged for, in ms. See DESIGN.md, "The clock with several tabs". */
-let lastChargeEnd = 0;
+const clock = { lastChargeEnd: 0 };
 
 /** @type {Promise<unknown>} */
 let queue = Promise.resolve();
@@ -52,13 +52,8 @@ function handle(msg, state, now) {
       return Drip.addBacklog(state, msg.video);
     case 'removeBacklog':
       return Drip.removeBacklog(state, msg.id);
-    case 'tick': {
-      const seconds = Math.min(Math.max(Number(msg.seconds) || 0, 0), 65);
-      const start = Math.max(lastChargeEnd, now - seconds * 1000);
-      lastChargeEnd = Math.max(lastChargeEnd, now);
-      const owed = Math.max(0, (now - start) / 1000);
-      return { ok: true, ...Drip.charge(state, owed, msg.videoId) };
-    }
+    case 'tick':
+      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, msg.videoId) };
     case 'status':
       return { ok: true, ...Drip.watchStatus(state, msg.videoId) };
     case 'needThis':
