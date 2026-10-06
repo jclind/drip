@@ -6,7 +6,8 @@
 // can't drift from the code. No dependencies: Chrome DevTools Protocol over Node's built-in WebSocket.
 //
 // Usage: bin/check-youtube           prints what it found, exits 1 if anything is missing
-//        bin/check-youtube --post    also posts a failure to DISCORD_WEBHOOK_URL, if set
+//        bin/check-youtube --post    also posts to DISCORD_WEBHOOK_URL, if set: the failure, or one line when all is
+//                                    well, so a week with no post means the check itself stopped running
 
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
@@ -146,14 +147,16 @@ async function main() {
   console.log(`${when} ${failures.length ? 'FAIL' : 'ok'}\n${lines.join('\n')}`);
   if (failures.length) {
     console.log(failures.join('\n'));
-    const webhook = process.env.DISCORD_WEBHOOK_URL;
-    if (post && webhook) {
-      const content = `**drip**: YouTube changed something drip depends on.\n${failures.map((f) => `- ${f}`).join('\n')}\nSelectors are at the top of each file in \`src/content/\`.`;
-      const res = await fetch(webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content.slice(0, 1900) }) });
-      console.log(res.ok ? 'posted to Discord' : `Discord post failed: ${res.status}`);
-    } else if (post) console.log('DISCORD_WEBHOOK_URL unset, not posted');
     process.exitCode = 1;
   }
+  const webhook = process.env.DISCORD_WEBHOOK_URL;
+  if (post && webhook) {
+    const content = failures.length
+      ? `**drip**: YouTube changed something drip depends on.\n${failures.map((f) => `- ${f}`).join('\n')}\nSelectors are at the top of each file in \`src/content/\`.`
+      : 'drip weekly check: ok (watch, search, home).';
+    const res = await fetch(webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content.slice(0, 1900) }) });
+    console.log(res.ok ? 'posted to Discord' : `Discord post failed: ${res.status}`);
+  } else if (post) console.log('DISCORD_WEBHOOK_URL unset, not posted');
 }
 
 /** @param {number} ms */
