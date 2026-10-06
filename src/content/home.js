@@ -10,8 +10,9 @@
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
     homeBrowse: 'ytd-browse[page-subtype="home"]',
+    subsBrowse: 'ytd-browse[page-subtype="subscriptions"]',
     mount: 'ytd-two-column-browse-results-renderer #primary',
-    item: 'ytd-rich-item-renderer',
+    item: 'ytd-rich-item-renderer, ytd-grid-video-renderer',
     link: 'a[href*="/watch?v="]',
     title: '#video-title, h3 a, h3',
     // Late 2026 markup uses camelCase classes (checked 2026-10-05); the kebab-case ones are the older markup.
@@ -39,9 +40,13 @@
     return '';
   }
 
-  /** Videos currently in the hidden grid, minus ads, Shorts, mixes, and ones already watched. */
-  function readPool() {
-    const browse = document.querySelector(SEL.homeBrowse);
+  /**
+   * Videos currently in a feed's grid, minus ads, Shorts, mixes, and ones already watched.
+   * @param {ParentNode} root The page, or a hidden frame's document.
+   * @param {string} browseSelector
+   */
+  function readPool(root = document, browseSelector = SEL.homeBrowse) {
+    const browse = root.querySelector(browseSelector);
     if (!browse) return [];
     /** @type {{id: string, title: string, channel: string, length: string}[]} */
     const pool = [];
@@ -72,6 +77,53 @@
     return pool;
   }
 
+  /** @param {{id: string}} video Not revealed before and not in the backlog, the same test reveal() applies. */
+  function isNew(video) {
+    return !!state && !state.seen.includes(video.id) && !state.backlog.some((/** @type {any} */ v) => v.id === video.id);
+  }
+
+  /**
+   * Loads another feed in a hidden same-origin frame and reads its grid. The frame is on screen but invisible,
+   * because YouTube only fills a feed that's in view. drip's scripts don't run inside it.
+   * @param {string} path
+   * @param {string} browseSelector
+   */
+  async function readFeedInFrame(path, browseSelector, timeoutMs = 15000) {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.tabIndex = -1;
+    frame.style.cssText = 'position:fixed;left:0;top:0;width:1280px;height:900px;border:0;opacity:0;pointer-events:none;z-index:-1';
+    frame.src = path;
+    try {
+      document.body.append(frame);
+      await new Promise((resolve) => {
+        frame.addEventListener('load', resolve, { once: true });
+        setTimeout(resolve, timeoutMs);
+      });
+      const start = Date.now();
+      let pool = [];
+      while (Date.now() - start < timeoutMs) {
+        const doc = frame.contentDocument;
+        if (doc) pool = readPool(doc, browseSelector);
+        if (pool.some(isNew)) break;
+        // The first screenful can be all revealed already, so scroll to make YouTube load older videos.
+        frame.contentWindow?.scrollTo(0, doc ? doc.documentElement.scrollHeight : 0);
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      return pool;
+    } catch {
+      return [];
+    } finally {
+      frame.remove();
+    }
+  }
+
+  /** The videos the next reveal can pick from, newest first for subscriptions. */
+  function readCandidates() {
+    if (state && state.settings.feedSource === 'subscriptions') return readFeedInFrame('/feed/subscriptions', SEL.subsBrowse);
+    return waitForPool();
+  }
+
   /** @param {any} res */
   function absorb(res) {
     if (res && res.error === 'disconnected') disconnected = true;
@@ -88,15 +140,34 @@
       case 'no-watch-tokens':
         return `No watch tokens left. More at ${reset}.`;
       case 'pool-empty':
-        return "YouTube hasn't loaded anything new to show. No token spent. Try again after a refresh.";
+        return state && state.settings.feedSource === 'subscriptions'
+          ? 'Nothing new from your subscriptions. No token spent.'
+          : "YouTube hasn't loaded anything new to show. No token spent. Try again after a refresh.";
       default:
         return 'Something went wrong. Refresh and try again.';
     }
   }
 
+  let revealing = false;
+
   async function onReveal() {
+    if (revealing) return;
+    revealing = true;
+    try {
+      await reveal();
+    } finally {
+      revealing = false;
+    }
+  }
+
+  async function reveal() {
     message = '';
-    const pool = await waitForPool();
+    if (state && state.settings.feedSource === 'subscriptions') {
+      message = 'Checking your subscriptions…';
+      render();
+    }
+    const pool = await readCandidates();
+    message = '';
     const res = absorb(await send({ type: 'reveal', candidates: pool }));
     if (res && !res.ok) message = errorText(res.error);
     render();
