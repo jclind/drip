@@ -166,6 +166,9 @@
       return;
     }
     attach();
+    // drip hides the miniplayer (early.css), so a video that drops into it gets paused rather than playing unseen.
+    // The main player playing off /watch means the miniplayer, however YouTube marks it.
+    if (location.pathname !== '/watch' && video && !video.paused) video.pause();
     const id = videoId();
     if (!clockActive() || !id) {
       takePlayed();

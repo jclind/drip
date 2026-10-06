@@ -18,3 +18,17 @@ ytd-browse[page-subtype="home"] #chips-wrapper,
 ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer {
   display: none !important;
 }
+
+/* Watch-page recommendations: the sidebar, the end-screen grid, and the cards that pop up during playback. */
+ytd-watch-flexy #related,
+ytd-watch-flexy ytd-watch-next-secondary-results-renderer,
+.ytp-endscreen-content,
+.ytp-ce-element {
+  display: none !important;
+}
+
+/* The miniplayer keeps a video going while you browse. watch.js pauses it when it opens. */
+ytd-miniplayer,
+.ytdMiniplayerComponentHost {
+  display: none !important;
+}

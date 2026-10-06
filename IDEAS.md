@@ -32,3 +32,7 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - Chrome Web Store listing. Google's branding rules don't allow "YouTube" in the name.
 - A Firefox build.
 - Move to WXT for TypeScript, hot reload, a React settings page, and store zips. Do it when settings outgrow one page or publishing gets serious.
+
+## Feel
+
+- Start each YouTube page dimmed or blank and fade the content in once it has loaded, so navigation feels calm instead of choppy. Jesse has seen another extension do a slow fade from dim. Raised 2026-10-06.
