@@ -37,6 +37,16 @@
   let disconnected = false;
   /** Set when watchFor gave up finding the player. Cleared once attach() finds one. */
   let playerBroken = false;
+
+  /**
+   * Also marks <html>, so guard.js stops refusing play() on a player drip can't see (Q25).
+   * @param {boolean} broken
+   */
+  function setPlayerBroken(broken) {
+    playerBroken = broken;
+    document.documentElement.toggleAttribute('data-drip-broken', broken);
+    if (broken) hideLock();
+  }
   /** @type {{id: string, paid: boolean, startedAt: number} | null} */
   let pendingTick = null;
   /** The video the running stretch of playback belongs to. */
@@ -231,7 +241,10 @@
     }
     video = el;
     if (!video) return;
-    playerBroken = false;
+    if (playerBroken) {
+      setPlayerBroken(false);
+      refreshStatus();
+    }
     video.addEventListener('playing', onPlay);
     for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopAndBank);
     video.addEventListener('ended', onEnded);
@@ -493,10 +506,7 @@
     refreshStatus();
   });
   // No player means YouTube's markup changed. drip fails open (Q25): the lock would only cover a page it can't control.
-  watchFor('player', SEL.video, (/** @type {string} */ path) => path === '/watch', () => {
-    playerBroken = true;
-    hideLock();
-  });
+  watchFor('player', SEL.video, (/** @type {string} */ path) => path === '/watch', () => setPlayerBroken(true));
   const tickTimer = setInterval(tick, 1000);
   const statusTimer = setInterval(() => { if (locked) refreshStatus(); }, 30000);
   defaultTheater();

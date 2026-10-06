@@ -346,4 +346,21 @@ test('a watch page with no player for 10 seconds says drip is broken and locks n
   assert.ok(tab.broken());
   assert.match(tab.broken().textContent, /video player/);
   assert.equal(tab.locked(), false);
+  assert.ok(tab.root.hasAttribute('data-drip-broken'), 'guard.js lets play() through');
+});
+
+test('a player that comes back and then goes missing again drops the lock again (Codex)', async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, 'aaa');
+  tab.noPlayer = true;
+  await settle();
+  for (let i = 0; i < 11; i++) { world.advance(1); await tab.second(); }
+  tab.noPlayer = false;
+  for (let i = 0; i < 2; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.root.hasAttribute('data-drip-broken'), false);
+  assert.ok(tab.locked(), 'the lock is back with a player and 0 minutes');
+  tab.noPlayer = true;
+  for (let i = 0; i < 12; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.locked(), false);
+  assert.ok(tab.root.hasAttribute('data-drip-broken'));
 });

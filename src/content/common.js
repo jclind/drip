@@ -122,18 +122,22 @@
    * @param {keyof typeof BROKEN} what
    * @param {string} selector
    * @param {(pathname: string) => boolean} onPage
-   * @param {() => void} [onBroken] Called once when the break is reported.
+   * @param {() => void} [onBroken] Called each time the selector goes missing for 10 seconds again.
    */
   function watchFor(what, selector, onPage, onBroken) {
     let missingSince = 0;
+    // One callback per outage. The banner itself shows once per page load (reportBroken).
+    let reported = false;
     document.addEventListener('yt-navigate-start', () => { missingSince = 0; });
     setInterval(() => {
       if (!onPage(location.pathname) || document.querySelector(selector)) {
         missingSince = 0;
+        reported = false;
         return;
       }
       if (!missingSince) missingSince = Date.now();
-      else if (Date.now() - missingSince >= 10000 && !brokenSeen.has(what)) {
+      else if (Date.now() - missingSince >= 10000 && !reported) {
+        reported = true;
         reportBroken(what, selector);
         onBroken?.();
       }
