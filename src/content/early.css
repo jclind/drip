@@ -32,3 +32,11 @@ ytd-miniplayer,
 .ytdMiniplayerComponentHost {
   display: none !important;
 }
+
+/* YouTube's loading skeleton is plain HTML in the page, so it paints before the grid rule above can apply.
+   Hide the placeholder video grid on home and the placeholder recommendations on watch pages (ids checked 2026-10-06). */
+#home-container-skeleton,
+#watch-page-skeleton #upnext,
+#watch-page-skeleton #related {
+  display: none !important;
+}
