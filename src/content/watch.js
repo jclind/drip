@@ -37,6 +37,15 @@
   let disconnected = false;
   /** @type {{id: string, paid: boolean, startedAt: number} | null} */
   let pendingTick = null;
+  /** The video the running stretch of playback belongs to. */
+  let runId = '';
+  /**
+   * Played time measured but not yet charged, oldest first, one entry per video. It goes to the worker every
+   * SEND_EVERY seconds, at once when it would use up the balance, and whenever playback stops or the video changes.
+   * @type {{id: string, seconds: number}[]}
+   */
+  const unsent = [];
+  const SEND_EVERY = 5;
 
   /** @type {Set<string>} */
   const theaterHandled = new Set();
@@ -145,7 +154,10 @@
   }
 
   function startRun() {
-    if (runningSince === null) runningSince = performance.now();
+    if (runningSince === null) {
+      runningSince = performance.now();
+      runId = videoId();
+    }
   }
 
   function stopRun() {
@@ -153,6 +165,15 @@
       playedMs += performance.now() - runningSince;
       runningSince = null;
     }
+  }
+
+  /** Moves measured playback into unsent, under the video it played on. */
+  function bank() {
+    const seconds = takePlayed();
+    if (seconds <= 0 || !runId) return;
+    const last = unsent[unsent.length - 1];
+    if (last && last.id === runId) last.seconds += seconds;
+    else unsent.push({ id: runId, seconds });
   }
 
   /** Seconds played since the last call. */
@@ -167,6 +188,11 @@
     return ms / 1000;
   }
 
+  function stopAndBank() {
+    stopRun();
+    bank();
+  }
+
   function onPlay() {
     if (disconnected || (locked && !inGrace())) {
       pausePlayer(video);
@@ -179,7 +205,7 @@
 
   function onEnded() {
     if (document.querySelector(SEL.ads)) return;
-    stopRun();
+    stopAndBank();
     const id = videoId();
     if (id && state && state.backlog.some((/** @type {any} */ v) => v.id === id)) send({ type: 'removeBacklog', id });
     if (locked) {
@@ -193,15 +219,15 @@
     const el = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
     if (el === video) return;
     if (video) {
-      stopRun();
+      stopAndBank();
       video.removeEventListener('playing', onPlay);
-      for (const ev of ['pause', 'waiting', 'emptied']) video.removeEventListener(ev, stopRun);
+      for (const ev of ['pause', 'waiting', 'emptied']) video.removeEventListener(ev, stopAndBank);
       video.removeEventListener('ended', onEnded);
     }
     video = el;
     if (!video) return;
     video.addEventListener('playing', onPlay);
-    for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopRun);
+    for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopAndBank);
     video.addEventListener('ended', onEnded);
     // A video waiting on autoplay isn't paused but hasn't played anything. 'playing' fires once it really starts.
     if (!video.paused && video.readyState >= 3) onPlay();
@@ -231,6 +257,16 @@
     theaterDone();
   }
 
+  /** Whether unsent time should go to the worker now rather than wait for SEND_EVERY seconds. */
+  function sendDue() {
+    const first = unsent[0];
+    if (!first || first.seconds <= 0) return false;
+    if (unsent.length > 1 || first.id !== videoId() || !video || video.paused) return true;
+    if (first.seconds >= SEND_EVERY || !state) return true;
+    const status = Drip.watchStatus(state, first.id);
+    return !status.unlocked && status.secondsLeft - first.seconds <= 1;
+  }
+
   async function tick() {
     if (disconnected) return;
     if (pendingTick) {
@@ -245,32 +281,42 @@
     // drip hides the miniplayer (early.css), so a video that drops into it gets paused rather than playing unseen.
     // The main player playing off /watch means the miniplayer, however YouTube marks it.
     if (location.pathname !== '/watch' && video) pausePlayer(video);
-    const id = videoId();
-    if (!clockActive() || !id) {
-      takePlayed();
+    if (clockActive()) bank();
+    else takePlayed();
+    if (state && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) await refreshStatus();
+    if (sendDue()) await sendTick();
+    if (!clockActive() || !videoId()) {
       hideLock();
+      renderPill();
       return;
-    }
-    const seconds = takePlayed();
-    if (seconds > 0) {
-      const before = state && Drip.watchStatus(state, id);
-      const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && video && !video.paused), startedAt: performance.now() };
-      pendingTick = request;
-      try {
-        const res = await send({ type: 'tick', seconds, videoId: id });
-        if (res && res.ok && !disconnected) {
-          state = res.state;
-          if (id === videoId()) {
-            if (request.paid && res.locked && state.settings.graceMode && video && !video.paused) setGrace(id);
-            applyStatus(res);
-          } else applyStatus(Drip.watchStatus(state, videoId()));
-        } else if (state) applyStatus(Drip.watchStatus(state, videoId()));
-      } finally {
-        pendingTick = null;
-      }
     }
     if (locked && !inGrace()) pausePlayer(video);
     renderPill();
+  }
+
+  /** Sends the oldest unsent time. If the worker doesn't confirm it, it stays unsent and goes again next tick. */
+  async function sendTick() {
+    const entry = unsent[0];
+    const seconds = entry.seconds;
+    const id = entry.id;
+    const before = state && Drip.watchStatus(state, id);
+    const playing = id === videoId() && !!video && !video.paused;
+    const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && playing), startedAt: performance.now() };
+    pendingTick = request;
+    try {
+      const res = await send({ type: 'tick', seconds, videoId: id });
+      if (res && res.ok && !disconnected) {
+        entry.seconds -= seconds;
+        if (entry.seconds <= 0.001 && unsent[0] === entry) unsent.shift();
+        state = res.state;
+        if (id === videoId()) {
+          if (request.paid && res.locked && state.settings.graceMode && video && !video.paused) setGrace(id);
+          applyStatus(res);
+        } else applyStatus(Drip.watchStatus(state, videoId()));
+      } else if (state) applyStatus(Drip.watchStatus(state, videoId()));
+    } finally {
+      pendingTick = null;
+    }
   }
 
   async function refreshStatus() {
@@ -357,7 +403,7 @@
       h('div', { class: 'drip-meta' }, `watch tokens ${state.tokens.watch} · unlocks left today ${needLeft}`),
       lockMessage && h('div', { class: 'drip-message' }, lockMessage),
       canBuy && h('button', { class: 'drip-btn drip-primary', onclick: onAddTime }, `Add ${s.minutesPerToken} min · 1 watch`),
-      needLeft > 0 && !reasonOpen && h('button', { class: 'drip-btn', onclick: () => { reasonOpen = true; showLock(); document.querySelector('#drip-lock textarea')?.focus(); } }, 'I need this one'),
+      needLeft > 0 && !reasonOpen && h('button', { class: 'drip-btn', onclick: () => { reasonOpen = true; showLock(); /** @type {HTMLTextAreaElement | null} */ (document.querySelector('#drip-lock textarea'))?.focus(); } }, 'I need this one'),
       needLeft > 0 && reasonOpen && h('div', { class: 'drip-reason' }, reason,
         h('button', { class: 'drip-btn drip-primary', onclick: () => onNeedThis(reason.value) }, 'Unlock this video')),
       !canBuy && needLeft === 0 && h('div', { class: 'drip-meta' }, `Done for today. Tokens come back at ${hourLabel(s.resetHour)}.`),
@@ -387,16 +433,25 @@
     renderPill();
   }
 
+  let pillView = '';
+
   function renderPill() {
     const id = videoId();
     let pill = document.getElementById('drip-pill');
     if (!id || !state) {
       pill?.remove();
+      pillView = '';
       return;
     }
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === id);
     const unlocked = state.unlocked.includes(id);
-    const time = unlocked ? 'unlocked' : `${Drip.formatMinutes(state.watchSecondsLeft)} left`;
+    // Count down between ticks, which only go out every few seconds.
+    const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
+    const time = unlocked ? 'unlocked' : `${Drip.formatMinutes(Math.max(0, state.watchSecondsLeft - pending))} left`;
+    // Rebuild only when the text changes. A button replaced mid-click loses the click.
+    const view = JSON.stringify([id, time, saved]);
+    if (pill && pillView === view) return;
+    pillView = view;
     const content = [
       h('span', {}, time),
       saved ? h('span', { class: 'drip-meta' }, 'In backlog') : h('button', { class: 'drip-btn', onclick: onSave }, 'Save to backlog'),
@@ -410,13 +465,21 @@
 
   onState((next) => {
     if (disconnected) return;
-    state = next;
     const id = videoId();
-    applyStatus(Drip.watchStatus(state, id), !!(pendingTick && pendingTick.id === id && pendingTick.paid));
+    const wasFunded = !!state && !!id && !Drip.watchStatus(state, id).locked;
+    state = next;
+    const status = Drip.watchStatus(state, id);
+    // Another tab may have used up the minutes. A video playing here when that happened gets grace too (Q3).
+    if (wasFunded && status.locked && state.settings.graceMode && clockActive() && video && !video.paused) setGrace(id);
+    applyStatus(status, !!(pendingTick && pendingTick.id === id && pendingTick.paid));
     renderPill();
   });
+  // Time played up to here belongs to the video being left, not the next one.
+  document.addEventListener('yt-navigate-start', bank);
   document.addEventListener('yt-navigate-finish', () => {
     if (disconnected) return;
+    bank();
+    if (runningSince !== null) runId = videoId();
     defaultTheater();
     const id = videoId();
     if (graceId !== id) setGrace('');

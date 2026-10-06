@@ -304,19 +304,43 @@
     );
   }
 
+  let rendered = '';
+
+  /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
     const root = document.getElementById('drip-home');
-    if (root) root.replaceChildren(view());
+    if (!root) return;
+    const key = JSON.stringify(state && [
+      Drip.formatMinutes(state.watchSecondsLeft), state.tokens, state.current, state.backlog,
+      state.settings.feedSource, state.settings.minutesPerToken, state.settings.resetHour,
+    ].concat([message, revealing, disconnected]));
+    if (root.firstChild && key === rendered) return;
+    rendered = key;
+    root.replaceChildren(view());
   }
+
+  let refreshing = false;
 
   /** Puts the drip page into the home browse page if it isn't there yet. */
   function mount() {
     if (location.pathname !== '/') return;
     const browse = document.querySelector(SEL.homeBrowse);
     if (!browse) return;
-    if (browse.querySelector('#drip-home')) return;
+    if (browse.querySelector('#drip-home')) {
+      // A page left open past the reset asks once for the new day's balances.
+      if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
+        refreshing = true;
+        send({ type: 'get' }).then((res) => {
+          absorb(res);
+          refreshing = false;
+          render();
+        });
+      }
+      return;
+    }
     const target = browse.querySelector(SEL.mount) || browse;
     target.prepend(h('div', { id: 'drip-home' }));
+    rendered = '';
     render();
     send({ type: 'get' }).then((res) => {
       absorb(res);

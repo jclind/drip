@@ -22,6 +22,17 @@ What this confirms:
 
 State size will grow on a real install. `seen` holds up to 2,000 ids at about 14 bytes each, so a long-time user writes roughly 30 KB per tick.
 
+### After the fixes (branch `watch-clock`)
+
+Same method, same day: ticks through the dev route, with a home tab and a paused watch tab open.
+
+| What | Before | After |
+|---|---|---|
+| Token page rebuilds during the ticks | 20 for 20 ticks | 0 for 5 ticks |
+| Pill rebuilds in a paused watch tab | about 1 per second | 0 |
+| Ticks a playing tab sends | 1 per second | 1 per 5 seconds, sooner near zero (from `test/watch.test.js`, since air can't play video) |
+| Storage writes for `get`, `status`, and zero ticks | 1 each | 0 (from `test/background.test.js`) |
+
 ## Selectors on live YouTube
 
 Every selector in `src/content/` and `early.css` matched at least one element on home, a watch page, and search results. Two things to recheck on the MacBook, where the window is visible:
