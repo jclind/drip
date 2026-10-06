@@ -4,7 +4,14 @@ Written 2026-10-06 on air, against `main` at `9555307`. Draft for Jesse to appro
 
 "1.0" here means a build Jesse could put on the Chrome Web Store, minus the visual design, which comes after with his input. DESIGN.md calls the core loop "v1" (Q23), so this plan says "1.0" to keep the two apart.
 
-## Where things stand
+## Status, 2026-10-06 evening
+
+- Steps 1 to 6 are done in stacked PRs #10 (audit) → #11 (state rules) → #12 (watch clock) → #13 (welcome, live pages, release build) → #14 (broken-page banner, store drafts). Merge them in that order. Each one had a Codex review, and every finding was fixed. 86 tests pass.
+- Still open: where a broken-page report gets sent (Q25), a scheduled check on air for YouTube markup changes, and step 7, which needs the MacBook because air's Chrome can't play video.
+- Left as is, by judgment: finding 8 (the fullscreen Comments button in other languages; the comments themselves stay hidden), and findings 2 and 3 (timers and search layout work), which only a DevTools trace on the MacBook can measure.
+- Dropped from the feature list: "Reset all data", because it hands back a full day's tokens in one click, against Q6.
+
+## Where things stood at the start
 
 - 3,313 lines in total. `src/lib/state.js` (324 lines) holds the rules. The content scripts hold everything YouTube-specific (watch.js 417, home.js 331, search.js 144, redirect.js 62, early.js 102, comments.js 45, fade.js 52, guard.js 27).
 - `node --test` runs 44 tests, all passing (Node v26.3.0). Every one tests `state.js`. Nothing tests `background.js`, the content scripts, the options page, or the popup.
