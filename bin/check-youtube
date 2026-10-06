@@ -65,13 +65,19 @@ async function main() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drip-check-'));
   const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`,
     '--no-first-run', '--no-default-browser-check', '--mute-audio', 'about:blank'], { stdio: 'ignore' });
+  /** @type {Promise<void>} */
+  const exited = new Promise((resolve) => chrome.once('exit', () => resolve()));
+  /** @type {Error | null} */
+  let launchError = null;
+  chrome.once('error', (err) => { launchError = err; });
   /** @type {string[]} */
   const failures = [];
   /** @type {string[]} */
   const lines = [];
   try {
     const portFile = path.join(dir, 'DevToolsActivePort');
-    for (let i = 0; i < 150 && !fs.existsSync(portFile); i++) await sleep(100);
+    for (let i = 0; i < 150 && !fs.existsSync(portFile) && !launchError; i++) await sleep(100);
+    if (launchError) throw launchError;
     const port = fs.readFileSync(portFile, 'utf8').split('\n')[0];
     const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
     const ws = new WebSocket(targets.find((/** @type {any} */ t) => t.type === 'page').webSocketDebuggerUrl);
@@ -79,15 +85,32 @@ async function main() {
     let nextId = 0;
     /** @type {Map<number, (msg: any) => void>} */
     const waiting = new Map();
+    /** @type {Map<number, (err: Error) => void>} */
+    const failing = new Map();
     ws.onmessage = (event) => {
       const msg = JSON.parse(String(event.data));
       waiting.get(msg.id)?.(msg);
       waiting.delete(msg.id);
+      failing.delete(msg.id);
     };
+    // A crashed or closed Chrome must fail the check, not leave a request hanging.
+    const dropAll = () => {
+      for (const reject of failing.values()) reject(new Error('Chrome closed the DevTools connection'));
+      waiting.clear();
+      failing.clear();
+    };
+    ws.onclose = dropAll;
+    ws.onerror = dropAll;
     /** @param {string} method @param {object} [params] @returns {Promise<any>} */
-    const cdp = (method, params = {}) => new Promise((resolve) => {
+    const cdp = (method, params = {}) => new Promise((resolve, reject) => {
       const id = ++nextId;
-      waiting.set(id, resolve);
+      const timer = setTimeout(() => {
+        waiting.delete(id);
+        failing.delete(id);
+        reject(new Error(`${method} got no answer in 30 seconds`));
+      }, 30000);
+      waiting.set(id, (msg) => { clearTimeout(timer); resolve(msg); });
+      failing.set(id, (err) => { clearTimeout(timer); reject(err); });
       ws.send(JSON.stringify({ id, method, params }));
     });
 
@@ -111,8 +134,12 @@ async function main() {
   } catch (err) {
     failures.push(`check failed to run: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
-    chrome.kill();
-    setTimeout(() => fs.rmSync(dir, { recursive: true, force: true }), 1000).unref();
+    // Wait for Chrome to let go of its profile before deleting it, or each run leaves one behind.
+    if (!launchError) {
+      chrome.kill();
+      await Promise.race([exited, sleep(5000)]);
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 
   const when = new Date().toISOString();
