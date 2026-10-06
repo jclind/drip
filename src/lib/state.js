@@ -407,7 +407,7 @@
     return count(stored.watchSecondsLeft, 0) <= 0;
   }
 
-  globalThis.Drip = {
+  /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, addBacklog,
     removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,

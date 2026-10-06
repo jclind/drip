@@ -1,0 +1,35 @@
+#!/bin/sh
+# Builds the zip for the Chrome Web Store: manifest.json, src/, and icons/ only, with the localhost dev route
+# taken out of the manifest. Refuses on uncommitted changes or a version that already has a git tag.
+# Usage: bin/build-release    Output: dist/drip-<version>.zip
+set -eu
+cd "$(dirname "$0")/.."
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "build-release: commit or stash your changes first" >&2
+  exit 1
+fi
+version=$(node -p "require('./manifest.json').version")
+if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+  echo "build-release: v$version is already tagged. Bump the version in manifest.json." >&2
+  exit 1
+fi
+node --test >/dev/null 2>&1 || { echo "build-release: node --test fails" >&2; exit 1; }
+
+out="dist/drip-$version"
+rm -rf "$out" "$out.zip"
+mkdir -p "$out"
+git archive HEAD src icons | tar -x -C "$out"
+node -e "
+  const m = require('./manifest.json');
+  delete m.externally_connectable;
+  require('fs').writeFileSync('$out/manifest.json', JSON.stringify(m, null, 2) + '\n');
+"
+if grep -q localhost "$out/manifest.json" || [ -e "$out/dev" ]; then
+  echo "build-release: the dev route is still in the build" >&2
+  exit 1
+fi
+(cd "$out" && zip -qr "../drip-$version.zip" .)
+rm -rf "$out"
+echo "dist/drip-$version.zip"
+echo "After uploading it, tag the release: git tag v$version && git push origin v$version"

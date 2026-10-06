@@ -26,12 +26,17 @@ function worker(initial = undefined) {
   let failNext = 0;
   /** @type {Function | null} */
   let onMessage = null;
+  /** @type {Function | null} */
+  let onInstalled = null;
+  /** @type {string[]} */
+  const opened = [];
   const chrome = {
     runtime: {
       getURL: (/** @type {string} */ p) => p,
+      getManifest: () => ({ externally_connectable: { matches: ['http://localhost/*'] } }),
       onMessage: { addListener: (/** @type {Function} */ fn) => { onMessage = fn; } },
       onMessageExternal: { addListener() {} },
-      onInstalled: { addListener() {} },
+      onInstalled: { addListener: (/** @type {Function} */ fn) => { onInstalled = fn; } },
       reload() {},
     },
     storage: {
@@ -48,7 +53,7 @@ function worker(initial = undefined) {
         },
       },
     },
-    tabs: { create() {} },
+    tabs: { create: (/** @type {{url: string}} */ opts) => { opened.push(opts.url); } },
   };
   /** @type {any} */
   const context = { chrome, console, setTimeout, structuredClone, URL, fetch: async () => ({ ok: false }) };
@@ -61,7 +66,8 @@ function worker(initial = undefined) {
     const async = /** @type {Function} */ (onMessage)(msg, sender, resolve);
     if (async !== true) setTimeout(() => resolve(undefined), 0);
   });
-  return { send, store, writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, Drip: context.Drip };
+  const install = (/** @type {string} */ reason) => /** @type {Function} */ (onInstalled)({ reason });
+  return { send, install, opened, store, writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, Drip: context.Drip };
 }
 
 test('every reply carries the saved state', async () => {
@@ -174,4 +180,11 @@ test('a tick whose write fails is charged by the next tick that resends it', asy
   assert.equal(w.store.drip.watchSecondsLeft, 900);
   await w.send({ type: 'tick', seconds: 10, videoId: 'abc' });
   assert.ok(w.store.drip.watchSecondsLeft <= 890, `left ${w.store.drip.watchSecondsLeft}`);
+});
+
+test('a new install opens the welcome page once, and an update does not', () => {
+  const w = worker();
+  w.install('install');
+  w.install('update');
+  assert.deepEqual([...w.opened], ['src/welcome/welcome.html']);
 });

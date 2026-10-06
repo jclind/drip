@@ -4,7 +4,8 @@
 importScripts('lib/state.js');
 
 /** @type {any} */
-const Drip = /** @type {any} */ (globalThis).Drip;
+// var, not const: these page scripts share one type-check program, and only var may be declared twice.
+var Drip = /** @type {any} */ (globalThis).Drip;
 const KEY = 'drip';
 
 /** End of the last stretch of watching we charged for, in ms. See DESIGN.md, "The clock with several tabs". */
@@ -93,12 +94,20 @@ function handle(msg, state, now) {
   }
 }
 
+// A new install opens the welcome page once. Updates don't.
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('src/welcome/welcome.html') });
+});
+
 // Development only: dev/reload.html on localhost asks for a reload after a code change.
 // Open YouTube tabs pause and ask for a refresh when this happens, so it can't be used to dodge the clock.
 // It can also read state, change settings, and send ticks. A fake tick can hide real playback and a reload can drop
 // an unsent tick, so the route only works in a checkout that has the gitignored file dev/ENABLED. Real installs don't.
 const DEV_TYPES = ['get', 'updateSettings', 'tick'];
-const devEnabled = fetch(chrome.runtime.getURL('dev/ENABLED')).then((r) => r.ok).catch(() => false);
+// A store build has no externally_connectable entry (bin/build-release removes it), so it doesn't look for the file.
+const devEnabled = chrome.runtime.getManifest().externally_connectable
+  ? fetch(chrome.runtime.getURL('dev/ENABLED')).then((r) => r.ok).catch(() => false)
+  : Promise.resolve(false);
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   if (!msg || !sender.origin || new URL(sender.origin).hostname !== 'localhost') return;
   devEnabled.then((on) => {
