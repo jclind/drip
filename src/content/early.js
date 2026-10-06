@@ -43,8 +43,8 @@
   }
 
   /**
-   * @param {boolean} [fromStorage] A balance change while the page is open. Pausing a video that's already playing is
-   *   watch.js's job then, because only it knows whether that video has grace.
+   * @param {boolean} [fromStorage] A balance change while the page is open. With grace mode on, pausing a video that's
+   *   already playing is watch.js's job then, because only it knows whether that video has grace.
    */
   function decide(fromStorage = false) {
     const id = videoId();
@@ -63,7 +63,7 @@
     pausedWhileUnknown = null;
     if (!id) return;
     const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
-    if (locked && !fromStorage) pausePlayer(video);
+    if (locked && !(fromStorage && state?.settings?.graceMode)) pausePlayer(video);
     else if (!locked && pending && pending.id === id && pending.video === video) {
       // Only undo our temporary pause, once. Autoplay can still reject playback.
       video.play().catch(() => {});
@@ -81,7 +81,7 @@
     } else if (locked) pausePlayer(target);
   }, true);
 
-  document.addEventListener('yt-navigate-finish', decide);
+  document.addEventListener('yt-navigate-finish', () => decide());
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.drip) return;
     const first = !storageKnown;

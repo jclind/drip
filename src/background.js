@@ -14,6 +14,21 @@ const clock = { lastChargeEnd: 0 };
 let queue = Promise.resolve();
 
 /**
+ * JSON with object keys sorted. chrome.storage hands objects back with sorted keys, so plain JSON.stringify would
+ * see a change in every read.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const obj = /** @type {Record<string, unknown>} */ (value);
+    return `{${Object.keys(obj).sort().filter((k) => obj[k] !== undefined).map((k) => `${JSON.stringify(k)}:${stableJson(obj[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
  * Runs fn on the current state, saves it if it changed, and returns fn's result. Calls run one at a time.
  * Every save wakes the storage listeners in every YouTube tab, so a call that changes nothing doesn't save.
  * @template T
@@ -26,10 +41,10 @@ function withState(fn) {
     const stored = await chrome.storage.local.get(KEY);
     const state = Drip.hydrate(stored[KEY], now);
     Drip.rollDay(state, now);
-    const before = JSON.stringify(stored[KEY]);
+    const before = stableJson(stored[KEY]);
     const chargedUntil = clock.lastChargeEnd;
     const result = fn(state, now);
-    if (JSON.stringify(state) !== before) {
+    if (stableJson(state) !== before) {
       try {
         await chrome.storage.local.set({ [KEY]: state });
       } catch (err) {

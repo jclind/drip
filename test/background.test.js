@@ -11,6 +11,13 @@ const SRC = path.join(__dirname, '..', 'src');
 const YT = { tab: { id: 1 }, url: 'https://www.youtube.com/watch?v=abc', origin: 'https://www.youtube.com' };
 const PAGE = { url: 'chrome-extension://drip/src/options/options.html', origin: 'chrome-extension://drip' };
 
+/** @param {any} value @returns {any} */
+function sortKeys(value) {
+  if (Array.isArray(value)) return value.map(sortKeys);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((k) => [k, sortKeys(value[k])]));
+  return value;
+}
+
 /** Loads background.js in a fresh context with in-memory storage. */
 function worker(initial = undefined) {
   /** @type {Record<string, any>} */
@@ -29,7 +36,8 @@ function worker(initial = undefined) {
     },
     storage: {
       local: {
-        get: async (/** @type {string} */ key) => (key in store ? { [key]: structuredClone(store[key]) } : {}),
+        // Chrome returns stored objects with their keys sorted.
+        get: async (/** @type {string} */ key) => (key in store ? { [key]: sortKeys(structuredClone(store[key])) } : {}),
         set: async (/** @type {Record<string, any>} */ items) => {
           if (failNext > 0) {
             failNext--;
