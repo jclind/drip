@@ -20,8 +20,13 @@
     length: 'ytd-thumbnail-overlay-time-status-renderer, .ytBadgeShapeText, .yt-badge-shape__text',
     saveSlot: '#meta, .text-wrapper',
   };
-  // Result rows that count toward the 10. Everything else in the list (shelves, ads) is hidden by CSS.
-  const RESULT_TAGS = new Set(['YTD-VIDEO-RENDERER', 'YTD-PLAYLIST-RENDERER', 'YTD-CHANNEL-RENDERER', 'YTD-MOVIE-RENDERER', 'YTD-RADIO-RENDERER']);
+  // The shelves, ads, and promos in the list are hidden by early.css, so any other row that's on screen is a result.
+  // Rows this script hid itself keep their mark so they stay counted.
+  /** @param {Element} el */
+  function isResult(el) {
+    if (el.tagName === 'YTD-CONTINUATION-ITEM-RENDERER') return false;
+    return el.hasAttribute('data-drip-over') || (getComputedStyle(el).display !== 'none' && /** @type {HTMLElement} */ (el).offsetHeight > 0);
+  }
 
   /** @type {any} */
   let state = null;
@@ -29,6 +34,9 @@
   let query = '';
   /** @type {HTMLElement | null} */
   let moreButton = null;
+  /** @type {Element | null} */
+  let watched = null;
+  let queued = false;
 
   /** @param {Element} root @param {string} selector */
   function text(root, selector) {
@@ -52,7 +60,9 @@
   /** @param {HTMLElement} button */
   function paintSave(button) {
     const saved = isSaved(button.dataset.videoId || '');
-    button.textContent = saved ? 'In backlog' : 'Save';
+    // Only write when it changed. Writing the same text still counts as a DOM change and would wake the observer.
+    const label = saved ? 'In backlog' : 'Save';
+    if (button.textContent !== label) button.textContent = label;
     /** @type {HTMLButtonElement} */ (button).disabled = saved;
   }
 
@@ -88,15 +98,28 @@
       query = location.search;
       shown = PAGE;
     }
-    const items = [...document.querySelectorAll(SEL.results)].flatMap((c) => [...c.children]).filter((el) => RESULT_TAGS.has(el.tagName));
+    const items = [...document.querySelectorAll(SEL.results)].flatMap((c) => [...c.children]).filter(isResult);
     items.forEach((el, i) => {
       el.toggleAttribute('data-drip-over', i >= shown);
       if (i < shown && el.matches(SEL.video)) addSave(el);
     });
-    // Keep one extra page buffered, and let YouTube load more only when the buffer runs low.
-    const buffered = items.length - shown;
-    for (const el of document.querySelectorAll(SEL.continuation)) el.toggleAttribute('data-drip-hold', buffered >= PAGE);
-    const more = buffered > 0 || (document.querySelector(SEL.continuation) !== null && items.length > 0);
+    // YouTube loads the next page only while its loader is on screen. Hold it back until the last button press
+    // asks for more than the page has, so nothing loads (or flashes) before you click.
+    for (const el of document.querySelectorAll(SEL.continuation)) el.toggleAttribute('data-drip-hold', items.length >= shown);
+    const more = items.length > shown || (document.querySelector(SEL.continuation) !== null && items.length > 0);
+    const search = document.querySelector('ytd-search');
+    if (search && search !== watched) {
+      watched = search;
+      // Hide new rows the moment YouTube adds them, not at the next half-second check.
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        queueMicrotask(() => {
+          queued = false;
+          apply();
+        });
+      }).observe(search, { childList: true, subtree: true });
+    }
     const primary = document.querySelector(SEL.primary);
     if (more && primary) {
       if (!moreButton) moreButton = h('div', { id: 'drip-more', class: 'drip-ui' }, h('button', { class: 'drip-btn', onclick: showMore }, 'More results'));
