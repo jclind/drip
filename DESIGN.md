@@ -40,6 +40,7 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 
 ## How it fits together
 
+- `src/content/early.js` guards the main player's first play at document start using stored time and unlocks; `watch.js` owns the overlay, clock, and grace.
 - `src/lib/state.js` holds all the rules as pure functions over a plain state object. It's a classic script that sets `globalThis.Drip`, so the service worker (`importScripts`), extension pages (`<script>`), content scripts (manifest list), and Node tests (`require`) all load the same file.
 - `src/background.js` is the only writer. Everything else sends it a message. It runs messages one at a time through a promise queue, so two tabs can't overwrite each other.
 - Every message starts with `rollDay(state, now)`, so the day resets lazily. A laptop asleep at 4am still resets correctly on the next read.

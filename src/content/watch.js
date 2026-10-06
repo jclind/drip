@@ -10,6 +10,9 @@
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
     video: '#movie_player video.html5-main-video',
+    watchPage: 'ytd-watch-flexy',
+    theaterAttr: 'theater',
+    theaterButton: '.ytp-size-button',
     ads: '#movie_player.ad-showing, #movie_player.ad-interrupting',
     app: 'ytd-app',
     miniplayerAttr: 'miniplayer-is-active',
@@ -31,6 +34,33 @@
   let disconnected = false;
   /** @type {{id: string, paid: boolean, startedAt: number} | null} */
   let pendingTick = null;
+
+  /** @type {Set<string>} */
+  const theaterHandled = new Set();
+  /** @type {ReturnType<typeof setInterval> | null} */
+  let theaterTimer = null;
+
+  function defaultTheater() {
+    if (theaterTimer !== null) clearInterval(theaterTimer);
+    theaterTimer = null;
+    const id = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
+    if (!id || theaterHandled.has(id)) return;
+    const deadline = performance.now() + 10000;
+    function attempt() {
+      const currentId = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
+      const page = document.querySelector(SEL.watchPage);
+      const button = /** @type {HTMLElement | null} */ (page?.querySelector(SEL.theaterButton));
+      if (disconnected || currentId !== id || performance.now() >= deadline || (page && button)) {
+        if (theaterTimer !== null) clearInterval(theaterTimer);
+        theaterTimer = null;
+        if (disconnected || currentId !== id || performance.now() >= deadline) return;
+        theaterHandled.add(id);
+        if (page && button && !page.hasAttribute(SEL.theaterAttr) && document.fullscreenElement === null) button.click();
+      }
+    }
+    theaterTimer = setInterval(attempt, 250);
+    attempt();
+  }
 
   function miniplayerActive() {
     const app = document.querySelector(SEL.app);
@@ -338,6 +368,7 @@
   });
   document.addEventListener('yt-navigate-finish', () => {
     if (disconnected) return;
+    defaultTheater();
     const id = videoId();
     if (graceId !== id) graceId = '';
     hideLock();
@@ -345,5 +376,6 @@
   });
   const tickTimer = setInterval(tick, 1000);
   const statusTimer = setInterval(() => { if (locked) refreshStatus(); }, 30000);
+  defaultTheater();
   refreshStatus();
 })();
