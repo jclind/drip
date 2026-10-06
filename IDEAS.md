@@ -12,7 +12,6 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 ## What you see
 
 - Thumbnails in the backlog as a setting. Jesse noted they sometimes carry real information.
-- Hide comments by default, with a click to show them.
 - Channel page grids, if they turn into a leak. Going to a channel is deliberate, so they're allowed for now.
 - The notification bell.
 - Charts and streaks built from the 90-day log.
