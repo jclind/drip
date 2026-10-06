@@ -77,13 +77,18 @@
     return pool;
   }
 
+  /** @param {{id: string}} video Not revealed before and not in the backlog, the same test reveal() applies. */
+  function isNew(video) {
+    return !!state && !state.seen.includes(video.id) && !state.backlog.some((/** @type {any} */ v) => v.id === video.id);
+  }
+
   /**
    * Loads another feed in a hidden same-origin frame and reads its grid. The frame is on screen but invisible,
    * because YouTube only fills a feed that's in view. drip's scripts don't run inside it.
    * @param {string} path
    * @param {string} browseSelector
    */
-  async function readFeedInFrame(path, browseSelector, timeoutMs = 12000) {
+  async function readFeedInFrame(path, browseSelector, timeoutMs = 15000) {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.tabIndex = -1;
@@ -100,7 +105,9 @@
       while (Date.now() - start < timeoutMs) {
         const doc = frame.contentDocument;
         if (doc) pool = readPool(doc, browseSelector);
-        if (pool.length > 0) break;
+        if (pool.some(isNew)) break;
+        // The first screenful can be all revealed already, so scroll to make YouTube load older videos.
+        frame.contentWindow?.scrollTo(0, doc ? doc.documentElement.scrollHeight : 0);
         await new Promise((r) => setTimeout(r, 400));
       }
       return pool;
