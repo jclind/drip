@@ -69,10 +69,19 @@ function handle(msg, state, now) {
 
 // Development only: dev/reload.html on localhost asks for a reload after a code change.
 // Open YouTube tabs pause and ask for a refresh when this happens, so it can't be used to dodge the clock.
+// It can also read state and change settings, which go through the same next-day rule, so nothing loosens early.
+// 'tick' only ever drains minutes.
+const DEV_TYPES = ['get', 'updateSettings', 'tick'];
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
-  if (msg && msg.type === 'devReload' && sender.origin && new URL(sender.origin).hostname === 'localhost') {
+  if (!msg || !sender.origin || new URL(sender.origin).hostname !== 'localhost') return;
+  if (msg.type === 'devReload') {
     sendResponse({ ok: true });
     setTimeout(() => chrome.runtime.reload(), 100);
+  } else if (DEV_TYPES.includes(msg.type)) {
+    withState((state, now) => ({ result: handle(msg, state, now), state }))
+      .then(({ result, state }) => sendResponse({ ...result, state }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
   }
 });
 

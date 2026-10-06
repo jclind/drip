@@ -133,7 +133,8 @@
     video.addEventListener('playing', onPlay);
     for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopRun);
     video.addEventListener('ended', onEnded);
-    if (!video.paused) onPlay();
+    // A video waiting on autoplay isn't paused but hasn't played anything. 'playing' fires once it really starts.
+    if (!video.paused && video.readyState >= 3) onPlay();
   }
 
   /** @param {any} status @param {boolean} [deferLock] */
