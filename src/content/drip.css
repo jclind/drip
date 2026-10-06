@@ -3,7 +3,8 @@
 
 #drip-home,
 #drip-lock,
-#drip-pill {
+#drip-pill,
+.drip-ui {
   --drip-text: var(--yt-sys-color-baseline--text-primary, var(--yt-spec-text-primary, #0f0f0f));
   --drip-muted: var(--yt-sys-color-baseline--text-secondary, var(--yt-spec-text-secondary, #606060));
   --drip-bg: var(--yt-sys-color-baseline--base-background, var(--yt-spec-base-background, #fff));
@@ -238,4 +239,13 @@
 ::view-transition-old(drip-lock),
 ::view-transition-old(drip-pill) {
   display: none;
+}
+
+.drip-save-row {
+  margin-top: 8px;
+}
+
+#drip-more {
+  text-align: center;
+  padding: 24px 0 48px;
 }
