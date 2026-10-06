@@ -12,7 +12,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q2 | Block home, watch-page sidebar, end screens, autoplay, Shorts. Search stays, minus the injected "discover" shelves. Playlists and mixes keep playing on their own (Jesse, 2026-10-06). |
 | Q3 | Out of time means hard stop: pause and overlay. "Finish the current video" grace mode is a setting, off by default. |
 | Q4 | Daily allowance only. Tasks are in IDEAS.md. The whole extension runs on the honor system. |
-| Q5 | Feed source setting: YouTube home feed (default) or subscriptions. |
+| Q5 | Feed source is a toggle on the token page: YouTube home feed (default) or subscriptions. It keeps the last choice. Explore was dropped because `/feed/explore` now serves the home feed (Jesse, 2026-10-06). |
 | Q6 | A settings change that loosens a limit takes effect at the next day reset. Tightening is immediate. |
 | Q7 | The clock runs on every youtube.com watch page while the video plays. Embeds elsewhere are free. |
 | Q8 | Built on air as private `jclind/drip`, tested in air's Chrome, cloned on the MacBook and loaded unpacked. Data in `chrome.storage.local`. |
@@ -32,7 +32,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q22 | Popup shows balances and minutes left, plus a Settings link. No spend buttons. |
 | Q23 | v1 is the core loop. The rest of the blocking is step 2. |
 
-## v1 and step 2
+## v1 and step 2 (both done)
 
 v1 has the home page replacement, tokens, reveals, backlog, the watch clock with its overlay, settings with the next-day rule, and the popup.
 
@@ -48,7 +48,7 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 
 ### Feed source
 
-With the feed source set to subscriptions, a reveal loads `/feed/subscriptions` in a hidden same-origin frame on the token page and reads its grid with the same selectors as the home grid. YouTube only fills a feed that's in view, so the frame sits on screen at opacity 0. Nothing new from the feed gives `pool-empty` and spends no token. The first version was tested on air only against the home feed, because air's account has no subscriptions.
+The toggle under Reveal writes `settings.feedSource` through `updateSettings`, which applies it at once because a feed change never loosens a limit. The Settings page has no control for it. With the feed source set to subscriptions, a reveal loads `/feed/subscriptions` in a hidden same-origin frame on the token page and reads its grid with the same selectors as the home grid. YouTube only fills a feed that's in view, so the frame sits on screen at opacity 0. Nothing new from the feed gives `pool-empty` and spends no token. The first version was tested on air only against the home feed, because air's account has no subscriptions.
 
 ### The clock with several tabs
 

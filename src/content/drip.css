@@ -73,6 +73,39 @@
   background: var(--drip-text);
 }
 
+.drip-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.drip-source .drip-meta {
+  margin-right: 2px;
+}
+
+.drip-chip {
+  font: inherit;
+  font-size: 13px;
+  color: var(--drip-muted);
+  background: none;
+  border: 1px solid var(--drip-line);
+  border-radius: 14px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.drip-chip[aria-pressed="true"] {
+  color: var(--drip-text);
+  background: var(--drip-chip);
+  border-color: transparent;
+}
+
+.drip-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .drip-message {
   margin-top: 12px;
   color: var(--drip-muted);

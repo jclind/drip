@@ -13,13 +13,6 @@ const FIELDS = [
   { key: 'resetHour', label: 'Day resets at hour', hint: '0 to 23, local time. 4 means 4:00am.', type: 'number', min: 0, max: 23 },
   { key: 'needThisPerDay', label: '"I need this one" unlocks per day', hint: 'Each needs a typed reason and is logged.', type: 'number', min: 0, max: 10 },
   { key: 'graceMode', label: 'Finish the current video when time runs out', hint: 'Off means the video pauses at zero.', type: 'checkbox' },
-  {
-    key: 'feedSource',
-    label: 'Recommendations come from',
-    hint: 'Subscriptions arrives in a later version.',
-    type: 'select',
-    options: [['home', 'YouTube home feed'], ['subscriptions', 'Subscriptions']],
-  },
 ];
 
 /** @type {any} */

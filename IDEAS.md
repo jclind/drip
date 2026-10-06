@@ -33,13 +33,10 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - A Firefox build.
 - Move to WXT for TypeScript, hot reload, a React settings page, and store zips. Do it when settings outgrow one page or publishing gets serious.
 
-## Feel
+## Feed sources
 
-- Start each YouTube page dimmed or blank and fade the content in once it has loaded, so navigation feels calm instead of choppy. Jesse has seen another extension do a slow fade from dim. Raised 2026-10-06.
-
-## Feed choice
-
-- A toggle on the token page for where the next reveal comes from: home recommendations, subscriptions, or Explore. It would turn the `feedSource` setting (Q5) into a per-reveal choice. Step 4 builds the pool by feed source, so this is a small change after it. Raised 2026-10-06.
+- Explore as a third reveal source. On 2026-10-06, `/feed/explore` loaded in a frame came back titled "Home - YouTube" with the home grid, so there's no separate Explore feed to read. Topic pages like `/gaming` might work as sources, one at a time.
+- Put the feed source back on the Settings page if the toggle on the token page isn't enough. Removed 2026-10-06.
 
 ## Playlists
 
