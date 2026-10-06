@@ -40,3 +40,7 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 ## Feed choice
 
 - A toggle on the token page for where the next reveal comes from: home recommendations, subscriptions, or Explore. It would turn the `feedSource` setting (Q5) into a per-reveal choice. Step 4 builds the pool by feed source, so this is a small change after it. Raised 2026-10-06.
+
+## Playlists
+
+- A setting to stop a playlist or mix after each video. For now a playlist moves on by itself, because you chose to start it and each video still goes through the watch clock. Swallowing the player's `ended` event in guard.js stopped nothing on a real playlist (tried 2026-10-06), so YouTube advances some other way. Find that first. Raised 2026-10-06.
