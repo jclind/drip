@@ -18,6 +18,8 @@
   window.addEventListener('ended', (event) => {
     const target = /** @type {Element | null} */ (event.target);
     if (!(target instanceof HTMLVideoElement) || !target.matches('#movie_player video')) return;
+    // An ad ends with the same event, and YouTube needs it to go back to the video.
+    if (document.querySelector('#movie_player.ad-showing, #movie_player.ad-interrupting')) return;
     event.stopImmediatePropagation();
     document.dispatchEvent(new CustomEvent('drip-ended'));
   }, true);
