@@ -28,15 +28,20 @@ function selectors(file) {
 /**
  * What each page must have. Keys name entries in a file's SEL. Selectors that only match after you've watched or
  * subscribed (watched markers, ads, the autoplay switch when it's off) aren't listed.
- * @returns {{name: string, url: string, need: [string, string][]}[]}
+ * A third entry is a row selector: then the selector has to match inside at least one row, the way the content
+ * script reads it, not just somewhere on the page.
+ * @returns {{name: string, url: string, need: ([string, string] | [string, string, string])[]}[]}
  */
 function pages() {
   const watch = selectors('src/content/watch.js');
   const comments = selectors('src/content/comments.js');
   const search = selectors('src/content/search.js');
   const home = selectors('src/content/home.js');
-  /** @param {string} file @param {Record<string, string>} sel @param {string[]} keys @returns {[string, string][]} */
-  const pick = (file, sel, keys) => keys.map((k) => [`${file} ${k}`, sel[k]]);
+  /**
+   * @param {string} file @param {Record<string, string>} sel @param {string[]} keys @param {string} [row]
+   * @returns {([string, string] | [string, string, string])[]}
+   */
+  const pick = (file, sel, keys, row) => keys.map((k) => (row ? [`${file} ${k}`, sel[k], row] : [`${file} ${k}`, sel[k]]));
   return [
     {
       name: 'watch',
@@ -51,7 +56,11 @@ function pages() {
     {
       name: 'search',
       url: 'https://www.youtube.com/results?search_query=mountain+biking',
-      need: pick('search.js', search, ['results', 'primary', 'video', 'link', 'title', 'channel', 'length', 'saveSlot']),
+      need: [
+        ...pick('search.js', search, ['results', 'primary', 'video']),
+        // search.js reads these inside each video row.
+        ...pick('search.js', search, ['link', 'title', 'channel', 'length', 'saveSlot'], search.video),
+      ],
     },
     {
       name: 'home',
@@ -122,7 +131,8 @@ async function main() {
       // Wait up to 20 seconds for everything to show up.
       for (let i = 0; i < 40; i++) {
         await sleep(500);
-        const expr = `JSON.stringify(Object.fromEntries(${JSON.stringify(page.need)}.map(([k, s]) => [k, document.querySelectorAll(s).length])))`;
+        const expr = `JSON.stringify(Object.fromEntries(${JSON.stringify(page.need)}.map(([k, s, row]) => [k,
+          row ? [...document.querySelectorAll(row)].filter((r) => r.querySelector(s)).length : document.querySelectorAll(s).length])))`;
         const res = await cdp('Runtime.evaluate', { expression: expr, returnByValue: true });
         counts = JSON.parse(res.result?.result?.value || '{}');
         if (page.need.every(([k]) => counts[k] > 0)) break;
