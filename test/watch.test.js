@@ -86,8 +86,9 @@ function makeTab(world, videoId) {
     /** @param {string} tag */
     createElement: (tag) => new FakeElement(tag),
     /** @param {string} sel */
-    querySelector: (sel) => (sel === '#movie_player video.html5-main-video' ? video : null),
+    querySelector: (sel) => (sel === '#movie_player video.html5-main-video' && !tab.noPlayer ? video : null),
     /** @param {string} id */
+    /** @param {string} id @returns {any} */
     getElementById: (id) => body.all().find((el) => el.id === id) || null,
     /** @param {string} ev @param {Function} fn */
     addEventListener: (ev, fn) => { (docHandlers[ev] ||= []).push(fn); },
@@ -96,6 +97,7 @@ function makeTab(world, videoId) {
   };
   /** @type {any} */
   const context = {
+    navigator: { userAgent: 'test', clipboard: { writeText: async () => {} } },
     document, location, URLSearchParams, JSON, Math, Number, String, Set, Array, Object, Promise, console,
     performance: { now: () => world.now },
     Date: class extends Date { static now() { return world.epoch + world.now; } },
@@ -103,7 +105,7 @@ function makeTab(world, videoId) {
     setInterval: (/** @type {Function} */ fn) => { intervals.push(fn); return intervals.length; },
     clearInterval: () => {},
     chrome: {
-      runtime: { id: 'drip', sendMessage: (/** @type {any} */ msg) => world.handle(msg) },
+      runtime: { id: 'drip', sendMessage: (/** @type {any} */ msg) => world.handle(msg), getManifest: () => ({ version: '0.1.0' }) },
       storage: { onChanged: { addListener: (/** @type {Function} */ fn) => world.listeners.push(fn) } },
     },
   };
@@ -113,11 +115,15 @@ function makeTab(world, videoId) {
     vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
   }
   const tab = {
+    noPlayer: false,
+    /** Runs every timer once, as one second passing would. */
+    second: async () => { for (const fn of intervals) await fn(); await settle(); },
+    broken: () => document.getElementById('drip-broken'),
     video, root, body, location,
     pill: () => document.getElementById('drip-pill'),
     locked: () => !!document.getElementById('drip-lock'),
     /** Runs watch.js's 1-second tick. */
-    tick: async () => { await intervals[0](); await settle(); },
+    tick: async () => { await /** @type {Function} */ (intervals.find((fn) => fn.name === 'tick'))(); await settle(); },
     /** @param {string} id */
     navigate: async (id) => {
       document.dispatchEvent({ type: 'yt-navigate-start' });
@@ -321,4 +327,40 @@ test('with grace off, every playing tab stops at zero', async () => {
   }
   assert.equal(a.video.paused, true);
   assert.equal(b.video.paused, true);
+});
+
+test('a watch page with no player for 10 seconds says drip is broken and locks nothing (Q25)', async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, 'aaa');
+  tab.noPlayer = true;
+  await settle();
+  for (let i = 0; i < 9; i++) {
+    world.advance(1);
+    await tab.second();
+  }
+  assert.equal(tab.broken(), null, 'not before 10 seconds');
+  for (let i = 0; i < 2; i++) {
+    world.advance(1);
+    await tab.second();
+  }
+  assert.ok(tab.broken());
+  assert.match(tab.broken().textContent, /video player/);
+  assert.equal(tab.locked(), false);
+  assert.ok(tab.root.hasAttribute('data-drip-broken'), 'guard.js lets play() through');
+});
+
+test('a player that comes back and then goes missing again drops the lock again (Codex)', async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, 'aaa');
+  tab.noPlayer = true;
+  await settle();
+  for (let i = 0; i < 11; i++) { world.advance(1); await tab.second(); }
+  tab.noPlayer = false;
+  for (let i = 0; i < 2; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.root.hasAttribute('data-drip-broken'), false);
+  assert.ok(tab.locked(), 'the lock is back with a player and 0 minutes');
+  tab.noPlayer = true;
+  for (let i = 0; i < 12; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.locked(), false);
+  assert.ok(tab.root.hasAttribute('data-drip-broken'));
 });

@@ -4,7 +4,7 @@
 
 (function () {
   /** @type {any} */
-  const { send, h, onState } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, watchFor } = /** @type {any} */ (globalThis).DripUI;
 
   const PAGE = 10;
 
@@ -138,6 +138,7 @@
     if (res && res.state) state = res.state;
     apply();
   });
+  watchFor('search', SEL.results, (/** @type {string} */ path) => path === '/results');
   document.addEventListener('yt-navigate-finish', apply);
   setInterval(apply, 500);
   apply();

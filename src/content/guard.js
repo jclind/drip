@@ -7,7 +7,9 @@
   const HOLD_ATTR = 'data-drip-hold';
   const native = HTMLMediaElement.prototype.play;
   HTMLMediaElement.prototype.play = function () {
-    if (document.documentElement.hasAttribute(HOLD_ATTR) && this.matches('#movie_player video')) {
+    // data-drip-broken: watch.js can't find the player, so drip fails open (Q25).
+    const root = document.documentElement;
+    if (root.hasAttribute(HOLD_ATTR) && !root.hasAttribute('data-drip-broken') && this.matches('#movie_player video')) {
       return Promise.reject(new DOMException('drip: out of watch time', 'NotAllowedError'));
     }
     return native.call(this);
