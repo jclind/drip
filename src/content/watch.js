@@ -214,6 +214,8 @@
     if (deferLock && state.settings.graceMode) return;
     pausePlayer(video);
     if (clockActive() && id) showLock();
+    // A locked video skips theater mode, so let fade.js show the page now.
+    theaterDone();
   }
 
   async function tick() {
