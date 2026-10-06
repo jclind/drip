@@ -34,6 +34,11 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
+      "js": ["src/content/fade.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.youtube.com/*"],
       "js": ["src/content/early.js"],
       "run_at": "document_start"
     },

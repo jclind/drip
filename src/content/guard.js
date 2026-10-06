@@ -13,13 +13,14 @@
     return native.call(this);
   };
 
-  // YouTube animates navigation with a View Transition. Behind a lock there's nothing to animate, and the
-  // transition's snapshot hid drip's overlay for a moment, so skip it while held.
+  // YouTube animates navigation with a View Transition, a cross-fade of page snapshots. It hid drip's overlay for a
+  // moment, and it fights fade.js, which fades each page in itself. Skip it. Reduced-motion users get no fade from
+  // drip, so they keep YouTube's own transition.
   if (typeof document.startViewTransition === 'function') {
     const nativeVT = document.startViewTransition;
     document.startViewTransition = function (...args) {
       const vt = nativeVT.apply(this, args);
-      if (document.documentElement.hasAttribute(HOLD_ATTR)) vt.skipTransition();
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute(HOLD_ATTR)) vt.skipTransition();
       return vt;
     };
   }

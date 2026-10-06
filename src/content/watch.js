@@ -41,16 +41,26 @@
   /** @type {ReturnType<typeof setInterval> | null} */
   let theaterTimer = null;
 
+  /** Tells fade.js the page layout is settled, so it can fade in after theater mode has been applied, not while it's moving. */
+  function theaterDone() {
+    document.dispatchEvent(new CustomEvent('drip-theater-done'));
+  }
+
   function defaultTheater() {
     if (theaterTimer !== null) clearInterval(theaterTimer);
     theaterTimer = null;
     const id = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
-    if (!state || !id || theaterHandled.has(id) || (locked && !inGrace())) return;
+    if (!id || theaterHandled.has(id) || (locked && !inGrace())) {
+      theaterDone();
+      return;
+    }
+    if (!state) return;
     const deadline = performance.now() + 10000;
     function attempt() {
       if (locked && !inGrace()) {
         if (theaterTimer !== null) clearInterval(theaterTimer);
         theaterTimer = null;
+        theaterDone();
         return;
       }
       const currentId = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
@@ -59,12 +69,16 @@
       if (disconnected || currentId !== id || performance.now() >= deadline || (page && button)) {
         if (theaterTimer !== null) clearInterval(theaterTimer);
         theaterTimer = null;
-        if (disconnected || currentId !== id || performance.now() >= deadline) return;
+        if (disconnected || currentId !== id || performance.now() >= deadline) {
+          theaterDone();
+          return;
+        }
         theaterHandled.add(id);
         if (page && button && !page.hasAttribute(SEL.theaterAttr) && document.fullscreenElement === null) button.click();
+        theaterDone();
       }
     }
-    theaterTimer = setInterval(attempt, 250);
+    theaterTimer = setInterval(attempt, 100);
     attempt();
   }
 
@@ -200,6 +214,8 @@
     if (deferLock && state.settings.graceMode) return;
     pausePlayer(video);
     if (clockActive() && id) showLock();
+    // A locked video skips theater mode, so let fade.js show the page now.
+    theaterDone();
   }
 
   async function tick() {
