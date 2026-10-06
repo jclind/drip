@@ -33,12 +33,19 @@
     return location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
   }
 
+  /** Tells guard.js, in the page world, whether to refuse YouTube's play() calls. */
+  /** @param {boolean} hold */
+  function setHold(hold) {
+    document.documentElement.toggleAttribute('data-drip-hold', hold);
+  }
+
   function decide() {
     const id = videoId();
     if (id !== decisionId) pausedWhileUnknown = null;
     decisionId = id;
     if (!storageKnown) {
       locked = null;
+      setHold(!!id);
       return;
     }
     const resetHour = state?.settings?.resetHour ?? 4;
@@ -49,6 +56,7 @@
     // A reset also clears yesterday's unlocks. Grace belongs to watch.js.
     const unlocked = !expired && Array.isArray(state?.unlocked) && state.unlocked.includes(id);
     locked = !state?.settings?.graceMode && seconds <= 0 && !unlocked;
+    setHold(!!id && locked);
 
     const pending = pausedWhileUnknown;
     pausedWhileUnknown = null;
