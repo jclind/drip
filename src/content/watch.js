@@ -169,13 +169,11 @@
       stopRun();
       video.removeEventListener('playing', onPlay);
       for (const ev of ['pause', 'waiting', 'emptied']) video.removeEventListener(ev, stopRun);
-      video.removeEventListener('ended', onEnded);
     }
     video = el;
     if (!video) return;
     video.addEventListener('playing', onPlay);
     for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopRun);
-    video.addEventListener('ended', onEnded);
     // A video waiting on autoplay isn't paused but hasn't played anything. 'playing' fires once it really starts.
     if (!video.paused && video.readyState >= 3) onPlay();
   }
@@ -386,6 +384,8 @@
     applyStatus(Drip.watchStatus(state, id), !!(pendingTick && pendingTick.id === id && pendingTick.paid));
     renderPill();
   });
+  // guard.js swallows the player's own 'ended' event so YouTube can't advance a playlist, and sends this instead.
+  document.addEventListener('drip-ended', onEnded);
   document.addEventListener('yt-navigate-finish', () => {
     if (disconnected) return;
     defaultTheater();
