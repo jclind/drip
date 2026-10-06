@@ -59,6 +59,11 @@
   cursor: pointer;
 }
 
+a.drip-btn {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .drip-btn:hover:not(:disabled) {
   background: var(--drip-chip-hover);
 }

@@ -7,7 +7,8 @@ Written 2026-10-06 on air, against `main` at `9555307`. Draft for Jesse to appro
 ## Status, 2026-10-06 evening
 
 - Steps 1 to 6 are done in stacked PRs #10 (audit) → #11 (state rules) → #12 (watch clock) → #13 (welcome, live pages, release build) → #14 (broken-page banner, store drafts). Merge them in that order. Each one had a Codex review, and every finding was fixed. 86 tests pass.
-- Still open: where a broken-page report gets sent (Q25), a scheduled check on air for YouTube markup changes, and step 7, which needs the MacBook because air's Chrome can't play video.
+- All of it merged to `main` on 2026-10-06 (#10, then #15 for the rest of the stack).
+- Reports go by email (Jesse, 2026-10-06), and `bin/check-youtube` runs weekly on air. Still open: the report address and the Discord webhook for the weekly check, and step 7. air's Chrome can play video when its window is brought forward (registry page `claude-in-chrome`), so most of step 7 can run on air.
 - Left as is, by judgment: finding 8 (the fullscreen Comments button in other languages; the comments themselves stay hidden), and findings 2 and 3 (timers and search layout work), which only a DevTools trace on the MacBook can measure.
 - Dropped from the feature list: "Reset all data", because it hands back a full day's tokens in one click, against Q6.
 

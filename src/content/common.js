@@ -90,6 +90,8 @@
   };
   /** @type {Set<string>} */
   const brokenSeen = new Set();
+  // Where "Send report" emails go (Q25). Empty hides the button. Keep it the same as the store listing's contact.
+  const REPORT_EMAIL = '';
 
   /**
    * Shows the "drip is broken here" banner, once per kind of break per page load.
@@ -112,7 +114,10 @@
     } }, 'Copy details');
     const banner = h('div', { id: 'drip-broken', class: 'drip-ui', role: 'status' },
       h('div', {}, BROKEN[what], ' YouTube probably changed its page, and drip needs an update.'),
-      h('div', { class: 'drip-row' }, copy, h('button', { class: 'drip-btn', onclick: () => banner.remove() }, 'Dismiss')));
+      h('div', { class: 'drip-row' },
+        // The user's own mail app opens with everything filled in, so they see exactly what gets sent.
+        REPORT_EMAIL && h('a', { class: 'drip-btn drip-primary', href: `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(`drip is broken: ${what}`)}&body=${encodeURIComponent(details)}` }, 'Send report'),
+        copy, h('button', { class: 'drip-btn', onclick: () => banner.remove() }, 'Dismiss')));
     document.getElementById('drip-broken')?.remove();
     document.body.append(banner);
   }
