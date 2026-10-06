@@ -1,6 +1,7 @@
 // @ts-check
 // Top-level players must go through the watch clock. Embeds on other sites stay free.
 // Shorts become ordinary watch pages, so the clock and the lock apply to them too.
+// The subscriptions, Explore, and trending feeds go to the home page, where the token page lives (decision Q16).
 
 (function () {
   if (window.top !== window) return;
@@ -24,8 +25,17 @@
     return;
   }
   redirectShort();
+  redirectFeed();
   // Clicking a Short inside YouTube doesn't reload the page, so check after each in-page navigation too.
-  document.addEventListener('yt-navigate-finish', redirectShort);
+  document.addEventListener('yt-navigate-finish', () => {
+    redirectShort();
+    redirectFeed();
+  });
+
+  function redirectFeed() {
+    if (location.hostname !== 'www.youtube.com') return;
+    if (/^\/feed\/(?:subscriptions|explore|trending)\/?$/.test(location.pathname)) location.replace('https://www.youtube.com/');
+  }
 
   function redirectShort() {
     const short = /^\/shorts\/([^/]+)\/?$/.exec(location.pathname);
