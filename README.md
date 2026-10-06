@@ -9,6 +9,7 @@ It's in early development. `DESIGN.md` has the decisions and `IDEAS.md` has what
 1. `git clone git@github.com:jclind/drip.git ~/drip`
 2. Open `chrome://extensions` and turn on Developer mode, top right.
 3. Click "Load unpacked" and pick the `~/drip` folder.
+4. On drip's Details page, turn on "Allow in Incognito", because otherwise an Incognito window skips drip.
 
 ## Update
 

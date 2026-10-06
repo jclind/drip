@@ -22,13 +22,14 @@
   /** @type {HTMLVideoElement | null} */
   let video = null;
   let playedMs = 0;
-  let runningSince = 0;
+  /** @type {number | null} */
+  let runningSince = null;
   let locked = false;
   /** Video allowed to finish after time ran out, when grace mode is on. */
   let graceId = '';
   let lastVideoId = '';
   let disconnected = false;
-  /** @type {{id: string, paid: boolean} | null} */
+  /** @type {{id: string, paid: boolean, startedAt: number} | null} */
   let pendingTick = null;
 
   function miniplayerActive() {
@@ -75,21 +76,21 @@
   }
 
   function startRun() {
-    if (!runningSince) runningSince = Date.now();
+    if (runningSince === null) runningSince = performance.now();
   }
 
   function stopRun() {
-    if (runningSince) {
-      playedMs += Date.now() - runningSince;
-      runningSince = 0;
+    if (runningSince !== null) {
+      playedMs += performance.now() - runningSince;
+      runningSince = null;
     }
   }
 
   /** Seconds played since the last call. */
   function takePlayed() {
-    const now = Date.now();
+    const now = performance.now();
     let ms = playedMs;
-    if (runningSince) {
+    if (runningSince !== null) {
       ms += now - runningSince;
       runningSince = now;
     }
@@ -156,7 +157,14 @@
   }
 
   async function tick() {
-    if (disconnected || pendingTick) return;
+    if (disconnected) return;
+    if (pendingTick) {
+      if (performance.now() - pendingTick.startedAt >= 5000) {
+        attach();
+        video?.pause();
+      }
+      return;
+    }
     attach();
     const id = videoId();
     if (!clockActive() || !id) {
@@ -167,7 +175,7 @@
     const seconds = takePlayed();
     if (seconds > 0) {
       const before = state && Drip.watchStatus(state, id);
-      const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && video && !video.paused) };
+      const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && video && !video.paused), startedAt: performance.now() };
       pendingTick = request;
       try {
         const res = await send({ type: 'tick', seconds, videoId: id });

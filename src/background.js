@@ -99,7 +99,11 @@ function handleDev(msg, sendResponse) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === 'tick' && (!sender.tab || !sender.url?.startsWith('https://www.youtube.com/'))) {
+    sendResponse({ ok: false, error: 'bad-sender' });
+    return;
+  }
   withState((state, now) => ({ result: handle(msg, state, now), state }))
     .then(({ result, state }) => sendResponse({ ...result, state }))
     .catch((err) => sendResponse({ ok: false, error: String(err) }));

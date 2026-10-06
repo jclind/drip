@@ -219,10 +219,12 @@
    */
   function chargeTick(state, clock, now, seconds, videoId) {
     seconds = Math.min(Math.max(Number(seconds) || 0, 0), 3600);
+    if (seconds === 0) return watchStatus(state, videoId);
     if (state.unlocked.includes(videoId)) {
       logDay(state).watchedSec += seconds;
       return watchStatus(state, videoId);
     }
+    if (clock.lastChargeEnd > now) clock.lastChargeEnd = 0;
     const start = Math.max(clock.lastChargeEnd, now - seconds * 1000);
     clock.lastChargeEnd = Math.max(clock.lastChargeEnd, now);
     return charge(state, Math.max(0, (now - start) / 1000), videoId);

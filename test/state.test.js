@@ -471,12 +471,25 @@ test('chargeTick clamps to 3600 seconds and ignores negative seconds', () => {
   }
 });
 
-test('chargeTick never moves the paid clock backwards', () => {
+test('chargeTick charges in full after the wall clock moves backwards', () => {
   const state = fresh();
   state.watchSecondsLeft = 100;
-  const clock = { lastChargeEnd: time(5) + 1000 };
+  const clock = { lastChargeEnd: time(5) + 3600000 };
   D.chargeTick(state, clock, time(5), 10, 'paid');
-  assert.equal(clock.lastChargeEnd, time(5) + 1000);
-  assert.equal(state.watchSecondsLeft, 100);
-  assert.equal(D.logDay(state).watchedSec, 0);
+  assert.equal(clock.lastChargeEnd, time(5));
+  assert.equal(state.watchSecondsLeft, 90);
+  assert.equal(D.logDay(state).watchedSec, 10);
+});
+
+test('chargeTick zero tick between paid ticks does not suppress playback', () => {
+  const state = fresh();
+  state.watchSecondsLeft = 100;
+  const clock = { lastChargeEnd: 0 };
+  D.chargeTick(state, clock, time(5), 10, 'paid');
+  assert.deepEqual(D.chargeTick(state, clock, time(5) + 5000, 0, 'paused'), { secondsLeft: 90, unlocked: false, locked: false });
+  assert.equal(clock.lastChargeEnd, time(5));
+  D.chargeTick(state, clock, time(5) + 10000, 10, 'paid');
+  assert.equal(clock.lastChargeEnd, time(5) + 10000);
+  assert.equal(state.watchSecondsLeft, 80);
+  assert.equal(D.logDay(state).watchedSec, 20);
 });
