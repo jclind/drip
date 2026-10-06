@@ -6,21 +6,23 @@
 
 (function () {
   const ATTR = 'data-drip-shown';
-  const DELAY_MS = 150;
   const FAILSAFE_MS = 6000;
   const root = document.documentElement;
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let timer;
+  let frame = 0;
   let dataReady = false;
   let theaterReady = false;
 
   function show() {
     clearTimeout(timer);
+    cancelAnimationFrame(frame);
     root.setAttribute(ATTR, '');
   }
 
   function hide() {
     clearTimeout(timer);
+    cancelAnimationFrame(frame);
     dataReady = false;
     theaterReady = false;
     root.removeAttribute(ATTR);
@@ -29,8 +31,12 @@
 
   function maybeShow() {
     if (location.pathname === '/watch' ? !theaterReady : !dataReady) return;
-    clearTimeout(timer);
-    timer = setTimeout(show, DELAY_MS);
+    // Two frames, so the theater layout has been painted before the fade starts. Frames don't run in a hidden tab,
+    // so a page loaded in the background fades in when you switch to it. The failsafe timer still stands.
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(show);
+    });
   }
 
   document.addEventListener('yt-navigate-start', hide);
