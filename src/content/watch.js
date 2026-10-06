@@ -21,6 +21,8 @@
     channel: 'ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a',
   };
 
+  const GRACE_ATTR = 'data-drip-grace';
+
   /** @type {any} */
   let state = null;
   /** @type {HTMLVideoElement | null} */
@@ -29,7 +31,7 @@
   /** @type {number | null} */
   let runningSince = null;
   let locked = false;
-  /** Video allowed to finish after time ran out, when grace mode is on. */
+  /** Video allowed to finish after time ran out, when grace mode is on. Set it with setGrace. */
   let graceId = '';
   let lastVideoId = '';
   let disconnected = false;
@@ -104,6 +106,17 @@
     return location.pathname === '/watch' || miniplayerActive();
   }
 
+  /**
+   * Also marks the grace video on <html>, so early.js doesn't hold a video that's finishing in grace.
+   * @param {string} id
+   */
+  function setGrace(id) {
+    graceId = id;
+    if (id) document.documentElement.setAttribute(GRACE_ATTR, id);
+    else document.documentElement.removeAttribute(GRACE_ATTR);
+    document.dispatchEvent(new CustomEvent('drip-grace'));
+  }
+
   function inGrace() {
     return !!graceId && graceId === videoId();
   }
@@ -114,7 +127,7 @@
     const res = await sendMessage(msg);
     if (res && res.error === 'disconnected') {
       disconnected = true;
-      graceId = '';
+      setGrace('');
       stopRun();
       pausePlayer(video);
       clearInterval(tickTimer);
@@ -170,7 +183,7 @@
     const id = videoId();
     if (id && state && state.backlog.some((/** @type {any} */ v) => v.id === id)) send({ type: 'removeBacklog', id });
     if (locked) {
-      graceId = '';
+      setGrace('');
       showLock();
     }
   }
@@ -198,10 +211,10 @@
   function applyStatus(status, deferLock = false) {
     if (disconnected) return;
     const id = videoId();
-    if (state && state.settings.graceMode === false) graceId = '';
+    if (state && state.settings.graceMode === false) setGrace('');
     locked = !!status.locked;
     if (!locked) {
-      graceId = '';
+      setGrace('');
       hideLock();
       if (!theaterHandled.has(id)) defaultTheater();
       return;
@@ -248,7 +261,7 @@
         if (res && res.ok && !disconnected) {
           state = res.state;
           if (id === videoId()) {
-            if (request.paid && res.locked && state.settings.graceMode && video && !video.paused) graceId = id;
+            if (request.paid && res.locked && state.settings.graceMode && video && !video.paused) setGrace(id);
             applyStatus(res);
           } else applyStatus(Drip.watchStatus(state, videoId()));
         } else if (state) applyStatus(Drip.watchStatus(state, videoId()));
@@ -406,7 +419,7 @@
     if (disconnected) return;
     defaultTheater();
     const id = videoId();
-    if (graceId !== id) graceId = '';
+    if (graceId !== id) setGrace('');
     if (id !== lockVideoId) hideLock();
     refreshStatus();
   });

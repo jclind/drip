@@ -101,8 +101,7 @@ function renderPending() {
 
 function renderLog() {
   /** @type {string[]} */
-  const days = [];
-  for (let i = 0; i < 7; i++) days.push(Drip.addDays(state.day, -i));
+  const days = Drip.logDays(state.day);
   const rows = days.map((day) => {
     const d = state.log[day];
     const cells = d

@@ -14,7 +14,8 @@ const clock = { lastChargeEnd: 0 };
 let queue = Promise.resolve();
 
 /**
- * Runs fn on the current state, saves it, and returns fn's result. Calls run one at a time.
+ * Runs fn on the current state, saves it if it changed, and returns fn's result. Calls run one at a time.
+ * Every save wakes the storage listeners in every YouTube tab, so a call that changes nothing doesn't save.
  * @template T
  * @param {(state: any, now: number) => T} fn
  * @returns {Promise<T>}
@@ -25,8 +26,18 @@ function withState(fn) {
     const stored = await chrome.storage.local.get(KEY);
     const state = Drip.hydrate(stored[KEY], now);
     Drip.rollDay(state, now);
+    const before = JSON.stringify(stored[KEY]);
+    const chargedUntil = clock.lastChargeEnd;
     const result = fn(state, now);
-    await chrome.storage.local.set({ [KEY]: state });
+    if (JSON.stringify(state) !== before) {
+      try {
+        await chrome.storage.local.set({ [KEY]: state });
+      } catch (err) {
+        // The charge didn't stick, so the tab's resent time must be charged again.
+        clock.lastChargeEnd = chargedUntil;
+        throw err;
+      }
+    }
     return result;
   });
   queue = run.catch(() => {});
@@ -47,7 +58,7 @@ function handle(msg, state, now) {
     case 'reveal':
       return Drip.reveal(state, Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'resolve':
-      return Drip.resolveCurrent(state, msg.action);
+      return Drip.resolveCurrent(state, msg.action, typeof msg.videoId === 'string' ? msg.videoId : undefined);
     case 'addBacklog':
       return Drip.addBacklog(state, msg.video);
     case 'removeBacklog':

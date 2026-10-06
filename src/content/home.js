@@ -139,6 +139,8 @@
         return `No rec tokens left. More at ${reset}.`;
       case 'no-watch-tokens':
         return `No watch tokens left. More at ${reset}.`;
+      case 'stale-card':
+        return 'That card changed in another tab.';
       case 'pool-empty':
         return state && state.settings.feedSource === 'subscriptions'
           ? 'Nothing new from your subscriptions. No token spent.'
@@ -194,10 +196,11 @@
     render();
   }
 
-  /** @param {'watch' | 'save' | 'pass'} action */
-  async function onResolve(action) {
+  /** @param {'watch' | 'save' | 'pass'} action @param {string} videoId The card the button was on. */
+  async function onResolve(action, videoId) {
     message = '';
-    const res = absorb(await send({ type: 'resolve', action }));
+    const res = absorb(await send({ type: 'resolve', action, videoId }));
+    if (res && !res.ok) message = errorText(res.error);
     if (action === 'watch' && res && res.ok) {
       location.assign(watchUrl(res.video.id));
       return;
@@ -217,16 +220,16 @@
     return h(
       'div',
       { class: 'drip-card' },
-      h('a', { class: 'drip-thumb', href: watchUrl(video.id), onclick: (/** @type {Event} */ e) => { e.preventDefault(); onResolve('watch'); } },
+      h('a', { class: 'drip-thumb', href: watchUrl(video.id), onclick: (/** @type {Event} */ e) => { e.preventDefault(); onResolve('watch', video.id); } },
         h('img', { src: `https://i.ytimg.com/vi/${encodeURIComponent(video.id)}/hqdefault.jpg`, alt: '' })),
       h('div', { class: 'drip-card-title' }, video.title),
       meta && h('div', { class: 'drip-meta' }, meta),
       h(
         'div',
         { class: 'drip-row' },
-        h('button', { class: 'drip-btn drip-primary', onclick: () => onResolve('watch') }, 'Watch'),
-        h('button', { class: 'drip-btn', onclick: () => onResolve('save') }, 'Save'),
-        h('button', { class: 'drip-btn', onclick: () => onResolve('pass') }, 'Pass'),
+        h('button', { class: 'drip-btn drip-primary', onclick: () => onResolve('watch', video.id) }, 'Watch'),
+        h('button', { class: 'drip-btn', onclick: () => onResolve('save', video.id) }, 'Save'),
+        h('button', { class: 'drip-btn', onclick: () => onResolve('pass', video.id) }, 'Pass'),
       ),
     );
   }
