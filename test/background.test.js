@@ -21,9 +21,10 @@ function sortKeys(value) {
 /**
  * Loads background.js in a fresh context with in-memory storage.
  * @param {any} [initial]
- * @param {{dev?: boolean}} [opts] dev: the checkout has dev/ENABLED.
+ * @param {{dev?: boolean, panel?: boolean}} [opts] dev: the checkout has dev/ENABLED. panel: false for a store build,
+ *   which has no dev panel.
  */
-function worker(initial = undefined, { dev = false } = {}) {
+function worker(initial = undefined, { dev = false, panel = true } = {}) {
   /** @type {Record<string, any>} */
   const store = initial === undefined ? {} : { drip: structuredClone(initial) };
   let writes = 0;
@@ -37,7 +38,10 @@ function worker(initial = undefined, { dev = false } = {}) {
   const chrome = {
     runtime: {
       getURL: (/** @type {string} */ p) => p,
-      getManifest: () => ({ externally_connectable: { matches: ['http://localhost/*'] } }),
+      getManifest: () => ({
+        externally_connectable: { matches: ['http://localhost/*'] },
+        content_scripts: panel ? [{ js: ['src/devpanel/panel.js'] }] : [],
+      }),
       onMessage: { addListener: (/** @type {Function} */ fn) => { onMessage = fn; } },
       onMessageExternal: { addListener() {} },
       onInstalled: { addListener: (/** @type {Function} */ fn) => { onInstalled = fn; } },
@@ -224,4 +228,34 @@ test('an unknown dev action is refused', async () => {
   const w = worker(undefined, { dev: true });
   const res = await w.send({ type: 'devAction', action: 'nope' });
   assert.equal(res.error, 'unknown-dev-action');
+});
+
+test('the Settings toggle turns developer mode on and off without dev/ENABLED', async () => {
+  const w = worker();
+  const before = await w.send({ type: 'devStatus' }, PAGE);
+  assert.equal(before.toggle, true);
+  assert.equal(before.enabled, false);
+  const on = await w.send({ type: 'setDevMode', on: true }, PAGE);
+  assert.equal(on.enabled, true);
+  assert.equal((await w.send({ type: 'devAction', action: 'minutes+5' })).state.watchSecondsLeft, 300);
+  const off = await w.send({ type: 'setDevMode', on: false }, PAGE);
+  assert.equal(off.enabled, false);
+  assert.equal((await w.send({ type: 'devAction', action: 'minutes+5' })).error, 'dev-off');
+});
+
+test('a store build has no developer mode, even with the toggle stored as on', async () => {
+  const w = worker(undefined, { dev: true, panel: false });
+  w.store.dripDev = true;
+  const status = await w.send({ type: 'devStatus' }, PAGE);
+  assert.equal(status.toggle, false);
+  assert.equal(status.enabled, false);
+  assert.equal((await w.send({ type: 'setDevMode', on: true }, PAGE)).error, 'dev-off');
+  assert.equal((await w.send({ type: 'devAction', action: 'minutes+5' })).error, 'dev-off');
+});
+
+test('dev/ENABLED keeps developer mode on whatever the toggle says', async () => {
+  const w = worker(undefined, { dev: true });
+  const off = await w.send({ type: 'setDevMode', on: false }, PAGE);
+  assert.equal(off.file, true);
+  assert.equal(off.enabled, true);
 });

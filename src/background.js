@@ -147,14 +147,32 @@ function runDevAction(msg, sendResponse) {
     .catch((err) => sendResponse({ ok: false, error: String(err) }));
 }
 
+// Developer mode, the Settings toggle for the dev panel. It's its own storage key, not part of drip's state. A store
+// build has no panel (bin/build-release strips it), so there the toggle hides itself and the worker refuses it.
+// The localhost route above stays tied to dev/ENABLED, since any localhost page can reach it.
+const DEV_KEY = 'dripDev';
+const shipsPanel = (chrome.runtime.getManifest().content_scripts || []).some((c) => (c.js || []).some((f) => f.startsWith('src/devpanel/')));
+
+/** @returns {Promise<{toggle: boolean, file: boolean, enabled: boolean}>} */
+async function devStatus() {
+  if (!shipsPanel) return { toggle: false, file: false, enabled: false };
+  const file = await devEnabled;
+  const stored = await chrome.storage.local.get(DEV_KEY);
+  return { toggle: true, file, enabled: file || stored[DEV_KEY] === true };
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  // The dev panel asks whether to show itself, and its buttons only work in a checkout with dev/ENABLED.
-  if (msg && (msg.type === 'devStatus' || msg.type === 'devAction')) {
-    devEnabled.then((on) => {
-      if (msg.type === 'devStatus') sendResponse({ ok: true, enabled: on });
-      else if (on) runDevAction(msg, sendResponse);
+  // The dev panel and Settings ask whether developer mode is on. The panel's buttons only work while it is.
+  if (msg && (msg.type === 'devStatus' || msg.type === 'devAction' || msg.type === 'setDevMode')) {
+    devStatus().then(async (dev) => {
+      if (msg.type === 'devStatus') sendResponse({ ok: true, ...dev });
+      else if (msg.type === 'setDevMode') {
+        if (!dev.toggle) return sendResponse({ ok: false, error: 'dev-off' });
+        await chrome.storage.local.set({ [DEV_KEY]: msg.on === true });
+        sendResponse({ ok: true, ...(await devStatus()) });
+      } else if (dev.enabled) runDevAction(msg, sendResponse);
       else sendResponse({ ok: false, error: 'dev-off' });
-    });
+    }).catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true;
   }
   if (msg && msg.type === 'tick' && (!sender.tab || !sender.url?.startsWith('https://www.youtube.com/'))) {

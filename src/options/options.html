@@ -29,6 +29,19 @@
         <div id="log"></div>
       </section>
 
+      <!-- Shown only in a build that has the dev panel, so never in the store build. -->
+      <section id="dev" hidden>
+        <h2>Developer mode</h2>
+        <label class="row">
+          <input type="checkbox" id="devMode" />
+          <span>Show the dev panel on YouTube pages</span>
+        </label>
+        <p class="muted" id="devHint">
+          For testing. The panel sets minutes and tokens and runs the daily reset now, so it undoes every limit while
+          it's on. Turn it off when you're done.
+        </p>
+      </section>
+
     </main>
     <script src="../lib/state.js"></script>
     <script src="options.js"></script>
