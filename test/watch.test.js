@@ -307,6 +307,16 @@ test('time before and after an ad stays in separate entries, so another tab duri
   assert.ok(Math.abs(world.state.watchSecondsLeft - 892) < 0.01, `${900 - world.state.watchSecondsLeft} charged`);
 });
 
+test('the pill does not count down during an ad (Codex, Q27)', async () => {
+  const { world, tab } = await setup();
+  tab.setAd(true);
+  // A state update renders the pill mid-ad, before the next tick has dropped the ad time.
+  world.advance(90);
+  await world.handle({ type: 'get' });
+  await settle();
+  assert.match(tab.pill().textContent, /^15 min left/);
+});
+
 test('nothing is sent while the video is paused', async () => {
   const { world, tab } = await setup();
   tab.video.pause();

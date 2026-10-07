@@ -513,8 +513,10 @@
     }
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === id);
     const unlocked = state.unlocked.includes(id);
-    // Count down between ticks, which only go out every few seconds.
-    const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
+    // Count down between ticks, which only go out every few seconds. During an ad, the time not banked yet is all ad
+    // (syncAd banked what came before it), and ads aren't charged (Q27).
+    const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
+    const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
     const time = unlocked ? 'unlocked' : `${Drip.formatMinutes(Math.max(0, state.watchSecondsLeft - pending))} left`;
     // Rebuild only when the text changes. A button replaced mid-click loses the click.
     const view = JSON.stringify([id, time, saved]);
