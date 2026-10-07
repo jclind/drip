@@ -280,6 +280,33 @@ test('a delayed tick spanning video, an ad, and video again charges only the vid
   assert.ok(Math.abs(total - 4) < 0.01, `charged ${total}`);
 });
 
+test('time before and after an ad stays in separate entries, so another tab during the ad is still charged (Codex, Q27)', async () => {
+  const world = makeWorld();
+  world.state.watchSecondsLeft = 900;
+  const a = makeTab(world, 'aaa');
+  const b = makeTab(world, 'bbb');
+  await settle();
+  await a.video.play();
+  await a.tick();
+  world.sent.length = 0;
+  // Tab A's timers are throttled, so it doesn't tick until the end.
+  world.advance(3);
+  a.setAd(true);
+  // Tab B plays the last 4 seconds of A's 20-second ad.
+  world.advance(16);
+  await b.video.play();
+  await b.tick();
+  for (let i = 0; i < 4; i++) { world.advance(1); await b.tick(); }
+  b.video.pause();
+  await b.tick();
+  a.setAd(false);
+  world.advance(1);
+  await a.tick();
+  a.video.pause();
+  await a.tick();
+  assert.ok(Math.abs(world.state.watchSecondsLeft - 892) < 0.01, `${900 - world.state.watchSecondsLeft} charged`);
+});
+
 test('nothing is sent while the video is paused', async () => {
   const { world, tab } = await setup();
   tab.video.pause();
