@@ -53,6 +53,13 @@ Settled:
 - Saved rows: title on one line cut with "…", channel and length under it in gray, and the blue cartoon play icon on the right with no circle behind it. The whole row plays the video. On hover the row gets a faint gray background and a plain lucide × appears left of the play icon. Removing a row collapses it to "Removed · Undo" for about 5 seconds. At 0 minutes the play icon shows "-1 drop", the same rule as Watch. The chevron points down when the list is open. An empty list says "Videos you save show up here." Jesse's mockup, 2026-10-07.
 - Durations use drip's existing format: "1 h 42 min", "42 min".
 
+Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Paying stays neutral and justifying stays a little effortful:
+
+- Headline: "You've had your fill." when no watch tokens are left, "Time for a breather." when there are tokens to buy minutes. Jesse's lines.
+- "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds, the only idle animation in drip. Clicking it plays one ripple that settles flat, then goes to the home page.
+- "+15 min · -1 drop" is the gray secondary button. "I need this one" is a text link, and its reason box gets no animation.
+- Proposed, not confirmed: the paused frame blurred and tinted blue, as if underwater. A gray line with time watched next to the same weekday last week, like "1 h 15 min today · 50 min last Tuesday". "The glass refills at 4:00am." when everything is out. "Kept 3 drops." on the home page after leaving with drops unspent.
+
 Ideas, not decided:
 
 - The minutes tile as a glass of water that fills when you buy minutes and drains while you watch. The same glass, smaller, could be the pill on the watch page. Full means the minutes bought today.
