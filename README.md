@@ -23,5 +23,6 @@ Your tokens and backlog live in Chrome's storage for the extension, so updating 
 
 - `node --test` runs the unit tests. There's nothing to install.
 - Edit, reload the extension, refresh YouTube.
+- `touch dev/ENABLED` turns on the dev panel, a box at the bottom left of YouTube pages for setting minutes and tokens, running the daily reset now, and clearing state. It also turns on the localhost route in `dev/reload.html`. Delete the file to turn both off. Don't create it on a copy you use for real, since the panel undoes every limit. The store build never has either.
 - `test/BROWSER.md` is the checklist for what Node can't test. Run it on a computer whose Chrome window is visible, since a hidden window doesn't play video.
 - Editors check types through `jsconfig.json`. To check from the command line without adding a dependency to the repo, install the checker in a scratch folder: `npm i --prefix /tmp/drip-tsc typescript@5 @types/chrome @types/node`, then `/tmp/drip-tsc/node_modules/.bin/tsc -p jsconfig.json --typeRoots /tmp/drip-tsc/node_modules/@types`. It should print nothing.

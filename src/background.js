@@ -125,6 +125,8 @@ function handleDev(msg, sendResponse) {
   if (msg.type === 'devReload') {
     sendResponse({ ok: true });
     setTimeout(() => chrome.runtime.reload(), 100);
+  } else if (msg.type === 'devAction') {
+    runDevAction(msg, sendResponse);
   } else if (DEV_TYPES.includes(msg.type)) {
     withState((state, now) => ({ result: handle(msg, state, now), state }))
       .then(({ result, state }) => sendResponse({ ...result, state }))
@@ -134,7 +136,27 @@ function handleDev(msg, sendResponse) {
   }
 }
 
+/**
+ * The dev panel's buttons (src/devpanel/panel.js) and the localhost route both end up here.
+ * @param {any} msg
+ * @param {(res: any) => void} sendResponse
+ */
+function runDevAction(msg, sendResponse) {
+  withState((state, now) => ({ result: Drip.devAction(state, String(msg.action), now), state }))
+    .then(({ result, state }) => sendResponse({ ...result, state }))
+    .catch((err) => sendResponse({ ok: false, error: String(err) }));
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // The dev panel asks whether to show itself, and its buttons only work in a checkout with dev/ENABLED.
+  if (msg && (msg.type === 'devStatus' || msg.type === 'devAction')) {
+    devEnabled.then((on) => {
+      if (msg.type === 'devStatus') sendResponse({ ok: true, enabled: on });
+      else if (on) runDevAction(msg, sendResponse);
+      else sendResponse({ ok: false, error: 'dev-off' });
+    });
+    return true;
+  }
   if (msg && msg.type === 'tick' && (!sender.tab || !sender.url?.startsWith('https://www.youtube.com/'))) {
     sendResponse({ ok: false, error: 'bad-sender' });
     return;

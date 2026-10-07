@@ -119,6 +119,7 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, needThis: [{ videoId
 - `logDays(day)` returns the 8 days the Settings log shows, `day` first (Q21).
 - `redirectTarget(href)` returns where a top-level YouTube URL should go instead, or `''`. Shorts and embeds become watch pages, the feeds in Q16 and `/tv` go to the token page, and `m.youtube.com` moves to `www`. redirect.js applies it, but only in the top frame, so embeds on other sites stay free (Q7).
 - `earlyLocked(raw, now, videoId)` decides, from raw storage, whether a loading watch page holds its video: no state, a day that has rolled over, or 0 seconds without an unlock today. Grace mode doesn't count, because nothing is playing yet. early.js also skips the video watch.js marks with `data-drip-grace` on `<html>`.
+- `devAction(state, action, now)` is test tooling, not a feature. It backs the dev panel (`src/devpanel/`), a floating box on YouTube pages that shows state and has buttons for minutes, tokens, "Run reset now" (moves `day` and any pending `effectiveDay` back one day, so the next message rolls over as a real reset would), applying pending settings, toggling grace now, clearing lists, and starting fresh. The worker answers `devStatus` and `devAction` only in a checkout with `dev/ENABLED`, and `bin/build-release` leaves the panel out. Error `'unknown-dev-action'`.
 
 ## Storage
 
