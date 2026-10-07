@@ -19,10 +19,12 @@ ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer {
   display: none !important;
 }
 
-/* Watch-page recommendations: the sidebar, the end-screen grid, and the cards that pop up during playback. */
+/* Watch-page recommendations: the sidebar, the end-screen grid, and the cards that pop up during playback.
+   .ytp-fullscreen-grid is the newer end-screen grid, also opened by "More videos (v)" (seen on air 2026-10-07). */
 ytd-watch-flexy #related,
 ytd-watch-flexy ytd-watch-next-secondary-results-renderer,
 .ytp-endscreen-content,
+.ytp-fullscreen-grid,
 .ytp-ce-element {
   display: none !important;
 }
