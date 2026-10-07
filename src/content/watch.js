@@ -15,6 +15,7 @@
     theaterButton: '.ytp-size-button',
     autoplayToggle: '.ytp-autonav-toggle-button[aria-checked="true"]',
     ads: '#movie_player.ad-showing, #movie_player.ad-interrupting',
+    player: '#movie_player',
     app: 'ytd-app',
     miniplayerAttr: 'miniplayer-is-active',
     title: 'ytd-watch-metadata h1, h1.ytd-watch-metadata',
@@ -194,16 +195,47 @@
     }
   }
 
-  /** Moves measured playback into unsent, under the video it played on. */
+  // Ads play in the same video element, and their time is dropped, not charged (Q27). A delayed tick can span an ad
+  // and the video around it, so time is settled the moment the player's ad class changes, under the state it had.
+  let adShowing = false;
+  /** Set at an ad change, so the time after it goes in its own entry. The worker reads an entry as one unbroken stretch
+   * ending at endedAt, and merging across an ad would hide the gap from its check against other tabs. */
+  let splitNext = false;
+  /** @type {Element | null} */
+  let watchedPlayer = null;
+  const adObserver = new MutationObserver(syncAd);
+
+  /** Starts watching the player's class, again if YouTube swapped the player element. */
+  function watchAds() {
+    const player = document.querySelector(SEL.player);
+    if (player === watchedPlayer) return;
+    adObserver.disconnect();
+    watchedPlayer = player;
+    if (player) adObserver.observe(player, { attributes: true, attributeFilter: ['class'] });
+    syncAd();
+  }
+
+  function syncAd() {
+    const now = !!document.querySelector(SEL.ads);
+    if (now === adShowing) return;
+    if (clockActive()) bank();
+    else takePlayed();
+    adShowing = now;
+    splitNext = true;
+  }
+
+  /** Moves measured playback into unsent, under the video it played on. Time played during an ad is dropped. */
   function bank() {
     const seconds = takePlayed();
+    if (adShowing) return;
     if (seconds <= 0 || !runId) return;
     const endedAt = performance.now();
     const last = unsent[unsent.length - 1];
-    if (last && last.id === runId) {
+    if (last && last.id === runId && !splitNext) {
       last.seconds += seconds;
       last.endedAt = endedAt;
     } else unsent.push({ id: runId, seconds, endedAt });
+    splitNext = false;
   }
 
   /** Seconds played since the last call. */
@@ -230,6 +262,7 @@
       else showLock();
       return;
     }
+    watchAds();
     startRun();
   }
 
@@ -311,6 +344,7 @@
       return;
     }
     attach();
+    watchAds();
     autoplayOff();
     // drip hides the miniplayer (early.css), so a video that drops into it gets paused rather than playing unseen.
     // The main player playing off /watch means the miniplayer, however YouTube marks it.
@@ -479,8 +513,10 @@
     }
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === id);
     const unlocked = state.unlocked.includes(id);
-    // Count down between ticks, which only go out every few seconds.
-    const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
+    // Count down between ticks, which only go out every few seconds. During an ad, the time not banked yet is all ad
+    // (syncAd banked what came before it), and ads aren't charged (Q27).
+    const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
+    const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
     const time = unlocked ? 'unlocked' : `${Drip.formatMinutes(Math.max(0, state.watchSecondsLeft - pending))} left`;
     // Rebuild only when the text changes. A button replaced mid-click loses the click.
     const view = JSON.stringify([id, time, saved]);
