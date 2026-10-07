@@ -1,6 +1,6 @@
 #!/bin/sh
-# Builds the zip for the Chrome Web Store: manifest.json, src/, and icons/ only, with the localhost dev route
-# taken out of the manifest. Refuses on uncommitted changes or a version that already has a git tag.
+# Builds the zip for the Chrome Web Store: manifest.json, src/, and icons/ only, with the localhost dev route and
+# the dev panel (src/devpanel) taken out. Refuses on uncommitted changes or a version that already has a git tag.
 # Usage: bin/build-release    Output: dist/drip-<version>.zip
 set -eu
 cd "$(dirname "$0")/.."
@@ -20,12 +20,14 @@ out="dist/drip-$version"
 rm -rf "$out" "$out.zip"
 mkdir -p "$out"
 git archive HEAD src icons | tar -x -C "$out"
+rm -rf "$out/src/devpanel"
 node -e "
   const m = require('./manifest.json');
   delete m.externally_connectable;
+  m.content_scripts = m.content_scripts.filter((c) => !c.js?.some((f) => f.startsWith('src/devpanel/')));
   require('fs').writeFileSync('$out/manifest.json', JSON.stringify(m, null, 2) + '\n');
 "
-if grep -q localhost "$out/manifest.json" || [ -e "$out/dev" ]; then
+if grep -q -e localhost -e devpanel "$out/manifest.json" || [ -e "$out/dev" ] || [ -e "$out/src/devpanel" ]; then
   echo "build-release: the dev route is still in the build" >&2
   exit 1
 fi

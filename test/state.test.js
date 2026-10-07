@@ -24,7 +24,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'addBacklog',
     'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'formatMinutes', 'cleanVideo',
-    'logDays', 'redirectTarget', 'earlyLocked',
+    'logDays', 'redirectTarget', 'earlyLocked', 'devAction',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {

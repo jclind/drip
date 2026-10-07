@@ -407,11 +407,54 @@
     return count(stored.watchSecondsLeft, 0) <= 0;
   }
 
+  /**
+   * The dev panel's actions, for testing in a checkout with dev/ENABLED. The worker refuses them anywhere else, and
+   * bin/build-release leaves the panel out of the store build. Not a feature: nothing in DESIGN.md's rules applies.
+   * @param {State} state
+   * @param {string} action
+   * @param {number} now
+   */
+  function devAction(state, action, now) {
+    /** @param {'watch' | 'rec'} kind @param {number} n */
+    const setTokens = (kind, n) => { state.tokens[kind] = Math.max(0, n); };
+    switch (action) {
+      case 'minutes-0': state.watchSecondsLeft = 0; break;
+      case 'minutes-1': state.watchSecondsLeft = 60; break;
+      case 'minutes+5': state.watchSecondsLeft += 5 * 60; break;
+      case 'minutes+15': state.watchSecondsLeft += 15 * 60; break;
+      case 'watch+1': setTokens('watch', state.tokens.watch + 1); break;
+      case 'watch-0': setTokens('watch', 0); break;
+      case 'rec+1': setTokens('rec', state.tokens.rec + 1); break;
+      case 'rec-0': setTokens('rec', 0); break;
+      case 'reset-now':
+        // Moves drip back a day without rolling it over, so the next message rolls it over the way a real reset
+        // does, and an open token page notices on its own 1-second check. A pending change moves back with it.
+        state.day = addDays(state.day, -1);
+        if (state.pending) state.pending.effectiveDay = addDays(state.pending.effectiveDay, -1);
+        break;
+      case 'apply-pending':
+        if (state.pending) Object.assign(state.settings, state.pending.changes);
+        state.pending = null;
+        break;
+      case 'grace-toggle':
+        state.settings.graceMode = !state.settings.graceMode;
+        cancelPending(state, 'graceMode');
+        break;
+      case 'clear-unlocks': state.unlocked = []; break;
+      case 'clear-backlog': state.backlog = []; break;
+      case 'clear-seen': state.seen = []; state.current = null; break;
+      case 'clear-log': delete state.log[state.day]; break;
+      case 'fresh': Object.assign(state, initialState(now)); break;
+      default: return { ok: false, error: 'unknown-dev-action' };
+    }
+    return { ok: true };
+  }
+
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, addBacklog,
     removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, formatMinutes, cleanVideo,
-    logDays, redirectTarget, earlyLocked,
+    logDays, redirectTarget, earlyLocked, devAction,
   };
 })();

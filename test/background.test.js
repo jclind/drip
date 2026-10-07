@@ -18,8 +18,12 @@ function sortKeys(value) {
   return value;
 }
 
-/** Loads background.js in a fresh context with in-memory storage. */
-function worker(initial = undefined) {
+/**
+ * Loads background.js in a fresh context with in-memory storage.
+ * @param {any} [initial]
+ * @param {{dev?: boolean}} [opts] dev: the checkout has dev/ENABLED.
+ */
+function worker(initial = undefined, { dev = false } = {}) {
   /** @type {Record<string, any>} */
   const store = initial === undefined ? {} : { drip: structuredClone(initial) };
   let writes = 0;
@@ -56,7 +60,7 @@ function worker(initial = undefined) {
     tabs: { create: (/** @type {{url: string}} */ opts) => { opened.push(opts.url); } },
   };
   /** @type {any} */
-  const context = { chrome, console, setTimeout, structuredClone, URL, fetch: async () => ({ ok: false }) };
+  const context = { chrome, console, setTimeout, structuredClone, URL, fetch: async () => ({ ok: dev }) };
   context.globalThis = context;
   context.importScripts = (/** @type {string} */ file) => vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
   vm.createContext(context);
@@ -187,4 +191,37 @@ test('a new install opens the welcome page once, and an update does not', () => 
   w.install('install');
   w.install('update');
   assert.deepEqual([...w.opened], ['src/welcome/welcome.html']);
+});
+
+test('the dev panel stays hidden and its buttons do nothing without dev/ENABLED', async () => {
+  const w = worker();
+  assert.equal((await w.send({ type: 'devStatus' })).enabled, false);
+  const res = await w.send({ type: 'devAction', action: 'minutes+15' });
+  assert.equal(res.error, 'dev-off');
+  const state = (await w.send({ type: 'get' }, PAGE)).state;
+  assert.equal(state.watchSecondsLeft, 0);
+});
+
+test('with dev/ENABLED, a dev button changes state and the reply carries it', async () => {
+  const w = worker(undefined, { dev: true });
+  assert.equal((await w.send({ type: 'devStatus' })).enabled, true);
+  const res = await w.send({ type: 'devAction', action: 'minutes+15' });
+  assert.equal(res.ok, true);
+  assert.equal(res.state.watchSecondsLeft, 900);
+});
+
+test('Run reset now is rolled over by the next message, as a real reset would be', async () => {
+  const w = worker(undefined, { dev: true });
+  await w.send({ type: 'devAction', action: 'watch-0' });
+  const rewound = await w.send({ type: 'devAction', action: 'reset-now' });
+  assert.equal(rewound.state.tokens.watch, 0);
+  const next = await w.send({ type: 'get' }, PAGE);
+  assert.equal(next.state.tokens.watch, 4);
+  assert.equal(next.state.day, w.Drip.dayKey(Date.now(), 4));
+});
+
+test('an unknown dev action is refused', async () => {
+  const w = worker(undefined, { dev: true });
+  const res = await w.send({ type: 'devAction', action: 'nope' });
+  assert.equal(res.error, 'unknown-dev-action');
 });

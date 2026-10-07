@@ -2,7 +2,7 @@
 
 What `node --test` can't cover: YouTube's real pages. Run it before a release and after any YouTube markup fix, on a computer whose Chrome window is visible. air's window is hidden, so videos there never play and lazy pages load little.
 
-Start from a reloaded extension and refreshed YouTube tabs. Each line is an action, then what should happen. Note any line that fails, with the date.
+Start from a reloaded extension and refreshed YouTube tabs. With `dev/ENABLED` in the checkout, the dev panel (bottom left) sets minutes and tokens, and its Run reset now does what the daily reset does, so items 7, 14, and 25 don't need to wait for a real day. Each line is an action, then what should happen. Note any line that fails, with the date.
 
 ## Token page
 
