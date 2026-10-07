@@ -50,6 +50,8 @@ Settled:
 - Revealing a new video shouldn't shift the layout. Reserve a 16:9 box and 2 title lines before the thumbnail loads.
 - Sentence case on all labels.
 - The backlog is called "Saved" on screen, to match the Save button, and stays newest first. Its header shows the count and total length, like "Saved · 8 videos · 1 h 42 min". It's open on the empty page with the top 3 rows and a "Show all" line, and collapsed to the header while a card is up.
+- Saved rows: title on one line cut with "…", channel and length under it in gray, and the blue cartoon play icon on the right with no circle behind it. The whole row plays the video. On hover the row gets a faint gray background and a plain lucide × appears left of the play icon. Removing a row collapses it to "Removed · Undo" for about 5 seconds. At 0 minutes the play icon shows "-1 drop", the same rule as Watch. The chevron points down when the list is open. An empty list says "Videos you save show up here." Jesse's mockup, 2026-10-07.
+- Durations use drip's existing format: "1 h 42 min", "42 min".
 
 Ideas, not decided:
 
@@ -60,7 +62,7 @@ Ideas, not decided:
 - A quiet note at rollover like "+2 saved from yesterday", to reward tokens not spent.
 - The drop, in the same style, as the toolbar icon and store tile.
 
-Still to mock: the empty page, the saved state, loading, out of cards, out of everything, backlog open, the page inside YouTube's top bar, and light mode.
+Jesse mocked the empty page, the reveal card, and the Saved list. He won't mock the rest. Claude drafts them from these rules when building starts, and Jesse reviews: the saved state on the card, loading, a failed reveal, out of cards, out of everything, the page inside YouTube's top bar, and light mode. The popup, Settings, welcome page, watch page pill, and lock screen haven't been designed yet.
 
 ## v1 and step 2 (both done)
 
