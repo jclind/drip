@@ -63,6 +63,9 @@
   const theaterHandled = new Set();
   /** @type {ReturnType<typeof setInterval> | null} */
   let theaterTimer = null;
+  /** The video the running theater loop is for. */
+  let theaterFor = '';
+  const THEATER_RETRY_MS = 1500;
 
   /** Tells fade.js the page layout is settled, so it can fade in after theater mode has been applied, not while it's moving. */
   function theaterDone() {
@@ -70,37 +73,49 @@
   }
 
   function defaultTheater() {
+    const id = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
+    // State and the status reply both call this on load. A second loop would click right after the first and could
+    // turn theater mode back off, so a loop already running for this video keeps going instead.
+    if (theaterTimer !== null && theaterFor === id) return;
     if (theaterTimer !== null) clearInterval(theaterTimer);
     theaterTimer = null;
-    const id = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
     if (!id || theaterHandled.has(id) || (locked && !inGrace())) {
       theaterDone();
       return;
     }
     if (!state) return;
     const deadline = performance.now() + 10000;
+    let clickedAt = -Infinity;
+    function stop() {
+      if (theaterTimer !== null) clearInterval(theaterTimer);
+      theaterTimer = null;
+      theaterDone();
+    }
     function attempt() {
-      if (locked && !inGrace()) {
-        if (theaterTimer !== null) clearInterval(theaterTimer);
-        theaterTimer = null;
-        theaterDone();
-        return;
-      }
+      if (locked && !inGrace()) return stop();
       const currentId = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
+      if (disconnected || currentId !== id) return stop();
+      if (performance.now() >= deadline) {
+        // Once it has clicked, giving up is final. Otherwise every state update during playback would start a new loop.
+        if (clickedAt > -Infinity) theaterHandled.add(id);
+        return stop();
+      }
       const page = document.querySelector(SEL.watchPage);
       const button = /** @type {HTMLElement | null} */ (page?.querySelector(SEL.theaterButton));
-      if (disconnected || currentId !== id || performance.now() >= deadline || (page && button)) {
-        if (theaterTimer !== null) clearInterval(theaterTimer);
-        theaterTimer = null;
-        if (disconnected || currentId !== id || performance.now() >= deadline) {
-          theaterDone();
-          return;
-        }
+      if (!page || !button) return;
+      if (page.hasAttribute(SEL.theaterAttr) || document.fullscreenElement !== null) {
         theaterHandled.add(id);
-        if (page && button && !page.hasAttribute(SEL.theaterAttr) && document.fullscreenElement === null) button.click();
-        theaterDone();
+        return stop();
+      }
+      // On a full page load the button shows up before the player is ready, and YouTube ignores a click that early
+      // (checked 2026-10-06). So click again until theater mode is on, spaced out so a click that did land has time
+      // to take effect before the next one would turn it back off.
+      if (performance.now() - clickedAt >= THEATER_RETRY_MS) {
+        clickedAt = performance.now();
+        button.click();
       }
     }
+    theaterFor = id;
     theaterTimer = setInterval(attempt, 100);
     attempt();
   }
