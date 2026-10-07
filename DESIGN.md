@@ -49,6 +49,7 @@ Settled:
 - Reveal card layout: thumbnail, then the title across the full width cut at 2 lines, then channel and length on the left with Watch on the right of the same line. Below that, one row: Save, "Reveal next · -1 card", and the round ×.
 - Revealing a new video shouldn't shift the layout. Reserve a 16:9 box and 2 title lines before the thumbnail loads.
 - Sentence case on all labels.
+- The backlog is called "Saved" on screen, to match the Save button, and stays newest first. Its header shows the count and total length, like "Saved · 8 videos · 1 h 42 min". It's open on the empty page with the top 3 rows and a "Show all" line, and collapsed to the header while a card is up.
 
 Ideas, not decided:
 
