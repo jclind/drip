@@ -54,6 +54,7 @@ Ideas, not decided:
 
 - The minutes tile as a glass of water that fills when you buy minutes and drains while you watch. The same glass, smaller, could be the pill on the watch page. Full means the minutes bought today.
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
+- The reveal opens the page: the stats slide up and the buttons slide down to make the card's space, a drop falls into it, and the thumbnail surfaces from the ripple. Reveal video stays the same button and moves down to become Reveal next. +15 min shrinks to a bead and Save and × bud out of it, like droplets splitting (a "gooey" SVG filter). Jesse's idea, 2026-10-07.
 - A drop falling into the glass on +15 min, and counts that roll when they change.
 - A quiet note at rollover like "+2 saved from yesterday", to reward tokens not spent.
 - The drop, in the same style, as the toolbar icon and store tile.
