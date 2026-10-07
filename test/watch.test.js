@@ -82,7 +82,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   // The watch page and its theater button. Like YouTube on a full load, a click before the player is ready does nothing,
   // and a click that lands changes the layout a moment later, not during the click.
   // These flags exist before watch.js loads, because it looks for the page while it starts.
-  const player = { hasPage, ready };
+  const player = { hasPage, ready, ad: false };
   const page = new FakeElement('ytd-watch-flexy');
   page.toggleAttribute('theater', theater);
   const theaterButton = {
@@ -105,6 +105,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     querySelector: (sel) => {
       if (sel === '#movie_player video.html5-main-video') return tab.noPlayer ? null : video;
       if (sel === 'ytd-watch-flexy') return player.hasPage ? page : null;
+      if (sel === '#movie_player.ad-showing, #movie_player.ad-interrupting') return player.ad ? {} : null;
       return null;
     },
     /** @param {string} id */
@@ -234,6 +235,19 @@ test('playback is charged in full, in a few batched ticks rather than one per se
   const total = ticks.reduce((sum, t) => sum + /** @type {number} */ (t.seconds), 0);
   assert.ok(Math.abs(total - 12) < 0.01, `charged ${total}`);
   assert.ok(Math.abs(world.state.watchSecondsLeft - 888) < 0.01);
+});
+
+test('ad time is not charged, and the video after it is (Q27)', async () => {
+  const { world, tab } = await setup();
+  tab.player.ad = true;
+  await play(world, tab, 20);
+  tab.player.ad = false;
+  await play(world, tab, 10);
+  tab.video.pause();
+  await tab.tick();
+  const total = world.ticks().reduce((sum, t) => sum + /** @type {number} */ (t.seconds), 0);
+  assert.ok(Math.abs(total - 10) < 0.01, `charged ${total}`);
+  assert.ok(Math.abs(world.state.watchSecondsLeft - 890) < 0.01);
 });
 
 test('nothing is sent while the video is paused', async () => {

@@ -197,6 +197,9 @@
   /** Moves measured playback into unsent, under the video it played on. */
   function bank() {
     const seconds = takePlayed();
+    // Ads play in the same video element, and their time is dropped, not charged (Q27). The tick banks once a second,
+    // so the second in which an ad starts or ends counts all one way or the other.
+    if (document.querySelector(SEL.ads)) return;
     if (seconds <= 0 || !runId) return;
     const endedAt = performance.now();
     const last = unsent[unsent.length - 1];
