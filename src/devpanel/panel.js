@@ -32,7 +32,7 @@
     const res = await send({ type: 'devAction', action });
     if (res && res.state) state = res.state;
     message = res && res.ok ? `Done: ${label}` : `Failed: ${(res && res.error) || 'no answer'}`;
-    render();
+    update();
   }
 
   /** @param {string} action @param {string} label @param {string} [text] */
@@ -45,88 +45,102 @@
     return h('div', { class: 'drip-dev-row' }, h('span', { class: 'drip-dev-label' }, title), ...buttons);
   }
 
-  function freshButton() {
-    return h('button', {
-      class: 'drip-btn',
-      type: 'button',
-      onclick: () => {
-        if (!confirmFresh) {
-          confirmFresh = true;
-          clearTimeout(confirmTimer);
-          confirmTimer = setTimeout(() => { confirmFresh = false; render(); }, 3000);
-          render();
-          return;
-        }
-        confirmFresh = false;
+  // Built once. State updates arrive every few seconds while a video plays, so they change text only: replacing the
+  // buttons would drop a click that lands mid-update, and keyboard focus with it.
+  const toggle = h('button', {
+    class: 'drip-dev-toggle',
+    type: 'button',
+    onclick: () => {
+      collapsed = !collapsed;
+      try {
+        localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
+      } catch {}
+      update();
+    },
+  });
+  const status = h('div', { class: 'drip-dev-status' });
+  const graceButton = h('button', {
+    class: 'drip-btn',
+    type: 'button',
+    onclick: () => run('grace-toggle', graceButton.textContent || 'grace'),
+  });
+  const freshButton = h('button', {
+    class: 'drip-btn',
+    type: 'button',
+    onclick: () => {
+      if (!confirmFresh) {
+        confirmFresh = true;
         clearTimeout(confirmTimer);
-        run('fresh', 'start fresh');
-      },
-    }, confirmFresh ? 'Click again to wipe everything' : 'Start fresh');
-  }
+        confirmTimer = setTimeout(() => { confirmFresh = false; update(); }, 3000);
+        update();
+        return;
+      }
+      confirmFresh = false;
+      clearTimeout(confirmTimer);
+      run('fresh', 'start fresh');
+    },
+  });
+  const messageLine = h('div', { class: 'drip-dev-message' });
+  const body = h('div', {},
+    status,
+    row('Minutes', button('minutes-0', 'minutes to 0', '0'), button('minutes-1', 'minutes to 1', '1 min'),
+      button('minutes+5', 'add 5 min', '+5'), button('minutes+15', 'add 15 min', '+15')),
+    row('Watch tokens', button('watch+1', 'watch token +1', '+1'), button('watch-0', 'watch tokens to 0', '0')),
+    row('Rec tokens', button('rec+1', 'rec token +1', '+1'), button('rec-0', 'rec tokens to 0', '0')),
+    row('Day', button('reset-now', 'reset', 'Run reset now')),
+    row('Settings', button('apply-pending', 'apply pending', 'Apply pending'), graceButton),
+    row('Clear', button('clear-unlocks', 'clear unlocks', 'Unlocks'), button('clear-backlog', 'clear backlog', 'Backlog'),
+      button('clear-seen', 'clear reveal history', 'Reveal history'), button('clear-log', "clear today's log", "Today's log")),
+    h('div', { class: 'drip-dev-row' }, freshButton),
+    messageLine,
+  );
 
   function statusLines() {
-    if (!state) return [h('div', {}, 'Loading…')];
+    if (!state) return ['Loading…'];
     const s = state.settings;
     const pending = state.pending
       ? Object.entries(state.pending.changes).map(([k, v]) => `${k} → ${v}`).join(', ') + ` (from ${state.pending.effectiveDay})`
       : 'none';
     return [
-      h('div', {}, `Day ${state.day}, resets at ${hourLabel(s.resetHour)}`),
-      h('div', {}, `${Drip.formatMinutes(state.watchSecondsLeft)} left (${Math.round(state.watchSecondsLeft)}s)`),
-      h('div', {}, `Watch tokens ${state.tokens.watch} · rec tokens ${state.tokens.rec}`),
-      h('div', {}, `Unlocks ${state.unlocked.length} of ${s.needThisPerDay} · grace ${s.graceMode ? 'on' : 'off'}`),
-      h('div', {}, `Pending: ${pending}`),
+      `Day ${state.day}, resets at ${hourLabel(s.resetHour)}`,
+      `${Drip.formatMinutes(state.watchSecondsLeft)} left (${Math.round(state.watchSecondsLeft)}s)`,
+      `Watch tokens ${state.tokens.watch} · rec tokens ${state.tokens.rec}`,
+      `Unlocks ${state.unlocked.length} of ${s.needThisPerDay} · grace ${s.graceMode ? 'on' : 'off'}`,
+      `Pending: ${pending}`,
     ];
   }
 
-  function render() {
+  /** @param {HTMLElement} el @param {string} text */
+  function setText(el, text) {
+    if (el.textContent !== text) el.textContent = text;
+  }
+
+  function update() {
     if (!panel) {
-      panel = h('div', { id: 'drip-dev', class: 'drip-ui' });
+      panel = h('div', { id: 'drip-dev', class: 'drip-ui' }, toggle, body);
       document.documentElement.append(panel);
     }
-    const toggle = h('button', {
-      class: 'drip-dev-toggle',
-      type: 'button',
-      'aria-expanded': String(!collapsed),
-      onclick: () => {
-        collapsed = !collapsed;
-        try {
-          localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
-        } catch {}
-        render();
-      },
-    }, collapsed ? 'drip dev ▸' : 'drip dev ▾');
-    if (collapsed) {
-      panel.replaceChildren(toggle);
-      return;
-    }
-    const graceLabel = state && state.settings.graceMode ? 'Grace off now' : 'Grace on now';
-    panel.replaceChildren(
-      toggle,
-      h('div', { class: 'drip-dev-status' }, ...statusLines()),
-      row('Minutes', button('minutes-0', 'minutes to 0', '0'), button('minutes-1', 'minutes to 1', '1 min'),
-        button('minutes+5', 'add 5 min', '+5'), button('minutes+15', 'add 15 min', '+15')),
-      row('Watch tokens', button('watch+1', 'watch token +1', '+1'), button('watch-0', 'watch tokens to 0', '0')),
-      row('Rec tokens', button('rec+1', 'rec token +1', '+1'), button('rec-0', 'rec tokens to 0', '0')),
-      row('Day', button('reset-now', 'reset', 'Run reset now')),
-      row('Settings', button('apply-pending', 'apply pending', 'Apply pending'), button('grace-toggle', graceLabel, graceLabel)),
-      row('Clear', button('clear-unlocks', 'clear unlocks', 'Unlocks'), button('clear-backlog', 'clear backlog', 'Backlog'),
-        button('clear-seen', 'clear reveal history', 'Reveal history'), button('clear-log', "clear today's log", "Today's log")),
-      h('div', { class: 'drip-dev-row' }, freshButton()),
-      // Always there, so the first message doesn't make the panel grow and move its buttons.
-      h('div', { class: 'drip-dev-message' }, message || 'Ready'),
-    );
+    setText(toggle, collapsed ? 'drip dev ▸' : 'drip dev ▾');
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    body.hidden = collapsed;
+    const lines = statusLines();
+    if (status.childElementCount !== lines.length) status.replaceChildren(...lines.map(() => h('div')));
+    lines.forEach((line, i) => setText(/** @type {HTMLElement} */ (status.children[i]), line));
+    setText(graceButton, state && state.settings.graceMode ? 'Grace off now' : 'Grace on now');
+    setText(freshButton, confirmFresh ? 'Click again to wipe everything' : 'Start fresh');
+    // Always there, so the first message doesn't make the panel grow and move its buttons.
+    setText(messageLine, message || 'Ready');
   }
 
   send({ type: 'devStatus' }).then((/** @type {any} */ res) => {
     if (!res || !res.enabled) return;
     onState((/** @type {any} */ next) => {
       state = next;
-      render();
+      update();
     });
     send({ type: 'get' }).then((/** @type {any} */ got) => {
       if (got && got.state) state = got.state;
-      render();
+      update();
     });
   });
 })();
