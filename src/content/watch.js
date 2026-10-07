@@ -15,6 +15,7 @@
     theaterButton: '.ytp-size-button',
     autoplayToggle: '.ytp-autonav-toggle-button[aria-checked="true"]',
     ads: '#movie_player.ad-showing, #movie_player.ad-interrupting',
+    player: '#movie_player',
     app: 'ytd-app',
     miniplayerAttr: 'miniplayer-is-active',
     title: 'ytd-watch-metadata h1, h1.ytd-watch-metadata',
@@ -194,12 +195,35 @@
     }
   }
 
-  /** Moves measured playback into unsent, under the video it played on. */
+  // Ads play in the same video element, and their time is dropped, not charged (Q27). A delayed tick can span an ad
+  // and the video around it, so time is settled the moment the player's ad class changes, under the state it had.
+  let adShowing = false;
+  /** @type {Element | null} */
+  let watchedPlayer = null;
+  const adObserver = new MutationObserver(syncAd);
+
+  /** Starts watching the player's class, again if YouTube swapped the player element. */
+  function watchAds() {
+    const player = document.querySelector(SEL.player);
+    if (player === watchedPlayer) return;
+    adObserver.disconnect();
+    watchedPlayer = player;
+    if (player) adObserver.observe(player, { attributes: true, attributeFilter: ['class'] });
+    syncAd();
+  }
+
+  function syncAd() {
+    const now = !!document.querySelector(SEL.ads);
+    if (now === adShowing) return;
+    if (clockActive()) bank();
+    else takePlayed();
+    adShowing = now;
+  }
+
+  /** Moves measured playback into unsent, under the video it played on. Time played during an ad is dropped. */
   function bank() {
     const seconds = takePlayed();
-    // Ads play in the same video element, and their time is dropped, not charged (Q27). The tick banks once a second,
-    // so the second in which an ad starts or ends counts all one way or the other.
-    if (document.querySelector(SEL.ads)) return;
+    if (adShowing) return;
     if (seconds <= 0 || !runId) return;
     const endedAt = performance.now();
     const last = unsent[unsent.length - 1];
@@ -233,6 +257,7 @@
       else showLock();
       return;
     }
+    watchAds();
     startRun();
   }
 
@@ -314,6 +339,7 @@
       return;
     }
     attach();
+    watchAds();
     autoplayOff();
     // drip hides the miniplayer (early.css), so a video that drops into it gets paused rather than playing unseen.
     // The main player playing off /watch means the miniplayer, however YouTube marks it.

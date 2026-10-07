@@ -85,6 +85,17 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   const player = { hasPage, ready, ad: false };
   const page = new FakeElement('ytd-watch-flexy');
   page.toggleAttribute('theater', theater);
+  // #movie_player, and the observers watching its class for ads.
+  const playerEl = new FakeElement('div');
+  /** @type {any} */ (playerEl).classList = { contains: () => false };
+  /** @type {Function[]} */
+  const classWatchers = [];
+  class FakeMutationObserver {
+    /** @param {Function} fn */
+    constructor(fn) { this.fn = fn; }
+    observe() { classWatchers.push(this.fn); }
+    disconnect() { const i = classWatchers.indexOf(this.fn); if (i >= 0) classWatchers.splice(i, 1); }
+  }
   const theaterButton = {
     clicks: 0,
     click() {
@@ -105,7 +116,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     querySelector: (sel) => {
       if (sel === '#movie_player video.html5-main-video') return tab.noPlayer ? null : video;
       if (sel === 'ytd-watch-flexy') return player.hasPage ? page : null;
-      if (sel === '#movie_player.ad-showing, #movie_player.ad-interrupting') return player.ad ? {} : null;
+      if (sel === '#movie_player.ad-showing, #movie_player.ad-interrupting') return player.ad ? playerEl : null;
+      if (sel === '#movie_player') return tab.noPlayer ? null : playerEl;
       return null;
     },
     /** @param {string} id */
@@ -120,6 +132,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   const context = {
     navigator: { userAgent: 'test', clipboard: { writeText: async () => {} } },
     document, location, URLSearchParams, JSON, Math, Number, String, Set, Array, Object, Promise, console,
+    MutationObserver: FakeMutationObserver,
     performance: { now: () => world.now },
     Date: class extends Date { static now() { return world.epoch + world.now; } },
     CustomEvent: class { /** @param {string} type */ constructor(type) { this.type = type; } },
@@ -138,6 +151,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   const tab = {
     noPlayer: false,
     player, page, theaterButton,
+    /** Starts or ends an ad, the way YouTube flips the player's class. @param {boolean} on */
+    setAd: (on) => { player.ad = on; for (const fn of [...classWatchers]) fn(); },
     /** Runs every timer once, as one second passing would. */
     second: async () => { for (const fn of [...intervals.values()]) await fn(); await settle(); },
     broken: () => document.getElementById('drip-broken'),
@@ -239,15 +254,30 @@ test('playback is charged in full, in a few batched ticks rather than one per se
 
 test('ad time is not charged, and the video after it is (Q27)', async () => {
   const { world, tab } = await setup();
-  tab.player.ad = true;
+  tab.setAd(true);
   await play(world, tab, 20);
-  tab.player.ad = false;
+  tab.setAd(false);
   await play(world, tab, 10);
   tab.video.pause();
   await tab.tick();
   const total = world.ticks().reduce((sum, t) => sum + /** @type {number} */ (t.seconds), 0);
   assert.ok(Math.abs(total - 10) < 0.01, `charged ${total}`);
   assert.ok(Math.abs(world.state.watchSecondsLeft - 890) < 0.01);
+});
+
+test('a delayed tick spanning video, an ad, and video again charges only the video (Codex, Q27)', async () => {
+  const { world, tab } = await setup();
+  // No tick runs in between, as when Chrome throttles a background tab's timers.
+  world.advance(3);
+  tab.setAd(true);
+  world.advance(20);
+  tab.setAd(false);
+  world.advance(1);
+  await tab.tick();
+  tab.video.pause();
+  await tab.tick();
+  const total = world.ticks().reduce((sum, t) => sum + /** @type {number} */ (t.seconds), 0);
+  assert.ok(Math.abs(total - 4) < 0.01, `charged ${total}`);
 });
 
 test('nothing is sent while the video is paused', async () => {
