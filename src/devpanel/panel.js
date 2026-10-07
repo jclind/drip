@@ -18,6 +18,10 @@
   let confirmTimer;
   /** @type {HTMLElement | null} */
   let panel = null;
+  /** Whether developer mode is on. Late timers and replies check it, so they can't bring a hidden panel back. */
+  let enabled = false;
+  /** Counts refresh() calls, so an older one that finishes late doesn't undo a newer one. */
+  let refreshes = 0;
 
   function readCollapsed() {
     try {
@@ -117,6 +121,7 @@
   }
 
   function update() {
+    if (!enabled) return;
     if (!panel) {
       panel = h('div', { id: 'drip-dev', class: 'drip-ui' }, toggle, body);
       document.documentElement.append(panel);
@@ -133,7 +138,6 @@
     setText(messageLine, message || 'Ready');
   }
 
-  let enabled = false;
   onState((/** @type {any} */ next) => {
     state = next;
     if (enabled) update();
@@ -141,14 +145,19 @@
 
   /** Shows or removes the panel to match developer mode. */
   async function refresh() {
+    const mine = ++refreshes;
     const res = await send({ type: 'devStatus' });
+    if (mine !== refreshes) return;
     enabled = !!(res && res.enabled);
     if (!enabled) {
+      confirmFresh = false;
+      clearTimeout(confirmTimer);
       panel?.remove();
       panel = null;
       return;
     }
     const got = await send({ type: 'get' });
+    if (mine !== refreshes) return;
     if (got && got.state) state = got.state;
     update();
   }
