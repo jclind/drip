@@ -20,12 +20,12 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q10 | 1 watch token = 15 min, drained only while playing. 1 rec token = 1 reveal. Defaults: 4 watch tokens, 10 rec tokens per day. |
 | Q11 | Tokens roll over up to 2 days' worth. Bought minutes expire at reset. |
 | Q12 | Day resets at 4am, as a setting. |
-| Q13 | The reveal card offers Watch, Save, Pass. Pass is free and final. |
+| Q13 | The reveal card offers Watch, Save, Pass. Pass is free and final. Planned, not built: Save keeps the card up and the button turns into "Saved ✓". "Reveal next · -1 card" passes and reveals in one click. Pass is a round × button with a tooltip, free and still final. A video saved and then passed stays in the backlog (Jesse, 2026-10-07). |
 | Q14 | Backlog videos cost no rec token. Save button on watch pages and search results. Backlog is a text list (title, channel, length), no thumbnails. |
 | Q15 | Search: remove injected shelves, stop at 10 results, free "more" button. |
 | Q16 | Replace subscriptions and Explore with the token page. Channel pages and the bell stay as they are. Watch page comments are hidden behind a "Show comments" button that lasts for that video (Jesse, 2026-10-06). |
 | Q17 | Name: `drip` (tentative). |
-| Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. |
+| Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. Planned, not built: while a card is up, Watch is free if minutes are left. At 0 minutes it reads "Watch · -1 drop", and clicking it buys one watch token's minutes and starts the video. "+15 min" shows only when no card is up (Jesse, 2026-10-07). |
 | Q19 | Background audio counts like any watching. `music.youtube.com` is out of scope. |
 | Q20 | "I need this one" on the overlay: typed reason, unlocks that one video for the day without draining minutes, 2 per day, every use logged. |
 | Q21 | Log per day: seconds watched, tokens spent, reveals saved or passed, "I need this" reasons. Keep 90 days. Show today plus the 7 days before it, 8 rows, so today sits next to the same weekday last week (Claude's pick, Jesse deferred, 2026-10-06). |
@@ -35,6 +35,30 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q25 | When YouTube's markup changes and drip can't find the player or the home grid, it fails open: videos play without the clock. drip tells the user it's broken and offers to send a report, which the user sees and confirms first. A check on air finds the break on its own too (Jesse, 2026-10-06). |
 | Q26 | Finishing a video that's in the backlog removes it from the backlog. Each new video opens in theater mode. Kept as they are for now (Jesse, 2026-10-06). |
 | Q27 | Ads don't use watch minutes. Time the player spends on an ad isn't charged or logged (Jesse, 2026-10-07). |
+
+## Visual design (in progress, nothing built)
+
+Jesse is designing the look by hand, with Claude reviewing his mockups, started 2026-10-07. The goal is a little character without being distracting. Spending a token can feel satisfying, but restraint should feel good too, so the design doesn't reward spending everything.
+
+Settled:
+
+- A blue drop is the watch token and a gold card is the rec token. Jesse drew both, in a cartoon style with a shimmer cutout.
+- Icons for actions and tokens (play, save, reveal, drop, card) use that cartoon fill with the shimmer. Icons that dismiss or collapse (×, the backlog arrow) are plain lucide lines, so they recede.
+- Every button that spends shows its price on the button, like "Reveal video · -1 card".
+- Watch is the primary button on the reveal card: white with black text in dark mode, black with white text in light mode. Reveal on the empty page is gold.
+- Reveal card layout: thumbnail, then the title across the full width cut at 2 lines, then channel and length on the left with Watch on the right of the same line. Below that, one row: Save, "Reveal next · -1 card", and the round ×.
+- Revealing a new video shouldn't shift the layout. Reserve a 16:9 box and 2 title lines before the thumbnail loads.
+- Sentence case on all labels.
+
+Ideas, not decided:
+
+- The minutes tile as a glass of water that fills when you buy minutes and drains while you watch. The same glass, smaller, could be the pill on the watch page. Full means the minutes bought today.
+- A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
+- A drop falling into the glass on +15 min, and counts that roll when they change.
+- A quiet note at rollover like "+2 saved from yesterday", to reward tokens not spent.
+- The drop, in the same style, as the toolbar icon and store tile.
+
+Still to mock: the empty page, the saved state, loading, out of cards, out of everything, backlog open, the page inside YouTube's top bar, and light mode.
 
 ## v1 and step 2 (both done)
 
@@ -105,7 +129,7 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, needThis: [{ videoId
 - `logDay(state)` returns `state.log[state.day]`, creating it with zeros.
 - `spendWatch(state)` takes one watch token and adds `minutesPerToken * 60` seconds. Error `'no-watch-tokens'`.
 - `reveal(state, candidates)` takes the first candidate whose id isn't in `seen` or the backlog, takes one rec token, sets `current`, and pushes the id to `seen` (dropping the oldest past 2000). Errors, checked in order: `'resolve-current'` if `current` is set, `'no-rec-tokens'`, `'pool-empty'` if no candidate qualifies. An error spends nothing. Returns `{ ok: true, video }`.
-- `resolveCurrent(state, action, videoId?)` with action `'watch'`, `'save'`, or `'pass'`. Save adds to the backlog and counts `saved`. Pass counts `passed`. All three clear `current` and return `{ ok: true, video }`. Errors, in order: `'no-current'`, `'bad-action'`, and `'stale-card'` when `videoId` is given and isn't the current card's, because another tab moved on.
+- `resolveCurrent(state, action, videoId?)` with action `'watch'`, `'save'`, or `'pass'`. Save adds to the backlog and counts `saved`. Pass counts `passed`. All three clear `current` and return `{ ok: true, video }`. Errors, in order: `'no-current'`, `'bad-action'`, and `'stale-card'` when `videoId` is given and isn't the current card's, because another tab moved on. The new reveal card in Q13 will change this.
 - `cleanVideo(raw)` returns a `Video` with string fields, or `null` when the id isn't 1 to 64 letters, digits, `_`, or `-`. `hydrate`, `reveal`, and `addBacklog` all pass videos through it.
 - `addBacklog(state, video)` adds the video unless its id is already there (then still `ok`). Error `'bad-video'`. `removeBacklog(state, id)` removes it. Neither touches tokens.
 - `charge(state, seconds, videoId)` adds `seconds` to the log's `watchedSec`. Unless `videoId` is unlocked, it subtracts from `watchSecondsLeft`, never below 0. Returns `watchStatus`.
