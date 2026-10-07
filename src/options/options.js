@@ -193,6 +193,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
   renderLog();
 });
 
+// Developer mode: the dev panel's toggle. The worker says whether this build has the panel at all.
+/** @param {any} dev */
+function renderDev(dev) {
+  if (!dev || !dev.ok || !dev.toggle) return;
+  const box = /** @type {HTMLInputElement} */ ($('devMode'));
+  box.checked = dev.enabled;
+  box.disabled = dev.file;
+  if (dev.file) $('devHint').textContent = 'On because this checkout has dev/ENABLED. Delete that file to turn it off.';
+  $('dev').hidden = false;
+}
+
+$('devMode').addEventListener('change', async () => {
+  const box = /** @type {HTMLInputElement} */ ($('devMode'));
+  renderDev(await chrome.runtime.sendMessage({ type: 'setDevMode', on: box.checked }));
+});
+chrome.runtime.sendMessage({ type: 'devStatus' }).then(renderDev);
+
 chrome.runtime.sendMessage({ type: 'get' }).then((res) => {
   absorb(res);
   if (state) render();

@@ -1,6 +1,7 @@
 // @ts-check
 // Dev panel: a floating box on YouTube pages for testing, with drip's state and buttons that change it.
-// It shows only in a checkout with dev/ENABLED (the worker checks), and bin/build-release leaves it out of the store build.
+// It shows while developer mode is on in Settings, or always in a checkout with dev/ENABLED (the worker decides).
+// bin/build-release leaves it out of the store build.
 
 (function () {
   /** @type {any} */
@@ -17,6 +18,10 @@
   let confirmTimer;
   /** @type {HTMLElement | null} */
   let panel = null;
+  /** Whether developer mode is on. Late timers and replies check it, so they can't bring a hidden panel back. */
+  let enabled = false;
+  /** Counts refresh() calls, so an older one that finishes late doesn't undo a newer one. */
+  let refreshes = 0;
 
   function readCollapsed() {
     try {
@@ -116,6 +121,7 @@
   }
 
   function update() {
+    if (!enabled) return;
     if (!panel) {
       panel = h('div', { id: 'drip-dev', class: 'drip-ui' }, toggle, body);
       document.documentElement.append(panel);
@@ -132,15 +138,33 @@
     setText(messageLine, message || 'Ready');
   }
 
-  send({ type: 'devStatus' }).then((/** @type {any} */ res) => {
-    if (!res || !res.enabled) return;
-    onState((/** @type {any} */ next) => {
-      state = next;
-      update();
-    });
-    send({ type: 'get' }).then((/** @type {any} */ got) => {
-      if (got && got.state) state = got.state;
-      update();
-    });
+  onState((/** @type {any} */ next) => {
+    state = next;
+    if (enabled) update();
   });
+
+  /** Shows or removes the panel to match developer mode. */
+  async function refresh() {
+    const mine = ++refreshes;
+    const res = await send({ type: 'devStatus' });
+    if (mine !== refreshes) return;
+    enabled = !!(res && res.enabled);
+    if (!enabled) {
+      confirmFresh = false;
+      clearTimeout(confirmTimer);
+      panel?.remove();
+      panel = null;
+      return;
+    }
+    const got = await send({ type: 'get' });
+    if (mine !== refreshes) return;
+    if (got && got.state) state = got.state;
+    update();
+  }
+
+  // The Settings toggle (dripDev) shows and hides the panel on open tabs, no refresh needed.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.dripDev) refresh();
+  });
+  refresh();
 })();
