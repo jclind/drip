@@ -73,6 +73,8 @@ Minutes and the watch page pill (2026-10-07):
 - The pill never offers to buy minutes. That stays on the lock screen (Jesse).
 - Proposed, not confirmed: "Unlocked" in gray with no glass on an unlocked video. A small "ad, not counted" while an ad plays. The glass down to its last drop in the last minute, with no red. The pill fading to low opacity a few seconds into playback and coming back when the mouse moves.
 
+Popup (2026-10-08, Jesse's mockup): the home page stats block, smaller. The glass tile with "34 min left today", the drop and card counts, then two gray links: "⚙ Settings" on the left and "Open YouTube ↗" on the right, with lucide's arrow-up-right after the text. Open YouTube switches to an open YouTube tab if there is one. The page fills Chrome's popup window edge to edge with no outer card, and it follows Chrome's light or dark theme, not YouTube's. Still read-only (Q22).
+
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
 - The reveal opens the page: the stats slide up and the buttons slide down to make the card's space, a drop falls into it, and the thumbnail surfaces from the ripple. Reveal video stays the same button and moves down to become Reveal next. +15 min shrinks to a bead and Save and × bud out of it, like droplets splitting (a "gooey" SVG filter). Jesse's idea, 2026-10-07.
