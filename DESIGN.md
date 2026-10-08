@@ -65,9 +65,14 @@ Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Pa
 - "Kept 3 drops." shows on the home page after leaving the lock screen with drops unspent.
 - Jesse confirmed these on 2026-10-07.
 
-Ideas, not decided:
+Minutes and the watch page pill (2026-10-07):
 
-- The minutes tile as a glass of water that fills when you buy minutes and drains while you watch. The same glass, smaller, could be the pill on the watch page. Full means the minutes bought today.
+- Minutes show as a glass of water: the tile on the home page and a small one in the pill. It fills when you buy minutes and drains while you watch. Full means the minutes bought today, which needs a new state field, since drip doesn't track that yet (Jesse).
+- The pill: the glass, "34 min", and a cartoon bookmark for Save that fills in when saved. Labels "Save" and "Saved".
+- The pill never offers to buy minutes. That stays on the lock screen (Jesse).
+- Proposed, not confirmed: "Unlocked" in gray with no glass on an unlocked video. A small "ad, not counted" while an ad plays. The glass down to its last drop in the last minute, with no red. The pill fading to low opacity a few seconds into playback and coming back when the mouse moves.
+
+Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
 - The reveal opens the page: the stats slide up and the buttons slide down to make the card's space, a drop falls into it, and the thumbnail surfaces from the ripple. Reveal video stays the same button and moves down to become Reveal next. +15 min shrinks to a bead and Save and × bud out of it, like droplets splitting (a "gooey" SVG filter). Jesse's idea, 2026-10-07.
 - A drop falling into the glass on +15 min, and counts that roll when they change.
