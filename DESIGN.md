@@ -57,8 +57,9 @@ Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Pa
 
 - Headline: "You've had your fill." when no watch tokens are left, "Time for a breather." when there are tokens to buy minutes. Jesse's lines.
 - "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds, the only idle animation in drip. Clicking it plays one ripple that settles flat, then goes to the home page.
-- "+15 min · -1 drop" is the gray secondary button. "I need this one" is a text link, and its reason box gets no animation.
-- Proposed, not confirmed: the paused frame blurred and tinted blue, as if underwater. A gray line with time watched next to the same weekday last week, like "1 h 15 min today · 50 min last Tuesday". "The glass refills at 4:00am." when everything is out. "Kept 3 drops." on the home page after leaving with drops unspent.
+- "+15 min · -1 drop" is the gray secondary button, with white text. "I need this one · 2 left" is a gray text link, and its reason box gets no animation.
+- Layout, top to bottom: headline, a gray line "1 h 15 min watched today · 50 min last Tuesday" (only the first half when last week has no data), the two buttons with Done for now on the right, then the link. No token counts on this screen; the headline already says whether minutes can be bought. Jesse's mockup, 2026-10-07.
+- Proposed, not confirmed: the paused frame blurred and tinted blue, as if underwater. "The glass refills at 4:00am." when everything is out. "Kept 3 drops." on the home page after leaving with drops unspent.
 
 Ideas, not decided:
 
