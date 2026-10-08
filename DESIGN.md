@@ -68,6 +68,7 @@ Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Pa
 Minutes and the watch page pill (2026-10-07):
 
 - Minutes show as a glass of water: the tile on the home page and a small one in the pill. It fills when you buy minutes and drains while you watch. Full means the minutes bought today, which needs a new state field, since drip doesn't track that yet (Jesse).
+- Jesse drew the glass in `cup-icons/` (2026-10-08): a gray glass with the shimmer cutout and blue water with a wavy surface, showing the top of the water when full. Build it as one SVG with the water height set from the fraction, so the level moves smoothly and the fill animation can rise. Near 0 the water thins to a sliver like Jesse's low cup, and while any minutes remain it stays at least 2 screen pixels tall, so the 20px pill can tell low from empty. At 0 the glass is empty. The glass outline uses `currentColor`: `#D9D9D9` on dark, about `#909090` on light, where the original gray is nearly invisible.
 - The pill: the glass, "34 min", and a cartoon bookmark for Save that fills in when saved. Labels "Save" and "Saved".
 - The pill never offers to buy minutes. That stays on the lock screen (Jesse).
 - Proposed, not confirmed: "Unlocked" in gray with no glass on an unlocked video. A small "ad, not counted" while an ad plays. The glass down to its last drop in the last minute, with no red. The pill fading to low opacity a few seconds into playback and coming back when the mouse moves.
