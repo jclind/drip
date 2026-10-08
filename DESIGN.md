@@ -59,7 +59,11 @@ Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Pa
 - "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds, the only idle animation in drip. Clicking it plays one ripple that settles flat, then goes to the home page.
 - "+15 min · -1 drop" is the gray secondary button, with white text. "I need this one · 2 left" is a gray text link, and its reason box gets no animation.
 - Layout, top to bottom: headline, a gray line "1 h 15 min watched today · 50 min last Tuesday" (only the first half when last week has no data), the two buttons with Done for now on the right, then the link. No token counts on this screen; the headline already says whether minutes can be bought. Jesse's mockup, 2026-10-07.
-- Proposed, not confirmed: the paused frame blurred and tinted blue, as if underwater. "The glass refills at 4:00am." when everything is out. "Kept 3 drops." on the home page after leaving with drops unspent.
+- "+15 min" keeps its clock icon here and on the home page, so it looks the same everywhere.
+- The paused frame behind the panel is blurred and tinted blue, as if underwater.
+- "You've had your fill." drops the gray button and leaves Done for now alone in the middle. When the unlocks are gone too, "The glass refills at 4:00am." (the reset hour) takes the link's place.
+- "Kept 3 drops." shows on the home page after leaving the lock screen with drops unspent.
+- Jesse confirmed these on 2026-10-07.
 
 Ideas, not decided:
 
