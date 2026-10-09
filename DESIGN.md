@@ -75,6 +75,16 @@ Minutes and the watch page pill (2026-10-07):
 
 Popup (2026-10-08, Jesse's mockup): the home page stats block, smaller. The glass tile with "34 min left today", the drop and card counts, then two gray links: "⚙ Settings" on the left and "Open YouTube ↗" on the right, with lucide's arrow-up-right after the text. Open YouTube switches to an open YouTube tab if there is one. The page fills Chrome's popup window edge to edge with no outer card, and it follows Chrome's light or dark theme, not YouTube's. Still read-only (Q22).
 
+Settings (2026-10-08, Jesse's mockups):
+
+- On screen, watch tokens are "drops" and rec tokens are "cards", in Settings, the welcome page, and everywhere else a user reads them. Code and state keep their names.
+- Three sections with small gray caps headers: "Your allowance" (drops per day, minutes per drop, cards per day, save unspent for), "Your day" (new day starts at), and "When time runs out" (finish the current video, "I need this one" per day). Labels sit flush left under their headers.
+- Numbers use steppers with plain lucide minus and plus. The unit or icon sits after the number inside the stepper: "4 💧", "15 min", "10 🃏", "2 days". The value boxes are all as wide as the widest value. − dims at the minimum and + at the maximum. The reset hour is a time picker showing "4:00 am", filled gray like the steppers. Grace mode is a blue toggle.
+- Gray hints only where needed: "Unspent drops and cards carry over up to this many days." under Save unspent for, and "Each one needs a typed reason." under the unlocks.
+- A loosening change that waits for the reset shows as a gray chip to the right of its label, like "→ 3 days from 4:00am · Undo", and wraps under the label when the row is too narrow. The row doesn't grow, so nothing moves. The old notice at the top and the separate pending list go away.
+- The white Save button stays, with "1 waiting for the reset." next to it.
+- Proposed, not mocked: "This week" as 8 blue bars of minutes watched, today highlighted and the same weekday last week marked, with a click on a bar showing that day's numbers. The "I need this one" reasons stay as a list under it. Developer mode stays at the bottom, unchanged.
+
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
 - The reveal opens the page: the stats slide up and the buttons slide down to make the card's space, a drop falls into it, and the thumbnail surfaces from the ripple. Reveal video stays the same button and moves down to become Reveal next. +15 min shrinks to a bead and Save and × bud out of it, like droplets splitting (a "gooey" SVG filter). Jesse's idea, 2026-10-07.
