@@ -88,7 +88,8 @@
   const messageLine = h('div', { class: 'drip-dev-message' });
   const body = h('div', {},
     status,
-    row('Minutes', button('minutes-0', 'minutes to 0', '0'), button('minutes-1', 'minutes to 1', '1 min'),
+    row('Minutes', button('minutes-0', 'minutes to 0', '0'), button('seconds-10', 'minutes to 10 sec', '10s'),
+      button('minutes-1', 'minutes to 1', '1 min'),
       button('minutes+5', 'add 5 min', '+5'), button('minutes+15', 'add 15 min', '+15')),
     row('Watch tokens', button('watch+1', 'watch token +1', '+1'), button('watch-0', 'watch tokens to 0', '0')),
     row('Rec tokens', button('rec+1', 'rec token +1', '+1'), button('rec-0', 'rec tokens to 0', '0')),

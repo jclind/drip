@@ -519,6 +519,7 @@
     const setTokens = (kind, n) => { state.tokens[kind] = Math.max(0, n); };
     switch (action) {
       case 'minutes-0': state.watchSecondsLeft = 0; break;
+      case 'seconds-10': state.watchSecondsLeft = 10; break;
       case 'minutes-1': state.watchSecondsLeft = 60; break;
       case 'minutes+5': state.watchSecondsLeft += 5 * 60; break;
       case 'minutes+15': state.watchSecondsLeft += 15 * 60; break;
