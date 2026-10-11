@@ -1,14 +1,16 @@
 /* The popup (DESIGN.md, "Popup"): the home page's stats block, smaller, edge to edge in Chrome's popup window. */
 
+/* No fixed width. Chrome sizes the popup to its content, so the stats row at its natural width, with the home page's
+   spacing, sets the width, and the links spread across it (Jesse, 2026-10-11). */
 body {
-  width: 300px;
+  width: max-content;
   padding: 24px 24px 20px;
-  box-sizing: border-box;
 }
 
 .stats {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   min-height: 56px;
 }
@@ -25,8 +27,7 @@ body {
 }
 
 .time-block {
-  flex: 1;
-  min-width: 0;
+  margin-right: 20px;
 }
 
 .time {
@@ -73,12 +74,12 @@ body {
   opacity: 0.45;
 }
 
-/* Set in from the edges, so the two links sit a little closer together than the stats above (Jesse, 2026-10-11). */
+/* The gap only matters when the time is short and the links are the wider row. */
 .links {
   display: flex;
   justify-content: space-between;
+  gap: 32px;
   margin-top: 28px;
-  padding: 0 16px;
 }
 
 button.plain {
