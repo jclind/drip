@@ -44,8 +44,9 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 27. The popup shows the glass, minutes left, and both balances, in Chrome's light and dark theme. Settings opens Settings. With a YouTube tab open in another window, Open YouTube brings that tab forward; with none open, it opens youtube.com in a new tab.
 28. In Settings, click + on Save unspent for and click Save. A gray "→ 3 days from 4:00am · Undo" chip appears by the label, and "1 waiting for the reset." by Save. Undo removes it. Lower Drops per day and save, and it applies at once with no chip.
 29. Tab to a stepper's number and use the arrow keys, Home, and End. − dims at the minimum and + at the maximum.
-30. History shows this week's bars with today's letter bold, the daily average, and last week's dashed line. ‹ steps back a week and the label and every number follow. Click a bar: the block below names that day and shows its drops, cards, and unlocks. Narrow the window to phone width: nothing overflows.
+30. Turn Developer mode on, then pick each profile under "Show Settings with". Each shows the sample banner, and nothing overflows. Back on Your data, your real settings are unchanged.
+31. History shows this week's bars with today's letter bold, the daily average, and last week's dashed line. ‹ steps back a week and the label and every number follow. Click a bar: the block below names that day and shows its drops, cards, and unlocks. Narrow the window to phone width: nothing overflows.
 
 ## After a day boundary
 
-31. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.
+32. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.

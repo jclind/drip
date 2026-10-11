@@ -10,6 +10,10 @@
   <body class="settings">
     <main>
       <h1>drip settings</h1>
+      <p class="sample-note" id="sampleNote" hidden>
+        Sample data: <strong id="sampleName"></strong>. Nothing on this page is saved.
+        <button class="link" id="sampleBack" type="button">Show my data</button>
+      </p>
 
       <form id="settings" novalidate></form>
       <div class="save-row">
@@ -33,6 +37,10 @@
           <input type="checkbox" id="devMode" />
           <span>Show the dev panel on YouTube pages</span>
         </label>
+        <div class="dev-row sample-row" id="sampleRow" hidden>
+          <label for="sample">Show Settings with</label>
+          <div class="picker-wrap"><select class="picker" id="sample"></select></div>
+        </div>
         <p class="muted" id="devHint">
           For testing. The panel sets minutes and tokens and runs the daily reset now, so it undoes every limit while
           it's on. Turn it off when you're done.

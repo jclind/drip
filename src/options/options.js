@@ -17,7 +17,9 @@ var DripPage = /** @type {any} */ (globalThis).DripPage;
  * @property {number} [max]
  * @property {number} [step] Steps by this much above it, and by 1 below it.
  * @property {(n: number) => (Node | string)[]} [unit] What follows the number inside the stepper.
+ * @property {(n: number) => string} [format] The number as shown, when it isn't the plain number.
  * @property {(n: number) => string} [say] The value in words, for the pending chip and screen readers.
+ * @property {(n: number) => string} [spoken] The value for screen readers, when `say` is too short to read aloud.
  * @property {[string, string][]} [options]
  */
 
@@ -32,7 +34,7 @@ const SECTIONS = [
       { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48,
         unit: () => [DripPage.icon('drop', 'drip-token-drop')], say: (n) => plural(n, 'drop', 'drops') },
       { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
-        unit: () => ['min'], say: (n) => `${n} min` },
+        format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
       { key: 'recTokensPerDay', label: 'Cards per day', kind: 'stepper', min: 0, max: 100,
         unit: () => [DripPage.icon('card', 'drip-token-card')], say: (n) => plural(n, 'card', 'cards') },
       // Not in the mockups. Settings is where the feed source lives for now (Q5).
@@ -68,14 +70,25 @@ let weeksBack = 0;
 let selectedDay = '';
 let historyShown = '';
 
+/**
+ * The sample profile shown in place of the real state (src/devpanel/profiles.js), or null. While one is up, Save and
+ * Undo run the real rules on it here, and nothing reaches the worker.
+ * @type {{id: string, name: string, build: (now: number) => any} | null}
+ */
+let sample = null;
+
+/** Messages that change settings go through here, so a sample profile never touches the real state. @param {any} msg */
+async function send(msg) {
+  if (!sample) return chrome.runtime.sendMessage(msg);
+  const result = msg.type === 'updateSettings' ? Drip.updateSettings(state, msg.changes)
+    : msg.type === 'cancelPending' ? Drip.cancelPending(state, msg.key)
+      : { ok: false, error: 'sample' };
+  return { ...result, state };
+}
+
 /** @param {string} id */
 function $(id) {
   return /** @type {HTMLElement} */ (document.getElementById(id));
-}
-
-/** "4:00 am" in the picker. The chip and the rest of drip say "4:00am". */
-function pickerHour(/** @type {number} */ hour) {
-  return DripPage.hourLabel(hour).replace(/(am|pm)$/, ' $1');
 }
 
 /** @param {Field} f @param {any} value */
@@ -116,9 +129,9 @@ function stepper(f, labelId) {
   const plus = /** @type {HTMLButtonElement} */ (h('button', { type: 'button', class: 'stepper-btn', tabindex: '-1', 'aria-label': 'More' }, icon('plus')));
   const update = () => {
     const v = draft[f.key];
-    value.replaceChildren(h('span', {}, String(v)), ...(f.unit ? f.unit(v) : []).map((u) => (typeof u === 'string' ? h('span', {}, u) : u)));
+    value.replaceChildren(h('span', {}, f.format ? f.format(v) : String(v)), ...(f.unit ? f.unit(v) : []).map((u) => (typeof u === 'string' ? h('span', {}, u) : u)));
     value.setAttribute('aria-valuenow', String(v));
-    value.setAttribute('aria-valuetext', valueWords(f, v));
+    value.setAttribute('aria-valuetext', f.spoken ? f.spoken(v) : valueWords(f, v));
     minus.disabled = v <= min;
     plus.disabled = v >= max;
   };
@@ -156,7 +169,7 @@ function control(f, labelId) {
     return box;
   }
   const options = f.kind === 'hour'
-    ? Array.from({ length: 24 }, (_, hour) => [String(hour), pickerHour(hour)])
+    ? Array.from({ length: 24 }, (_, hour) => [String(hour), DripPage.hourLabel(hour)])
     : f.options || [];
   const select = /** @type {HTMLSelectElement} */ (h('select', { class: 'picker', id: f.key },
     ...options.map(([v, label]) => h('option', { value: v, selected: v === String(draft[f.key]) }, label))));
@@ -233,7 +246,7 @@ async function save() {
     $('result').textContent = 'Nothing changed.';
     return;
   }
-  absorb(await chrome.runtime.sendMessage({ type: 'updateSettings', changes }));
+  absorb(await send({ type: 'updateSettings', changes }));
   draft = { ...state.settings };
   justSaved = true;
   renderForm();
@@ -245,7 +258,7 @@ async function cancel(key) {
   // Undo keeps any other edit in progress.
   const kept = edits(state.settings);
   delete kept[key];
-  absorb(await chrome.runtime.sendMessage({ type: 'cancelPending', key }));
+  absorb(await send({ type: 'cancelPending', key }));
   justSaved = false;
   draft = { ...state.settings, ...kept };
   renderForm();
@@ -367,7 +380,7 @@ $('save').addEventListener('click', save);
 
 // Another tab or the day reset changed the state. Keep everything current without wiping an edit in progress.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes.drip || !state) return;
+  if (area !== 'local' || !changes.drip || !state || sample) return;
   const before = JSON.stringify([state.settings, state.pending]);
   const kept = edits(state.settings);
   const today = state.day;
@@ -393,14 +406,65 @@ function renderDev(dev) {
   $('dev').hidden = false;
 }
 
+/**
+ * The sample profiles, loaded only when asked for, since the store build doesn't have the file.
+ * @returns {Promise<any>}
+ */
+function loadProfiles() {
+  const loaded = /** @type {any} */ (globalThis).DripProfiles;
+  if (loaded) return Promise.resolve(loaded);
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = '../devpanel/profiles.js';
+    script.onload = () => resolve(/** @type {any} */ (globalThis).DripProfiles || null);
+    script.onerror = () => resolve(null);
+    document.head.append(script);
+  });
+}
+
+/** Goes to a sample profile, or back to the real data with ''. The choice lives in the URL, so a reload keeps it. */
+function showSample(/** @type {string} */ id) {
+  location.search = id ? `?sample=${encodeURIComponent(id)}` : '';
+}
+
+/** The sample data picker under Developer mode, while developer mode is on. @param {any} dev */
+async function renderSamples(dev) {
+  const on = !!(dev && dev.ok && dev.enabled);
+  const profiles = on ? await loadProfiles() : null;
+  $('sampleRow').hidden = !profiles;
+  if (!profiles) return;
+  const { h } = DripPage;
+  const select = /** @type {HTMLSelectElement} */ ($('sample'));
+  if (!select.nextElementSibling) select.after(DripPage.icon('chevron-down'));
+  select.replaceChildren(h('option', { value: '' }, 'Your data'),
+    ...profiles.list.map((/** @type {any} */ p) => h('option', { value: p.id, selected: !!sample && sample.id === p.id }, p.name)));
+}
+
+$('sample').addEventListener('change', () => showSample(/** @type {HTMLSelectElement} */ ($('sample')).value));
+$('sampleBack').addEventListener('click', () => showSample(''));
+
 $('devMode').addEventListener('change', async () => {
   const box = /** @type {HTMLInputElement} */ ($('devMode'));
-  renderDev(await chrome.runtime.sendMessage({ type: 'setDevMode', on: box.checked }));
+  const dev = await chrome.runtime.sendMessage({ type: 'setDevMode', on: box.checked });
+  renderDev(dev);
+  if (sample && !(dev && dev.enabled)) showSample('');
+  else renderSamples(dev);
 });
-chrome.runtime.sendMessage({ type: 'devStatus' }).then(renderDev);
 
-chrome.runtime.sendMessage({ type: 'get' }).then((res) => {
-  absorb(res);
+Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.sendMessage({ type: 'get' })]).then(async ([dev, res]) => {
+  renderDev(dev);
+  const want = new URLSearchParams(location.search).get('sample');
+  // A sample only shows while developer mode is on, so a stale link can't hide the real settings.
+  const profiles = want && dev && dev.ok && dev.enabled ? await loadProfiles() : null;
+  sample = profiles ? profiles.find(want) : null;
+  if (sample) {
+    state = Drip.hydrate(sample.build(Date.now()), Date.now());
+    $('sampleName').textContent = sample.name;
+    $('sampleNote').hidden = false;
+  } else {
+    absorb(res);
+  }
+  renderSamples(dev);
   if (!state) return;
   draft = { ...state.settings };
   renderForm();

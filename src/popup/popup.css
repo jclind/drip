@@ -6,9 +6,11 @@ body {
   box-sizing: border-box;
 }
 
+/* Centered as one group, like the home page's stats (Jesse, 2026-10-11). */
 .stats {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   min-height: 56px;
 }
@@ -24,9 +26,10 @@ body {
   color: var(--glass-line);
 }
 
+/* Less space before the counts than the home page has, so "12h 59m" still fits the 300px popup. */
 .time-block {
-  flex: 1;
   min-width: 0;
+  margin-right: 8px;
 }
 
 .time {

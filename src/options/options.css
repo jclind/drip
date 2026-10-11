@@ -119,11 +119,14 @@ footer {
   background: var(--gray-hover);
 }
 
+/* One outline around the whole stepper, so the number reads as part of the control (the mockup's look). */
 .stepper {
   display: flex;
   flex: none;
   align-items: stretch;
+  box-sizing: border-box;
   height: 32px;
+  border: 1px solid var(--gray-hover);
   border-radius: 8px;
   overflow: hidden;
   background: var(--gray);
@@ -162,7 +165,6 @@ footer {
   justify-content: center;
   gap: 4px;
   width: 72px;
-  border-inline: 2px solid var(--bg);
   background: var(--bg);
   font-size: 15px;
   font-weight: 500;
@@ -609,6 +611,32 @@ button.col.is-selected .letter {
 
 .reason-text a:hover {
   text-decoration: underline;
+}
+
+.sample-note {
+  margin: -16px 0 32px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--blue) 18%, transparent);
+  font-size: 14px;
+}
+
+.sample-note button.link {
+  margin-left: 6px;
+}
+
+.sample-row {
+  justify-content: space-between;
+  margin: 4px 0 12px;
+}
+
+.sample-row .picker-wrap {
+  min-width: 0;
+}
+
+.sample-row select.picker {
+  max-width: 100%;
+  text-overflow: ellipsis;
 }
 
 .dev-row {
