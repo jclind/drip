@@ -18,6 +18,8 @@ test('minute and token buttons set what they say, and never go below 0', () => {
   assert.equal(state.watchSecondsLeft, 20 * 60);
   D.devAction(state, 'minutes-1', time(7));
   assert.equal(state.watchSecondsLeft, 60);
+  D.devAction(state, 'seconds-10', time(7));
+  assert.equal(state.watchSecondsLeft, 10);
   D.devAction(state, 'minutes-0', time(7));
   assert.equal(state.watchSecondsLeft, 0);
   D.devAction(state, 'watch-0', time(7));

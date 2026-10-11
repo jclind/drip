@@ -20,7 +20,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q10 | 1 watch token = 15 min, drained only while playing. 1 rec token = 1 reveal. Defaults: 4 watch tokens, 10 rec tokens per day. |
 | Q11 | Tokens roll over up to 2 days' worth. Bought minutes expire at reset. |
 | Q12 | Day resets at 4am, as a setting. |
-| Q13 | The reveal card offers Watch, Save, Pass. Pass is free and final. Save keeps the card up and the button turns into "Saved". "Reveal next · -1 card" passes and reveals in one click. Pass is a round × button with a tooltip, free and still final. A video saved and then passed stays in the backlog (Jesse, 2026-10-07; built 2026-10-10). |
+| Q13 | The reveal card offers Watch, Save, Pass. Pass is free and final. Save keeps the card up and the button turns into "Saved". "Reveal next · -1 card" passes and reveals in one click. Pass is a round × button with a tooltip, free and still final. A video saved and then passed stays in the backlog (Jesse, 2026-10-07; built 2026-10-10). On screen, Save is "Stash" and "Stashed", and the Saved list is "Stash", so drip's button doesn't look like YouTube's own Save (Jesse, 2026-10-11). |
 | Q14 | Backlog videos cost no rec token. Save button on watch pages and search results. Backlog is a text list (title, channel, length), no thumbnails. |
 | Q15 | Search: remove injected shelves, stop at 10 results, free "more" button. |
 | Q16 | Replace subscriptions and Explore with the token page. Channel pages and the bell stay as they are. Watch page comments are hidden behind a "Show comments" button that lasts for that video (Jesse, 2026-10-06). |
@@ -36,7 +36,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q26 | Finishing a video that's in the backlog removes it from the backlog. Each new video opens in theater mode. Kept as they are for now (Jesse, 2026-10-06). |
 | Q27 | Ads don't use watch minutes. Time the player spends on an ad isn't charged or logged (Jesse, 2026-10-07). |
 
-## Visual design (in progress, home page built)
+## Visual design (in progress, home page and lock screen built)
 
 Jesse is designing the look by hand, with Claude reviewing his mockups, started 2026-10-07. The goal is a little character without being distracting. Spending a token can feel satisfying, but restraint should feel good too, so the design doesn't reward spending everything.
 
@@ -49,14 +49,14 @@ Settled:
 - Reveal card layout: thumbnail, then the title across the full width cut at 2 lines, then channel and length on the left with Watch on the right of the same line. Below that, one row: Save, "Reveal next · -1 card", and the round ×.
 - Revealing a new video shouldn't shift the layout. Reserve a 16:9 box and 2 title lines before the thumbnail loads.
 - Sentence case on all labels.
-- The backlog is called "Saved" on screen, to match the Save button, and stays newest first. Its header shows the count and total length, like "Saved · 8 videos · 1 h 42 min". It's open on the empty page with the top 3 rows, and collapsed to the header while a card is up. Two controls: the chevron on the header opens and closes the list (right when closed, down when open), and a gray "Show 5 more" line under the third row shows the rest, then reads "Show less". The line names the hidden count, since the header already has the total. With 3 or fewer videos there's no line.
-- Saved rows: title on one line cut with "…", channel and length under it in gray, and the blue cartoon play icon on the right with no circle behind it. The whole row plays the video. On hover the row gets a faint gray background and a plain lucide × appears left of the play icon. Removing a row collapses it to "Removed · Undo" for about 5 seconds. At 0 minutes the play icon shows "-1 drop", the same rule as Watch. The chevron points down when the list is open. An empty list says "Videos you save show up here." Jesse's mockup, 2026-10-07.
+- The backlog is called "Stash" on screen, to match the Stash button, and stays newest first. Its header shows the count and total length, like "Stash · 8 videos · 1 h 42 min". It's open on the empty page with the top 3 rows, and collapsed to the header while a card is up. Two controls: the chevron on the header opens and closes the list (right when closed, down when open), and a gray "Show 5 more" line under the third row shows the rest, then reads "Show less". The line names the hidden count, since the header already has the total. With 3 or fewer videos there's no line.
+- Saved rows: title on one line cut with "…", channel and length under it in gray, and the blue cartoon play icon on the right with no circle behind it. The whole row plays the video. On hover the row gets a faint gray background and a plain lucide × appears left of the play icon. Removing a row collapses it to "Removed · Undo" for about 5 seconds. At 0 minutes the play icon shows "-1 drop", the same rule as Watch. The chevron points down when the list is open. An empty list says "Videos you stash show up here." Jesse's mockup, 2026-10-07.
 - Durations everywhere use the compact format, like Apple's Screen Time: "1h 42m", "34m", "1h 5m" (no leading zero), "<1m" under a minute. That includes "34m left today", "+15m", and the stepper's "15m". Older examples in this file that say "1 h 42 min" or "15 min" follow this rule now. `formatMinutes` changes to match (Jesse, 2026-10-09).
 
 Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Paying stays neutral and justifying stays a little effortful:
 
 - Headline: "You've had your fill." when no watch tokens are left, "Time for a breather." when there are tokens to buy minutes. Jesse's lines.
-- "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds, the only idle animation in drip. Clicking it plays one ripple that settles flat, then goes to the home page.
+- "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds. The pill's low-time shimmer is the only other one. Clicking it sends rings through the panel, and the water falls away onto the home page.
 - "+15 min · -1 drop" is the gray secondary button, with white text. "I need this one · 2 left" is a gray text link, and its reason box gets no animation.
 - Layout, top to bottom: headline, a gray line "1 h 15 min watched today · 50 min last Tuesday" (only the first half when last week has no data), the two buttons with Done for now on the right, then the link. No token counts on this screen; the headline already says whether minutes can be bought. Jesse's mockup, 2026-10-07.
 - "+15 min" keeps its clock icon here and on the home page, so it looks the same everywhere.
@@ -69,7 +69,7 @@ Minutes and the watch page pill (2026-10-07):
 
 - Minutes show as a glass of water: the tile on the home page and a small one in the pill. It fills when you buy minutes and drains while you watch. Full means the minutes bought today, which needs a new state field, since drip doesn't track that yet (Jesse).
 - Jesse drew the glass in `cup-icons/` (2026-10-08): a gray glass with the shimmer cutout and blue water with a wavy surface, showing the top of the water when full. Build it as one SVG with the water height set from the fraction, so the level moves smoothly and the fill animation can rise. Near 0 the water thins to a sliver like Jesse's low cup, and while any minutes remain it stays at least 2 screen pixels tall, so the 20px pill can tell low from empty. At 0 the glass is empty. The glass outline uses `currentColor`: `#D9D9D9` on dark, about `#909090` on light, where the original gray is nearly invisible.
-- The pill: the glass, "34 min", and a cartoon bookmark for Save that fills in when saved. Labels "Save" and "Saved".
+- The pill: the glass, "34 min", and a cartoon bookmark for Stash that fills in when stashed. Labels "Stash" and "Stashed".
 - The pill never offers to buy minutes. That stays on the lock screen (Jesse).
 - Proposed, not confirmed: "Unlocked" in gray with no glass on an unlocked video. A small "ad, not counted" while an ad plays. The glass down to its last drop in the last minute, with no red. The pill fading to low opacity a few seconds into playback and coming back when the mouse moves.
 
@@ -92,7 +92,7 @@ Settings (2026-10-08, Jesse's mockups):
 
 Welcome page (2026-10-09, Jesse's first mockup and this plan):
 
-- Hero: the drop and "drip", the tagline "Make every drop count." (Jesse's), then three cards: Drops "1 drop = 15m of watching", Cards "1 card = 1 video revealed", Saved "Keep videos for later. Opening one costs no card." Under them: "You get 4 drops and 10 cards a day. You can change these in Settings." Numbers come from settings.
+- Hero: the drop and "drip", the tagline "Make every drop count." (Jesse's), then three cards: Drops "1 drop = 15m of watching", Cards "1 card = 1 video revealed", Stash "Keep videos for later. Opening one costs no card." Under them: "You get 4 drops and 10 cards a day. You can change these in Settings." Numbers come from settings.
 - Then one interactive tour panel in 5 steps, each one sentence over a working miniature of the real screen: the stats block where "+15m" fills the glass, a reveal with the parting animation and Save, a fake player with the pill draining fast, the lock panel where Done for now ripples, and the five "what changes" bullets. Step dots, Back, Next, and Skip. The last step ends on the white Open YouTube button.
 - The tour is a sandbox and never touches real state. It reuses the real components, so it has no screenshots or separate art, and it's built last, after those components exist.
 - Footer: gray "Open YouTube ↗" and "⚙ Settings" for people who skip, and "Everything drip knows stays in this browser."
@@ -104,7 +104,7 @@ Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. W
 - Colors and sizes are CSS custom properties at the top of the home block in `drip.css`, so tuning is mostly editing those. Dark or light comes from YouTube's `html[dark]`.
 - Icons live in `src/icons/` and draw as CSS masks filled with the text color, so one SVG serves every background. That's why the manifest lists them as web accessible to youtube.com. The clock, chevron, and × are new files in the same folder. The glass is `src/lib/glass.js`, one SVG built from `cup-icons/` with the water level set from minutes left over minutes bought today. It glides between levels.
 - The feed source (Q5) isn't on the home page. It's "Reveal from" in Settings for now (Jesse, 2026-10-10).
-- Saved on the card is a slightly lighter gray button with the label "Saved". Clicking it again takes the video back out of Saved.
+- Stashed on the card is a slightly lighter gray button with the label "Stashed". Clicking it again takes the video back out of the stash.
 - When something runs out, a gray line under the buttons says what and when it comes back: "No cards left. More at 4:00am.", "No drops left. …", or "You're out for today. Drops and cards refill at 4:00am." The spent buttons go gray. This is a placeholder. Jesse wants running out to feel like a good place to stop, not a sad dead end, so it needs its own design, like the lock screen's "Done for now" (2026-10-10).
 - Loading: a reveal from the empty page shows the card's shape right away with a shimmering box and title bars, and "Finding a video…" or "Checking your subscriptions…". Reveal next dims the old card and reads "Revealing…" until the new one lands. A new card rises in over 260ms. Rebuilds for Save and the like don't replay it.
 - Watch at 0 minutes with no drops left still goes to the video, so the lock screen's "I need this one" stays in reach.
@@ -112,7 +112,27 @@ Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. W
 - Durations of a whole number of hours read "2h", not "2h 0m".
 - The column is 400px. Below about 450px of room the gaps and button padding shrink, and below about 370px Save shows only its icon. Container queries measure the column, not the window, so YouTube's open guide counts too.
 - `dev/home.html` runs the real home page outside YouTube, with the real worker on fake storage and a fake grid, in any of a dozen states, light or dark. `dev/home-sizes.html` shows it at several widths at once. See the comment at the top of each.
-- Not built yet: "Kept 3 drops." (it follows the lock screen), the reveal animations under "Ideas", and the "+2 saved from yesterday" note. Jesse liked the loading placeholder and wants the animations designed in a later pass (2026-10-10).
+- Not built yet: the reveal animations under "Ideas", and the "+2 saved from yesterday" note. Jesse liked the loading placeholder and wants the animations designed in a later pass (2026-10-10).
+
+Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups and the rules above. Claude's calls, open to Jesse's review:
+
+- The lock and the pill share the home page's color tokens and button styles (`drip.css`, the block on `#drip-home, #drip-lock, #drip-pill`), and `icon()` and `price()` moved to `common.js`.
+- The blur and blue tint cover the whole window, not only the frame: `backdrop-filter` on the overlay. Dark mode is a deep blue at 60%, light mode a pale blue at 45%.
+- "Done for now" shimmers every 5 seconds. On the white button in dark mode the sweep is pale blue, since white on white wouldn't show.
+- Hovering or keyboard focus on "Done for now" sends a thin blue ring out around the button every 1.4 seconds. Each one keeps the pill shape and fades 8px out.
+- Clicking it sends a splash and two rings out through the panel from where it was pressed. Meanwhile YouTube goes home inside the page, the way its logo does, so the lock stays up. The paused video behind the water fades out over 0.4 seconds instead of vanishing. While YouTube is still fetching its home page, a slower, fainter ring goes out every 0.8 seconds (Jesse found faster ones jarring, 2026-10-11). On air that fetch took 1.2 to 1.4 seconds (2026-10-11), so click to home takes about 2.5 seconds. After at least 0.7 seconds, once drip's home page is there, the water falls away top first over 1 second, the way it rose, while the panel lifts and fades. "Kept 3 drops." rises in under it. If home isn't there after 4 seconds, the water falls anyway. If YouTube's logo is missing or its navigation hasn't started within 1.5 seconds, drip loads the home page the old way. Back to the watch page before the water is gone cancels it, and the lock comes back. Reduced motion skips the rings and the fall.
+- Jesse picked this from design round 2 on 2026-10-11, as D: the shimmer as built, the hover rings of round 1's A kept closer and slower, and the click of round 1's C. It replaced a hover tide, a small ripple, and a full page load after 520ms, which together felt "a little like patchwork of animations".
+- "Kept 3 drops." rides from the lock to the home page in `sessionStorage` (`drip-kept`), read once, so it needs no state field. It's the home page's gray message line, rising in once.
+- "I need this one" opens a plain textarea with Cancel and a gray "Unlock this video" button with the lock icon. No animation, as the spec says.
+- The watched line reads "0m watched today" on a day with nothing watched yet. `watchedSummary(state)` in state.js supplies it.
+- The pill shows the glass at 20px, the compact minutes, and Stash with a lucide outline bookmark that becomes the filled cartoon one once stashed (`src/icons/save-outline.svg` is new). Stashed can be clicked to take the video back out, like the home card. The proposals "Unlocked" (gray, no glass) and "Ad, not counted" are built as written, pending Jesse.
+- The pill sits inside the player's top right and hides along with YouTube's controls, so it shows in fullscreen too. Jesse picked it from three drafts (2026-10-10); the others were a corner of the window and a bottom center bar that faded. In theater mode it sits in the dark band beside the video. Clicks on it don't reach the player.
+- Paused, the pill reads "14m · paused" in gray, so it's clear the minutes aren't draining (Jesse's idea, 2026-10-10).
+- In the last 2 minutes the pill stays up while YouTube's controls hide, and a slow blue shimmer crosses it every 4 seconds while the video plays. No red (Jesse's idea, 2026-10-10).
+- Running out no longer cuts straight to the panel. Blue water rises up the window over 1.1 seconds with a wavy crest, blurring the frame as it climbs, and the panel surfaces once it's most of the way up. Buying minutes or an unlock drains the water back down in 0.6 seconds. The water is a mask on `#drip-lock` itself, because its `view-transition-name` keeps a child's `backdrop-filter` from seeing the page (Jesse asked for a smoother way into the lock, 2026-10-10).
+
+- Under the lock's water, faint bubbles drift up at random sizes and speeds, and two small fish cross now and then, one every minute or so, at different depths and directions. The overlay's mask covers them, so they only show where the water has risen. Reduced motion hides them (Jesse asked for something underwater, 2026-10-10).
+- More motion ideas are in IDEAS.md, "Motion and small touches".
 
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
@@ -210,6 +230,7 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, watched, needThis: [
 - `cancelPending(state, key)` drops one pending key.
 - `formatMinutes(seconds)` returns compact time: `'1h 42m'`, `'42m'`, `'2h'`, `'<1m'` for 1 to 59 seconds, or `'0m'`.
 - `logDays(day)` returns the 8 days the Settings log shows, `day` first (Q21).
+- `watchedSummary(state)` returns `{ today, lastWeek, weekday }` for the lock screen: seconds watched today, seconds on the same weekday a week back (`null` when the log has no entry for it), and today's weekday name.
 - `redirectTarget(href)` returns where a top-level YouTube URL should go instead, or `''`. Shorts and embeds become watch pages, the feeds in Q16 and `/tv` go to the token page, and `m.youtube.com` moves to `www`. redirect.js applies it, but only in the top frame, so embeds on other sites stay free (Q7).
 - `earlyLocked(raw, now, videoId)` decides, from raw storage, whether a loading watch page holds its video: no state, a day that has rolled over, or 0 seconds without an unlock today. Grace mode doesn't count, because nothing is playing yet. early.js also skips the video watch.js marks with `data-drip-grace` on `<html>`.
 - `devAction(state, action, now)` is test tooling, not a feature. It backs the dev panel (`src/devpanel/`), a floating box on YouTube pages that shows state and has buttons for minutes, tokens, "Run reset now" (moves `day` and any pending `effectiveDay` back one day, so the next message rolls over as a real reset would), applying pending settings, toggling grace now, clearing lists, and starting fresh. The panel shows while Developer mode is on in Settings (storage key `dripDev`, written by the worker on `setDevMode`) or the checkout has `dev/ENABLED`, and the worker refuses `devAction` otherwise. `bin/build-release` leaves the panel out, and a build without it hides the toggle and refuses `setDevMode`. Error `'unknown-dev-action'`.

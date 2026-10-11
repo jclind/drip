@@ -24,7 +24,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'formatMinutes', 'cleanVideo',
-    'logDays', 'redirectTarget', 'earlyLocked', 'devAction',
+    'logDays', 'watchedSummary', 'redirectTarget', 'earlyLocked', 'devAction',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
@@ -680,4 +680,15 @@ test('chargeTick places held-back time where it was played, so it does not overl
   D.chargeTick(state, clock, now, 3, 'a', 3000);
   assert.equal(state.watchSecondsLeft, 94);
   assert.equal(clock.lastChargeEnd, now);
+});
+
+test('watchedSummary gives today, the same weekday last week, and null when last week has no log', () => {
+  const s = fresh();
+  assert.equal(s.day, '2026-10-05');
+  assert.deepEqual(D.watchedSummary(s), { today: 0, lastWeek: null, weekday: 'Monday' });
+  D.logDay(s).watchedSec = 4500;
+  s.log['2026-09-28'] = { ...structuredClone(s.log[s.day]), watchedSec: 3000 };
+  assert.deepEqual(D.watchedSummary(s), { today: 4500, lastWeek: 3000, weekday: 'Monday' });
+  s.log['2026-09-28'].watchedSec = 0;
+  assert.equal(D.watchedSummary(s).lastWeek, 0);
 });

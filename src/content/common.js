@@ -81,6 +81,29 @@
     return `/watch?v=${encodeURIComponent(id)}`;
   }
 
+  /**
+   * A cartoon or lucide icon from src/icons, drawn as a CSS mask so it takes the color of the text around it.
+   * @param {string} name
+   * @param {string} [cls]
+   */
+  function icon(name, cls = '') {
+    const el = h('span', { class: `drip-i drip-i-${name} ${cls}`.trim(), 'aria-hidden': 'true' });
+    el.style.setProperty('--drip-icon', `url("${chrome.runtime.getURL(`src/icons/${name}.svg`)}")`);
+    return el;
+  }
+
+  /**
+   * A price on a button: "-1" and the token's icon. Screen readers get "costs 1 drop".
+   * @param {'drop' | 'card'} token
+   */
+  function price(token) {
+    return h('span', { class: 'drip-price' },
+      h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'),
+      h('span', { 'aria-hidden': 'true' }, '-1'),
+      icon(token, `drip-token-${token}`),
+      h('span', { class: 'drip-sr' }, `, costs 1 ${token}`));
+  }
+
   // When YouTube changes its markup, drip fails open (Q25): nothing locks, and a banner says what broke.
   const BROKEN = {
     player: "drip can't find YouTube's video player, so it isn't counting minutes on this page.",
@@ -149,5 +172,8 @@
     }, 1000);
   }
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, pausePlayer, reportBroken, watchFor };
+  // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
+  const KEPT_KEY = 'drip-kept';
+
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, icon, price, KEPT_KEY, pausePlayer, reportBroken, watchFor };
 })();

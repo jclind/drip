@@ -65,7 +65,14 @@ a.drip-btn {
   color: var(--drip-muted);
 }
 
+/* The lock screen (watch.js). DESIGN.md "Lock screen" is the spec, and drip-page-demos/lock-screen-*.png the mockups.
+   The paused frame behind the panel is blurred and tinted blue, as if underwater. */
 #drip-lock {
+  --drip-panel: #fff;
+  /* The rings around "Done for now", darker here, where the page is light. */
+  --drip-ring: rgba(25, 118, 210, 0.6);
+  --drip-tint: rgba(150, 195, 240, 0.45);
+  --drip-shimmer: rgba(255, 255, 255, 0.3);
   position: fixed;
   inset: 0;
   z-index: 100000;
@@ -73,58 +80,395 @@ a.drip-btn {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.82);
+  overflow: hidden;
+  background: var(--drip-tint);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  backdrop-filter: blur(20px) saturate(1.2);
+  /* Running out: blue water rises up the window, blurring the frame as it climbs, with a wavy crest that drifts. Buying
+     minutes or an unlock drains it back down (watch.js placeLockPanel and hideLock). The water is a mask on the overlay
+     itself: its view-transition-name stops a child's backdrop-filter from seeing the page. Two layers, the crest and
+     the solid water under it, both placed from --drip-water, the crest's top edge. */
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-water) / 640px 26px repeat-x,
+    linear-gradient(#000, #000) 0 calc(var(--drip-water) + 25px) / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-water) / 640px 26px repeat-x,
+    linear-gradient(#000, #000) 0 calc(var(--drip-water) + 25px) / 100% 100% no-repeat;
+  animation: drip-water-rise 1100ms cubic-bezier(0.35, 0.6, 0.25, 1) both, drip-crest 1100ms linear;
 }
 
-.drip-lock-panel {
+#drip-lock.is-draining {
+  pointer-events: none;
+  animation: drip-water-drain 600ms cubic-bezier(0.55, 0, 0.75, 0.45) both, drip-crest 600ms linear;
+}
+
+/* Under the water, behind the panel: faint bubbles rising and two small fish crossing now and then (watch.js sea()).
+   The overlay's mask covers them too, so they only show where the water has risen. */
+#drip-lock .drip-sea {
+  --drip-bubble-line: rgba(255, 255, 255, 0.7);
+  --drip-bubble-shine: rgba(255, 255, 255, 0.5);
+  --drip-fish: rgba(10, 60, 120, 0.16);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+html[dark] #drip-lock .drip-sea {
+  --drip-bubble-line: rgba(255, 255, 255, 0.3);
+  --drip-bubble-shine: rgba(255, 255, 255, 0.35);
+  --drip-fish: rgba(170, 215, 255, 0.13);
+}
+
+#drip-lock .drip-bubble {
+  position: absolute;
+  bottom: -24px;
+  left: var(--x);
+  opacity: 0;
+  animation: drip-bubble-rise var(--rise) linear var(--delay) infinite;
+}
+
+#drip-lock .drip-bubble > span {
+  display: block;
+  width: var(--size);
+  height: var(--size);
+  border: 1px solid var(--drip-bubble-line);
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, var(--drip-bubble-shine), transparent 62%);
+  animation: drip-bubble-sway var(--sway) ease-in-out infinite alternate;
+}
+
+#drip-lock .drip-fish {
+  position: absolute;
+  left: 0;
+  animation: drip-swim-right 56s linear 3s infinite both;
+}
+
+#drip-lock .drip-fish > span {
+  display: block;
+  width: 26px;
+  height: 13px;
+  background: var(--drip-fish);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 16'%3E%3Cpath fill-rule='evenodd' d='M0 2.5L7.5 8 0 13.5ZM7 8C10 2 18 1.5 24 3.5 28 5 31 7 32 8 31 9 28 11 24 12.5 18 14.5 10 14 7 8ZM26.5 6.2A1.1 1.1 0 1 0 26.5 8.4 1.1 1.1 0 1 0 26.5 6.2Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 16'%3E%3Cpath fill-rule='evenodd' d='M0 2.5L7.5 8 0 13.5ZM7 8C10 2 18 1.5 24 3.5 28 5 31 7 32 8 31 9 28 11 24 12.5 18 14.5 10 14 7 8ZM26.5 6.2A1.1 1.1 0 1 0 26.5 8.4 1.1 1.1 0 1 0 26.5 6.2Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: drip-fish-bob 2.8s ease-in-out infinite alternate;
+}
+
+#drip-lock .drip-fish-a {
+  top: 27%;
+}
+
+/* The second one is smaller, deeper, and swims the other way. */
+#drip-lock .drip-fish-b {
+  top: 74%;
+  animation: drip-swim-left 72s linear 19s infinite both;
+}
+
+#drip-lock .drip-fish-b > span {
+  width: 18px;
+  height: 9px;
+  scale: -1 1;
+  animation-duration: 3.4s;
+}
+
+#drip-lock .drip-lock-panel {
+  position: relative;
+  z-index: 1;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+/* The panel surfaces once the water is most of the way up. */
+#drip-lock .drip-lock-panel.is-new {
+  animation: drip-surface 460ms cubic-bezier(0.3, 0.7, 0.2, 1) 650ms both;
+}
+
+#drip-lock.is-draining .drip-lock-panel {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+html[dark] #drip-lock {
+  --drip-panel: #121212;
+  --drip-ring: rgba(66, 165, 246, 0.75);
+  --drip-tint: rgba(3, 22, 46, 0.6);
+  /* The primary button is white in dark mode, so its shimmer is a pale blue to show up on it. */
+  --drip-shimmer: rgba(66, 165, 246, 0.3);
+}
+
+#drip-lock .drip-lock-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: center;
   width: 100%;
   max-width: 400px;
-  padding: 24px;
+  padding: 36px 36px 30px;
   border-radius: 16px;
-  background: var(--drip-bg);
+  background: var(--drip-panel);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+  text-align: center;
 }
 
-.drip-lock-title {
-  font-size: 20px;
+#drip-lock .drip-lock-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 30px;
+}
+
+#drip-lock .drip-lock-sub {
+  margin-top: 10px;
+  color: var(--drip-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+#drip-lock .drip-lock-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 30px;
+}
+
+#drip-lock .drip-lock-actions > .drip-b {
+  flex: 1;
+  padding: 0 14px;
+}
+
+#drip-lock .drip-lock-add .drip-i-clock {
+  width: 17px;
+  height: 17px;
+}
+
+/* "Done for now" is the only thing on drip's screens that moves on its own: a slow shimmer every few seconds. */
+#drip-lock .drip-done {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+#drip-lock .drip-done::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, var(--drip-shimmer) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: drip-done-shimmer 5s ease-in-out 1.2s infinite;
+  pointer-events: none;
+}
+
+#drip-lock .drip-done.is-leaving::after {
+  animation: none;
+  opacity: 0;
+}
+
+/* Hover or keyboard focus: a ring leaves the button every 1.4 seconds and fades 8px out (watch.js startRings).
+   outline-offset keeps the pill shape as it grows. */
+#drip-lock .drip-done-ring {
+  position: absolute;
+  border-radius: calc(var(--drip-btn-h) / 2);
+  outline: 1.5px solid var(--drip-ring);
+  pointer-events: none;
+  animation: drip-done-ring 1400ms cubic-bezier(0.15, 0.6, 0.35, 1) forwards;
+}
+
+/* The click: a splash and two rings from the press point out through the panel. They play for 0.7 seconds before the
+   water falls (watch.js onDone LEAVE_MS). */
+#drip-lock .drip-leave-ring {
+  position: absolute;
+  border: 2px solid rgba(66, 165, 246, 0.8);
+  border-radius: 50%;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+#drip-lock .drip-leave-ring.is-splash {
+  border: 0;
+  background: rgba(66, 165, 246, 0.35);
+}
+
+#drip-lock.is-leaving .drip-lock-panel {
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* With drip's home page underneath, the water falls away top first, the way it rose, and the panel lifts and fades. */
+#drip-lock.is-surfacing {
+  pointer-events: none;
+  animation: drip-water-drain 1000ms cubic-bezier(0.5, 0, 0.4, 1) both, drip-crest 1000ms linear;
+}
+
+#drip-lock.is-surfacing .drip-lock-panel {
+  animation: drip-lift 560ms cubic-bezier(0.5, 0, 0.75, 0.3) 300ms both;
+}
+
+#drip-lock .drip-lock-link {
+  margin-top: 18px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--drip-muted);
+  background: none;
+  cursor: pointer;
+}
+
+#drip-lock .drip-lock-link:hover {
+  color: var(--drip-text);
+}
+
+#drip-lock .drip-lock-note {
+  margin-top: 18px;
+  color: var(--drip-muted);
+  font-size: 13px;
   font-weight: 500;
 }
 
-.drip-reason {
+/* "I need this one" opens a plain box with no animation. Justifying should take a little effort. */
+#drip-lock .drip-reason {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+#drip-lock .drip-reason textarea {
+  min-height: 76px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font: inherit;
+  color: var(--drip-text);
+  background: var(--drip-gray);
+  text-align: left;
+  resize: none;
+}
+
+#drip-lock .drip-reason textarea:focus {
+  border-color: var(--drip-focus);
+  outline: none;
+}
+
+#drip-lock .drip-reason-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
-.drip-reason textarea {
-  font: inherit;
-  color: var(--drip-text);
-  background: var(--drip-chip);
-  border: 1px solid var(--drip-line);
-  border-radius: 8px;
-  padding: 8px;
-  resize: vertical;
+#drip-lock .drip-reason-row .drip-lock-link {
+  margin-top: 0;
 }
 
-.drip-link {
-  color: var(--drip-muted);
-  font-size: 13px;
+#drip-lock .drip-reason-row .drip-i-unlock {
+  width: 15px;
+  height: 18px;
 }
 
+/* The watch page pill (watch.js): the glass, minutes left, and Save, inside the player's top right. It sits over the
+   video, so it's light on dark in both themes, and it hides along with YouTube's own controls. Its colors are below
+   the shared token rules. */
 #drip-pill {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 2000;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 70;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 6px 6px 14px;
-  border-radius: 22px;
-  background: var(--drip-bg);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+  height: 36px;
+  padding: 0 4px 0 12px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 18px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: opacity 200ms ease;
+}
+
+#drip-pill.is-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* No player to sit in (watch.js renderPill): pinned to the window, below YouTube's 56px top bar and above it. */
+#drip-pill.is-floating {
+  position: fixed;
+  top: 68px;
+  right: 16px;
+  z-index: 2100;
+}
+
+/* The last two minutes: the pill stays up and a slow blue shimmer crosses it, the same sweep as "Done for now". */
+#drip-pill.is-low::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 25%, var(--drip-shimmer) 50%, transparent 75%);
+  transform: translateX(-100%);
+  animation: drip-done-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+#drip-pill .drip-pill-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  padding-right: 10px;
+  border-right: 1px solid var(--drip-rule);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#drip-pill .drip-glass {
+  color: var(--drip-glass-line);
+}
+
+#drip-pill .is-unlocked .drip-pill-minutes,
+#drip-pill .is-paused .drip-pill-minutes,
+#drip-pill .drip-pill-note {
+  color: var(--drip-muted);
+}
+
+#drip-pill .drip-pill-label {
+  line-height: 20px;
+}
+
+#drip-pill .drip-pill-note {
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+#drip-pill .drip-pill-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  margin-left: 4px;
+  padding: 0 12px 0 10px;
+  border: 0;
+  border-radius: 15px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--drip-text);
+  background: none;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+#drip-pill .drip-pill-save:hover {
+  background: var(--drip-gray);
+}
+
+#drip-pill .drip-pill-save .drip-i {
+  width: 13px;
+  height: 16px;
 }
 
 /* YouTube animates navigation with View Transitions. During one, Chrome paints snapshots of the page, and drip's
@@ -178,10 +522,11 @@ a.drip-btn {
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
 }
 
-/* The home page (home.js). DESIGN.md's "Visual design" section is the spec and drip-page-demos/ has Jesse's mockups.
-   Colors that differ by theme key off html[dark], which YouTube sets in dark mode. Sizes are tokens here, so tuning
-   the look is mostly edits to this block. */
-#drip-home {
+/* drip's colors and button size, shared by the home page (home.js) and the lock screen and pill (watch.js). Colors that
+   differ by theme key off html[dark], which YouTube sets in dark mode. */
+#drip-home,
+#drip-lock,
+#drip-pill {
   --drip-blue: #42a5f6;
   --drip-gold: #fdc905;
   --drip-gold-hover: #ffd633;
@@ -197,8 +542,13 @@ a.drip-btn {
   --drip-row-hover: rgba(0, 0, 0, 0.05);
   --drip-skeleton: rgba(0, 0, 0, 0.06);
   --drip-focus: #065fd4;
-  --drip-col: 400px;
   --drip-btn-h: 42px;
+}
+
+/* The home page (home.js). DESIGN.md's "Visual design" section is the spec and drip-page-demos/ has Jesse's mockups.
+   Sizes are tokens here, so tuning the look is mostly edits to this block. */
+#drip-home {
+  --drip-col: 400px;
   --drip-radius: 12px;
   max-width: calc(var(--drip-col) + 32px);
   margin: clamp(32px, 16vh, 168px) auto 96px;
@@ -207,7 +557,7 @@ a.drip-btn {
   container: drip-home / inline-size;
 }
 
-html[dark] #drip-home {
+html[dark] :is(#drip-home, #drip-lock, #drip-pill) {
   --drip-gray: #272727;
   --drip-gray-hover: #3a3a3a;
   --drip-gray-active: #474747;
@@ -221,14 +571,26 @@ html[dark] #drip-home {
   --drip-focus: #3ea6ff;
 }
 
-#drip-home *,
-#drip-home *::before,
-#drip-home *::after {
+/* The pill's own colors, light on dark in both themes. They come after the two shared rules above and match their
+   weight (html[dark] for dark mode), so these win. Moving them above those rules gave white on near-white in light. */
+#drip-pill,
+html[dark] #drip-pill {
+  --drip-text: #fff;
+  --drip-muted: rgba(255, 255, 255, 0.7);
+  --drip-rule: rgba(255, 255, 255, 0.2);
+  --drip-gray: rgba(255, 255, 255, 0.16);
+  --drip-glass-line: #d9d9d9;
+  --drip-shimmer: rgba(66, 165, 246, 0.45);
+}
+
+:is(#drip-home, #drip-lock, #drip-pill) *,
+:is(#drip-home, #drip-lock, #drip-pill) *::before,
+:is(#drip-home, #drip-lock, #drip-pill) *::after {
   box-sizing: border-box;
 }
 
 /* Text only screen readers get, like the token names after a price. */
-#drip-home .drip-sr {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-sr {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -238,7 +600,7 @@ html[dark] #drip-home {
 }
 
 /* Icons from src/icons are masks filled with the text color, so one SVG works on every background. */
-#drip-home .drip-i {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-i {
   display: inline-block;
   flex: none;
   width: 18px;
@@ -248,11 +610,11 @@ html[dark] #drip-home {
   mask: var(--drip-icon) center / contain no-repeat;
 }
 
-#drip-home .drip-token-drop {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-token-drop {
   color: var(--drip-blue);
 }
 
-#drip-home .drip-token-card {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-token-card {
   color: var(--drip-gold);
 }
 
@@ -276,16 +638,16 @@ html[dark] #drip-home {
   color: var(--drip-glass-line);
 }
 
-#drip-home .drip-glass {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-glass {
   display: block;
   overflow: visible;
 }
 
-#drip-home .drip-glass-wave {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-glass-wave {
   transition: transform 700ms cubic-bezier(0.3, 0.7, 0.2, 1);
 }
 
-#drip-home .drip-glass-surface {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-glass-surface {
   transition: opacity 300ms ease;
 }
 
@@ -339,7 +701,7 @@ html[dark] #drip-home {
 }
 
 /* Buttons. Every button that spends shows its price ("· -1" and the token). */
-#drip-home .drip-b {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -357,75 +719,75 @@ html[dark] #drip-home {
   transition: background-color 120ms ease, transform 120ms ease, opacity 120ms ease;
 }
 
-#drip-home .drip-b:active:not(:disabled) {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-#drip-home .drip-b:disabled {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b:disabled {
   cursor: default;
   opacity: 0.4;
 }
 
-#drip-home :is(button, a):focus-visible {
+:is(#drip-home, #drip-lock, #drip-pill) :is(button, a):focus-visible {
   outline: 2px solid var(--drip-focus);
   outline-offset: 2px;
 }
 
-#drip-home .drip-b-gray {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gray {
   color: var(--drip-text);
   background: var(--drip-gray);
 }
 
-#drip-home .drip-b-gray:hover:not(:disabled) {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gray:hover:not(:disabled) {
   background: var(--drip-gray-hover);
 }
 
-#drip-home .drip-b-gold {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold {
   color: var(--drip-on-gold);
   background: var(--drip-gold);
 }
 
-#drip-home .drip-b-gold:hover:not(:disabled) {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold:hover:not(:disabled) {
   background: var(--drip-gold-hover);
 }
 
-#drip-home .drip-b-gold .drip-token-card {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold .drip-token-card {
   color: var(--drip-on-gold);
 }
 
 /* Dimmed gold reads as brown on dark, so a gold button that can't be used goes gray instead. */
-#drip-home .drip-b-gold:disabled {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold:disabled {
   color: var(--drip-muted);
   background: var(--drip-gray);
   opacity: 0.6;
 }
 
-#drip-home .drip-b-gold:disabled .drip-token-card {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold:disabled .drip-token-card {
   color: inherit;
 }
 
-#drip-home .drip-b-primary {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-primary {
   color: var(--drip-primary-fg);
   background: var(--drip-primary-bg);
 }
 
-#drip-home .drip-b-primary:hover:not(:disabled) {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-primary:hover:not(:disabled) {
   background: var(--drip-primary-hover);
 }
 
-#drip-home .drip-price {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-price {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-#drip-home .drip-price .drip-i {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-price .drip-i {
   width: 14px;
   height: 16px;
   margin-left: -3px;
 }
 
-#drip-home .drip-sep {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-sep {
   opacity: 0.7;
 }
 
@@ -454,6 +816,16 @@ html[dark] #drip-home {
   font-size: 13px;
   text-align: center;
   text-wrap: balance;
+}
+
+/* After "Done for now", "Kept 3 drops." rises in as the lock's water falls away (home.js view). */
+#drip-home .drip-message.is-kept {
+  animation: drip-kept-rise 600ms cubic-bezier(0.3, 0.7, 0.2, 1) 400ms both;
+}
+
+/* Held until fade.js starts showing the page, so the rise isn't spent while YouTube's page is still invisible. */
+html:not([data-drip-shown]) #drip-home .drip-message.is-kept {
+  animation-play-state: paused;
 }
 
 /* The reveal card. The 16:9 box and two title lines are reserved before anything loads, so nothing shifts. */
@@ -859,6 +1231,142 @@ html[dark] #drip-home {
   }
 }
 
+@keyframes drip-done-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  35%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Registered so the water's height and the crest's drift can animate (#drip-lock's mask). The resting water is up past
+   the top, so the whole window is under it. */
+@property --drip-water {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: -26px;
+}
+
+@property --drip-crest-x {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes drip-water-rise {
+  from {
+    --drip-water: 100vh;
+  }
+}
+
+@keyframes drip-water-drain {
+  to {
+    --drip-water: 100vh;
+  }
+}
+
+@keyframes drip-crest {
+  to {
+    --drip-crest-x: -640px;
+  }
+}
+
+@keyframes drip-bubble-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+
+  8%,
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-100vh - 40px));
+  }
+}
+
+@keyframes drip-bubble-sway {
+  from {
+    transform: translateX(-5px);
+  }
+
+  to {
+    transform: translateX(5px);
+  }
+}
+
+/* Each fish crosses in the first 60% of its loop and waits off screen for the rest. */
+@keyframes drip-swim-right {
+  0% {
+    transform: translateX(-40px);
+  }
+
+  60%,
+  100% {
+    transform: translateX(calc(100vw + 40px));
+  }
+}
+
+@keyframes drip-swim-left {
+  0% {
+    transform: translateX(calc(100vw + 40px));
+  }
+
+  60%,
+  100% {
+    transform: translateX(-40px);
+  }
+}
+
+@keyframes drip-fish-bob {
+  from {
+    transform: translateY(-3px);
+  }
+
+  to {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes drip-surface {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+@keyframes drip-done-ring {
+  from {
+    opacity: 0.85;
+    outline-offset: 0;
+  }
+
+  to {
+    opacity: 0;
+    outline-offset: 8px;
+  }
+}
+
+@keyframes drip-kept-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes drip-lift {
+  to {
+    opacity: 0;
+    transform: translateY(-48px);
+  }
+}
+
 @keyframes drip-rise {
   from {
     opacity: 0;
@@ -867,9 +1375,23 @@ html[dark] #drip-home {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #drip-home *,
-  #drip-home *::before,
-  #drip-home *::after {
+  #drip-lock,
+  #drip-lock.is-draining,
+  #drip-lock.is-surfacing {
+    animation: none;
+  }
+
+  #drip-lock.is-draining {
+    opacity: 0;
+  }
+
+  #drip-lock .drip-sea {
+    display: none;
+  }
+
+  :is(#drip-home, #drip-lock, #drip-pill) *,
+  :is(#drip-home, #drip-lock, #drip-pill) *::before,
+  :is(#drip-home, #drip-lock, #drip-pill) *::after {
     animation: none !important;
     transition: none !important;
   }

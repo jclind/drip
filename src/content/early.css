@@ -99,6 +99,13 @@ ytd-search ytd-continuation-item-renderer[data-drip-hold] {
     transition: opacity 0.8s ease-out;
   }
 
+  /* Leaving through "Done for now" (watch.js onDone), the paused video behind the lock's water fades out instead of
+     vanishing. */
+  html[data-drip-leaving]:not([data-drip-shown]) ytd-app,
+  html[data-drip-leaving]:not([data-drip-shown]) body > #player {
+    transition: opacity 0.4s ease-out;
+  }
+
   @keyframes drip-failsafe {
     to { opacity: 1; }
   }

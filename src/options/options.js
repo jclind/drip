@@ -119,7 +119,7 @@ function renderLog() {
       h(
         'table',
         {},
-        h('thead', {}, h('tr', {}, ...['Day', 'Minutes', 'Watch', 'Reveals', 'Saved', 'Passed', 'Unlocks'].map((t) => h('th', {}, t)))),
+        h('thead', {}, h('tr', {}, ...['Day', 'Minutes', 'Watch', 'Reveals', 'Stashed', 'Passed', 'Unlocks'].map((t) => h('th', {}, t)))),
         h('tbody', {}, ...rows),
       ),
     ),

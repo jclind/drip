@@ -442,6 +442,24 @@
     return Array.from({ length: 8 }, (_, i) => addDays(day, -i));
   }
 
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  /**
+   * The lock screen's watched line: seconds watched today, and on the same weekday last week. `lastWeek` is null when
+   * the log has no entry for that day, so the line can drop its second half.
+   * @param {any} state
+   * @returns {{today: number, lastWeek: number | null, weekday: string}}
+   */
+  function watchedSummary(state) {
+    const today = state.log[state.day];
+    const before = state.log[addDays(state.day, -7)];
+    return {
+      today: today ? today.watchedSec : 0,
+      lastWeek: before ? before.watchedSec : null,
+      weekday: WEEKDAYS[new Date(`${state.day}T00:00:00Z`).getUTCDay()],
+    };
+  }
+
   // Subscriptions, Explore, and its topic pages (Q16). The two channel ids are Shopping and Music, which YouTube links
   // as channels (checked on the MacBook 2026-10-06). Other channel pages stay.
   const FEEDS = /^\/(?:channel\/(?:UCkYQyvc_i9hXEo4xic9Hh2g|UC-9-kyTW8ZkZNDHQJ6FgpwQ)|feed\/(?:subscriptions|explore|trending|storefront|courses_destination|news_destination|music_destination)|gaming|shopping|podcasts|playables|hype|courses|learning|fashion|news|sports|music|live)\/?$/;
@@ -501,6 +519,7 @@
     const setTokens = (kind, n) => { state.tokens[kind] = Math.max(0, n); };
     switch (action) {
       case 'minutes-0': state.watchSecondsLeft = 0; break;
+      case 'seconds-10': state.watchSecondsLeft = 10; break;
       case 'minutes-1': state.watchSecondsLeft = 60; break;
       case 'minutes+5': state.watchSecondsLeft += 5 * 60; break;
       case 'minutes+15': state.watchSecondsLeft += 15 * 60; break;
@@ -537,6 +556,6 @@
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, formatMinutes, cleanVideo,
-    logDays, redirectTarget, earlyLocked, devAction,
+    logDays, watchedSummary, redirectTarget, earlyLocked, devAction,
   };
 })();

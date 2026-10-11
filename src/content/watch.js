@@ -5,7 +5,9 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send: sendMessage, h, onState, hourLabel, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send: sendMessage, h, onState, hourLabel, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  /** @type {any} */
+  const DripGlass = /** @type {any} */ (globalThis).DripGlass;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -16,10 +18,14 @@
     autoplayToggle: '.ytp-autonav-toggle-button[aria-checked="true"]',
     ads: '#movie_player.ad-showing, #movie_player.ad-interrupting',
     player: '#movie_player',
+    // YouTube hides its controls with this class a few seconds into playback.
+    playerIdle: '#movie_player.ytp-autohide',
     app: 'ytd-app',
     miniplayerAttr: 'miniplayer-is-active',
     title: 'ytd-watch-metadata h1, h1.ytd-watch-metadata',
     channel: 'ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a',
+    // The YouTube logo. "Done for now" clicks it, so YouTube goes home in the page instead of loading a new one.
+    homeLink: 'ytd-topbar-logo-renderer a#logo',
   };
 
   const GRACE_ATTR = 'data-drip-grace';
@@ -175,10 +181,7 @@
   }
 
   function showDisconnected() {
-    const panel = h('div', { class: 'drip-lock-panel' }, 'drip was updated. Refresh this page.');
-    const existing = document.getElementById('drip-lock');
-    if (existing) existing.replaceChildren(panel);
-    else document.body.append(h('div', { id: 'drip-lock' }, panel));
+    placeLockPanel(h('div', { class: 'drip-lock-panel' }, 'drip was updated. Refresh this page.'));
   }
 
   function startRun() {
@@ -216,6 +219,7 @@
   }
 
   function syncAd() {
+    pillLook();
     const now = !!document.querySelector(SEL.ads);
     if (now === adShowing) return;
     if (clockActive()) bank();
@@ -286,6 +290,7 @@
       video.removeEventListener('playing', onPlay);
       for (const ev of ['pause', 'waiting', 'emptied']) video.removeEventListener(ev, stopAndBank);
       video.removeEventListener('ended', onEnded);
+      for (const ev of ['play', 'pause']) video.removeEventListener(ev, renderPill);
     }
     video = el;
     if (!video) return;
@@ -296,6 +301,7 @@
     video.addEventListener('playing', onPlay);
     for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopAndBank);
     video.addEventListener('ended', onEnded);
+    for (const ev of ['play', 'pause']) video.addEventListener(ev, renderPill);
     // A video waiting on autoplay isn't paused but hasn't played anything. 'playing' fires once it really starts.
     if (!video.paused && video.readyState >= 3) onPlay();
   }
@@ -319,7 +325,8 @@
     // Storage may arrive before our tick response. Only that response can grant grace.
     if (deferLock && state.settings.graceMode) return;
     pausePlayer(video);
-    if (clockActive() && id) showLock();
+    // Not over the miniplayer, which drip hides: the lock would cover whatever page YouTube moved to.
+    if (location.pathname === '/watch' && id) showLock();
     // A locked video skips theater mode, so let fade.js show the page now.
     theaterDone();
   }
@@ -406,27 +413,246 @@
   let lockView = '';
   let lockVideoId = '';
 
+  /** The lock overlay showing now, or null. One still draining away, or leaving for the home page, doesn't count. */
+  function liveLock() {
+    const lock = document.getElementById('drip-lock');
+    return lock && !lock.classList.contains('is-draining') && !lock.classList.contains('is-leaving') ? lock : null;
+  }
+
+  /** Whether "Done for now" is taking the lock to the home page. Nothing else touches the lock until it's gone. */
+  function leavingLock() {
+    return !!document.querySelector('#drip-lock.is-leaving');
+  }
+
+  /**
+   * Puts a panel in the lock overlay. A new overlay plays the water rising and then the panel surfacing. A panel swapped
+   * into an overlay that's already up just replaces the old one, so the water doesn't rise again.
+   * @param {HTMLElement} panel
+   */
+  function placeLockPanel(panel) {
+    const lock = liveLock();
+    if (lock) {
+      const old = lock.querySelector('.drip-lock-panel');
+      if (old) old.replaceWith(panel);
+      else lock.append(panel);
+      return;
+    }
+    // A lock still draining away goes at once, and a new one rises.
+    document.getElementById('drip-lock')?.remove();
+    panel.classList.add('is-new');
+    document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), panel));
+  }
+
+  const BUBBLES = 14;
+
+  /**
+   * Life under the water behind the lock panel: bubbles drifting up at different sizes and speeds, and two small fish
+   * that cross now and then. Kept faint, so it reads as atmosphere, not something to watch.
+   */
+  function sea() {
+    /** @param {number} min @param {number} max */
+    const between = (min, max) => min + Math.random() * (max - min);
+    const bubbles = Array.from({ length: BUBBLES }, () => {
+      const bubble = h('span', { class: 'drip-bubble' }, h('span', {}));
+      bubble.style.setProperty('--x', `${between(3, 97).toFixed(1)}%`);
+      bubble.style.setProperty('--size', `${Math.round(between(4, 13))}px`);
+      bubble.style.setProperty('--rise', `${between(10, 19).toFixed(1)}s`);
+      // The first ones leave soon after the water is up, the rest spread out.
+      bubble.style.setProperty('--delay', `${between(0.9, 12).toFixed(1)}s`);
+      bubble.style.setProperty('--sway', `${between(2.4, 4.2).toFixed(1)}s`);
+      return bubble;
+    });
+    const fish = ['drip-fish-a', 'drip-fish-b'].map((name) => h('span', { class: `drip-fish ${name}` }, h('span', {})));
+    return h('div', { class: 'drip-sea', 'aria-hidden': 'true' }, ...bubbles, ...fish);
+  }
+
+  /** Set just before buying minutes or an unlock lifts the lock, so the water drains away instead of vanishing. */
+  let drainNext = false;
+  const DRAIN_MS = 600;
+
   function hideLock() {
     if (disconnected) return;
     lockView = '';
     lockVideoId = '';
     reasonText = '';
-    document.getElementById('drip-lock')?.remove();
+    const lock = liveLock();
+    if (lock && drainNext) {
+      lock.classList.add('is-draining');
+      setTimeout(() => lock.remove(), DRAIN_MS);
+    } else lock?.remove();
+    drainNext = false;
     reasonOpen = false;
     lockMessage = '';
   }
 
   async function onAddTime() {
+    // The worker's storage change can lift the lock before this reply arrives, so the drain is asked for up front.
+    drainNext = true;
     const res = await send({ type: 'spendWatch' });
     if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
       applyStatus(Drip.watchStatus(state, videoId()));
+      drainNext = false;
       video?.play();
     } else {
-      lockMessage = 'No watch tokens left.';
+      drainNext = false;
+      lockMessage = 'No drops left.';
       showLock();
     }
+  }
+
+  const reducedMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  /** @param {number} ms */
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  /** Hovering or keyboard focus on "Done for now" sends a ring out around it this often. */
+  const RING_EVERY_MS = 1400;
+  /** @type {ReturnType<typeof setInterval> | undefined} */
+  let ringTimer;
+  /** @type {HTMLElement | null} */
+  let ringButton = null;
+
+  /** @param {HTMLElement} button */
+  function ring(button) {
+    const panel = button.closest('.drip-lock-panel');
+    // A panel rebuilt or a lock lifted under the pointer sends no pointerleave, so the timer stops itself here.
+    if (!panel || !button.isConnected || button.classList.contains('is-leaving')) {
+      stopRings();
+      return;
+    }
+    // In the panel rather than the button, so it can grow past the button's edge.
+    const p = panel.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+    const r = h('span', { class: 'drip-done-ring', 'aria-hidden': 'true' });
+    r.style.cssText = `left:${b.left - p.left}px;top:${b.top - p.top}px;width:${b.width}px;height:${b.height}px`;
+    panel.append(r);
+    r.addEventListener('animationend', () => r.remove());
+  }
+
+  /** @param {Event} e */
+  function startRings(e) {
+    const button = /** @type {HTMLElement} */ (e.currentTarget);
+    if ((ringTimer !== undefined && ringButton === button) || reducedMotion() || (e.type === 'focus' && !button.matches(':focus-visible'))) return;
+    stopRings();
+    ringButton = button;
+    ring(button);
+    ringTimer = setInterval(() => ring(button), RING_EVERY_MS);
+  }
+
+  function stopRings() {
+    clearInterval(ringTimer);
+    ringTimer = undefined;
+    ringButton = null;
+  }
+
+  /** The click's rings play this long before the water starts to fall. */
+  const LEAVE_MS = 700;
+  /** While YouTube is still fetching its home page, another ring goes out this often. On air that fetch took 1.2s. */
+  const WAIT_RING_MS = 800;
+  /** The water falling away, top first (drip.css #drip-lock.is-surfacing). */
+  const SURFACE_MS = 1000;
+  /** Past this with no navigation started, YouTube ignored the logo click, so drip loads home instead. */
+  const NAV_WAIT_MS = 1500;
+  /** Set while "Done for now" waits on the home page. Back to a watch page in that time cancels it (yt-navigate-finish). */
+  let cancelLeave = false;
+  /** Past this, the water falls even if drip's home page hasn't shown up yet. */
+  const HOME_WAIT_MS = 4000;
+
+  /** drip's home page is drawn and fade.js has started fading the page in. */
+  function homeShown() {
+    return location.pathname === '/' && document.documentElement.hasAttribute('data-drip-shown')
+      && !!document.getElementById('drip-home')?.getClientRects().length;
+  }
+
+  /**
+   * A splash and two rings from where the button was pressed, out through the panel. Returns a function that sends
+   * one more ring from the same point.
+   * @param {HTMLElement} panel
+   * @param {HTMLElement} button
+   * @param {MouseEvent} e
+   */
+  function leaveRings(panel, button, e) {
+    const p = panel.getBoundingClientRect();
+    const box = button.getBoundingClientRect();
+    // From the pointer, or from the middle for a keyboard press, which reports 0, 0.
+    const x = (e.clientX || box.left + box.width / 2) - p.left;
+    const y = (e.clientY || box.top + box.height / 2) - p.top;
+    const far = Math.hypot(Math.max(x, p.width - x), Math.max(y, p.height - y)) * 2;
+    const burst = 'cubic-bezier(0.2, 0.6, 0.3, 1)';
+    /** @param {string} cls @param {number} size @param {number} ms @param {number} delay @param {string} easing @param {number} opacity */
+    const grow = (cls, size, ms, delay, easing = burst, opacity = 1) => {
+      const r = h('span', { class: cls, 'aria-hidden': 'true' });
+      r.style.cssText = `left:${x}px;top:${y}px`;
+      panel.append(r);
+      r.animate([{ width: '0px', height: '0px', opacity }, { width: `${size}px`, height: `${size}px`, opacity: 0 }],
+        { duration: ms, delay, easing, fill: 'both' });
+    };
+    grow('drip-leave-ring is-splash', 110, 420, 0);
+    grow('drip-leave-ring', far, 900, 0);
+    grow('drip-leave-ring', far, 900, 140);
+    // The rings that fill a wait are slower and fainter than the click's, so the panel calms down instead of pulsing.
+    return () => grow('drip-leave-ring', far, 1800, 0, 'cubic-bezier(0.3, 0.3, 0.5, 1)', 0.6);
+  }
+
+  /**
+   * Rings run out through the panel while YouTube goes home underneath, the way its logo does, so the page and the
+   * lock stay up. Once drip's home page is there, the water falls away the way it rose. Drops left unspent ride along
+   * in sessionStorage, so the home page can say "Kept 3 drops." once (home.js).
+   * @param {MouseEvent} e
+   */
+  async function onDone(e) {
+    const button = /** @type {HTMLElement} */ (e.currentTarget);
+    const lock = liveLock();
+    const panel = /** @type {HTMLElement | null} */ (button.closest('.drip-lock-panel'));
+    if (!lock || !panel || button.classList.contains('is-leaving')) return;
+    button.classList.add('is-leaving');
+    lock.classList.add('is-leaving');
+    stopRings();
+    const kept = state ? state.tokens.watch : 0;
+    try {
+      if (kept > 0) sessionStorage.setItem(KEPT_KEY, String(kept));
+    } catch {
+      // Storage blocked: the home page just won't mention the drops.
+    }
+    const reduced = reducedMotion();
+    const moreRing = reduced ? null : leaveRings(panel, button, e);
+    const started = performance.now();
+    let lastRing = 140;
+    let navStarted = false;
+    document.addEventListener('yt-navigate-start', () => { navStarted = true; }, { once: true });
+    cancelLeave = false;
+    // early.css fades the page behind the water out instead of hiding it at once when YouTube starts navigating.
+    document.documentElement.setAttribute('data-drip-leaving', '');
+    const logo = /** @type {HTMLElement | null} */ (document.querySelector(SEL.homeLink));
+    logo?.click();
+    while (true) {
+      await sleep(50);
+      if (cancelLeave || !lock.isConnected) {
+        document.documentElement.removeAttribute('data-drip-leaving');
+        return;
+      }
+      const waited = performance.now() - started;
+      if (!reduced && waited < LEAVE_MS) continue;
+      if (homeShown()) break;
+      // No logo, or YouTube ignored the click: the old way, a full page load. The lock stays up until the page goes.
+      if (!logo || (!navStarted && waited > NAV_WAIT_MS)) {
+        location.assign('/');
+        return;
+      }
+      if (waited > HOME_WAIT_MS) break;
+      if (moreRing && waited - lastRing >= WAIT_RING_MS) {
+        moreRing();
+        lastRing = waited;
+      }
+    }
+    document.documentElement.removeAttribute('data-drip-leaving');
+    if (reduced) {
+      lock.remove();
+      return;
+    }
+    lock.classList.add('is-surfacing');
+    setTimeout(() => lock.remove(), SURFACE_MS);
   }
 
   /** @param {string} reason */
@@ -434,25 +660,50 @@
     const id = videoId();
     const title = document.querySelector(SEL.title)?.textContent?.trim() || '';
     if (!id) return;
+    drainNext = true;
     const res = await send({ type: 'needThis', videoId: id, title, reason });
     if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
       applyStatus(Drip.watchStatus(state, videoId()));
+      drainNext = false;
       video?.play();
       return;
     }
+    drainNext = false;
     lockMessage = res && res.error === 'reason-required' ? 'Write a few words about why.' : "You've used all of today's unlocks.";
     showLock();
   }
 
+  /** "1h 15m watched today · 50m last Tuesday", or only the first half when last week has no log. */
+  function watchedLine() {
+    const { today, lastWeek, weekday } = Drip.watchedSummary(state);
+    const first = `${Drip.formatMinutes(today)} watched today`;
+    return lastWeek === null ? first : `${first} · ${Drip.formatMinutes(lastWeek)} last ${weekday}`;
+  }
+
+  function openReason() {
+    reasonOpen = true;
+    showLock();
+    /** @type {HTMLTextAreaElement | null} */ (document.querySelector('#drip-lock textarea'))?.focus();
+  }
+
+  function closeReason() {
+    reasonOpen = false;
+    lockMessage = '';
+    showLock();
+  }
+
+  // DESIGN.md "Lock screen". The satisfying moment is leaving: "Done for now" is the one primary button and the only
+  // thing that moves. Buying more stays neutral gray, and "I need this one" is a quiet link with a typed reason.
   function showLock() {
-    if (!state || disconnected || playerBroken) return;
+    if (!state || disconnected || playerBroken || leavingLock()) return;
     const s = state.settings;
     const needLeft = Math.max(0, s.needThisPerDay - state.unlocked.length);
     const canBuy = state.tokens.watch > 0;
-    const existing = document.getElementById('drip-lock');
-    const view = JSON.stringify([videoId(), state.tokens.watch, needLeft, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage]);
+    const line = watchedLine();
+    const existing = liveLock();
+    const view = JSON.stringify([videoId(), canBuy, needLeft, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
     if (existing && lockView === view) return;
     lockView = view;
     lockVideoId = videoId();
@@ -462,23 +713,35 @@
     const selectionStart = oldReason?.selectionStart ?? 0;
     const selectionEnd = oldReason?.selectionEnd ?? 0;
     /** @type {HTMLTextAreaElement} */
-    const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', oninput: (/** @type {Event} */ e) => { reasonText = /** @type {HTMLTextAreaElement} */ (e.target).value; } }));
+    const reason = /** @type {any} */ (h('textarea', {
+      rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?',
+      oninput: (/** @type {Event} */ e) => { reasonText = /** @type {HTMLTextAreaElement} */ (e.target).value; },
+    }));
     reason.value = reasonText;
+    const unlocks = needLeft > 0 && !reasonOpen
+      ? h('button', { class: 'drip-lock-link', 'data-k': 'need', onclick: openReason }, `I need this one · ${needLeft} left`)
+      : needLeft > 0
+        ? h('div', { class: 'drip-reason' }, reason,
+          h('div', { class: 'drip-reason-row' },
+            h('button', { class: 'drip-lock-link', 'data-k': 'cancel', onclick: closeReason }, 'Cancel'),
+            h('button', { class: 'drip-b drip-b-gray', 'data-k': 'unlock', onclick: () => onNeedThis(reason.value) }, icon('unlock'), h('span', {}, 'Unlock this video'))))
+        : h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`);
     const panel = h(
       'div',
-      { class: 'drip-lock-panel' },
-      h('div', { class: 'drip-lock-title' }, 'Out of watch time'),
-      h('div', { class: 'drip-meta' }, `watch tokens ${state.tokens.watch} · unlocks left today ${needLeft}`),
-      lockMessage && h('div', { class: 'drip-message' }, lockMessage),
-      canBuy && h('button', { class: 'drip-btn drip-primary', onclick: onAddTime }, `Add ${s.minutesPerToken} min · 1 watch`),
-      needLeft > 0 && !reasonOpen && h('button', { class: 'drip-btn', onclick: () => { reasonOpen = true; showLock(); /** @type {HTMLTextAreaElement | null} */ (document.querySelector('#drip-lock textarea'))?.focus(); } }, 'I need this one'),
-      needLeft > 0 && reasonOpen && h('div', { class: 'drip-reason' }, reason,
-        h('button', { class: 'drip-btn drip-primary', onclick: () => onNeedThis(reason.value) }, 'Unlock this video')),
-      !canBuy && needLeft === 0 && h('div', { class: 'drip-meta' }, `Done for today. Tokens come back at ${hourLabel(s.resetHour)}.`),
-      h('a', { class: 'drip-link', href: '/' }, 'Back to drip home'),
+      { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },
+      h('h2', { class: 'drip-lock-title', id: 'drip-lock-title' }, canBuy ? 'Time for a breather.' : "You've had your fill."),
+      h('div', { class: 'drip-lock-sub' }, line),
+      h('div', { class: `drip-lock-actions${canBuy ? '' : ' is-alone'}` },
+        canBuy && h('button', { class: 'drip-b drip-b-gray drip-lock-add', 'data-k': 'add', onclick: onAddTime, title: `Add ${s.minutesPerToken} minutes for 1 drop` },
+          icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop')),
+        h('button', {
+          class: 'drip-b drip-b-primary drip-done', 'data-k': 'done', onclick: onDone,
+          onpointerenter: startRings, onpointerleave: stopRings, onfocus: startRings, onblur: stopRings,
+        }, h('span', {}, 'Done for now'))),
+      lockMessage && h('div', { class: 'drip-lock-note', role: 'status' }, lockMessage),
+      unlocks,
     );
-    if (existing) existing.replaceChildren(panel);
-    else document.body.append(h('div', { id: 'drip-lock' }, panel));
+    placeLockPanel(panel);
     if (focused && reasonOpen && needLeft > 0) {
       reason.focus();
       reason.setSelectionRange(selectionStart, selectionEnd);
@@ -487,13 +750,19 @@
 
   // The pill with minutes left and the Save button.
 
+  /** Stashes the video, or takes it back out of the stash when it's already there, like Stash on the home page's card. */
   async function onSave() {
     const id = videoId();
-    const title = document.querySelector(SEL.title)?.textContent?.trim() || document.title.replace(/ - YouTube$/, '');
-    const channel = document.querySelector(SEL.channel)?.textContent?.trim() || '';
-    const secs = video && Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
-    const length = secs ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '';
-    const res = await send({ type: 'addBacklog', video: { id, title, channel, length } });
+    if (!id || !state) return;
+    let res;
+    if (state.backlog.some((/** @type {any} */ v) => v.id === id)) res = await send({ type: 'removeBacklog', id });
+    else {
+      const title = document.querySelector(SEL.title)?.textContent?.trim() || document.title.replace(/ - YouTube$/, '');
+      const channel = document.querySelector(SEL.channel)?.textContent?.trim() || '';
+      const secs = video && Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
+      const length = secs ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '';
+      res = await send({ type: 'addBacklog', video: { id, title, channel, length } });
+    }
     if (res && res.ok && !disconnected) {
       state = res.state;
       applyStatus(Drip.watchStatus(state, videoId()));
@@ -502,7 +771,39 @@
   }
 
   let pillView = '';
+  /** @type {SVGSVGElement | null} */
+  let pillGlass = null;
+  const PILL_GLASS_PX = 20;
+  /** In the last this many seconds, the pill stays up over the video and shimmers. */
+  const LOW_SECONDS = 120;
 
+  /**
+   * Keeps clicks and keys on the pill away from the player, which would otherwise read a click as play or pause.
+   * @param {Event} e
+   */
+  function keepFromPlayer(e) {
+    e.stopPropagation();
+  }
+
+  /** Whether the minutes are nearly gone, set by renderPill and read by pillLook. */
+  let pillLow = false;
+
+  /**
+   * The pill hides along with YouTube's controls a few seconds into playback, except in the last minutes, when it stays
+   * up and shimmers. Checked every tick and whenever the player's class changes.
+   */
+  function pillLook() {
+    const pill = document.getElementById('drip-pill');
+    if (!pill) return;
+    const playing = !!video && !video.paused;
+    pill.classList.toggle('is-low', pillLow && playing);
+    // Never hidden while it has keyboard focus, or Enter would act on a button nobody can see.
+    const focused = pill.contains(document.activeElement);
+    pill.classList.toggle('is-idle', playing && !pillLow && !focused && !!document.querySelector(SEL.playerIdle));
+  }
+
+  // DESIGN.md "Minutes and the watch page pill": the glass, minutes left, and Save. It never offers to buy minutes.
+  // It sits inside the player's top right, so it shows in fullscreen too (Jesse picked this placement, 2026-10-10).
   function renderPill() {
     const id = videoId();
     let pill = document.getElementById('drip-pill');
@@ -517,20 +818,47 @@
     // (syncAd banked what came before it), and ads aren't charged (Q27).
     const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
     const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
-    const time = unlocked ? 'unlocked' : `${Drip.formatMinutes(Math.max(0, state.watchSecondsLeft - pending))} left`;
+    const left = Math.max(0, state.watchSecondsLeft - pending);
+    const time = unlocked ? 'Unlocked' : Drip.formatMinutes(left);
+    // Paused, the minutes aren't draining, and the pill says so.
+    const paused = !unlocked && !adShowing && !!video && video.paused && left > 0;
+    pillLow = !unlocked && !adShowing && left > 0 && left <= LOW_SECONDS;
+    if (!unlocked) {
+      const fraction = DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
+      if (!pillGlass) pillGlass = DripGlass.make(fraction, PILL_GLASS_PX);
+      else DripGlass.set(pillGlass, fraction, PILL_GLASS_PX);
+    }
+    const parent = document.querySelector(SEL.player) || document.body;
     // Rebuild only when the text changes. A button replaced mid-click loses the click.
-    const view = JSON.stringify([id, time, saved]);
-    if (pill && pillView === view) return;
+    const view = JSON.stringify([id, time, saved, adShowing, paused]);
+    if (pill && pillView === view && pill.parentElement === parent) return pillLook();
     pillView = view;
     const content = [
-      h('span', {}, time),
-      saved ? h('span', { class: 'drip-meta' }, 'In backlog') : h('button', { class: 'drip-btn', onclick: onSave }, 'Save to backlog'),
+      h('span', { class: `drip-pill-time${unlocked ? ' is-unlocked' : ''}${paused ? ' is-paused' : ''}` },
+        !unlocked && pillGlass,
+        // One inline line, so the smaller note sits on the minutes' baseline instead of being centered as its own box.
+        h('span', { class: 'drip-pill-label' },
+          h('span', { class: 'drip-pill-minutes' }, time),
+          !unlocked && h('span', { class: 'drip-sr' }, ' left today'),
+          paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
+          adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
+      h('button', {
+        class: `drip-pill-save${saved ? ' is-saved' : ''}`, 'data-k': 'pill-save', 'aria-pressed': String(saved), onclick: onSave,
+        title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
+      }, icon(saved ? 'save' : 'save-outline'), h('span', {}, saved ? 'Stashed' : 'Stash')),
     ];
     if (!pill) {
-      pill = h('div', { id: 'drip-pill' });
-      document.body.append(pill);
+      pill = h('div', { id: 'drip-pill', class: 'drip-ui' });
+      for (const ev of ['click', 'dblclick', 'mousedown', 'pointerdown', 'keydown']) pill.addEventListener(ev, keepFromPlayer);
+      for (const ev of ['focusin', 'focusout']) pill.addEventListener(ev, () => setTimeout(pillLook));
     }
+    const focused = pill.contains(document.activeElement);
     pill.replaceChildren(...content);
+    if (pill.parentElement !== parent) parent.append(pill);
+    // No player found: pinned to the window instead, below YouTube's top bar, where it can still be seen and clicked.
+    pill.classList.toggle('is-floating', parent === document.body);
+    if (focused) /** @type {HTMLElement | null} */ (pill.querySelector('[data-k="pill-save"]'))?.focus();
+    pillLook();
   }
 
   onState((next) => {
@@ -548,6 +876,15 @@
   document.addEventListener('yt-navigate-start', bank);
   document.addEventListener('yt-navigate-finish', () => {
     if (disconnected) return;
+    if (leavingLock() && location.pathname === '/watch') {
+      cancelLeave = true;
+      document.getElementById('drip-lock')?.remove();
+      try {
+        sessionStorage.removeItem(KEPT_KEY);
+      } catch {
+        // Storage blocked: nothing was saved.
+      }
+    }
     bank();
     if (runningSince !== null) runId = videoId();
     defaultTheater();

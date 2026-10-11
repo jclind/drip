@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel, watchUrl, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, hourLabel, watchUrl, icon, price, KEPT_KEY, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
 
@@ -284,29 +284,6 @@
   let savedShowAll = false;
 
   /**
-   * A cartoon or lucide icon from src/icons, drawn as a CSS mask so it takes the color of the text around it.
-   * @param {string} name
-   * @param {string} [cls]
-   */
-  function icon(name, cls = '') {
-    const el = h('span', { class: `drip-i drip-i-${name} ${cls}`.trim(), 'aria-hidden': 'true' });
-    el.style.setProperty('--drip-icon', `url("${chrome.runtime.getURL(`src/icons/${name}.svg`)}")`);
-    return el;
-  }
-
-  /**
-   * A price on a button: "-1" and the token's icon. Screen readers get "costs 1 drop".
-   * @param {'drop' | 'card'} token
-   */
-  function price(token) {
-    return h('span', { class: 'drip-price' },
-      h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'),
-      h('span', { 'aria-hidden': 'true' }, '-1'),
-      icon(token, `drip-token-${token}`),
-      h('span', { class: 'drip-sr' }, `, costs 1 ${token}`));
-  }
-
-  /**
    * Seconds in a length string like "8:31" or "1:02:03", or 0 when there's none.
    * @param {string} length
    */
@@ -421,8 +398,8 @@
       h('div', { class: 'drip-card-actions' },
         h('button', {
           class: `drip-b drip-b-gray drip-card-save${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
-          onclick: () => onResolve(saved ? 'unsave' : 'save', video.id), title: saved ? 'In Saved. Click to take it out.' : 'Keep it in Saved for later',
-        }, icon('save'), h('span', { class: 'drip-save-label' }, saved ? 'Saved' : 'Save')),
+          onclick: () => onResolve(saved ? 'unsave' : 'save', video.id), title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
+        }, icon('save'), h('span', { class: 'drip-save-label' }, saved ? 'Stashed' : 'Stash')),
         h('button', {
           class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || state.tokens.rec < 1,
           onclick: () => onRevealNext(video.id),
@@ -438,7 +415,7 @@
     const open = savedOpen[mode];
     const count = state.backlog.length;
     const total = state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + lengthSeconds(v.length), 0);
-    const head = ['Saved'];
+    const head = ['Stash'];
     if (count) head.push(`${count} ${count === 1 ? 'video' : 'videos'}`);
     if (total) head.push(Drip.formatMinutes(total));
 
@@ -453,7 +430,7 @@
         onclick: () => { savedOpen[mode] = !open; render(); },
       }, icon('chevron-down', 'drip-chevron'), h('span', {}, head.join(' · '))),
       open && (rows.length === 0
-        ? h('div', { class: 'drip-saved-empty' }, 'Videos you save show up here.')
+        ? h('div', { class: 'drip-saved-empty' }, 'Videos you stash show up here.')
         : h('ul', { class: 'drip-saved-list' }, ...shown.map(({ video, removed: gone }) => gone
           ? h('li', { class: 'drip-saved-row is-removed' },
             h('span', {}, 'Removed'), h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'),
@@ -476,7 +453,7 @@
           h('span', { class: 'drip-saved-title' }, video.title || 'Untitled'),
           h('span', { class: 'drip-saved-meta' }, [video.channel, video.length].filter(Boolean).join(' · '))),
           h('button', {
-            class: 'drip-saved-x', 'data-k': `x-${video.id}`, title: 'Remove from Saved', 'aria-label': `Remove ${video.title || 'video'} from Saved`,
+            class: 'drip-saved-x', 'data-k': `x-${video.id}`, title: 'Remove from stash', 'aria-label': `Remove ${video.title || 'video'} from stash`,
             onclick: () => onRemove(video.id),
           }, icon('x')),
           h('span', { class: 'drip-saved-play', 'aria-hidden': 'true' }, costsDrop(video.id) && h('span', { class: 'drip-saved-price' }, '-1', icon('drop', 'drip-token-drop')), icon('play')))))),
@@ -490,11 +467,13 @@
     if (!state) return h('div', { class: 'drip-loading', 'aria-busy': 'true' });
     const note = outNote();
     const showCard = state.current || busy === 'reveal';
+    // The kept drops rise in once, as the lock's water falls away. Rebuilds after that leave the message still.
+    const rises = !!message && message === keptMessage;
     return h('div', { class: 'drip-page' },
       stats(),
       !showCard && actions(),
       state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
-      (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
+      (message || note) && h('div', { class: `drip-message${rises ? ' is-kept' : ''}`, role: 'status' }, message || note),
       savedList());
   }
 
@@ -515,17 +494,55 @@
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
     root.classList.add('drip-ui');
     root.replaceChildren(view());
+    keptSeen(root);
     if (focused) /** @type {HTMLElement | null} */ (root.querySelector(`[data-k="${CSS.escape(focused)}"]`))?.focus();
   }
 
   let refreshing = false;
 
-  /** Puts the drip page into the home browse page if it isn't there yet. */
-  function mount() {
+  /** "Kept 3 drops." until it has been drawn once with its rise. */
+  let keptMessage = '';
+
+  /**
+   * The message has risen once it's drawn on a page that shows. YouTube keeps the home page hidden until its data
+   * arrives, and builds drawn before then keep the rise for when it shows.
+   * @param {HTMLElement} root
+   */
+  function keptSeen(root) {
+    if (keptMessage && root.getClientRects().length && document.documentElement.hasAttribute('data-drip-shown')) keptMessage = '';
+  }
+
+  /** Shows the drops the lock screen's "Done for now" left unspent, read once (watch.js onDone). */
+  function takeKept() {
+    let kept = 0;
+    try {
+      kept = Number(sessionStorage.getItem(KEPT_KEY));
+      sessionStorage.removeItem(KEPT_KEY);
+    } catch {
+      // Storage blocked: no message.
+    }
+    if (kept <= 0) return;
+    message = keptMessage = `Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.`;
+    // The same words may already be on the page from last time. Rebuild anyway, so they rise now.
+    rendered = '';
+  }
+
+  /**
+   * Puts the drip page into the home browse page if it isn't there yet.
+   * @param {boolean} [navigated] YouTube just finished a navigation, rather than the half-second check.
+   */
+  function mount(navigated = false) {
     if (location.pathname !== '/') return;
     const browse = document.querySelector(SEL.homeBrowse);
     if (!browse) return;
     if (browse.querySelector('#drip-home')) {
+      const root = /** @type {HTMLElement} */ (browse.querySelector('#drip-home'));
+      // "Done for now" came back through YouTube's in-page navigation, to a home page drip had already built.
+      if (navigated) {
+        takeKept();
+        render();
+      }
+      keptSeen(root);
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;
@@ -539,6 +556,7 @@
     }
     const target = browse.querySelector(SEL.mount) || browse;
     target.prepend(h('div', { id: 'drip-home' }));
+    takeKept();
     rendered = '';
     render();
     send({ type: 'get' }).then((res) => {
@@ -552,7 +570,7 @@
     render();
   });
   watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
-  document.addEventListener('yt-navigate-finish', mount);
-  setInterval(mount, 500);
+  document.addEventListener('yt-navigate-finish', () => mount(true));
+  setInterval(() => mount(), 500);
   mount();
 })();

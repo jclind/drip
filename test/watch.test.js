@@ -22,7 +22,25 @@ class FakeElement {
     this.parent = null;
     this.className = '';
     this.rebuilds = 0;
+    /** @type {Record<string, string>} */
+    this.dataset = {};
+    const props = new Map();
+    this.style = { cssText: '', transform: '', opacity: '', /** @param {string} k @param {string} v */ setProperty: (k, v) => props.set(k, v) };
+    const el = this;
+    this.classList = {
+      /** @param {string} c */
+      contains: (c) => el.className.split(' ').includes(c),
+      /** @param {string} c */
+      add: (c) => { if (!el.classList.contains(c)) el.className = `${el.className} ${c}`.trim(); },
+      /** @param {string} c */
+      remove: (c) => { el.className = el.className.split(' ').filter((x) => x && x !== c).join(' '); },
+      /** @param {string} c @param {boolean} [on] */
+      toggle: (c, on) => { if (on ?? !el.classList.contains(c)) el.classList.add(c); else el.classList.remove(c); },
+    };
   }
+  get parentElement() { return this.parent; }
+  /** @param {any} other */
+  contains(other) { return this.all().includes(other); }
   get id() { return this.attrs.get('id') || ''; }
   /** @param {string} k @param {string} v */
   setAttribute(k, v) { this.attrs.set(k, String(v)); }
@@ -40,10 +58,35 @@ class FakeElement {
   /** @param {...any} kids */
   replaceChildren(...kids) { this.children = []; this.rebuilds++; this.append(...kids); }
   remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
-  querySelector() { return null; }
+  /** Only `.class` selectors, which is all watch.js asks of its own elements. @param {string} sel */
+  querySelector(sel) {
+    if (!sel.startsWith('.')) return null;
+    return this.all().slice(1).find((el) => el.className.split(' ').includes(sel.slice(1))) || null;
+  }
+  /** @param {any} other */
+  replaceWith(other) {
+    const parent = this.parent;
+    if (!parent) return;
+    const i = parent.children.indexOf(this);
+    other.parent = parent;
+    parent.children[i] = other;
+    this.parent = null;
+  }
   get textContent() { return this.children.map((c) => (c instanceof FakeElement ? c.textContent : String(c))).join(''); }
   /** @returns {FakeElement[]} */
   all() { return [this, ...this.children.flatMap((c) => (c instanceof FakeElement ? c.all() : []))]; }
+}
+
+function fakeStorage() {
+  const items = new Map();
+  return {
+    /** @param {string} k */
+    getItem: (k) => (items.has(k) ? items.get(k) : null),
+    /** @param {string} k @param {string} v */
+    setItem: (k, v) => { items.set(k, String(v)); },
+    /** @param {string} k */
+    removeItem: (k) => { items.delete(k); },
+  };
 }
 
 class FakeVideo {
@@ -112,6 +155,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     fullscreenElement: null,
     /** @param {string} tag */
     createElement: (tag) => new FakeElement(tag),
+    /** @param {string} _ns @param {string} tag */
+    createElementNS: (_ns, tag) => new FakeElement(tag),
     /** @param {string} sel */
     querySelector: (sel) => {
       if (sel === '#movie_player video.html5-main-video') return tab.noPlayer ? null : video;
@@ -122,7 +167,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     },
     /** @param {string} id */
     /** @param {string} id @returns {any} */
-    getElementById: (id) => body.all().find((el) => el.id === id) || null,
+    getElementById: (id) => [...body.all(), ...playerEl.all()].find((el) => el.id === id) || null,
     /** @param {string} ev @param {Function} fn */
     addEventListener: (ev, fn) => { (docHandlers[ev] ||= []).push(fn); },
     /** @param {{type: string}} event */
@@ -133,19 +178,21 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     navigator: { userAgent: 'test', clipboard: { writeText: async () => {} } },
     document, location, URLSearchParams, JSON, Math, Number, String, Set, Array, Object, Promise, console,
     MutationObserver: FakeMutationObserver,
+    localStorage: fakeStorage(), sessionStorage: fakeStorage(),
     performance: { now: () => world.now },
     Date: class extends Date { static now() { return world.epoch + world.now; } },
     CustomEvent: class { /** @param {string} type */ constructor(type) { this.type = type; } },
+    setTimeout, matchMedia: () => ({ matches: false }),
     setInterval: (/** @type {Function} */ fn) => { intervals.set(++nextInterval, fn); return nextInterval; },
     clearInterval: (/** @type {number} */ id) => { intervals.delete(id); },
     chrome: {
-      runtime: { id: 'drip', sendMessage: (/** @type {any} */ msg) => world.handle(msg), getManifest: () => ({ version: '0.1.0' }) },
+      runtime: { id: 'drip', sendMessage: (/** @type {any} */ msg) => world.handle(msg), getManifest: () => ({ version: '0.1.0' }), getURL: (/** @type {string} */ p) => p },
       storage: { onChanged: { addListener: (/** @type {Function} */ fn) => world.listeners.push(fn) } },
     },
   };
   context.globalThis = context;
   vm.createContext(context);
-  for (const file of ['lib/state.js', 'content/common.js', 'content/watch.js']) {
+  for (const file of ['lib/state.js', 'lib/glass.js', 'content/common.js', 'content/watch.js']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
   }
   const tab = {
@@ -159,6 +206,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     video, root, body, location,
     pill: () => document.getElementById('drip-pill'),
     locked: () => !!document.getElementById('drip-lock'),
+    lockText: () => document.getElementById('drip-lock')?.textContent || '',
     /** Runs watch.js's 1-second tick. */
     tick: async () => { await /** @type {Function} */ ([...intervals.values()].find((fn) => fn.name === 'tick'))(); await settle(); },
     /** @param {string} id */
@@ -314,7 +362,7 @@ test('the pill does not count down during an ad (Codex, Q27)', async () => {
   world.advance(90);
   await world.handle({ type: 'get' });
   await settle();
-  assert.match(tab.pill().textContent, /^15m left/);
+  assert.match(tab.pill().textContent, /^15m left today/);
 });
 
 test('nothing is sent while the video is paused', async () => {
@@ -337,6 +385,27 @@ test('time runs out on time: the video stops within a second of zero (Q3)', asyn
   assert.ok(tab.locked());
   const total = world.ticks().reduce((sum, t) => sum + /** @type {number} */ (t.seconds), 0);
   assert.ok(total <= 4.01, `played ${total} seconds on a 3-second balance`);
+});
+
+test('the lock screen says what can still happen: buy minutes, unlock, or nothing until the reset (DESIGN.md "Lock screen")', async () => {
+  const { world, tab } = await setup(3);
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /^Time for a breather\./);
+  assert.match(tab.lockText(), /watched today/);
+  assert.doesNotMatch(tab.lockText(), /last Monday/, 'no log a week back, so no comparison');
+  assert.match(tab.lockText(), /\+15m/);
+  assert.match(tab.lockText(), /Done for now/);
+  assert.match(tab.lockText(), /I need this one · 2 left/);
+  assert.doesNotMatch(tab.lockText(), /token/i);
+
+  world.state.tokens.watch = 0;
+  world.state.unlocked = ['x', 'y'];
+  world.state.log['2026-09-29'] = { ...structuredClone(world.state.log[world.state.day]), watchedSec: 3000 };
+  await tab.second();
+  assert.match(tab.lockText(), /^You've had your fill\./);
+  assert.match(tab.lockText(), /· 50m last Tuesday/);
+  assert.doesNotMatch(tab.lockText(), /\+15m|I need this one/);
+  assert.match(tab.lockText(), /The glass refills at 4:00am\./);
 });
 
 test("time played before a navigation is charged to the video it played on (finding 12)", async () => {
@@ -375,6 +444,26 @@ test('a tick the worker refuses is sent again, not lost (finding 17)', async () 
   await tab.tick();
   await tab.tick();
   assert.ok(Math.abs(world.state.watchSecondsLeft - 890) < 0.01, `left ${world.state.watchSecondsLeft}`);
+});
+
+test('the pill says paused while the video is paused, and stays up and shimmers in the last two minutes', async () => {
+  const { world, tab } = await setup(900);
+  assert.doesNotMatch(tab.pill().textContent, /paused/);
+  tab.video.pause();
+  await tab.tick();
+  assert.match(tab.pill().textContent, /^15m left today · paused/);
+  assert.doesNotMatch(tab.pill().className, /is-low/);
+
+  world.state.watchSecondsLeft = 100;
+  // Any message saves the state, and the tab hears about it like a storage change.
+  await world.handle({ type: 'status', videoId: 'aaa' });
+  await tab.video.play();
+  await tab.tick();
+  assert.match(tab.pill().className, /is-low/);
+  assert.doesNotMatch(tab.pill().textContent, /paused/);
+  tab.video.pause();
+  await tab.tick();
+  assert.doesNotMatch(tab.pill().className, /is-low/, 'no shimmer while nothing drains');
 });
 
 test('the Save button is not rebuilt while nothing it shows changes (finding 4)', async () => {
