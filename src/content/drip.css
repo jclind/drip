@@ -448,45 +448,6 @@ html[dark] #drip-home {
   height: 17px;
 }
 
-/* Where the next reveal comes from (Q5). Quiet, since it rarely changes. */
-#drip-home .drip-source {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  margin-top: 12px;
-  color: var(--drip-muted);
-  font-size: 12px;
-}
-
-#drip-home .drip-source > span {
-  margin-right: 2px;
-}
-
-#drip-home .drip-source-opt {
-  padding: 3px 9px;
-  border: 0;
-  border-radius: 12px;
-  font: inherit;
-  color: var(--drip-muted);
-  background: none;
-  cursor: pointer;
-}
-
-#drip-home .drip-source-opt:hover:not(:disabled) {
-  color: var(--drip-text);
-}
-
-#drip-home .drip-source-opt[aria-pressed="true"] {
-  color: var(--drip-text);
-  background: var(--drip-gray);
-}
-
-#drip-home .drip-source-opt:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
 #drip-home .drip-message {
   margin-top: 14px;
   color: var(--drip-muted);

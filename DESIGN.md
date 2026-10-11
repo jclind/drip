@@ -12,7 +12,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q2 | Block home, watch-page sidebar, end screens, autoplay, Shorts. Search stays, minus the injected "discover" shelves. Playlists and mixes keep playing on their own (Jesse, 2026-10-06). |
 | Q3 | Out of time means hard stop: pause and overlay. "Finish the current video" grace mode is a setting, off by default. |
 | Q4 | Daily allowance only. Tasks are in IDEAS.md. The whole extension runs on the honor system. |
-| Q5 | Feed source is a toggle on the token page: YouTube home feed (default) or subscriptions. It keeps the last choice. Explore was dropped because `/feed/explore` now serves the home feed (Jesse, 2026-10-06). |
+| Q5 | Feed source: YouTube home feed (default) or subscriptions. It keeps the last choice. Explore was dropped because `/feed/explore` now serves the home feed (Jesse, 2026-10-06). It's a Settings field for now, not a toggle on the home page; its design comes later (Jesse, 2026-10-10). |
 | Q6 | A settings change that loosens a limit takes effect at the next day reset. Tightening is immediate. |
 | Q7 | The clock runs on every youtube.com watch page while the video plays. Embeds elsewhere are free. |
 | Q8 | Built on air as private `jclind/drip`, tested in air's Chrome, cloned on the MacBook and loaded unpacked. Data in `chrome.storage.local`. |
@@ -103,16 +103,16 @@ Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. W
 
 - Colors and sizes are CSS custom properties at the top of the home block in `drip.css`, so tuning is mostly editing those. Dark or light comes from YouTube's `html[dark]`.
 - Icons live in `src/icons/` and draw as CSS masks filled with the text color, so one SVG serves every background. That's why the manifest lists them as web accessible to youtube.com. The clock, chevron, and × are new files in the same folder. The glass is `src/lib/glass.js`, one SVG built from `cup-icons/` with the water level set from minutes left over minutes bought today. It glides between levels.
-- The From Home / Subscriptions toggle (Q5) isn't in the mockups. It sits as a small gray line under the two buttons, and hides while a card is up.
+- The feed source (Q5) isn't on the home page. It's "Reveal from" in Settings for now (Jesse, 2026-10-10).
 - Saved on the card is a slightly lighter gray button with the label "Saved". Clicking it again takes the video back out of Saved.
-- When something runs out, a gray line under the buttons says what and when it comes back: "No cards left. More at 4:00am.", "No drops left. …", or "You're out for today. Drops and cards refill at 4:00am." The spent buttons dim.
+- When something runs out, a gray line under the buttons says what and when it comes back: "No cards left. More at 4:00am.", "No drops left. …", or "You're out for today. Drops and cards refill at 4:00am." The spent buttons go gray. This is a placeholder. Jesse wants running out to feel like a good place to stop, not a sad dead end, so it needs its own design, like the lock screen's "Done for now" (2026-10-10).
 - Loading: a reveal from the empty page shows the card's shape right away with a shimmering box and title bars, and "Finding a video…" or "Checking your subscriptions…". Reveal next dims the old card and reads "Revealing…" until the new one lands. A new card rises in over 260ms. Rebuilds for Save and the like don't replay it.
 - Watch at 0 minutes with no drops left still goes to the video, so the lock screen's "I need this one" stays in reach.
 - The thumbnail is `hq720.jpg`, falling back to `hqdefault.jpg` when YouTube has none. Clicking it is Watch.
 - Durations of a whole number of hours read "2h", not "2h 0m".
 - The column is 400px. Below about 450px of room the gaps and button padding shrink, and below about 370px Save shows only its icon. Container queries measure the column, not the window, so YouTube's open guide counts too.
 - `dev/home.html` runs the real home page outside YouTube, with the real worker on fake storage and a fake grid, in any of a dozen states, light or dark. `dev/home-sizes.html` shows it at several widths at once. See the comment at the top of each.
-- Not built yet: "Kept 3 drops." (it follows the lock screen), the reveal animations under "Ideas", and the "+2 saved from yesterday" note.
+- Not built yet: "Kept 3 drops." (it follows the lock screen), the reveal animations under "Ideas", and the "+2 saved from yesterday" note. Jesse liked the loading placeholder and wants the animations designed in a later pass (2026-10-10).
 
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
@@ -142,7 +142,7 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 
 ### Feed source
 
-The toggle under Reveal writes `settings.feedSource` through `updateSettings`, which applies it at once because a feed change never loosens a limit. The Settings page has no control for it. With the feed source set to subscriptions, a reveal loads `/feed/subscriptions` in a hidden same-origin frame on the token page and reads its grid with the same selectors as the home grid. YouTube only fills a feed that's in view, so the frame sits on screen at opacity 0. Nothing new from the feed gives `pool-empty` and spends no token. The first version was tested on air only against the home feed, because air's account has no subscriptions.
+The "Reveal from" field in Settings writes `settings.feedSource` through `updateSettings`, which applies it at once because a feed change never loosens a limit. The home page has no control for it (Jesse, 2026-10-10). With the feed source set to subscriptions, a reveal loads `/feed/subscriptions` in a hidden same-origin frame on the token page and reads its grid with the same selectors as the home grid. YouTube only fills a feed that's in view, so the frame sits on screen at opacity 0. Nothing new from the feed gives `pool-empty` and spends no token. The first version was tested on air only against the home feed, because air's account has no subscriptions.
 
 ### The clock with several tabs
 

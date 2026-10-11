@@ -6,10 +6,10 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 
 ## Token page
 
-1. Open youtube.com. The page fades in, there's no video grid or chip bar, and the home page shows the glass, minutes left, the drop and card counts, +15m and Reveal video with their prices, the From toggle, and Saved open on 3 rows.
-2. Click Reveal video. A gray placeholder holds the card's place, then one card appears with a thumbnail, title, channel, and length, and cards drop by 1. +15m, Reveal video, and the toggle go, and Saved collapses to its header.
+1. Open youtube.com. The page fades in, there's no video grid or chip bar, and the home page shows the glass, minutes left, the drop and card counts, +15m and Reveal video with their prices, and Saved open on 3 rows.
+2. Click Reveal video. A gray placeholder holds the card's place, then one card appears with a thumbnail, title, channel, and length, and cards drop by 1. +15m and Reveal video go, and Saved collapses to its header.
 3. Click Save. The card stays up, the button says Saved, and Saved's count goes up by 1. Click Saved and it comes back out. Click Reveal next. A new card takes this one's place, cards drop by 1, and the first card is gone for good. Click ×. The card goes and the empty page comes back.
-4. Switch From to Subscriptions and click Reveal video. "Checking your subscriptions…" shows, then a card from a subscribed channel, or "Nothing new from your subscriptions" with no card spent.
+4. In Settings, set Reveal from to Subscriptions, then click Reveal video on the home page. "Checking your subscriptions…" shows, then a card from a subscribed channel, or "Nothing new from your subscriptions" with no card spent.
 5. Open a second YouTube tab and play a video in it. Back on the home page, hover a button and click it a few times. Every click works, and the button doesn't flicker.
 6. With 0 minutes and a card up, Watch reads "Watch · -1" with a drop. Clicking it spends a drop and the video plays. Saved rows show "-1" and a drop by their play icon, and work the same way.
 7. Hover a Saved row and click its ×. The row reads "Removed · Undo" for 5 seconds. Undo puts it back where it was.

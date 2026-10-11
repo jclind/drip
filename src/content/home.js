@@ -154,8 +154,6 @@
   /** What's in flight: a reveal from the empty page, or Reveal next on a card. The page shows a placeholder for it. */
   /** @type {'' | 'reveal' | 'next'} */
   let busy = '';
-  /** A source change still saving. Reveal waits for it, so it reads the feed that was just picked. */
-  let sourceSaving = Promise.resolve();
 
   /**
    * Reads the feed, then sends `msg` with the videos it found. Shared by Reveal and Reveal next.
@@ -168,7 +166,6 @@
     message = '';
     render();
     try {
-      await sourceSaving;
       const pool = await readCandidates();
       // No videos at all, not just none new: the grid's markup changed (Q25).
       const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
@@ -192,15 +189,6 @@
   /** @param {string} videoId The card the button was on. */
   function onRevealNext(videoId) {
     return revealWith('next', { type: 'revealNext', videoId });
-  }
-
-  /** @param {'home' | 'subscriptions'} source */
-  async function onSource(source) {
-    if (busy || !state || state.settings.feedSource === source) return;
-    message = '';
-    sourceSaving = send({ type: 'updateSettings', changes: { feedSource: source } }).then(absorb);
-    await sourceSaving;
-    render();
   }
 
   async function onAddTime() {
@@ -404,20 +392,6 @@
       }, h('span', {}, 'Reveal video'), price('card')));
   }
 
-  /**
-   * Where the next reveal comes from (Q5). It's the feedSource setting, so it stays until changed.
-   * @param {string} current
-   */
-  function sourceToggle(current) {
-    const options = /** @type {const} */ ([['home', 'Home'], ['subscriptions', 'Subscriptions']]);
-    return h('div', { class: 'drip-source', role: 'group', 'aria-label': 'Reveal from' },
-      h('span', {}, 'From'),
-      ...options.map(([value, label]) => h('button', {
-        class: 'drip-source-opt', 'data-k': `source-${value}`, 'aria-pressed': String(value === current), disabled: !!busy,
-        onclick: () => onSource(value),
-      }, label)));
-  }
-
   /** The reveal card while a reveal from the empty page reads the feed. Same size as the real one, so nothing jumps. */
   function placeholderCard() {
     const subs = state.settings.feedSource === 'subscriptions';
@@ -519,7 +493,6 @@
     return h('div', { class: 'drip-page' },
       stats(),
       !showCard && actions(),
-      !showCard && sourceToggle(state.settings.feedSource),
       state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
       savedList());

@@ -12,6 +12,7 @@ const FIELDS = [
   { key: 'recTokensPerDay', label: 'Rec tokens per day', hint: 'Each one reveals one recommended video.', type: 'number', min: 0, max: 100 },
   { key: 'rolloverDays', label: 'Rollover cap, in days', hint: 'Unspent tokens carry over up to this many days of allowance.', type: 'number', min: 1, max: 7 },
   { key: 'resetHour', label: 'Day resets at hour', hint: '0 to 23, local time. 4 means 4:00am.', type: 'number', min: 0, max: 23 },
+  { key: 'feedSource', label: 'Reveal from', hint: 'Where Reveal picks the next video. Applies now.', type: 'select', options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
   { key: 'needThisPerDay', label: '"I need this one" unlocks per day', hint: 'Each needs a typed reason and is logged.', type: 'number', min: 0, max: 10 },
   { key: 'graceMode', label: 'Finish the current video when time runs out', hint: 'Off means the video pauses at zero.', type: 'checkbox' },
 ];
