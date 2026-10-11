@@ -199,6 +199,15 @@ function dirty() {
   return FIELDS.some((f) => draft[f.key] !== state.settings[f.key]);
 }
 
+/**
+ * The fields the user changed and hasn't saved: draft values that differ from `base`, the settings the form was drawn
+ * from. Only these carry over when the settings change underneath, so Save never sends a stale copy of another field.
+ * @param {Record<string, any>} base
+ */
+function edits(base) {
+  return Object.fromEntries(FIELDS.filter((f) => draft[f.key] !== base[f.key]).map((f) => [f.key, draft[f.key]]));
+}
+
 function renderStatus() {
   const waiting = state.pending ? Object.keys(state.pending.changes).length : 0;
   const waitingText = waiting ? `${waiting} waiting for the reset.` : '';
@@ -233,11 +242,12 @@ async function save() {
 
 /** @param {string} key */
 async function cancel(key) {
+  // Undo keeps any other edit in progress.
+  const kept = edits(state.settings);
+  delete kept[key];
   absorb(await chrome.runtime.sendMessage({ type: 'cancelPending', key }));
   justSaved = false;
-  // Undo keeps any other edit in progress.
-  const edits = Object.fromEntries(FIELDS.filter((f) => f.key !== key && draft[f.key] !== undefined).map((f) => [f.key, draft[f.key]]));
-  draft = { ...state.settings, ...edits };
+  draft = { ...state.settings, ...kept };
   renderForm();
 }
 
@@ -325,7 +335,7 @@ function renderHistory() {
       changeLine(w)),
     h('div', { class: 'chart' },
       h('div', { class: 'plot' }, ...columns,
-        w.lastAverage !== null && h('div', { class: 'avg-line', style: `bottom: ${pct(w.lastAverage)}`, 'aria-hidden': 'true' })),
+        w.lastAverage !== null && h('div', { class: 'avg-line', style: `--at: ${Math.min(1, w.lastAverage / max)}`, 'aria-hidden': 'true' })),
       h('div', { class: 'gutter', 'aria-hidden': 'true' }, h('span', { class: 'gutter-top' }, Drip.formatMinutes(max)), h('span', { class: 'gutter-zero' }, '0'))),
     w.lastAverage !== null && h('div', { class: 'key' }, h('span', { class: 'key-dash', 'aria-hidden': 'true' }), `${than} · ${Drip.formatMinutes(w.lastAverage)}`),
     h('div', { class: 'day' },
@@ -359,13 +369,13 @@ $('save').addEventListener('click', save);
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !changes.drip || !state) return;
   const before = JSON.stringify([state.settings, state.pending]);
-  const untouched = !dirty();
+  const kept = edits(state.settings);
   const today = state.day;
   state = Drip.hydrate(changes.drip.newValue, Date.now());
   if (selectedDay === today) selectedDay = state.day;
   if (JSON.stringify([state.settings, state.pending]) !== before) {
-    if (untouched) draft = { ...state.settings };
-    // The form rebuilds from the draft, so an edit in progress keeps its values.
+    // Fields being edited keep their values. Every other field follows the new settings (Codex, 2026-10-11).
+    draft = { ...state.settings, ...kept };
     renderForm();
   }
   renderHistory();

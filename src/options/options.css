@@ -423,11 +423,13 @@ button.col.is-selected .letter {
   text-underline-offset: 3px;
 }
 
+/* --at is the average over the scale's top, 0 to 1. The line measures from the baseline across the bars' height only,
+   not the weekday row under them (Codex, 2026-10-11). */
 .avg-line {
   position: absolute;
   left: 0;
   right: 0;
-  margin-bottom: var(--letters-h);
+  bottom: calc(var(--letters-h) + var(--at) * var(--plot-h));
   border-top: 1.5px dashed var(--text);
   opacity: 0.8;
   pointer-events: none;
