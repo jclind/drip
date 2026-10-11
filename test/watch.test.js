@@ -314,7 +314,7 @@ test('the pill does not count down during an ad (Codex, Q27)', async () => {
   world.advance(90);
   await world.handle({ type: 'get' });
   await settle();
-  assert.match(tab.pill().textContent, /^15 min left/);
+  assert.match(tab.pill().textContent, /^15m left/);
 });
 
 test('nothing is sent while the video is paused', async () => {

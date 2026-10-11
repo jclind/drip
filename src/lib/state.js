@@ -8,6 +8,7 @@
  * @property {string} day
  * @property {{watch: number, rec: number}} tokens
  * @property {number} watchSecondsLeft
+ * @property {number} watchSecondsBought Minutes bought today, in seconds. The glass is full at this.
  * @property {Video | null} current
  * @property {Video[]} backlog
  * @property {string[]} seen
@@ -39,6 +40,7 @@
  * @property {number} recSpent
  * @property {number} saved
  * @property {number} passed
+ * @property {number} watched
  * @property {{videoId: string, title: string, reason: string, at: number}[]} needThis
  */
 
@@ -86,13 +88,13 @@
       version: 1, settings: { ...DEFAULT_SETTINGS }, pending: null,
       day: dayKey(now, DEFAULT_SETTINGS.resetHour),
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
-      watchSecondsLeft: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
+      watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
     };
   }
 
   /** @returns {LogDay} */
   function emptyLog() {
-    return { watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 0, passed: 0, needThis: [] };
+    return { watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 0, passed: 0, watched: 0, needThis: [] };
   }
 
   /**
@@ -126,6 +128,8 @@
       rec: count(stored.tokens?.rec, state.settings.recTokensPerDay),
     };
     state.watchSecondsLeft = count(stored.watchSecondsLeft, 0);
+    // State saved before this field existed counts what's left as bought, so the glass shows full, not empty.
+    state.watchSecondsBought = count(stored.watchSecondsBought, state.watchSecondsLeft);
     state.current = cleanVideo(stored.current);
     state.backlog = Array.isArray(stored.backlog) ? /** @type {Video[]} */ (stored.backlog.map(cleanVideo).filter(Boolean)) : [];
     state.seen = Array.isArray(stored.seen) ? stored.seen.filter(id => typeof id === 'string').slice(-2000) : [];
@@ -155,6 +159,7 @@
     state.tokens.watch = Math.min(state.tokens.watch + settings.watchTokensPerDay * elapsed, settings.watchTokensPerDay * settings.rolloverDays);
     state.tokens.rec = Math.min(state.tokens.rec + settings.recTokensPerDay * elapsed, settings.recTokensPerDay * settings.rolloverDays);
     state.watchSecondsLeft = 0;
+    state.watchSecondsBought = 0;
     state.unlocked = [];
     state.day = nextDay;
     const oldest = addDays(nextDay, -89);
@@ -174,6 +179,7 @@
     if (state.tokens.watch <= 0) return { ok: false, error: 'no-watch-tokens' };
     state.tokens.watch--;
     state.watchSecondsLeft += state.settings.minutesPerToken * 60;
+    state.watchSecondsBought += state.settings.minutesPerToken * 60;
     logDay(state).watchSpent++;
     return { ok: true };
   }
@@ -195,30 +201,100 @@
   }
 
   /**
+   * Buys one drop's minutes when none are left, so Watch can start the video (Q18). With no drops left it buys
+   * nothing, and the watch page's lock takes over. An unlocked video needs no minutes.
    * @param {State} state
-   * @param {'watch' | 'save' | 'pass'} action
+   * @param {string} videoId
+   */
+  function buyIfOut(state, videoId) {
+    const bought = state.watchSecondsLeft <= 0 && !state.unlocked.includes(videoId) && spendWatch(state).ok;
+    return { ok: true, bought };
+  }
+
+  /** @param {State} state */
+  function currentIsSaved(state) {
+    return !!state.current && state.backlog.some(video => video.id === state.current?.id);
+  }
+
+  /**
+   * Ends the card. Each card counts once in the log by how it ended: Watch counts `watched`. Pass counts `passed`,
+   * unless the card was saved first, since the video stays in Saved, and then it stays counted as `saved`.
+   * @param {State} state
+   * @param {'watch' | 'pass'} action
+   */
+  function endCard(state, action) {
+    const day = logDay(state);
+    const saved = currentIsSaved(state);
+    if (action === 'watch') {
+      if (saved) day.saved = Math.max(0, day.saved - 1);
+      day.watched++;
+    } else if (!saved) {
+      day.passed++;
+    }
+    state.current = null;
+  }
+
+  /**
+   * The reveal card's buttons (Q13). Save and unsave keep the card up. Watch and pass end it. Watch at 0 minutes buys
+   * a drop's minutes first (Q18).
+   * @param {State} state
+   * @param {'watch' | 'save' | 'unsave' | 'pass'} action
    * @param {string} [videoId] The card the action was shown for. Another tab may have moved on since.
    */
   function resolveCurrent(state, action, videoId) {
     if (!state.current) return { ok: false, error: 'no-current' };
-    if (action !== 'watch' && action !== 'save' && action !== 'pass') return { ok: false, error: 'bad-action' };
+    if (!['watch', 'save', 'unsave', 'pass'].includes(action)) return { ok: false, error: 'bad-action' };
     if (videoId !== undefined && videoId !== state.current.id) return { ok: false, error: 'stale-card' };
     const video = state.current;
     if (action === 'save') {
-      addBacklog(state, video);
-      logDay(state).saved++;
-    } else if (action === 'pass') {
-      logDay(state).passed++;
+      if (!currentIsSaved(state)) {
+        addBacklog(state, video);
+        logDay(state).saved++;
+      }
+      return { ok: true, video };
     }
-    state.current = null;
-    return { ok: true, video };
+    if (action === 'unsave') {
+      if (currentIsSaved(state)) {
+        removeBacklog(state, video.id);
+        const day = logDay(state);
+        day.saved = Math.max(0, day.saved - 1);
+      }
+      return { ok: true, video };
+    }
+    const bought = action === 'watch' && buyIfOut(state, video.id).bought;
+    endCard(state, action);
+    return action === 'watch' ? { ok: true, video, bought } : { ok: true, video };
   }
 
-  /** @param {State} state @param {unknown} raw */
-  function addBacklog(state, raw) {
+  /**
+   * "Reveal next · -1 card": passes the card and reveals another in one step (Q13). Nothing changes on an error,
+   * so a failed reveal leaves the card up.
+   * @param {State} state
+   * @param {string} videoId The card the button was on.
+   * @param {unknown[]} candidates
+   */
+  function revealNext(state, videoId, candidates) {
+    if (!state.current) return { ok: false, error: 'no-current' };
+    if (videoId !== state.current.id) return { ok: false, error: 'stale-card' };
+    if (state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
+    const seen = new Set(state.seen);
+    const saved = new Set(state.backlog.map(video => video.id));
+    if (!candidates.map(cleanVideo).some(c => !!c && !seen.has(c.id) && !saved.has(c.id))) return { ok: false, error: 'pool-empty' };
+    endCard(state, 'pass');
+    return reveal(state, candidates);
+  }
+
+  /**
+   * @param {State} state
+   * @param {unknown} raw
+   * @param {number} [index] Where to put it, for undoing a removal. New videos go at the end, the newest place.
+   */
+  function addBacklog(state, raw, index) {
     const video = cleanVideo(raw);
     if (!video) return { ok: false, error: 'bad-video' };
-    if (!state.backlog.some(saved => saved.id === video.id)) state.backlog.push(video);
+    if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
+    const at = typeof index === 'number' && Number.isInteger(index) ? Math.min(Math.max(index, 0), state.backlog.length) : state.backlog.length;
+    state.backlog.splice(at, 0, video);
     return { ok: true };
   }
 
@@ -345,11 +421,17 @@
     return { ok: true };
   }
 
-  /** @param {number} seconds */
+  /**
+   * Compact time like Screen Time: "1h 42m", "34m", "2h", "<1m", "0m" (Jesse, 2026-10-09).
+   * @param {number} seconds
+   */
   function formatMinutes(seconds) {
-    if (seconds <= 0) return '0 min';
-    if (seconds < 60) return 'under 1 min';
-    return `${Math.floor(seconds / 60)} min`;
+    if (!(seconds > 0)) return '0m';
+    if (seconds < 60) return '<1m';
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    if (!hours) return `${minutes}m`;
+    return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
   }
 
   /**
@@ -452,7 +534,7 @@
 
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
-    rollDay, logDay, spendWatch, reveal, resolveCurrent, addBacklog,
+    rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, formatMinutes, cleanVideo,
     logDays, redirectTarget, earlyLocked, devAction,

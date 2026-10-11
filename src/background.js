@@ -75,8 +75,12 @@ function handle(msg, state, now) {
       return Drip.reveal(state, Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'resolve':
       return Drip.resolveCurrent(state, msg.action, typeof msg.videoId === 'string' ? msg.videoId : undefined);
+    case 'revealNext':
+      return Drip.revealNext(state, String(msg.videoId), Array.isArray(msg.candidates) ? msg.candidates : []);
+    case 'buyIfOut':
+      return Drip.buyIfOut(state, String(msg.videoId));
     case 'addBacklog':
-      return Drip.addBacklog(state, msg.video);
+      return Drip.addBacklog(state, msg.video, msg.index);
     case 'removeBacklog':
       return Drip.removeBacklog(state, msg.id);
     case 'tick':

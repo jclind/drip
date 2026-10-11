@@ -21,7 +21,7 @@ function refusesUnchanged(state, call, error) {
 test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
-    'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'addBacklog',
+    'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'formatMinutes', 'cleanVideo',
     'logDays', 'redirectTarget', 'earlyLocked', 'devAction',
@@ -57,7 +57,7 @@ test('initialState has the specified shape and independent mutable values', () =
   const state = fresh();
   assert.deepEqual(state, {
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
-    tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0,
+    tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
     current: null, backlog: [], seen: [], unlocked: [], log: {},
   });
   state.settings.recTokensPerDay = 1;
@@ -106,7 +106,7 @@ test('skipping five days caps balances at two days of allowance', () => {
 test('logDay creates a zero entry only for the current day and reuses it', () => {
   const state = fresh();
   const entry = D.logDay(state);
-  assert.deepEqual(entry, { watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 0, passed: 0, needThis: [] });
+  assert.deepEqual(entry, { watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 0, passed: 0, watched: 0, needThis: [] });
   assert.strictEqual(D.logDay(state), entry);
   D.rollDay(state, time(6));
   const next = D.logDay(state);
@@ -167,20 +167,131 @@ test('seen retains the newest 2000 ids', () => {
   assert.equal(state.seen.at(-1), 'new');
 });
 
-for (const action of /** @type {const} */ (['watch', 'save', 'pass'])) {
-  test(`resolveCurrent ${action} clears the card and logs the appropriate action`, () => {
+for (const action of /** @type {const} */ (['watch', 'pass'])) {
+  test(`resolveCurrent ${action} clears the card and logs it once`, () => {
     const state = fresh();
+    state.watchSecondsLeft = 60;
     const chosen = video('a');
     D.reveal(state, [chosen]);
     const tokens = { ...state.tokens };
-    assert.deepEqual(D.resolveCurrent(state, action), { ok: true, video: chosen });
+    const res = D.resolveCurrent(state, action);
+    assert.deepEqual(res, action === 'watch' ? { ok: true, video: chosen, bought: false } : { ok: true, video: chosen });
     assert.equal(state.current, null);
     assert.deepEqual(state.tokens, tokens);
-    assert.deepEqual(state.backlog, action === 'save' ? [chosen] : []);
-    assert.equal(D.logDay(state).saved, action === 'save' ? 1 : 0);
+    assert.deepEqual(state.backlog, []);
+    assert.equal(D.logDay(state).watched, action === 'watch' ? 1 : 0);
     assert.equal(D.logDay(state).passed, action === 'pass' ? 1 : 0);
   });
 }
+
+test('save keeps the card up, counts once, and unsave takes it back (Q13)', () => {
+  const state = fresh();
+  const chosen = video('a');
+  D.reveal(state, [chosen]);
+  assert.deepEqual(D.resolveCurrent(state, 'save', 'a'), { ok: true, video: chosen });
+  assert.deepEqual(state.current, chosen);
+  assert.deepEqual(state.backlog, [chosen]);
+  D.resolveCurrent(state, 'save', 'a');
+  assert.equal(state.backlog.length, 1);
+  assert.equal(D.logDay(state).saved, 1);
+  assert.deepEqual(D.resolveCurrent(state, 'unsave', 'a'), { ok: true, video: chosen });
+  assert.deepEqual(state.current, chosen);
+  assert.deepEqual(state.backlog, []);
+  assert.equal(D.logDay(state).saved, 0);
+});
+
+test('a saved card that is passed stays saved and counts as saved, not passed', () => {
+  const state = fresh();
+  D.reveal(state, [video('a')]);
+  D.resolveCurrent(state, 'save');
+  D.resolveCurrent(state, 'pass');
+  assert.equal(state.current, null);
+  assert.deepEqual(state.backlog, [video('a')]);
+  assert.deepEqual([D.logDay(state).saved, D.logDay(state).passed, D.logDay(state).watched], [1, 0, 0]);
+});
+
+test('a saved card that is watched counts as watched, by its last outcome', () => {
+  const state = fresh();
+  state.watchSecondsLeft = 60;
+  D.reveal(state, [video('a')]);
+  D.resolveCurrent(state, 'save');
+  D.resolveCurrent(state, 'watch');
+  assert.deepEqual(state.backlog, [video('a')]);
+  assert.deepEqual([D.logDay(state).saved, D.logDay(state).passed, D.logDay(state).watched], [0, 0, 1]);
+});
+
+test('watch at 0 minutes buys one drop of minutes (Q18)', () => {
+  const state = fresh();
+  D.reveal(state, [video('a')]);
+  assert.deepEqual(D.resolveCurrent(state, 'watch'), { ok: true, video: video('a'), bought: true });
+  assert.equal(state.tokens.watch, 3);
+  assert.equal(state.watchSecondsLeft, 15 * 60);
+  assert.equal(state.watchSecondsBought, 15 * 60);
+  assert.equal(D.logDay(state).watchSpent, 1);
+});
+
+test('watch at 0 minutes and 0 drops still ends the card and buys nothing', () => {
+  const state = fresh();
+  state.tokens.watch = 0;
+  D.reveal(state, [video('a')]);
+  assert.deepEqual(D.resolveCurrent(state, 'watch'), { ok: true, video: video('a'), bought: false });
+  assert.equal(state.current, null);
+  assert.equal(state.watchSecondsLeft, 0);
+});
+
+test('buyIfOut buys only at 0 minutes, and never for an unlocked video', () => {
+  const state = fresh();
+  state.unlocked = ['u'];
+  assert.deepEqual(D.buyIfOut(state, 'u'), { ok: true, bought: false });
+  assert.deepEqual(D.buyIfOut(state, 'a'), { ok: true, bought: true });
+  assert.deepEqual(D.buyIfOut(state, 'a'), { ok: true, bought: false });
+  assert.equal(state.tokens.watch, 3);
+});
+
+test('revealNext passes the card and reveals the next in one step (Q13)', () => {
+  const state = fresh();
+  D.reveal(state, [video('a')]);
+  assert.deepEqual(D.revealNext(state, 'a', [video('a'), video('b')]), { ok: true, video: video('b') });
+  assert.deepEqual(state.current, video('b'));
+  assert.equal(state.tokens.rec, 8);
+  assert.equal(D.logDay(state).passed, 1);
+  assert.equal(D.logDay(state).recSpent, 2);
+});
+
+test('revealNext changes nothing on an error, so the card stays up', () => {
+  const state = fresh();
+  D.reveal(state, [video('a')]);
+  refusesUnchanged(state, () => D.revealNext(state, 'a', [video('a')]), 'pool-empty');
+  refusesUnchanged(state, () => D.revealNext(state, 'old', [video('b')]), 'stale-card');
+  state.tokens.rec = 0;
+  refusesUnchanged(state, () => D.revealNext(state, 'a', [video('b')]), 'no-rec-tokens');
+  state.current = null;
+  refusesUnchanged(state, () => D.revealNext(state, 'a', [video('b')]), 'no-current');
+});
+
+test('addBacklog puts an undone removal back where it was', () => {
+  const state = fresh();
+  for (const id of ['a', 'b', 'c']) D.addBacklog(state, video(id));
+  D.removeBacklog(state, 'b');
+  D.addBacklog(state, video('b'), 1);
+  assert.deepEqual(state.backlog.map((v) => v.id), ['a', 'b', 'c']);
+  D.addBacklog(state, video('d'), 99);
+  D.addBacklog(state, video('e'), -3);
+  assert.deepEqual(state.backlog.map((v) => v.id), ['e', 'a', 'b', 'c', 'd']);
+});
+
+test('the glass: buying fills watchSecondsBought, the reset empties it, and old state counts as full', () => {
+  const state = fresh();
+  D.spendWatch(state);
+  D.spendWatch(state);
+  assert.equal(state.watchSecondsBought, 30 * 60);
+  D.rollDay(state, time(6));
+  assert.equal(state.watchSecondsBought, 0);
+  const old = /** @type {any} */ (fresh());
+  delete old.watchSecondsBought;
+  old.watchSecondsLeft = 600;
+  assert.equal(D.hydrate(old, time(5)).watchSecondsBought, 600);
+});
 
 test('resolveCurrent without a reveal is atomic', () => {
   const state = fresh();
@@ -371,7 +482,7 @@ test('hydrate undefined equals initialState; partial storage gets settings and n
   assert.equal(state.day, '2026-10-05');
   assert.deepEqual(state.settings, { ...D.DEFAULT_SETTINGS, resetHour: 0, recTokensPerDay: 5 });
   assert.deepEqual(state.tokens, { watch: 4, rec: 2 });
-  assert.deepEqual(state.log['2026-10-04'], { watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 1, passed: 0, needThis: [] });
+  assert.deepEqual(state.log['2026-10-04'], { watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 1, passed: 0, watched: 0, needThis: [] });
   assert.deepEqual(state.backlog, []);
   assert.equal(state.pending, null);
 });
@@ -405,11 +516,15 @@ test('log pruning retains 89 days back and removes 90 days back', () => {
   assert.deepEqual(Object.keys(state.log).sort(), [keep, '2026-10-05'].sort());
 });
 
-test('formatMinutes displays zero, sub-minute time, and whole minutes rounded down', () => {
-  assert.equal(D.formatMinutes(0), '0 min');
-  assert.equal(D.formatMinutes(30), 'under 1 min');
-  assert.equal(D.formatMinutes(60), '1 min');
-  assert.equal(D.formatMinutes(2550), '42 min');
+test('formatMinutes is compact: 0m, <1m, minutes rounded down, hours with no leading zero', () => {
+  assert.equal(D.formatMinutes(0), '0m');
+  assert.equal(D.formatMinutes(-5), '0m');
+  assert.equal(D.formatMinutes(30), '<1m');
+  assert.equal(D.formatMinutes(60), '1m');
+  assert.equal(D.formatMinutes(2550), '42m');
+  assert.equal(D.formatMinutes(3600), '1h');
+  assert.equal(D.formatMinutes(3900), '1h 5m');
+  assert.equal(D.formatMinutes(6120), '1h 42m');
 });
 
 
