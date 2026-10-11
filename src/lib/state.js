@@ -434,14 +434,6 @@
     return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
   }
 
-  /**
-   * Days the Settings log shows: today and the 7 before it, newest first (Q21).
-   * @param {string} day
-   */
-  function logDays(day) {
-    return Array.from({ length: 8 }, (_, i) => addDays(day, -i));
-  }
-
   const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   /**
@@ -458,6 +450,59 @@
       lastWeek: before ? before.watchedSec : null,
       weekday: WEEKDAYS[new Date(`${state.day}T00:00:00Z`).getUTCDay()],
     };
+  }
+
+  /** @param {string} day */
+  function weekdayOf(day) {
+    return new Date(`${day}T00:00:00Z`).getUTCDay();
+  }
+
+  /**
+   * One week of Settings' History card, Sunday first (Jesse, 2026-10-09). `back` is how many weeks before this one.
+   * Days before the log's oldest entry, and days after today, don't count toward an average, so the first week after
+   * install and the current week average only the days drip was there for. `lastAverage` is the week before's, or
+   * null when the log has nothing that far back. `hasEarlier` is false at the week holding the log's oldest day.
+   * @param {State} state
+   * @param {number} [back]
+   */
+  function weekView(state, back = 0) {
+    const first = Object.keys(state.log).reduce((oldest, day) => (day < oldest ? day : oldest), state.day);
+    const start = addDays(state.day, -weekdayOf(state.day) - 7 * Math.max(0, Math.floor(back)));
+    /** @param {string} from */
+    const week = from => Array.from({ length: 7 }, (_, i) => {
+      const day = addDays(from, i);
+      const entry = state.log[day];
+      return { day, watchedSec: entry ? entry.watchedSec : 0, today: day === state.day, future: day > state.day, counted: day >= first && day <= state.day };
+    });
+    /** @param {{watchedSec: number, counted: boolean}[]} days */
+    const average = days => {
+      const counted = days.filter(d => d.counted);
+      return counted.length ? counted.reduce((sum, d) => sum + d.watchedSec, 0) / counted.length : null;
+    };
+    const days = week(start);
+    return {
+      start, end: addDays(start, 6), days,
+      average: average(days),
+      lastAverage: average(week(addDays(start, -7))),
+      hasEarlier: start > addDays(first, -weekdayOf(first)),
+      hasLater: start < addDays(state.day, -weekdayOf(state.day)),
+    };
+  }
+
+  /**
+   * The line under a day's tiles in History: "Of 5 cards, 2 saved and 3 passed." Zero parts drop out, and a day with no
+   * cards gives ''. recSpent counts a card that's still showing, so the parts can add up to one less.
+   * @param {LogDay | undefined} entry
+   */
+  function cardsLine(entry) {
+    const total = entry ? entry.recSpent : 0;
+    if (!entry || !(total > 0)) return '';
+    const noun = total === 1 ? 'card' : 'cards';
+    const parts = /** @type {[number, string][]} */ ([[entry.saved, 'saved'], [entry.watched, 'watched'], [entry.passed, 'passed']])
+      .filter(([n]) => n > 0).map(([n, word]) => `${n} ${word}`);
+    if (!parts.length) return `${total} ${noun} revealed.`;
+    const list = parts.length < 3 ? parts.join(' and ') : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+    return `Of ${total} ${noun}, ${list}.`;
   }
 
   // Subscriptions, Explore, and its topic pages (Q16). The two channel ids are Shopping and Music, which YouTube links
@@ -556,6 +601,6 @@
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, formatMinutes, cleanVideo,
-    logDays, watchedSummary, redirectTarget, earlyLocked, devAction,
+    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction,
   };
 })();

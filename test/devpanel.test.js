@@ -75,6 +75,7 @@ function load() {
     chrome: {
       runtime: {
         id: 'drip',
+        onMessage: { addListener() {} },
         sendMessage: async (/** @type {any} */ msg) => {
           if (msg.type === 'devStatus') return { ok: true, toggle: true, file: false, enabled: world.devOn };
           if (msg.type === 'get') return { ok: true, state };

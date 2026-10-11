@@ -186,7 +186,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     setInterval: (/** @type {Function} */ fn) => { intervals.set(++nextInterval, fn); return nextInterval; },
     clearInterval: (/** @type {number} */ id) => { intervals.delete(id); },
     chrome: {
-      runtime: { id: 'drip', sendMessage: (/** @type {any} */ msg) => world.handle(msg), getManifest: () => ({ version: '0.1.0' }), getURL: (/** @type {string} */ p) => p },
+      runtime: { id: 'drip', onMessage: { addListener() {} }, sendMessage: (/** @type {any} */ msg) => world.handle(msg), getManifest: () => ({ version: '0.1.0' }), getURL: (/** @type {string} */ p) => p },
       storage: { onChanged: { addListener: (/** @type {Function} */ fn) => world.listeners.push(fn) } },
     },
   };

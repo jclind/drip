@@ -172,6 +172,12 @@
     }, 1000);
   }
 
+  // The popup's "Open YouTube" asks every tab this, since drip has no permission to read tab URLs (store/LISTING.md).
+  // Only a YouTube tab with drip running answers.
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg && msg.type === 'drip-ping') sendResponse({ ok: true });
+  });
+
   // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
   const KEPT_KEY = 'drip-kept';
 

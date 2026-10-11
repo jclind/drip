@@ -24,7 +24,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'formatMinutes', 'cleanVideo',
-    'logDays', 'watchedSummary', 'redirectTarget', 'earlyLocked', 'devAction',
+    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
@@ -691,4 +691,47 @@ test('watchedSummary gives today, the same weekday last week, and null when last
   assert.deepEqual(D.watchedSummary(s), { today: 4500, lastWeek: 3000, weekday: 'Monday' });
   s.log['2026-09-28'].watchedSec = 0;
   assert.equal(D.watchedSummary(s).lastWeek, 0);
+});
+
+test('weekView starts on Sunday and averages only the days drip was there for', () => {
+  const s = fresh();
+  let w = D.weekView(s);
+  assert.equal(w.start, '2026-10-04');
+  assert.equal(w.end, '2026-10-10');
+  assert.deepEqual(w.days.map(d => [d.today, d.future, d.counted]), [
+    [false, false, false], [true, false, true], [false, true, false], [false, true, false],
+    [false, true, false], [false, true, false], [false, true, false],
+  ]);
+  assert.equal(w.average, 0);
+  assert.equal(w.lastAverage, null);
+  assert.equal(w.hasEarlier, false);
+  assert.equal(w.hasLater, false);
+
+  const entry = (/** @type {number} */ watchedSec) => ({ ...structuredClone(D.logDay(s)), watchedSec });
+  D.logDay(s).watchedSec = 1800;
+  s.log['2026-10-04'] = entry(1200);
+  s.log['2026-09-29'] = entry(600);
+  w = D.weekView(s);
+  assert.deepEqual(w.days.map(d => d.watchedSec), [1200, 1800, 0, 0, 0, 0, 0]);
+  assert.equal(w.average, 1500);
+  // Last week counts Tuesday, the log's oldest day, through Saturday.
+  assert.equal(w.lastAverage, 120);
+  assert.equal(w.hasEarlier, true);
+
+  w = D.weekView(s, 1);
+  assert.equal(w.start, '2026-09-27');
+  assert.equal(w.average, 120);
+  assert.equal(w.lastAverage, null);
+  assert.equal(w.hasEarlier, false);
+  assert.equal(w.hasLater, true);
+});
+
+test('cardsLine says how the day\'s cards ended and drops the zero parts', () => {
+  const day = (/** @type {Partial<import('../src/lib/state.js').LogDay>} */ e) => ({ watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 0, passed: 0, watched: 0, needThis: [], ...e });
+  assert.equal(D.cardsLine(undefined), '');
+  assert.equal(D.cardsLine(day({})), '');
+  assert.equal(D.cardsLine(day({ recSpent: 5, saved: 2, passed: 3 })), 'Of 5 cards, 2 saved and 3 passed.');
+  assert.equal(D.cardsLine(day({ recSpent: 1, saved: 1 })), 'Of 1 card, 1 saved.');
+  assert.equal(D.cardsLine(day({ recSpent: 6, saved: 2, watched: 1, passed: 3 })), 'Of 6 cards, 2 saved, 1 watched, and 3 passed.');
+  assert.equal(D.cardsLine(day({ recSpent: 1 })), '1 card revealed.');
 });

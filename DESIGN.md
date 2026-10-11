@@ -28,7 +28,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. While a card is up, Watch is free if minutes are left. At 0 minutes it reads "Watch · -1 drop", and clicking it buys one watch token's minutes and starts the video. "+15 min" shows only when no card is up (Jesse, 2026-10-07; built 2026-10-10). |
 | Q19 | Background audio counts like any watching. `music.youtube.com` is out of scope. |
 | Q20 | "I need this one" on the overlay: typed reason, unlocks that one video for the day without draining minutes, 2 per day, every use logged. |
-| Q21 | Log per day: seconds watched, tokens spent, reveals saved or passed, "I need this" reasons. Keep 90 days. Show today plus the 7 days before it, 8 rows, so today sits next to the same weekday last week (Claude's pick, Jesse deferred, 2026-10-06). |
+| Q21 | Log per day: seconds watched, tokens spent, reveals saved or passed, "I need this" reasons. Keep 90 days. Show today plus the 7 days before it, 8 rows, so today sits next to the same weekday last week (Claude's pick, Jesse deferred, 2026-10-06). Jesse's Settings mockups replaced the 8 rows with the History card, a week at a time (2026-10-09, built 2026-10-11). |
 | Q22 | Popup shows balances and minutes left, plus a Settings link. No spend buttons. |
 | Q23 | v1 is the core loop. The rest of the blocking is step 2. |
 | Q24 | 1.0 is a build that works for a stranger installing it from the Chrome Web Store. Visual design comes after, with Jesse. `RELEASE-PLAN.md` has the steps (Jesse, 2026-10-06). |
@@ -36,7 +36,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q26 | Finishing a video that's in the backlog removes it from the backlog. Each new video opens in theater mode. Kept as they are for now (Jesse, 2026-10-06). |
 | Q27 | Ads don't use watch minutes. Time the player spends on an ad isn't charged or logged (Jesse, 2026-10-07). |
 
-## Visual design (in progress, home page and lock screen built)
+## Visual design (in progress, home page, lock screen, popup, and Settings built)
 
 Jesse is designing the look by hand, with Claude reviewing his mockups, started 2026-10-07. The goal is a little character without being distracting. Spending a token can feel satisfying, but restraint should feel good too, so the design doesn't reward spending everything.
 
@@ -134,6 +134,18 @@ Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups 
 - Under the lock's water, faint bubbles drift up at random sizes and speeds, and two small fish cross now and then, one every minute or so, at different depths and directions. The overlay's mask covers them, so they only show where the water has risen. Reduced motion hides them (Jesse asked for something underwater, 2026-10-10).
 - More motion ideas are in IDEAS.md, "Motion and small touches".
 
+Popup and Settings as built (2026-10-11, step 4). Built from `popup.png`, `settings.png`, and the rules above. Claude's calls, open to Jesse's review:
+
+- The popup, Settings, and the welcome page share `src/pages.css`, whose color tokens match drip.css's and follow Chrome's light or dark theme. `src/pages.js` has `h()`, `icon()`, and `hourLabel()` for these pages.
+- "Open YouTube" brings forward an open YouTube tab, this window's first, then the most recently used, or opens a new one. drip can't read tab URLs without a host permission, and the store listing says it has none, so the popup asks every tab and only YouTube tabs with drip running answer (`drip-ping` in common.js). Adding `host_permissions` would make it a plain query, at the cost of that claim.
+- "Reveal from" (Home feed or Subscriptions) sits in Your allowance, right under Cards per day, since the mockup has no place for it.
+- The steppers are ARIA spinbuttons: arrow keys step, Home and End jump to the ends, and Tab skips the − and + buttons. Minutes per drop steps by 1 up to 5, then by 5, so 15 to 30 is three clicks.
+- Edits wait for Save. Until then the line beside Save reads "Not saved yet."; after it, "Saved." and the waiting count. The chip's Undo applies at once and keeps other unsaved edits. The chip's tooltip has the full date the change starts.
+- A change from another tab, or the day reset, redraws the form without losing an edit in progress.
+- History is under a "Watch time" title, as in the mockup. The chart's scale steps through 30m, 1h, 2h, 3h, 4h, 6h, 8h, 12h, 16h, and 24h, taking the first at or above the tallest bar and last week's average. A day with nothing watched shows a 2px sliver. Days before the log's oldest entry don't count toward an average and can't be picked, so the first week after install isn't dragged down by days drip wasn't there. Clicking a bar picks that day for the block below it, marked by an underlined letter and a soft column; a past week starts on its Saturday. On weeks before this one, the comparison reads "from the week before".
+- The unlocks tile's active look at 1 or more is the lock and number in full text color instead of dimmed.
+- "Why you needed one" lists every reason in the 90-day log, newest first. Each title opens the video in a new tab.
+
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
 - The reveal opens the page: the stats slide up and the buttons slide down to make the card's space, a drop falls into it, and the thumbnail surfaces from the ripple. Reveal video stays the same button and moves down to become Reveal next. +15 min shrinks to a bead and Save and × bud out of it, like droplets splitting (a "gooey" SVG filter). Jesse's idea, 2026-10-07.
@@ -158,7 +170,7 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 - `src/lib/state.js` holds all the rules as pure functions over a plain state object. It's a classic script that sets `globalThis.Drip`, so the service worker (`importScripts`), extension pages (`<script>`), content scripts (manifest list), and Node tests (`require`) all load the same file.
 - `src/background.js` is the only writer. Everything else sends it a message. It runs messages one at a time through a promise queue, so two tabs can't overwrite each other. It saves only when a message changed the state, because every save wakes the storage listeners in every YouTube tab. If a save fails, it puts the charge marker back, so the tab's resent time is charged.
 - Every message starts with `rollDay(state, now)`, so the day resets lazily. A laptop asleep at 4am still resets correctly on the next read.
-- `src/content/` replaces the home page and runs the watch clock. `src/lib/glass.js` draws the glass for the home page, and later the pill and popup. `comments.js` adds the "Show comments" button, and the CSS that hides comments is in `early.css`. `src/popup/` and `src/options/` are extension pages.
+- `src/content/` replaces the home page and runs the watch clock. `src/lib/glass.js` draws the glass for the home page, the pill, and the popup. `comments.js` adds the "Show comments" button, and the CSS that hides comments is in `early.css`. `src/popup/` and `src/options/` are extension pages.
 
 ### Feed source
 
@@ -229,7 +241,8 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, watched, needThis: [
 - `updateSettings(state, changes)` cleans the changes, then for each key that differs from the current value it either applies it now (tightening or neutral) or puts it in `pending` with `effectiveDay = addDays(state.day, 1)`. Applying a key now removes any pending value for that key. Setting a key back to its current value removes its pending value too. An empty `pending.changes` becomes `null`. Balances above the new cap (`perDay * rolloverDays`) drop to it at once. Returns `{ ok: true, applied: {...}, pending: {...} }` listing just what this call did.
 - `cancelPending(state, key)` drops one pending key.
 - `formatMinutes(seconds)` returns compact time: `'1h 42m'`, `'42m'`, `'2h'`, `'<1m'` for 1 to 59 seconds, or `'0m'`.
-- `logDays(day)` returns the 8 days the Settings log shows, `day` first (Q21).
+- `weekView(state, back = 0)` returns one week for Settings' History card, `back` weeks before this one: `{ start, end, days, average, lastAverage, hasEarlier, hasLater }`. Weeks start on Sunday. Each day is `{ day, watchedSec, today, future, counted }`, and only counted days (on or after the log's oldest day, and not after today) go into `average`. `lastAverage` is the week before's, or `null` when it has no counted days. `hasEarlier` stops at the week holding the log's oldest day.
+- `cardsLine(logDay)` returns the line under History's tiles, like `'Of 5 cards, 2 saved and 3 passed.'`, dropping zero parts, or `''` with no cards.
 - `watchedSummary(state)` returns `{ today, lastWeek, weekday }` for the lock screen: seconds watched today, seconds on the same weekday a week back (`null` when the log has no entry for it), and today's weekday name.
 - `redirectTarget(href)` returns where a top-level YouTube URL should go instead, or `''`. Shorts and embeds become watch pages, the feeds in Q16 and `/tv` go to the token page, and `m.youtube.com` moves to `www`. redirect.js applies it, but only in the top frame, so embeds on other sites stay free (Q7).
 - `earlyLocked(raw, now, videoId)` decides, from raw storage, whether a loading watch page holds its video: no state, a day that has rolled over, or 0 seconds without an unlock today. Grace mode doesn't count, because nothing is playing yet. early.js also skips the video watch.js marks with `data-drip-grace` on `<html>`.

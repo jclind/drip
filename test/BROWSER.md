@@ -20,7 +20,7 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 
 10. With 0 minutes left, open a watch page. The video never starts, not even for a moment. The water rises and the lock says "Time for a breather." with drops left, or "You've had your fill." with none.
 11. Click +15m on the lock. The water drains, the video plays, and the pill says about 15m left.
-12. Let it play 2 minutes. The pill counts down, and the Settings log's minutes for today rise by 2.
+12. Let it play 2 minutes. The pill counts down, and Today's minutes in Settings' History rise by 2.
 13. Click Stash on the pill while the video plays, five times in a row on five videos. Every click works.
 14. The page opens in theater mode. There's no sidebar, and the end screen shows no suggestions.
 15. Comments are hidden behind Show comments. Clicking it shows them for this video only. The next video hides them again.
@@ -28,7 +28,7 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 17. Let the minutes run out while a video plays, with grace mode off. It pauses within a second or two of 0 and the lock shows.
 18. Turn grace mode on (it applies at the next reset). The next day, run out of minutes mid-video. That video finishes, and opening another video shows the lock.
 19. With minutes left, play two videos in two tabs for a minute. The minutes go down by about one minute, not two.
-20. On the lock, click I need this one, type a reason, and unlock. The video plays, the pill says Unlocked, and the reason shows in the Settings log.
+20. On the lock, click I need this one, type a reason, and unlock. The video plays, the pill says Unlocked, and the reason shows under Why you needed one in Settings.
 21. On the lock with drops left, hover Done for now: thin blue rings leave the button. Click it: rings cross the panel, the water falls away onto the home page with no blank page between, and "Kept N drops." rises in. Do it twice in one tab; the second time home was already built, and the message still shows.
 
 ## Redirects and blocking
@@ -41,10 +41,11 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 
 ## Pages
 
-27. The popup shows minutes left and both balances, plus a Settings link.
-28. In Settings, raise a limit and save. It's listed as waiting for the reset. Lower one, and it applies now.
-29. The Settings log shows today and the 7 days before it.
+27. The popup shows the glass, minutes left, and both balances, in Chrome's light and dark theme. Settings opens Settings. With a YouTube tab open in another window, Open YouTube brings that tab forward; with none open, it opens youtube.com in a new tab.
+28. In Settings, click + on Save unspent for and click Save. A gray "→ 3 days from 4:00am · Undo" chip appears by the label, and "1 waiting for the reset." by Save. Undo removes it. Lower Drops per day and save, and it applies at once with no chip.
+29. Tab to a stepper's number and use the arrow keys, Home, and End. − dims at the minimum and + at the maximum.
+30. History shows this week's bars with today's letter bold, the daily average, and last week's dashed line. ‹ steps back a week and the label and every number follow. Click a bar: the block below names that day and shows its drops, cards, and unlocks. Narrow the window to phone width: nothing overflows.
 
 ## After a day boundary
 
-30. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.
+31. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.

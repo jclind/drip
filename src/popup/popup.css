@@ -1,0 +1,107 @@
+/* The popup (DESIGN.md, "Popup"): the home page's stats block, smaller, edge to edge in Chrome's popup window. */
+
+body {
+  width: 300px;
+  padding: 24px 24px 20px;
+  box-sizing: border-box;
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 56px;
+}
+
+.tile {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 14px;
+  background: var(--gray);
+  color: var(--glass-line);
+}
+
+.time-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.time {
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 36px;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sub {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.counts {
+  display: grid;
+  gap: 6px;
+}
+
+.count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.count .drip-i {
+  width: 20px;
+  height: 22px;
+}
+
+.count.is-zero {
+  color: var(--muted);
+}
+
+.count.is-zero .drip-i {
+  opacity: 0.45;
+}
+
+.links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 28px;
+}
+
+button.plain {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+button.plain:hover {
+  background: none;
+  color: var(--text);
+}
+
+button.plain .drip-i-settings {
+  width: 18px;
+  height: 18px;
+}
+
+button.plain .drip-i-arrow-up-right {
+  width: 13px;
+  height: 13px;
+  margin-left: -2px;
+}

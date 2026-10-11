@@ -7,32 +7,29 @@
     <link rel="stylesheet" href="../pages.css" />
     <link rel="stylesheet" href="options.css" />
   </head>
-  <body>
+  <body class="settings">
     <main>
-      <h1>drip</h1>
-      <p class="muted">
-        Changes that make limits stricter apply now. Changes that loosen them wait for the next day reset.
-      </p>
+      <h1>drip settings</h1>
 
-      <section>
-        <h2>Settings</h2>
-        <form id="settings"></form>
-        <div class="row">
-          <button class="primary" id="save" type="button">Save</button>
-          <span class="muted" id="result" role="status"></span>
-        </div>
-        <div id="pending"></div>
-      </section>
+      <form id="settings" novalidate></form>
+      <div class="save-row">
+        <button class="primary" id="save" type="button">Save</button>
+        <span class="muted" id="result" role="status"></span>
+      </div>
 
-      <section>
-        <h2>Today and the 7 days before</h2>
-        <div id="log"></div>
+      <h1 class="watch-title">Watch time</h1>
+      <h2 class="caps">History</h2>
+      <div class="card" id="history"></div>
+
+      <section id="reasons-section" hidden>
+        <h2 class="caps">Why you needed one</h2>
+        <ul class="reasons" id="reasons"></ul>
       </section>
 
       <!-- Shown only in a build that has the dev panel, so never in the store build. -->
       <section id="dev" hidden>
-        <h2>Developer mode</h2>
-        <label class="row">
+        <h2 class="caps">Developer mode</h2>
+        <label class="dev-row">
           <input type="checkbox" id="devMode" />
           <span>Show the dev panel on YouTube pages</span>
         </label>
@@ -41,9 +38,9 @@
           it's on. Turn it off when you're done.
         </p>
       </section>
-
     </main>
     <script src="../lib/state.js"></script>
+    <script src="../pages.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

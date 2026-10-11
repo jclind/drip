@@ -16,40 +16,6 @@ h2 {
   margin: 32px 0 12px;
 }
 
-form {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px 16px;
-  align-items: center;
-}
-
-form label {
-  display: flex;
-  flex-direction: column;
-}
-
-input[type="number"],
-select {
-  font: inherit;
-  color: var(--text);
-  background: var(--chip);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 5px 8px;
-  width: 110px;
-  box-sizing: border-box;
-}
-
-select {
-  width: auto;
-}
-
-input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  justify-self: start;
-}
-
 .row {
   display: flex;
   align-items: center;
@@ -57,51 +23,622 @@ input[type="checkbox"] {
   margin-top: 16px;
 }
 
-#pending ul {
-  margin: 12px 0 0;
-  padding-left: 18px;
-}
-
-#pending li {
-  margin: 4px 0;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-
-th,
-td {
-  text-align: right;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--line);
-}
-
-th:first-child,
-td:first-child {
-  text-align: left;
-}
-
-th {
-  font-weight: 500;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.reasons {
-  margin: 12px 0 0;
-  padding-left: 18px;
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
 footer {
   margin-top: 48px;
   display: flex;
   gap: 8px;
   align-items: baseline;
+}
+
+/* Settings (DESIGN.md, "Settings", and drip-page-demos/settings.png). The rules above are the welcome page's until
+   step 5 rebuilds it. */
+
+.settings main {
+  max-width: 532px;
+  padding: 56px 16px 96px;
+}
+
+.settings h1 {
+  font-size: 30px;
+  line-height: 38px;
+  margin: 0 0 32px;
+}
+
+.settings h1.watch-title {
+  margin: 56px 0 28px;
+}
+
+.settings h2.caps {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.group {
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+  margin-bottom: 12px;
+}
+
+.setting-text {
+  min-width: 0;
+}
+
+.setting-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.setting-label {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+/* The waiting change: "→ 3 days from 4:00am · Undo". */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 12px;
+  background: var(--gray);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chip button.chip-undo {
+  padding: 0 6px;
+  border-radius: 10px;
+  background: none;
+  font-size: 12px;
+}
+
+.chip button.chip-undo:hover {
+  background: var(--gray-hover);
+}
+
+.stepper {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--gray);
+}
+
+.stepper button.stepper-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  padding: 0;
+  border-radius: 0;
+  background: var(--gray);
+  color: var(--text);
+}
+
+.stepper button.stepper-btn:hover:not(:disabled) {
+  background: var(--gray-hover);
+}
+
+.stepper button.stepper-btn:disabled {
+  cursor: default;
+  color: var(--muted);
+  opacity: 0.45;
+}
+
+.stepper .drip-i-minus,
+.stepper .drip-i-plus {
+  width: 18px;
+  height: 18px;
+}
+
+/* Every value box is as wide as the widest value, "120 min". */
+.stepper-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 72px;
+  border-inline: 2px solid var(--bg);
+  background: var(--bg);
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.stepper-value:focus-visible {
+  outline-offset: -2px;
+}
+
+.stepper-value .drip-i {
+  width: 14px;
+  height: 17px;
+}
+
+.picker-wrap {
+  position: relative;
+  flex: none;
+}
+
+select.picker {
+  appearance: none;
+  height: 32px;
+  min-width: 140px;
+  padding: 0 36px 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--gray);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+}
+
+select.picker:hover {
+  background: var(--gray-hover);
+}
+
+.picker-wrap .drip-i-chevron-down {
+  position: absolute;
+  right: 12px;
+  top: 7px;
+  pointer-events: none;
+}
+
+/* Grace mode's switch. */
+input.toggle {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 72px;
+  height: 32px;
+  margin: 0;
+  border-radius: 16px;
+  background: var(--gray-hover);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+input.toggle::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 36px;
+  height: 24px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 150ms ease;
+}
+
+input.toggle:checked {
+  background: var(--toggle);
+}
+
+input.toggle:checked::after {
+  transform: translateX(28px);
+}
+
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: -8px;
+}
+
+.save-row button.primary {
+  min-width: 80px;
+  padding: 10px 24px;
+  border-radius: 21px;
+}
+
+/* History. */
+
+.card {
+  padding: 24px 36px 32px;
+  border-radius: 16px;
+  background: var(--gray);
+}
+
+.card .label {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.card .big {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 38px;
+  font-variant-numeric: tabular-nums;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -8px 20px;
+}
+
+.week-label {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+button.nav-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+}
+
+button.nav-btn:hover:not(:disabled) {
+  background: var(--gray-raised);
+}
+
+button.nav-btn:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.avg-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.change {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.change .drip-i {
+  width: 17px;
+  height: 17px;
+}
+
+.chart {
+  --plot-h: 180px;
+  --letters-h: 26px;
+  display: flex;
+}
+
+.plot {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+}
+
+.plot::after {
+  /* The baseline under the bars. */
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--letters-h);
+  border-top: 1px solid var(--line);
+  pointer-events: none;
+}
+
+button.col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+
+button.col:hover:not(:disabled) .bar {
+  filter: brightness(1.12);
+}
+
+button.col:disabled {
+  cursor: default;
+}
+
+button.col:focus-visible {
+  outline-offset: -2px;
+}
+
+.bar-area {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: var(--plot-h);
+}
+
+.bar {
+  width: 58%;
+  min-height: 2px;
+  max-width: 34px;
+  border-radius: 3px 3px 0 0;
+  background: var(--blue);
+  transition: height 300ms ease;
+}
+
+button.col.is-selected .bar-area {
+  background: linear-gradient(to top, color-mix(in srgb, var(--text) 7%, transparent), transparent);
+}
+
+.letter {
+  display: grid;
+  place-items: center;
+  height: var(--letters-h);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+button.col.is-today .letter {
+  color: var(--text);
+  font-weight: 700;
+}
+
+button.col.is-selected .letter {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.avg-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin-bottom: var(--letters-h);
+  border-top: 1.5px dashed var(--text);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.gutter {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: calc(var(--plot-h) + var(--letters-h));
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.gutter span {
+  position: absolute;
+  left: 6px;
+  line-height: 16px;
+}
+
+/* Centered on the top line and on the baseline. */
+.gutter-top {
+  top: -8px;
+}
+
+.gutter-zero {
+  bottom: calc(var(--letters-h) - 8px);
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.key-dash {
+  width: 18px;
+  border-top: 1.5px dashed var(--text);
+  opacity: 0.8;
+}
+
+.day {
+  margin-top: 32px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.tile {
+  padding: 12px 16px 10px;
+  border-radius: 12px;
+  background: var(--gray-raised);
+}
+
+.tile-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tile-top .drip-i {
+  align-self: center;
+  width: 20px;
+  height: 22px;
+}
+
+.tile-num {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile-of {
+  margin-left: -4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tile-label {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.tile .tile-lock {
+  color: var(--text);
+}
+
+.tile.is-zero .tile-num {
+  color: var(--muted);
+}
+
+.tile.is-zero .drip-i {
+  opacity: 0.45;
+}
+
+.tile.is-zero .tile-lock {
+  color: var(--muted);
+}
+
+.cards-line {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Why you needed one. */
+
+#reasons-section,
+#dev {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+
+.reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.reason {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.date {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 58px;
+  height: 58px;
+  border-radius: 6px;
+  background: var(--gray);
+  line-height: 1.1;
+}
+
+.date-month {
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.date-day {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.reason-text {
+  min-width: 0;
+}
+
+.reason-text a {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reason-text a:hover {
+  text-decoration: underline;
+}
+
+.dev-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dev-row input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 20px 18px 24px;
+  }
+
+  .tiles {
+    gap: 8px;
+  }
+
+  .tile {
+    padding: 10px 12px 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  input.toggle,
+  input.toggle::after {
+    transition: none;
+  }
 }
