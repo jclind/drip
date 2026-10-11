@@ -451,7 +451,7 @@ test('the pill says paused while the video is paused, and stays up and shimmers 
   assert.doesNotMatch(tab.pill().textContent, /paused/);
   tab.video.pause();
   await tab.tick();
-  assert.match(tab.pill().textContent, /^15m left today· paused/);
+  assert.match(tab.pill().textContent, /^15m left today · paused/);
   assert.doesNotMatch(tab.pill().className, /is-low/);
 
   world.state.watchSecondsLeft = 100;

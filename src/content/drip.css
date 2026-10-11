@@ -69,6 +69,8 @@ a.drip-btn {
    The paused frame behind the panel is blurred and tinted blue, as if underwater. */
 #drip-lock {
   --drip-panel: #fff;
+  /* The tide on "Done for now" under a black button here, a white one in dark mode. */
+  --drip-tide-color: rgba(66, 165, 246, 0.5);
   --drip-tint: rgba(150, 195, 240, 0.45);
   --drip-shimmer: rgba(255, 255, 255, 0.3);
   position: fixed;
@@ -98,8 +100,78 @@ a.drip-btn {
   animation: drip-water-drain 600ms cubic-bezier(0.55, 0, 0.75, 0.45) both, drip-crest 600ms linear;
 }
 
+/* Under the water, behind the panel: faint bubbles rising and two small fish crossing now and then (watch.js sea()).
+   The overlay's mask covers them too, so they only show where the water has risen. */
+#drip-lock .drip-sea {
+  --drip-bubble-line: rgba(255, 255, 255, 0.7);
+  --drip-bubble-shine: rgba(255, 255, 255, 0.5);
+  --drip-fish: rgba(10, 60, 120, 0.16);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+html[dark] #drip-lock .drip-sea {
+  --drip-bubble-line: rgba(255, 255, 255, 0.3);
+  --drip-bubble-shine: rgba(255, 255, 255, 0.35);
+  --drip-fish: rgba(170, 215, 255, 0.13);
+}
+
+#drip-lock .drip-bubble {
+  position: absolute;
+  bottom: -24px;
+  left: var(--x);
+  opacity: 0;
+  animation: drip-bubble-rise var(--rise) linear var(--delay) infinite;
+}
+
+#drip-lock .drip-bubble > span {
+  display: block;
+  width: var(--size);
+  height: var(--size);
+  border: 1px solid var(--drip-bubble-line);
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, var(--drip-bubble-shine), transparent 62%);
+  animation: drip-bubble-sway var(--sway) ease-in-out infinite alternate;
+}
+
+#drip-lock .drip-fish {
+  position: absolute;
+  left: 0;
+  animation: drip-swim-right 56s linear 3s infinite both;
+}
+
+#drip-lock .drip-fish > span {
+  display: block;
+  width: 26px;
+  height: 13px;
+  background: var(--drip-fish);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 16'%3E%3Cpath fill-rule='evenodd' d='M0 2.5L7.5 8 0 13.5ZM7 8C10 2 18 1.5 24 3.5 28 5 31 7 32 8 31 9 28 11 24 12.5 18 14.5 10 14 7 8ZM26.5 6.2A1.1 1.1 0 1 0 26.5 8.4 1.1 1.1 0 1 0 26.5 6.2Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 16'%3E%3Cpath fill-rule='evenodd' d='M0 2.5L7.5 8 0 13.5ZM7 8C10 2 18 1.5 24 3.5 28 5 31 7 32 8 31 9 28 11 24 12.5 18 14.5 10 14 7 8ZM26.5 6.2A1.1 1.1 0 1 0 26.5 8.4 1.1 1.1 0 1 0 26.5 6.2Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: drip-fish-bob 2.8s ease-in-out infinite alternate;
+}
+
+#drip-lock .drip-fish-a {
+  top: 27%;
+}
+
+/* The second one is smaller, deeper, and swims the other way. */
+#drip-lock .drip-fish-b {
+  top: 74%;
+  animation: drip-swim-left 72s linear 19s infinite both;
+}
+
+#drip-lock .drip-fish-b > span {
+  width: 18px;
+  height: 9px;
+  scale: -1 1;
+  animation-duration: 3.4s;
+}
+
 #drip-lock .drip-lock-panel {
   position: relative;
+  z-index: 1;
   transition: opacity 200ms ease, transform 200ms ease;
 }
 
@@ -115,6 +187,7 @@ a.drip-btn {
 
 html[dark] #drip-lock {
   --drip-panel: #121212;
+  --drip-tide-color: rgba(66, 165, 246, 0.3);
   --drip-tint: rgba(3, 22, 46, 0.6);
   /* The primary button is white in dark mode, so its shimmer is a pale blue to show up on it. */
   --drip-shimmer: rgba(66, 165, 246, 0.3);
@@ -181,6 +254,28 @@ html[dark] #drip-lock {
   transform: translateX(-100%);
   animation: drip-done-shimmer 5s ease-in-out 1.2s infinite;
   pointer-events: none;
+}
+
+/* Hover or focus: a blue tide rises halfway up the button with a small drifting crest, the glass filling in miniature,
+   and settles back down when the pointer leaves. */
+#drip-lock .drip-done::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--drip-tide-color);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M0 5C15 1 30 1 45 4S75 9 90 6 112 1 120 4V10H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-tide) / 120px 10px repeat-x,
+    linear-gradient(#000, #000) 0 calc(var(--drip-tide) + 9px) / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M0 5C15 1 30 1 45 4S75 9 90 6 112 1 120 4V10H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-tide) / 120px 10px repeat-x,
+    linear-gradient(#000, #000) 0 calc(var(--drip-tide) + 9px) / 100% 100% no-repeat;
+  transition: --drip-tide 520ms cubic-bezier(0.3, 0.7, 0.2, 1);
+  pointer-events: none;
+}
+
+#drip-lock .drip-done:is(:hover, :focus-visible)::before,
+#drip-lock .drip-done.is-leaving::before {
+  --drip-tide: 18px;
+  animation: drip-tide-drift 1.8s linear infinite;
 }
 
 #drip-lock .drip-done.is-leaving::after {
@@ -337,8 +432,12 @@ html[dark] #drip-pill {
   color: var(--drip-muted);
 }
 
+#drip-pill .drip-pill-label {
+  line-height: 20px;
+}
+
 #drip-pill .drip-pill-note {
-  margin-left: -2px;
+  margin-left: 4px;
   font-size: 12px;
 }
 
@@ -1131,6 +1230,19 @@ html[dark] :is(#drip-home, #drip-lock, #drip-pill) {
   initial-value: 0px;
 }
 
+/* Resting below the bottom of the "Done for now" button, which is 42px tall. */
+@property --drip-tide {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 46px;
+}
+
+@keyframes drip-tide-drift {
+  to {
+    --drip-crest-x: -120px;
+  }
+}
+
 @keyframes drip-water-rise {
   from {
     --drip-water: 100vh;
@@ -1146,6 +1258,66 @@ html[dark] :is(#drip-home, #drip-lock, #drip-pill) {
 @keyframes drip-crest {
   to {
     --drip-crest-x: -640px;
+  }
+}
+
+@keyframes drip-bubble-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+
+  8%,
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-100vh - 40px));
+  }
+}
+
+@keyframes drip-bubble-sway {
+  from {
+    transform: translateX(-5px);
+  }
+
+  to {
+    transform: translateX(5px);
+  }
+}
+
+/* Each fish crosses in the first 60% of its loop and waits off screen for the rest. */
+@keyframes drip-swim-right {
+  0% {
+    transform: translateX(-40px);
+  }
+
+  60%,
+  100% {
+    transform: translateX(calc(100vw + 40px));
+  }
+}
+
+@keyframes drip-swim-left {
+  0% {
+    transform: translateX(calc(100vw + 40px));
+  }
+
+  60%,
+  100% {
+    transform: translateX(-40px);
+  }
+}
+
+@keyframes drip-fish-bob {
+  from {
+    transform: translateY(-3px);
+  }
+
+  to {
+    transform: translateY(3px);
   }
 }
 
@@ -1178,6 +1350,10 @@ html[dark] :is(#drip-home, #drip-lock, #drip-pill) {
 
   #drip-lock.is-draining {
     opacity: 0;
+  }
+
+  #drip-lock .drip-sea {
+    display: none;
   }
 
   :is(#drip-home, #drip-lock, #drip-pill) *,

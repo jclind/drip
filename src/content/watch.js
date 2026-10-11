@@ -432,7 +432,30 @@
     // A lock still draining away goes at once, and a new one rises.
     document.getElementById('drip-lock')?.remove();
     panel.classList.add('is-new');
-    document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, panel));
+    document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), panel));
+  }
+
+  const BUBBLES = 14;
+
+  /**
+   * Life under the water behind the lock panel: bubbles drifting up at different sizes and speeds, and two small fish
+   * that cross now and then. Kept faint, so it reads as atmosphere, not something to watch.
+   */
+  function sea() {
+    /** @param {number} min @param {number} max */
+    const between = (min, max) => min + Math.random() * (max - min);
+    const bubbles = Array.from({ length: BUBBLES }, () => {
+      const bubble = h('span', { class: 'drip-bubble' }, h('span', {}));
+      bubble.style.setProperty('--x', `${between(3, 97).toFixed(1)}%`);
+      bubble.style.setProperty('--size', `${Math.round(between(4, 13))}px`);
+      bubble.style.setProperty('--rise', `${between(10, 19).toFixed(1)}s`);
+      // The first ones leave soon after the water is up, the rest spread out.
+      bubble.style.setProperty('--delay', `${between(0.9, 12).toFixed(1)}s`);
+      bubble.style.setProperty('--sway', `${between(2.4, 4.2).toFixed(1)}s`);
+      return bubble;
+    });
+    const fish = ['drip-fish-a', 'drip-fish-b'].map((name) => h('span', { class: `drip-fish ${name}` }, h('span', {})));
+    return h('div', { class: 'drip-sea', 'aria-hidden': 'true' }, ...bubbles, ...fish);
   }
 
   /** Set just before buying minutes or an unlock lifts the lock, so the water drains away instead of vanishing. */
@@ -677,10 +700,12 @@
     const content = [
       h('span', { class: `drip-pill-time${unlocked ? ' is-unlocked' : ''}${paused ? ' is-paused' : ''}` },
         !unlocked && pillGlass,
-        h('span', { class: 'drip-pill-minutes' }, time),
-        !unlocked && h('span', { class: 'drip-sr' }, ' left today'),
-        paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'), ' paused'),
-        adShowing && h('span', { class: 'drip-pill-note' }, 'Ad, not counted')),
+        // One inline line, so the smaller note sits on the minutes' baseline instead of being centered as its own box.
+        h('span', { class: 'drip-pill-label' },
+          h('span', { class: 'drip-pill-minutes' }, time),
+          !unlocked && h('span', { class: 'drip-sr' }, ' left today'),
+          paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
+          adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       h('button', {
         class: `drip-pill-save${saved ? ' is-saved' : ''}`, 'data-k': 'pill-save', 'aria-pressed': String(saved), onclick: onSave,
         title: saved ? 'In Saved. Click to take it out.' : 'Keep it in Saved for later',

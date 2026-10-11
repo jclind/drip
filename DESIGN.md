@@ -128,6 +128,10 @@ Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups 
 - In the last 2 minutes the pill stays up while YouTube's controls hide, and a slow blue shimmer crosses it every 4 seconds while the video plays. No red (Jesse's idea, 2026-10-10).
 - Running out no longer cuts straight to the panel. Blue water rises up the window over 1.1 seconds with a wavy crest, blurring the frame as it climbs, and the panel surfaces once it's most of the way up. Buying minutes or an unlock drains the water back down in 0.6 seconds. The water is a mask on `#drip-lock` itself, because its `view-transition-name` keeps a child's `backdrop-filter` from seeing the page (Jesse asked for a smoother way into the lock, 2026-10-10).
 
+- Under the lock's water, faint bubbles drift up at random sizes and speeds, and two small fish cross now and then, one every minute or so, at different depths and directions. The overlay's mask covers them, so they only show where the water has risen. Reduced motion hides them (Jesse asked for something underwater, 2026-10-10).
+- Hovering or focusing "Done for now" raises a blue tide halfway up the button with a drifting crest, the glass filling in miniature. It stays up through the ripple on click (Jesse asked for an on-theme hover, 2026-10-10).
+- More motion ideas are in IDEAS.md, "Motion and small touches".
+
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
 - The reveal opens the page: the stats slide up and the buttons slide down to make the card's space, a drop falls into it, and the thumbnail surfaces from the ripple. Reveal video stays the same button and moves down to become Reveal next. +15 min shrinks to a bead and Save and × bud out of it, like droplets splitting (a "gooey" SVG filter). Jesse's idea, 2026-10-07.
