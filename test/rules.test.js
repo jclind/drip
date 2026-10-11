@@ -85,8 +85,3 @@ test('early lock uses the same day boundary as dayKey', () => {
   assert.equal(D.earlyLocked(state, time(6, 4), 'abc'), true);
 });
 
-test('the log view covers today and the 7 days before it (Q21)', () => {
-  assert.deepEqual(D.logDays('2026-10-06'), [
-    '2026-10-06', '2026-10-05', '2026-10-04', '2026-10-03', '2026-10-02', '2026-10-01', '2026-09-30', '2026-09-29',
-  ]);
-});

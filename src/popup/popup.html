@@ -4,25 +4,17 @@
     <meta charset="utf-8" />
     <title>drip</title>
     <link rel="stylesheet" href="../pages.css" />
-    <style>
-      body {
-        width: 240px;
-        padding: 16px;
-      }
-      .time {
-        font-size: 24px;
-        font-weight: 500;
-      }
-      .tokens {
-        margin: 2px 0 14px;
-      }
-    </style>
+    <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="time" id="time">…</div>
-    <div class="muted tokens" id="tokens"></div>
-    <button class="link" id="settings">Settings</button>
+    <div class="stats" id="stats" aria-live="polite"></div>
+    <nav class="links">
+      <button class="plain" id="settings" type="button"></button>
+      <button class="plain" id="youtube" type="button"></button>
+    </nav>
     <script src="../lib/state.js"></script>
+    <script src="../lib/glass.js"></script>
+    <script src="../pages.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

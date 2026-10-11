@@ -1,4 +1,5 @@
-/* Shared by the popup and the settings page. */
+/* Shared by the popup, Settings, and the welcome page. These pages follow Chrome's light or dark theme, not YouTube's,
+   so the colors key off prefers-color-scheme. The values match drip.css's tokens for the pages inside YouTube. */
 
 :root {
   --text: #0f0f0f;
@@ -8,6 +9,17 @@
   --chip-hover: rgba(0, 0, 0, 0.1);
   --line: rgba(0, 0, 0, 0.1);
   --note: #8a5a00;
+  --blue: #42a5f6;
+  --toggle: #1e88e5;
+  --gold: #fdc905;
+  --gray: #f2f2f2;
+  --gray-hover: #e5e5e5;
+  --gray-raised: #e5e5e5;
+  --primary-bg: #0f0f0f;
+  --primary-fg: #fff;
+  --primary-hover: #272727;
+  --glass-line: #909090;
+  --focus: #065fd4;
   color-scheme: light dark;
 }
 
@@ -18,8 +30,17 @@
     --bg: #0f0f0f;
     --chip: rgba(255, 255, 255, 0.1);
     --chip-hover: rgba(255, 255, 255, 0.2);
-    --line: rgba(255, 255, 255, 0.15);
+    --line: rgba(255, 255, 255, 0.12);
     --note: #f0b54a;
+    --toggle: #42a5f6;
+    --gray: #272727;
+    --gray-hover: #3a3a3a;
+    --gray-raised: #383838;
+    --primary-bg: #fff;
+    --primary-fg: #0f0f0f;
+    --primary-hover: #e5e5e5;
+    --glass-line: #d9d9d9;
+    --focus: #3ea6ff;
   }
 }
 
@@ -30,6 +51,16 @@ body {
   line-height: 1.45;
   color: var(--text);
   background: var(--bg);
+}
+
+/* A display rule on a class must not show what the hidden attribute hides. */
+[hidden] {
+  display: none !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .muted {
@@ -67,10 +98,14 @@ a.button {
 }
 
 button.primary,
-button.primary:hover,
 a.button.primary {
-  color: var(--bg);
-  background: var(--text);
+  color: var(--primary-fg);
+  background: var(--primary-bg);
+}
+
+button.primary:hover,
+a.button.primary:hover {
+  background: var(--primary-hover);
 }
 
 button.link {
@@ -79,4 +114,53 @@ button.link {
   color: var(--muted);
   font-weight: 400;
   text-decoration: underline;
+}
+
+/* Icons from src/icons are masks filled with the text color, so one SVG works on every background (pages.js). */
+.drip-i {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  -webkit-mask: var(--drip-icon) center / contain no-repeat;
+  mask: var(--drip-icon) center / contain no-repeat;
+}
+
+.drip-token-drop {
+  color: var(--blue);
+}
+
+.drip-token-card {
+  color: var(--gold);
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The glass from src/lib/glass.js. */
+.drip-glass {
+  display: block;
+  overflow: visible;
+}
+
+.drip-glass-wave {
+  transition: transform 700ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.drip-glass-surface {
+  transition: opacity 300ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drip-glass-wave,
+  .drip-glass-surface {
+    transition: none;
+  }
 }
