@@ -393,6 +393,17 @@ html[dark] #drip-home {
   color: var(--drip-on-gold);
 }
 
+/* Dimmed gold reads as brown on dark, so a gold button that can't be used goes gray instead. */
+#drip-home .drip-b-gold:disabled {
+  color: var(--drip-muted);
+  background: var(--drip-gray);
+  opacity: 0.6;
+}
+
+#drip-home .drip-b-gold:disabled .drip-token-card {
+  color: inherit;
+}
+
 #drip-home .drip-b-primary {
   color: var(--drip-primary-fg);
   background: var(--drip-primary-bg);
