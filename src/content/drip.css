@@ -65,7 +65,12 @@ a.drip-btn {
   color: var(--drip-muted);
 }
 
+/* The lock screen (watch.js). DESIGN.md "Lock screen" is the spec, and drip-page-demos/lock-screen-*.png the mockups.
+   The paused frame behind the panel is blurred and tinted blue, as if underwater. */
 #drip-lock {
+  --drip-panel: #fff;
+  --drip-tint: rgba(150, 195, 240, 0.45);
+  --drip-shimmer: rgba(255, 255, 255, 0.3);
   position: fixed;
   inset: 0;
   z-index: 100000;
@@ -73,58 +78,273 @@ a.drip-btn {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.82);
+  background: var(--drip-tint);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  backdrop-filter: blur(20px) saturate(1.2);
 }
 
-.drip-lock-panel {
+html[dark] #drip-lock {
+  --drip-panel: #121212;
+  --drip-tint: rgba(3, 22, 46, 0.6);
+  /* The primary button is white in dark mode, so its shimmer is a pale blue to show up on it. */
+  --drip-shimmer: rgba(66, 165, 246, 0.3);
+}
+
+#drip-lock .drip-lock-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: center;
   width: 100%;
   max-width: 400px;
-  padding: 24px;
+  padding: 36px 36px 30px;
   border-radius: 16px;
-  background: var(--drip-bg);
+  background: var(--drip-panel);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+  text-align: center;
 }
 
-.drip-lock-title {
-  font-size: 20px;
+#drip-lock .drip-lock-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 30px;
+}
+
+#drip-lock .drip-lock-sub {
+  margin-top: 10px;
+  color: var(--drip-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+#drip-lock .drip-lock-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 30px;
+}
+
+#drip-lock .drip-lock-actions > .drip-b {
+  flex: 1;
+  padding: 0 14px;
+}
+
+#drip-lock .drip-lock-add .drip-i-clock {
+  width: 17px;
+  height: 17px;
+}
+
+/* "Done for now" is the only thing on drip's screens that moves on its own: a slow shimmer every few seconds. */
+#drip-lock .drip-done {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+#drip-lock .drip-done::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, var(--drip-shimmer) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: drip-done-shimmer 5s ease-in-out 1.2s infinite;
+  pointer-events: none;
+}
+
+#drip-lock .drip-done.is-leaving::after {
+  animation: none;
+  opacity: 0;
+}
+
+/* One ripple from the press, then the page leaves (watch.js RIPPLE_MS). */
+#drip-lock .drip-ripple {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  background: var(--drip-blue);
+  opacity: 0.4;
+  transform: scale(0);
+  animation: drip-ripple 520ms cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+#drip-lock .drip-lock-link {
+  margin-top: 18px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--drip-muted);
+  background: none;
+  cursor: pointer;
+}
+
+#drip-lock .drip-lock-link:hover {
+  color: var(--drip-text);
+}
+
+#drip-lock .drip-lock-note {
+  margin-top: 18px;
+  color: var(--drip-muted);
+  font-size: 13px;
   font-weight: 500;
 }
 
-.drip-reason {
+/* "I need this one" opens a plain box with no animation. Justifying should take a little effort. */
+#drip-lock .drip-reason {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+#drip-lock .drip-reason textarea {
+  min-height: 76px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font: inherit;
+  color: var(--drip-text);
+  background: var(--drip-gray);
+  text-align: left;
+  resize: none;
+}
+
+#drip-lock .drip-reason textarea:focus {
+  border-color: var(--drip-focus);
+  outline: none;
+}
+
+#drip-lock .drip-reason-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
-.drip-reason textarea {
-  font: inherit;
-  color: var(--drip-text);
-  background: var(--drip-chip);
-  border: 1px solid var(--drip-line);
-  border-radius: 8px;
-  padding: 8px;
-  resize: vertical;
+#drip-lock .drip-reason-row .drip-lock-link {
+  margin-top: 0;
 }
 
-.drip-link {
-  color: var(--drip-muted);
-  font-size: 13px;
+#drip-lock .drip-reason-row .drip-i-unlock {
+  width: 15px;
+  height: 18px;
 }
 
+/* The watch page pill (watch.js): the glass, minutes left, and Save. Three drafts while Jesse picks, set by data-draft. */
 #drip-pill {
+  --drip-pill-bg: #fff;
   position: fixed;
-  right: 16px;
-  bottom: 16px;
   z-index: 2000;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 6px 6px 14px;
-  border-radius: 22px;
-  background: var(--drip-bg);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+  height: 40px;
+  padding: 0 4px 0 12px;
+  border-radius: 20px;
+  background: var(--drip-pill-bg);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.18);
+  transition: opacity 400ms ease;
+}
+
+html[dark] #drip-pill {
+  --drip-pill-bg: #212121;
+}
+
+#drip-pill .drip-pill-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  padding-right: 10px;
+  border-right: 1px solid var(--drip-rule);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#drip-pill .drip-glass {
+  color: var(--drip-glass-line);
+}
+
+#drip-pill .is-unlocked .drip-pill-minutes,
+#drip-pill .drip-pill-ad {
+  color: var(--drip-muted);
+}
+
+#drip-pill .drip-pill-ad {
+  font-size: 12px;
+}
+
+#drip-pill .drip-pill-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin-left: 4px;
+  padding: 0 12px 0 10px;
+  border: 0;
+  border-radius: 16px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--drip-text);
+  background: none;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+#drip-pill .drip-pill-save:hover {
+  background: var(--drip-gray);
+}
+
+#drip-pill .drip-pill-save .drip-i {
+  width: 13px;
+  height: 16px;
+}
+
+#drip-pill[data-draft="corner"] {
+  right: 16px;
+  bottom: 16px;
+}
+
+#drip-pill[data-draft="fade"] {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+}
+
+#drip-pill[data-draft="fade"].is-faded {
+  opacity: 0.2;
+  transition-duration: 900ms;
+}
+
+/* Inside the player, over the video: always light on dark, and hidden along with YouTube's own controls. */
+#drip-pill[data-draft="player"] {
+  --drip-text: #fff;
+  --drip-muted: rgba(255, 255, 255, 0.7);
+  --drip-rule: rgba(255, 255, 255, 0.2);
+  --drip-gray: rgba(255, 255, 255, 0.16);
+  --drip-glass-line: #d9d9d9;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 70;
+  height: 36px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: none;
+  transition-duration: 200ms;
+}
+
+#drip-pill[data-draft="player"].is-idle {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* YouTube animates navigation with View Transitions. During one, Chrome paints snapshots of the page, and drip's
@@ -178,10 +398,11 @@ a.drip-btn {
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
 }
 
-/* The home page (home.js). DESIGN.md's "Visual design" section is the spec and drip-page-demos/ has Jesse's mockups.
-   Colors that differ by theme key off html[dark], which YouTube sets in dark mode. Sizes are tokens here, so tuning
-   the look is mostly edits to this block. */
-#drip-home {
+/* drip's colors and button size, shared by the home page (home.js) and the lock screen and pill (watch.js). Colors that
+   differ by theme key off html[dark], which YouTube sets in dark mode. */
+#drip-home,
+#drip-lock,
+#drip-pill {
   --drip-blue: #42a5f6;
   --drip-gold: #fdc905;
   --drip-gold-hover: #ffd633;
@@ -197,8 +418,13 @@ a.drip-btn {
   --drip-row-hover: rgba(0, 0, 0, 0.05);
   --drip-skeleton: rgba(0, 0, 0, 0.06);
   --drip-focus: #065fd4;
-  --drip-col: 400px;
   --drip-btn-h: 42px;
+}
+
+/* The home page (home.js). DESIGN.md's "Visual design" section is the spec and drip-page-demos/ has Jesse's mockups.
+   Sizes are tokens here, so tuning the look is mostly edits to this block. */
+#drip-home {
+  --drip-col: 400px;
   --drip-radius: 12px;
   max-width: calc(var(--drip-col) + 32px);
   margin: clamp(32px, 16vh, 168px) auto 96px;
@@ -207,7 +433,7 @@ a.drip-btn {
   container: drip-home / inline-size;
 }
 
-html[dark] #drip-home {
+html[dark] :is(#drip-home, #drip-lock, #drip-pill) {
   --drip-gray: #272727;
   --drip-gray-hover: #3a3a3a;
   --drip-gray-active: #474747;
@@ -221,14 +447,14 @@ html[dark] #drip-home {
   --drip-focus: #3ea6ff;
 }
 
-#drip-home *,
-#drip-home *::before,
-#drip-home *::after {
+:is(#drip-home, #drip-lock, #drip-pill) *,
+:is(#drip-home, #drip-lock, #drip-pill) *::before,
+:is(#drip-home, #drip-lock, #drip-pill) *::after {
   box-sizing: border-box;
 }
 
 /* Text only screen readers get, like the token names after a price. */
-#drip-home .drip-sr {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-sr {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -238,7 +464,7 @@ html[dark] #drip-home {
 }
 
 /* Icons from src/icons are masks filled with the text color, so one SVG works on every background. */
-#drip-home .drip-i {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-i {
   display: inline-block;
   flex: none;
   width: 18px;
@@ -248,11 +474,11 @@ html[dark] #drip-home {
   mask: var(--drip-icon) center / contain no-repeat;
 }
 
-#drip-home .drip-token-drop {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-token-drop {
   color: var(--drip-blue);
 }
 
-#drip-home .drip-token-card {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-token-card {
   color: var(--drip-gold);
 }
 
@@ -276,16 +502,16 @@ html[dark] #drip-home {
   color: var(--drip-glass-line);
 }
 
-#drip-home .drip-glass {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-glass {
   display: block;
   overflow: visible;
 }
 
-#drip-home .drip-glass-wave {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-glass-wave {
   transition: transform 700ms cubic-bezier(0.3, 0.7, 0.2, 1);
 }
 
-#drip-home .drip-glass-surface {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-glass-surface {
   transition: opacity 300ms ease;
 }
 
@@ -339,7 +565,7 @@ html[dark] #drip-home {
 }
 
 /* Buttons. Every button that spends shows its price ("· -1" and the token). */
-#drip-home .drip-b {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -357,75 +583,75 @@ html[dark] #drip-home {
   transition: background-color 120ms ease, transform 120ms ease, opacity 120ms ease;
 }
 
-#drip-home .drip-b:active:not(:disabled) {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-#drip-home .drip-b:disabled {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b:disabled {
   cursor: default;
   opacity: 0.4;
 }
 
-#drip-home :is(button, a):focus-visible {
+:is(#drip-home, #drip-lock, #drip-pill) :is(button, a):focus-visible {
   outline: 2px solid var(--drip-focus);
   outline-offset: 2px;
 }
 
-#drip-home .drip-b-gray {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gray {
   color: var(--drip-text);
   background: var(--drip-gray);
 }
 
-#drip-home .drip-b-gray:hover:not(:disabled) {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gray:hover:not(:disabled) {
   background: var(--drip-gray-hover);
 }
 
-#drip-home .drip-b-gold {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold {
   color: var(--drip-on-gold);
   background: var(--drip-gold);
 }
 
-#drip-home .drip-b-gold:hover:not(:disabled) {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold:hover:not(:disabled) {
   background: var(--drip-gold-hover);
 }
 
-#drip-home .drip-b-gold .drip-token-card {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold .drip-token-card {
   color: var(--drip-on-gold);
 }
 
 /* Dimmed gold reads as brown on dark, so a gold button that can't be used goes gray instead. */
-#drip-home .drip-b-gold:disabled {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold:disabled {
   color: var(--drip-muted);
   background: var(--drip-gray);
   opacity: 0.6;
 }
 
-#drip-home .drip-b-gold:disabled .drip-token-card {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-gold:disabled .drip-token-card {
   color: inherit;
 }
 
-#drip-home .drip-b-primary {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-primary {
   color: var(--drip-primary-fg);
   background: var(--drip-primary-bg);
 }
 
-#drip-home .drip-b-primary:hover:not(:disabled) {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-b-primary:hover:not(:disabled) {
   background: var(--drip-primary-hover);
 }
 
-#drip-home .drip-price {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-price {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-#drip-home .drip-price .drip-i {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-price .drip-i {
   width: 14px;
   height: 16px;
   margin-left: -3px;
 }
 
-#drip-home .drip-sep {
+:is(#drip-home, #drip-lock, #drip-pill) .drip-sep {
   opacity: 0.7;
 }
 
@@ -859,6 +1085,24 @@ html[dark] #drip-home {
   }
 }
 
+@keyframes drip-done-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  35%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes drip-ripple {
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
 @keyframes drip-rise {
   from {
     opacity: 0;
@@ -867,9 +1111,9 @@ html[dark] #drip-home {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #drip-home *,
-  #drip-home *::before,
-  #drip-home *::after {
+  :is(#drip-home, #drip-lock, #drip-pill) *,
+  :is(#drip-home, #drip-lock, #drip-pill) *::before,
+  :is(#drip-home, #drip-lock, #drip-pill) *::after {
     animation: none !important;
     transition: none !important;
   }

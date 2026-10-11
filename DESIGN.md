@@ -36,7 +36,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q26 | Finishing a video that's in the backlog removes it from the backlog. Each new video opens in theater mode. Kept as they are for now (Jesse, 2026-10-06). |
 | Q27 | Ads don't use watch minutes. Time the player spends on an ad isn't charged or logged (Jesse, 2026-10-07). |
 
-## Visual design (in progress, home page built)
+## Visual design (in progress, home page and lock screen built)
 
 Jesse is designing the look by hand, with Claude reviewing his mockups, started 2026-10-07. The goal is a little character without being distracting. Spending a token can feel satisfying, but restraint should feel good too, so the design doesn't reward spending everything.
 
@@ -112,7 +112,18 @@ Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. W
 - Durations of a whole number of hours read "2h", not "2h 0m".
 - The column is 400px. Below about 450px of room the gaps and button padding shrink, and below about 370px Save shows only its icon. Container queries measure the column, not the window, so YouTube's open guide counts too.
 - `dev/home.html` runs the real home page outside YouTube, with the real worker on fake storage and a fake grid, in any of a dozen states, light or dark. `dev/home-sizes.html` shows it at several widths at once. See the comment at the top of each.
-- Not built yet: "Kept 3 drops." (it follows the lock screen), the reveal animations under "Ideas", and the "+2 saved from yesterday" note. Jesse liked the loading placeholder and wants the animations designed in a later pass (2026-10-10).
+- Not built yet: the reveal animations under "Ideas", and the "+2 saved from yesterday" note. Jesse liked the loading placeholder and wants the animations designed in a later pass (2026-10-10).
+
+Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups and the rules above. Claude's calls, open to Jesse's review:
+
+- The lock and the pill share the home page's color tokens and button styles (`drip.css`, the block on `#drip-home, #drip-lock, #drip-pill`), and `icon()` and `price()` moved to `common.js`.
+- The blur and blue tint cover the whole window, not only the frame: `backdrop-filter` on the overlay. Dark mode is a deep blue at 60%, light mode a pale blue at 45%.
+- "Done for now" shimmers every 5 seconds. On the white button in dark mode the sweep is pale blue, since white on white wouldn't show. The ripple is drip blue, starts where the button was pressed, and the page leaves after 520ms. Reduced motion skips both.
+- "Kept 3 drops." rides from the lock to the home page in `sessionStorage` (`drip-kept`), read once, so it needs no state field. It's the home page's gray message line for now; the animation pass can give it more.
+- "I need this one" opens a plain textarea with Cancel and a gray "Unlock this video" button with the lock icon. No animation, as the spec says.
+- The watched line reads "0m watched today" on a day with nothing watched yet. `watchedSummary(state)` in state.js supplies it.
+- The pill shows the glass at 20px, the compact minutes, and Save with a lucide outline bookmark that becomes the filled cartoon one once saved (`src/icons/save-outline.svg` is new). Saved can be clicked to take the video back out, like the home card. The proposals "Unlocked" (gray, no glass) and "Ad, not counted" are built as written, pending Jesse.
+- Three pill placements are drafted while Jesse picks, switched with Alt+Shift+P and remembered in the page's localStorage: in the window's bottom right corner, always showing; inside the player's top right, hiding with YouTube's controls and showing in fullscreen; and at the bottom center, fading to 20% three seconds into playback until the mouse moves. The two that live outside the player don't show in fullscreen.
 
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
@@ -210,6 +221,7 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, watched, needThis: [
 - `cancelPending(state, key)` drops one pending key.
 - `formatMinutes(seconds)` returns compact time: `'1h 42m'`, `'42m'`, `'2h'`, `'<1m'` for 1 to 59 seconds, or `'0m'`.
 - `logDays(day)` returns the 8 days the Settings log shows, `day` first (Q21).
+- `watchedSummary(state)` returns `{ today, lastWeek, weekday }` for the lock screen: seconds watched today, seconds on the same weekday a week back (`null` when the log has no entry for it), and today's weekday name.
 - `redirectTarget(href)` returns where a top-level YouTube URL should go instead, or `''`. Shorts and embeds become watch pages, the feeds in Q16 and `/tv` go to the token page, and `m.youtube.com` moves to `www`. redirect.js applies it, but only in the top frame, so embeds on other sites stay free (Q7).
 - `earlyLocked(raw, now, videoId)` decides, from raw storage, whether a loading watch page holds its video: no state, a day that has rolled over, or 0 seconds without an unlock today. Grace mode doesn't count, because nothing is playing yet. early.js also skips the video watch.js marks with `data-drip-grace` on `<html>`.
 - `devAction(state, action, now)` is test tooling, not a feature. It backs the dev panel (`src/devpanel/`), a floating box on YouTube pages that shows state and has buttons for minutes, tokens, "Run reset now" (moves `day` and any pending `effectiveDay` back one day, so the next message rolls over as a real reset would), applying pending settings, toggling grace now, clearing lists, and starting fresh. The panel shows while Developer mode is on in Settings (storage key `dripDev`, written by the worker on `setDevMode`) or the checkout has `dev/ENABLED`, and the worker refuses `devAction` otherwise. `bin/build-release` leaves the panel out, and a build without it hides the toggle and refuses `setDevMode`. Error `'unknown-dev-action'`.

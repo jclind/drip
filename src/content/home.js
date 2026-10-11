@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel, watchUrl, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, hourLabel, watchUrl, icon, price, KEPT_KEY, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
 
@@ -284,29 +284,6 @@
   let savedShowAll = false;
 
   /**
-   * A cartoon or lucide icon from src/icons, drawn as a CSS mask so it takes the color of the text around it.
-   * @param {string} name
-   * @param {string} [cls]
-   */
-  function icon(name, cls = '') {
-    const el = h('span', { class: `drip-i drip-i-${name} ${cls}`.trim(), 'aria-hidden': 'true' });
-    el.style.setProperty('--drip-icon', `url("${chrome.runtime.getURL(`src/icons/${name}.svg`)}")`);
-    return el;
-  }
-
-  /**
-   * A price on a button: "-1" and the token's icon. Screen readers get "costs 1 drop".
-   * @param {'drop' | 'card'} token
-   */
-  function price(token) {
-    return h('span', { class: 'drip-price' },
-      h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'),
-      h('span', { 'aria-hidden': 'true' }, '-1'),
-      icon(token, `drip-token-${token}`),
-      h('span', { class: 'drip-sr' }, `, costs 1 ${token}`));
-  }
-
-  /**
    * Seconds in a length string like "8:31" or "1:02:03", or 0 when there's none.
    * @param {string} length
    */
@@ -520,6 +497,17 @@
 
   let refreshing = false;
 
+  /** Drops the lock screen's "Done for now" left unspent, read once (watch.js onDone). */
+  function takeKept() {
+    try {
+      const kept = Number(sessionStorage.getItem(KEPT_KEY));
+      sessionStorage.removeItem(KEPT_KEY);
+      return kept > 0 ? kept : 0;
+    } catch {
+      return 0;
+    }
+  }
+
   /** Puts the drip page into the home browse page if it isn't there yet. */
   function mount() {
     if (location.pathname !== '/') return;
@@ -539,6 +527,8 @@
     }
     const target = browse.querySelector(SEL.mount) || browse;
     target.prepend(h('div', { id: 'drip-home' }));
+    const kept = takeKept();
+    if (kept) message = `Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.`;
     rendered = '';
     render();
     send({ type: 'get' }).then((res) => {
