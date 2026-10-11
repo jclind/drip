@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>drip home at several widths</title>
+<style>
+  body { margin: 0; padding: 12px; background: #555; font: 12px monospace; color: #fff; }
+  .row { display: flex; gap: 12px; align-items: flex-start; }
+  iframe { display: block; border: 0; background: #fff; }
+</style>
+</head>
+<body>
+<!--
+  dev/home.html in frames of exact widths, since a browser window can't get narrower than about 500px.
+  Takes the same query as home.html, plus widths=320,360,... and height=.
+  http://localhost:8077/dev/home-sizes.html?scenario=card&theme=dark&widths=320,360,420,520
+-->
+<div class="row" id="row"></div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const widths = (params.get('widths') || '320,360,420,520,800').split(',').map(Number);
+  const height = Number(params.get('height') || 900);
+  params.delete('widths');
+  params.delete('height');
+  for (const w of widths) {
+    const box = document.createElement('div');
+    box.textContent = `${w}px`;
+    const frame = document.createElement('iframe');
+    frame.width = String(w);
+    frame.height = String(height);
+    frame.src = `home.html?${params}`;
+    box.append(frame);
+    document.getElementById('row').append(box);
+  }
+</script>
+</body>
+</html>

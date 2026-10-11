@@ -259,3 +259,19 @@ test('dev/ENABLED keeps developer mode on whatever the toggle says', async () =>
   assert.equal(off.file, true);
   assert.equal(off.enabled, true);
 });
+
+test('the home page messages: revealNext, buyIfOut, and addBacklog with an index', async () => {
+  const w = worker();
+  await w.send({ type: 'reveal', candidates: [{ id: 'aaa', title: 'A' }] });
+  const next = await w.send({ type: 'revealNext', videoId: 'aaa', candidates: [{ id: 'aaa', title: 'A' }, { id: 'bbb', title: 'B' }] });
+  assert.equal(next.ok, true);
+  assert.equal(w.store.drip.current.id, 'bbb');
+  const stale = await w.send({ type: 'revealNext', videoId: 'aaa', candidates: [{ id: 'ccc', title: 'C' }] });
+  assert.equal(stale.error, 'stale-card');
+  const buy = await w.send({ type: 'buyIfOut', videoId: 'zzz' });
+  assert.equal(buy.bought, true);
+  assert.equal(w.store.drip.watchSecondsBought, 900);
+  for (const id of ['x1', 'x2']) await w.send({ type: 'addBacklog', video: { id, title: id } });
+  await w.send({ type: 'addBacklog', video: { id: 'x0', title: 'x0' }, index: 0 });
+  assert.deepEqual(w.store.drip.backlog.map((/** @type {any} */ v) => v.id), ['x0', 'x1', 'x2']);
+});

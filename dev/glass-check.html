@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>glass check</title>
+<style>body{margin:0;padding:12px;font:12px sans-serif;color:#aaa}.row{display:flex;gap:18px;align-items:flex-end;padding:12px}.c{text-align:center}.dark{background:#0f0f0f;color:#d9d9d9}.light{background:#fff;color:#909090}</style>
+<div id="out"></div>
+<script src="/src/lib/glass.js"></script>
+<script>
+  const levels = [0, 0.004, 0.03, 0.1, 0.25, 0.5, 0.75, 0.95, 0.999, 1];
+  for (const theme of ['dark', 'light']) for (const px of [20, 34, 120]) {
+    const row = document.createElement('div');
+    row.className = `row ${theme}`;
+    for (const f of levels) {
+      const c = document.createElement('div');
+      c.className = 'c';
+      c.append(DripGlass.make(f, px), document.createElement('br'), String(f));
+      row.append(c);
+    }
+    document.getElementById('out').append(row);
+  }
+</script>

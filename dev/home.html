@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>drip home harness</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/src/content/early.css">
+<link rel="stylesheet" href="/src/content/drip.css">
+<style>
+  /* Stand-ins for YouTube's theme variables, light by default and dark with html[dark] as on YouTube. */
+  html { --yt-sys-color-baseline--text-primary: #0f0f0f; --yt-sys-color-baseline--text-secondary: #606060; --yt-sys-color-baseline--base-background: #fff; }
+  html[dark] { --yt-sys-color-baseline--text-primary: #f1f1f1; --yt-sys-color-baseline--text-secondary: #aaa; --yt-sys-color-baseline--base-background: #0f0f0f; }
+  body { margin: 0; background: var(--yt-sys-color-baseline--base-background); font-family: Roboto, Arial, sans-serif; }
+  #masthead { height: 56px; border-bottom: 1px solid rgba(128, 128, 128, 0.2); }
+  ytd-browse, ytd-two-column-browse-results-renderer, #primary { display: block; }
+  #harness-bar { position: fixed; right: 8px; bottom: 8px; z-index: 5; font: 12px monospace; color: #888; }
+</style>
+</head>
+<body>
+<!--
+  Runs the real home page outside YouTube: state.js, background.js (the real worker, on in-memory storage), common.js,
+  glass.js, and home.js, over a fake home grid. Serve the repo root and open it:
+    python3 -m http.server 8077 --bind 127.0.0.1
+    http://localhost:8077/dev/home.html?scenario=card&theme=dark
+  Scenarios are in SCENARIOS below. `click=<data-k>,...` clicks controls after load, 300ms apart, like click=reveal or click=x-<id>.
+  `grid=0` leaves the grid empty, so a reveal stays loading for 6 seconds. The page moves its URL to "/" because
+  home.js only mounts there, so reload from the address you opened. A tool that reloads the tab gets the folder listing.
+-->
+<div id="masthead"></div>
+<ytd-browse page-subtype="home">
+  <ytd-two-column-browse-results-renderer>
+    <div id="primary"><ytd-rich-grid-renderer id="grid"></ytd-rich-grid-renderer></div>
+  </ytd-two-column-browse-results-renderer>
+</ytd-browse>
+<div id="harness-bar"></div>
+<script src="/src/lib/state.js"></script>
+<script>
+  // @ts-check
+  const params = new URLSearchParams(location.search);
+  const theme = params.get('theme') || 'dark';
+  if (theme === 'dark') document.documentElement.setAttribute('dark', '');
+  document.getElementById('harness-bar').textContent = `${params.get('scenario') || 'empty'} · ${theme}`;
+
+  // Real video ids, so thumbnails load. Titles and channels are made up, like the mockups.
+  const VIDEOS = [
+    { id: 'aqz-KE-bpKQ', title: 'I Spent 30 Days Building a Cabin in the Woods With Only Hand Tools (Full Build)', channel: 'Rogi', length: '5:05' },
+    { id: 'dQw4w9WgXcQ', title: 'Frontier AI doesn\'t need your help', channel: 'Less Bitter', length: '8:31' },
+    { id: 'jNQXAC9IVRw', title: 'PLAY ME! じゃんけん (2000s liquid dnb mix for gaming and studying late at night)', channel: 'Noumena', length: '59:02' },
+    { id: '9bZkp7q19f0', title: '☆☆☆☆☆☆☆', channel: 'mai', length: '33:53' },
+    { id: 'kJQP7kiw5Fk', title: 'How Japanese Joinery Works', channel: 'Woodworkers Journal', length: '12:40' },
+    { id: 'YbJOTdZBX1g', title: 'The quiet math behind every train timetable', channel: 'Practical Engineering', length: '17:05' },
+    { id: 'ScMzIvxBSi4', title: 'A short film about a lighthouse keeper', channel: 'Vimeo Staff Picks', length: '1:04:12' },
+    { id: 'M7lc1UVf-VE', title: 'Why bread goes stale', channel: 'Adam Ragusea', length: '9:58' },
+    { id: 'LXb3EKWsInQ', title: 'COSTA RICA IN 4K 60fps HDR (ULTRA HD)', channel: 'Jacob + Katie Schwarz', length: '5:14' },
+    { id: 'ktvTqknDobU', title: 'Imagine Dragons - Radioactive', channel: 'ImagineDragonsVEVO', length: '3:09' },
+    { id: 'RgKAFK5djSk', title: 'See You Again', channel: 'Wiz Khalifa', length: '3:58' },
+  ];
+  const D = /** @type {any} */ (globalThis).Drip;
+  const now = Date.now();
+  const s = D.initialState(now);
+  s.tokens = { watch: 15, rec: 12 };
+  s.watchSecondsBought = 60 * 60;
+  s.watchSecondsLeft = 34 * 60;
+  s.backlog = VIDEOS.slice(1, 9).reverse();
+  const SCENARIOS = {
+    empty() {},
+    card() { s.current = VIDEOS[0]; s.seen.push(VIDEOS[0].id); },
+    saved() { this.card(); s.backlog.push(VIDEOS[0]); },
+    zero() { this.card(); s.watchSecondsLeft = 0; },
+    low() { s.watchSecondsLeft = 40; },
+    nocards() { s.tokens.rec = 0; },
+    nocardsCard() { this.card(); s.tokens.rec = 0; },
+    out() { s.tokens = { watch: 0, rec: 0 }; s.watchSecondsLeft = 0; },
+    fresh() { Object.assign(s, D.initialState(now)); },
+    one() { s.backlog = [VIDEOS[4]]; },
+    full() { s.watchSecondsLeft = s.watchSecondsBought; },
+    longtitle() { s.current = { ...VIDEOS[2], title: 'An extremely long title that goes on and on, the kind YouTube allows, with more words than two lines can hold at this width so it has to cut' , channel: 'A channel with a really quite long name, longer than any sane channel' }; },
+    big() { s.watchSecondsLeft = 3 * 3600 + 25 * 60; s.watchSecondsBought = 4 * 3600; s.tokens = { watch: 96, rec: 200 }; },
+  };
+  (SCENARIOS[params.get('scenario') || 'empty'] || SCENARIOS.empty).call(SCENARIOS);
+
+  /** @type {Record<string, any>} */
+  const store = { drip: JSON.parse(JSON.stringify(s)) };
+  /** @type {Function[]} */
+  const changeListeners = [];
+  /** @type {Function | null} */
+  let onMessage = null;
+  /** @type {any} */ (globalThis).importScripts = () => {};
+  /** @type {any} */ (globalThis).chrome = {
+    runtime: {
+      id: 'harness',
+      getURL: (/** @type {string} */ p) => `/${p}`,
+      getManifest: () => ({ version: 'harness', content_scripts: [] }),
+      onMessage: { addListener: (/** @type {Function} */ fn) => { onMessage = fn; } },
+      onMessageExternal: { addListener() {} },
+      onInstalled: { addListener() {} },
+      sendMessage: (/** @type {any} */ msg) => new Promise((resolve) => {
+        // A small delay, like a real round trip to the worker.
+        setTimeout(() => { if (onMessage) onMessage(JSON.parse(JSON.stringify(msg)), { tab: { id: 1 }, url: 'https://www.youtube.com/' }, resolve); }, 30);
+      }),
+    },
+    storage: {
+      local: {
+        get: async (/** @type {string} */ key) => (key in store ? { [key]: JSON.parse(JSON.stringify(store[key])) } : {}),
+        set: async (/** @type {Record<string, any>} */ items) => {
+          for (const [key, value] of Object.entries(items)) {
+            const oldValue = store[key];
+            store[key] = JSON.parse(JSON.stringify(value));
+            for (const fn of changeListeners) fn({ [key]: { oldValue, newValue: store[key] } }, 'local');
+          }
+        },
+      },
+      onChanged: { addListener: (/** @type {Function} */ fn) => { changeListeners.push(fn); } },
+    },
+    tabs: { create() {} },
+  };
+
+  // The fake home grid that Reveal reads, with the markup home.js's selectors expect.
+  const grid = document.getElementById('grid');
+  if (params.get('grid') !== '0') {
+    for (const v of VIDEOS) {
+      const item = document.createElement('ytd-rich-item-renderer');
+      const link = document.createElement('a');
+      link.href = `/watch?v=${v.id}`;
+      const title = document.createElement('h3');
+      title.textContent = v.title;
+      const channel = document.createElement('span');
+      channel.className = 'ytContentMetadataViewModelMetadataText';
+      channel.textContent = v.channel;
+      const badge = document.createElement('span');
+      badge.className = 'ytBadgeShapeText';
+      badge.textContent = v.length;
+      link.append(title);
+      item.append(link, channel, badge);
+      grid.append(item);
+    }
+  }
+  history.replaceState(null, '', `/${location.search}`);
+</script>
+<script src="/src/background.js"></script>
+<script src="/src/lib/glass.js"></script>
+<script src="/src/content/common.js"></script>
+<script src="/src/content/home.js"></script>
+<script>
+  const click = new URLSearchParams(location.search).get('click');
+  // Clicks run 300ms apart, so each one's message to the worker lands before the next.
+  if (click) {
+    click.split(',').forEach((k, i) => setTimeout(() => {
+      /** @type {HTMLElement | null} */ (document.querySelector(`[data-k="${k}"]`))?.click();
+    }, 400 + i * 300));
+  }
+</script>
+</body>
+</html>
