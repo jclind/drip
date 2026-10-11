@@ -73,7 +73,7 @@ Minutes and the watch page pill (2026-10-07):
 - The pill never offers to buy minutes. That stays on the lock screen (Jesse).
 - Proposed, not confirmed: "Unlocked" in gray with no glass on an unlocked video. A small "ad, not counted" while an ad plays. The glass down to its last drop in the last minute, with no red. The pill fading to low opacity a few seconds into playback and coming back when the mouse moves.
 
-Popup (2026-10-08, Jesse's mockup): the home page stats block, smaller, and centered like the home page's rather than spread edge to edge as mocked (Jesse, 2026-10-11). The glass tile with "34 min left today", the drop and card counts, then two gray links: "⚙ Settings" on the left and "Open YouTube ↗" on the right, with lucide's arrow-up-right after the text. Open YouTube switches to an open YouTube tab if there is one. The page fills Chrome's popup window edge to edge with no outer card, and it follows Chrome's light or dark theme, not YouTube's. Still read-only (Q22).
+Popup (2026-10-08, Jesse's mockup): the home page stats block, smaller, spread edge to edge as mocked. The two links sit 16px in from the edges, a little closer together than the stats (Jesse, 2026-10-11, after trying the stats centered). The glass tile with "34 min left today", the drop and card counts, then two gray links: "⚙ Settings" on the left and "Open YouTube ↗" on the right, with lucide's arrow-up-right after the text. Open YouTube switches to an open YouTube tab if there is one. The page fills Chrome's popup window edge to edge with no outer card, and it follows Chrome's light or dark theme, not YouTube's. Still read-only (Q22).
 
 Settings (2026-10-08, Jesse's mockups):
 
