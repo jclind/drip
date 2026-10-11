@@ -467,11 +467,13 @@
     if (!state) return h('div', { class: 'drip-loading', 'aria-busy': 'true' });
     const note = outNote();
     const showCard = state.current || busy === 'reveal';
+    // The kept drops rise in once, as the lock's water falls away. Rebuilds after that leave the message still.
+    const rises = !!message && message === keptMessage;
     return h('div', { class: 'drip-page' },
       stats(),
       !showCard && actions(),
       state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
-      (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
+      (message || note) && h('div', { class: `drip-message${rises ? ' is-kept' : ''}`, role: 'status' }, message || note),
       savedList());
   }
 
@@ -492,20 +494,37 @@
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
     root.classList.add('drip-ui');
     root.replaceChildren(view());
+    keptSeen(root);
     if (focused) /** @type {HTMLElement | null} */ (root.querySelector(`[data-k="${CSS.escape(focused)}"]`))?.focus();
   }
 
   let refreshing = false;
 
-  /** Drops the lock screen's "Done for now" left unspent, read once (watch.js onDone). */
+  /** "Kept 3 drops." until it has been drawn once with its rise. */
+  let keptMessage = '';
+
+  /**
+   * The message has risen once it's drawn on a page that shows. YouTube keeps the home page hidden until its data
+   * arrives, and builds drawn before then keep the rise for when it shows.
+   * @param {HTMLElement} root
+   */
+  function keptSeen(root) {
+    if (keptMessage && root.getClientRects().length) keptMessage = '';
+  }
+
+  /** Shows the drops the lock screen's "Done for now" left unspent, read once (watch.js onDone). */
   function takeKept() {
+    let kept = 0;
     try {
-      const kept = Number(sessionStorage.getItem(KEPT_KEY));
+      kept = Number(sessionStorage.getItem(KEPT_KEY));
       sessionStorage.removeItem(KEPT_KEY);
-      return kept > 0 ? kept : 0;
     } catch {
-      return 0;
+      // Storage blocked: no message.
     }
+    if (kept <= 0) return;
+    message = keptMessage = `Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.`;
+    // The same words may already be on the page from last time. Rebuild anyway, so they rise now.
+    rendered = '';
   }
 
   /** Puts the drip page into the home browse page if it isn't there yet. */
@@ -514,6 +533,10 @@
     const browse = document.querySelector(SEL.homeBrowse);
     if (!browse) return;
     if (browse.querySelector('#drip-home')) {
+      // "Done for now" came back through YouTube's in-page navigation, to a home page drip had already built.
+      takeKept();
+      render();
+      keptSeen(/** @type {HTMLElement} */ (browse.querySelector('#drip-home')));
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;
@@ -527,8 +550,7 @@
     }
     const target = browse.querySelector(SEL.mount) || browse;
     target.prepend(h('div', { id: 'drip-home' }));
-    const kept = takeKept();
-    if (kept) message = `Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.`;
+    takeKept();
     rendered = '';
     render();
     send({ type: 'get' }).then((res) => {

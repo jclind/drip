@@ -56,7 +56,7 @@ Settled:
 Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Paying stays neutral and justifying stays a little effortful:
 
 - Headline: "You've had your fill." when no watch tokens are left, "Time for a breather." when there are tokens to buy minutes. Jesse's lines.
-- "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds. The pill's low-time shimmer is the only other one. Clicking it plays one ripple that settles flat, then goes to the home page.
+- "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds. The pill's low-time shimmer is the only other one. Clicking it sends rings through the panel, and the water falls away onto the home page.
 - "+15 min · -1 drop" is the gray secondary button, with white text. "I need this one · 2 left" is a gray text link, and its reason box gets no animation.
 - Layout, top to bottom: headline, a gray line "1 h 15 min watched today · 50 min last Tuesday" (only the first half when last week has no data), the two buttons with Done for now on the right, then the link. No token counts on this screen; the headline already says whether minutes can be bought. Jesse's mockup, 2026-10-07.
 - "+15 min" keeps its clock icon here and on the home page, so it looks the same everywhere.
@@ -118,8 +118,11 @@ Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups 
 
 - The lock and the pill share the home page's color tokens and button styles (`drip.css`, the block on `#drip-home, #drip-lock, #drip-pill`), and `icon()` and `price()` moved to `common.js`.
 - The blur and blue tint cover the whole window, not only the frame: `backdrop-filter` on the overlay. Dark mode is a deep blue at 60%, light mode a pale blue at 45%.
-- "Done for now" shimmers every 5 seconds. On the white button in dark mode the sweep is pale blue, since white on white wouldn't show. The ripple is drip blue, starts where the button was pressed, and the page leaves after 520ms. Reduced motion skips both.
-- "Kept 3 drops." rides from the lock to the home page in `sessionStorage` (`drip-kept`), read once, so it needs no state field. It's the home page's gray message line for now; the animation pass can give it more.
+- "Done for now" shimmers every 5 seconds. On the white button in dark mode the sweep is pale blue, since white on white wouldn't show.
+- Hovering or keyboard focus on "Done for now" sends a thin blue ring out around the button every 1.4 seconds. Each one keeps the pill shape and fades 8px out.
+- Clicking it sends a splash and two rings out through the panel from where it was pressed. Meanwhile YouTube goes home inside the page, the way its logo does, so the lock stays up. While YouTube is still fetching its home page, another ring goes out every 0.45 seconds. On air that fetch took 1.2 to 1.4 seconds (2026-10-11), so click to home takes about 2.5 seconds. After at least 0.7 seconds, once drip's home page is there, the water falls away top first over 1 second, the way it rose, while the panel lifts and fades. "Kept 3 drops." rises in under it. If home isn't there after 4 seconds, the water falls anyway. If YouTube's logo is missing or the page doesn't move within 1.5 seconds, drip loads the home page the old way. Reduced motion skips the rings and the fall.
+- Jesse picked this from design round 2 on 2026-10-11, as D: the shimmer as built, the hover rings of round 1's A kept closer and slower, and the click of round 1's C. It replaced a hover tide, a small ripple, and a full page load after 520ms, which together felt "a little like patchwork of animations".
+- "Kept 3 drops." rides from the lock to the home page in `sessionStorage` (`drip-kept`), read once, so it needs no state field. It's the home page's gray message line, rising in once.
 - "I need this one" opens a plain textarea with Cancel and a gray "Unlock this video" button with the lock icon. No animation, as the spec says.
 - The watched line reads "0m watched today" on a day with nothing watched yet. `watchedSummary(state)` in state.js supplies it.
 - The pill shows the glass at 20px, the compact minutes, and Stash with a lucide outline bookmark that becomes the filled cartoon one once stashed (`src/icons/save-outline.svg` is new). Stashed can be clicked to take the video back out, like the home card. The proposals "Unlocked" (gray, no glass) and "Ad, not counted" are built as written, pending Jesse.
@@ -129,7 +132,6 @@ Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups 
 - Running out no longer cuts straight to the panel. Blue water rises up the window over 1.1 seconds with a wavy crest, blurring the frame as it climbs, and the panel surfaces once it's most of the way up. Buying minutes or an unlock drains the water back down in 0.6 seconds. The water is a mask on `#drip-lock` itself, because its `view-transition-name` keeps a child's `backdrop-filter` from seeing the page (Jesse asked for a smoother way into the lock, 2026-10-10).
 
 - Under the lock's water, faint bubbles drift up at random sizes and speeds, and two small fish cross now and then, one every minute or so, at different depths and directions. The overlay's mask covers them, so they only show where the water has risen. Reduced motion hides them (Jesse asked for something underwater, 2026-10-10).
-- Hovering or focusing "Done for now" raises a blue tide halfway up the button with a drifting crest, the glass filling in miniature. It stays up through the ripple on click (Jesse asked for an on-theme hover, 2026-10-10).
 - More motion ideas are in IDEAS.md, "Motion and small touches".
 
 Ideas, not decided:

@@ -29,21 +29,22 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 18. Turn grace mode on (it applies at the next reset). The next day, run out of minutes mid-video. That video finishes, and opening another video shows the lock.
 19. With minutes left, play two videos in two tabs for a minute. The minutes go down by about one minute, not two.
 20. On the lock, click I need this one, type a reason, and unlock. The video plays, the pill says unlocked, and the reason shows in the Settings log.
+21. On the lock with drops left, hover Done for now: thin blue rings leave the button. Click it: rings cross the panel, the water falls away onto the home page with no blank page between, and "Kept N drops." rises in. Do it twice in one tab; the second time home was already built, and the message still shows.
 
 ## Redirects and blocking
 
-21. Open a `/shorts/` link. It opens as a normal watch page.
-22. Open `/feed/subscriptions`, `/feed/explore`, and `/gaming`. Each lands on the token page.
-23. Open `m.youtube.com`. It moves to `www.youtube.com`.
-24. Open a YouTube embed on another site, such as a news article. It plays without drip.
-25. Search for something. At most 10 results show, with no Shorts or "People also watched" shelves, each has a Stash button, and More results shows the next 10.
+22. Open a `/shorts/` link. It opens as a normal watch page.
+23. Open `/feed/subscriptions`, `/feed/explore`, and `/gaming`. Each lands on the token page.
+24. Open `m.youtube.com`. It moves to `www.youtube.com`.
+25. Open a YouTube embed on another site, such as a news article. It plays without drip.
+26. Search for something. At most 10 results show, with no Shorts or "People also watched" shelves, each has a Stash button, and More results shows the next 10.
 
 ## Pages
 
-26. The popup shows minutes left and both balances, plus a Settings link.
-27. In Settings, raise a limit and save. It's listed as waiting for the reset. Lower one, and it applies now.
-28. The Settings log shows today and the 7 days before it.
+27. The popup shows minutes left and both balances, plus a Settings link.
+28. In Settings, raise a limit and save. It's listed as waiting for the reset. Lower one, and it applies now.
+29. The Settings log shows today and the 7 days before it.
 
 ## After a day boundary
 
-29. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.
+30. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.

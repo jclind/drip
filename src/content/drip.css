@@ -69,8 +69,8 @@ a.drip-btn {
    The paused frame behind the panel is blurred and tinted blue, as if underwater. */
 #drip-lock {
   --drip-panel: #fff;
-  /* The tide on "Done for now" under a black button here, a white one in dark mode. */
-  --drip-tide-color: rgba(66, 165, 246, 0.5);
+  /* The rings around "Done for now", darker here, where the page is light. */
+  --drip-ring: rgba(25, 118, 210, 0.6);
   --drip-tint: rgba(150, 195, 240, 0.45);
   --drip-shimmer: rgba(255, 255, 255, 0.3);
   position: fixed;
@@ -187,7 +187,7 @@ html[dark] #drip-lock .drip-sea {
 
 html[dark] #drip-lock {
   --drip-panel: #121212;
-  --drip-tide-color: rgba(66, 165, 246, 0.3);
+  --drip-ring: rgba(66, 165, 246, 0.75);
   --drip-tint: rgba(3, 22, 46, 0.6);
   /* The primary button is white in dark mode, so its shimmer is a pale blue to show up on it. */
   --drip-shimmer: rgba(66, 165, 246, 0.3);
@@ -256,43 +256,49 @@ html[dark] #drip-lock {
   pointer-events: none;
 }
 
-/* Hover or focus: a blue tide rises halfway up the button with a small drifting crest, the glass filling in miniature,
-   and settles back down when the pointer leaves. */
-#drip-lock .drip-done::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--drip-tide-color);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M0 5C15 1 30 1 45 4S75 9 90 6 112 1 120 4V10H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-tide) / 120px 10px repeat-x,
-    linear-gradient(#000, #000) 0 calc(var(--drip-tide) + 9px) / 100% 100% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M0 5C15 1 30 1 45 4S75 9 90 6 112 1 120 4V10H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-tide) / 120px 10px repeat-x,
-    linear-gradient(#000, #000) 0 calc(var(--drip-tide) + 9px) / 100% 100% no-repeat;
-  transition: --drip-tide 520ms cubic-bezier(0.3, 0.7, 0.2, 1);
-  pointer-events: none;
-}
-
-#drip-lock .drip-done:is(:hover, :focus-visible)::before,
-#drip-lock .drip-done.is-leaving::before {
-  --drip-tide: 18px;
-  animation: drip-tide-drift 1.8s linear infinite;
-}
-
 #drip-lock .drip-done.is-leaving::after {
   animation: none;
   opacity: 0;
 }
 
-/* One ripple from the press, then the page leaves (watch.js RIPPLE_MS). */
-#drip-lock .drip-ripple {
+/* Hover or keyboard focus: a ring leaves the button every 1.4 seconds and fades 8px out (watch.js startRings).
+   outline-offset keeps the pill shape as it grows. */
+#drip-lock .drip-done-ring {
   position: absolute;
-  z-index: -1;
-  border-radius: 50%;
-  background: var(--drip-blue);
-  opacity: 0.4;
-  transform: scale(0);
-  animation: drip-ripple 520ms cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+  border-radius: calc(var(--drip-btn-h) / 2);
+  outline: 1.5px solid var(--drip-ring);
   pointer-events: none;
+  animation: drip-done-ring 1400ms cubic-bezier(0.15, 0.6, 0.35, 1) forwards;
+}
+
+/* The click: a splash and two rings from the press point out through the panel. They play for 0.7 seconds before the
+   water falls (watch.js onDone LEAVE_MS). */
+#drip-lock .drip-leave-ring {
+  position: absolute;
+  border: 2px solid rgba(66, 165, 246, 0.8);
+  border-radius: 50%;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+#drip-lock .drip-leave-ring.is-splash {
+  border: 0;
+  background: rgba(66, 165, 246, 0.35);
+}
+
+#drip-lock.is-leaving .drip-lock-panel {
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* With drip's home page underneath, the water falls away top first, the way it rose, and the panel lifts and fades. */
+#drip-lock.is-surfacing {
+  pointer-events: none;
+  animation: drip-water-drain 1000ms cubic-bezier(0.5, 0, 0.4, 1) both, drip-crest 1000ms linear;
+}
+
+#drip-lock.is-surfacing .drip-lock-panel {
+  animation: drip-lift 560ms cubic-bezier(0.5, 0, 0.75, 0.3) 300ms both;
 }
 
 #drip-lock .drip-lock-link {
@@ -804,6 +810,11 @@ html[dark] #drip-pill {
   text-wrap: balance;
 }
 
+/* After "Done for now", "Kept 3 drops." rises in as the lock's water falls away (home.js view). */
+#drip-home .drip-message.is-kept {
+  animation: drip-kept-rise 600ms cubic-bezier(0.3, 0.7, 0.2, 1) 400ms both;
+}
+
 /* The reveal card. The 16:9 box and two title lines are reserved before anything loads, so nothing shifts. */
 #drip-home .drip-card.is-new {
   animation: drip-rise 260ms cubic-bezier(0.3, 0.7, 0.2, 1);
@@ -1232,19 +1243,6 @@ html[dark] #drip-pill {
   initial-value: 0px;
 }
 
-/* Resting below the bottom of the "Done for now" button, which is 42px tall. */
-@property --drip-tide {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 46px;
-}
-
-@keyframes drip-tide-drift {
-  to {
-    --drip-crest-x: -120px;
-  }
-}
-
 @keyframes drip-water-rise {
   from {
     --drip-water: 100vh;
@@ -1330,10 +1328,29 @@ html[dark] #drip-pill {
   }
 }
 
-@keyframes drip-ripple {
+@keyframes drip-done-ring {
+  from {
+    opacity: 0.85;
+    outline-offset: 0;
+  }
+
   to {
     opacity: 0;
-    transform: scale(1);
+    outline-offset: 8px;
+  }
+}
+
+@keyframes drip-kept-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes drip-lift {
+  to {
+    opacity: 0;
+    transform: translateY(-48px);
   }
 }
 
@@ -1346,7 +1363,8 @@ html[dark] #drip-pill {
 
 @media (prefers-reduced-motion: reduce) {
   #drip-lock,
-  #drip-lock.is-draining {
+  #drip-lock.is-draining,
+  #drip-lock.is-surfacing {
     animation: none;
   }
 

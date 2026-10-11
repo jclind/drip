@@ -24,6 +24,8 @@
     miniplayerAttr: 'miniplayer-is-active',
     title: 'ytd-watch-metadata h1, h1.ytd-watch-metadata',
     channel: 'ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a',
+    // The YouTube logo. "Done for now" clicks it, so YouTube goes home in the page instead of loading a new one.
+    homeLink: 'ytd-topbar-logo-renderer a#logo',
   };
 
   const GRACE_ATTR = 'data-drip-grace';
@@ -410,10 +412,15 @@
   let lockView = '';
   let lockVideoId = '';
 
-  /** The lock overlay showing now, or null. One still draining away doesn't count. */
+  /** The lock overlay showing now, or null. One still draining away, or leaving for the home page, doesn't count. */
   function liveLock() {
     const lock = document.getElementById('drip-lock');
-    return lock && !lock.classList.contains('is-draining') ? lock : null;
+    return lock && !lock.classList.contains('is-draining') && !lock.classList.contains('is-leaving') ? lock : null;
+  }
+
+  /** Whether "Done for now" is taking the lock to the home page. Nothing else touches the lock until it's gone. */
+  function leavingLock() {
+    return !!document.querySelector('#drip-lock.is-leaving');
   }
 
   /**
@@ -494,34 +501,137 @@
     }
   }
 
-  /** How long the ripple on "Done for now" plays before the page leaves. */
-  const RIPPLE_MS = 520;
+  const reducedMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  /** @param {number} ms */
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  /** Hovering or keyboard focus on "Done for now" sends a ring out around it this often. */
+  const RING_EVERY_MS = 1400;
+  /** @type {ReturnType<typeof setInterval> | undefined} */
+  let ringTimer;
+
+  /** @param {HTMLElement} button */
+  function ring(button) {
+    const panel = button.closest('.drip-lock-panel');
+    if (!panel || button.classList.contains('is-leaving')) {
+      stopRings();
+      return;
+    }
+    // In the panel rather than the button, so it can grow past the button's edge.
+    const p = panel.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+    const r = h('span', { class: 'drip-done-ring', 'aria-hidden': 'true' });
+    r.style.cssText = `left:${b.left - p.left}px;top:${b.top - p.top}px;width:${b.width}px;height:${b.height}px`;
+    panel.append(r);
+    r.addEventListener('animationend', () => r.remove());
+  }
+
+  /** @param {Event} e */
+  function startRings(e) {
+    const button = /** @type {HTMLElement} */ (e.currentTarget);
+    if (ringTimer !== undefined || reducedMotion() || (e.type === 'focus' && !button.matches(':focus-visible'))) return;
+    ring(button);
+    ringTimer = setInterval(() => ring(button), RING_EVERY_MS);
+  }
+
+  function stopRings() {
+    clearInterval(ringTimer);
+    ringTimer = undefined;
+  }
+
+  /** The click's rings play this long before the water starts to fall. */
+  const LEAVE_MS = 700;
+  /** While YouTube is still fetching its home page, another ring goes out this often. On air that fetch took 1.2s. */
+  const WAIT_RING_MS = 450;
+  /** The water falling away, top first (drip.css #drip-lock.is-surfacing). */
+  const SURFACE_MS = 1000;
+  /** Past this with YouTube still on the watch page, the in-page navigation didn't happen, so drip loads home instead. */
+  const NAV_WAIT_MS = 1500;
+  /** Past this, the water falls even if drip's home page hasn't shown up yet. */
+  const HOME_WAIT_MS = 4000;
+
+  /** drip's home page is drawn and fade.js has started fading the page in. */
+  function homeShown() {
+    return location.pathname === '/' && document.documentElement.hasAttribute('data-drip-shown')
+      && !!document.getElementById('drip-home')?.getClientRects().length;
+  }
 
   /**
-   * Plays one ripple from where the button was pressed, then goes to the home page. Drops left unspent ride along in
-   * sessionStorage, so the home page can say "Kept 3 drops." once (home.js).
+   * A splash and two rings from where the button was pressed, out through the panel. Returns a function that sends
+   * one more ring from the same point.
+   * @param {HTMLElement} panel
+   * @param {HTMLElement} button
    * @param {MouseEvent} e
    */
-  function onDone(e) {
+  function leaveRings(panel, button, e) {
+    const p = panel.getBoundingClientRect();
+    const box = button.getBoundingClientRect();
+    // From the pointer, or from the middle for a keyboard press, which reports 0, 0.
+    const x = (e.clientX || box.left + box.width / 2) - p.left;
+    const y = (e.clientY || box.top + box.height / 2) - p.top;
+    const far = Math.hypot(Math.max(x, p.width - x), Math.max(y, p.height - y)) * 2;
+    /** @param {string} cls @param {number} size @param {number} ms @param {number} delay */
+    const grow = (cls, size, ms, delay) => {
+      const r = h('span', { class: cls, 'aria-hidden': 'true' });
+      r.style.cssText = `left:${x}px;top:${y}px`;
+      panel.append(r);
+      r.animate([{ width: '0px', height: '0px', opacity: 1 }, { width: `${size}px`, height: `${size}px`, opacity: 0 }],
+        { duration: ms, delay, easing: 'cubic-bezier(0.2, 0.6, 0.3, 1)', fill: 'both' });
+    };
+    grow('drip-leave-ring is-splash', 110, 420, 0);
+    grow('drip-leave-ring', far, 900, 0);
+    grow('drip-leave-ring', far, 900, 140);
+    return () => grow('drip-leave-ring', far, 900, 0);
+  }
+
+  /**
+   * Rings run out through the panel while YouTube goes home underneath, the way its logo does, so the page and the
+   * lock stay up. Once drip's home page is there, the water falls away the way it rose. Drops left unspent ride along
+   * in sessionStorage, so the home page can say "Kept 3 drops." once (home.js).
+   * @param {MouseEvent} e
+   */
+  async function onDone(e) {
     const button = /** @type {HTMLElement} */ (e.currentTarget);
-    if (button.classList.contains('is-leaving')) return;
+    const lock = liveLock();
+    const panel = /** @type {HTMLElement | null} */ (button.closest('.drip-lock-panel'));
+    if (!lock || !panel || button.classList.contains('is-leaving')) return;
     button.classList.add('is-leaving');
+    lock.classList.add('is-leaving');
+    stopRings();
     const kept = state ? state.tokens.watch : 0;
     try {
       if (kept > 0) sessionStorage.setItem(KEPT_KEY, String(kept));
     } catch {
       // Storage blocked: the home page just won't mention the drops.
     }
-    const box = button.getBoundingClientRect();
-    // From the pointer, or from the middle for a keyboard press, which reports 0, 0.
-    const x = e.clientX || box.left + box.width / 2;
-    const y = e.clientY || box.top + box.height / 2;
-    const ripple = h('span', { class: 'drip-ripple', 'aria-hidden': 'true' });
-    const size = Math.hypot(box.width, box.height) * 2;
-    ripple.style.cssText = `width:${size}px;height:${size}px;left:${x - box.left - size / 2}px;top:${y - box.top - size / 2}px`;
-    button.append(ripple);
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    setTimeout(() => location.assign('/'), reduced ? 0 : RIPPLE_MS);
+    const reduced = reducedMotion();
+    const moreRing = reduced ? null : leaveRings(panel, button, e);
+    const started = performance.now();
+    let lastRing = 140;
+    const logo = /** @type {HTMLElement | null} */ (document.querySelector(SEL.homeLink));
+    logo?.click();
+    while (true) {
+      await sleep(50);
+      const waited = performance.now() - started;
+      if (!reduced && waited < LEAVE_MS) continue;
+      if (homeShown()) break;
+      // No logo, or YouTube ignored the click: the old way, a full page load. The lock stays up until the page goes.
+      if (!logo || (location.pathname === '/watch' && waited > NAV_WAIT_MS)) {
+        location.assign('/');
+        return;
+      }
+      if (waited > HOME_WAIT_MS) break;
+      if (moreRing && waited - lastRing >= WAIT_RING_MS) {
+        moreRing();
+        lastRing = waited;
+      }
+    }
+    if (reduced) {
+      lock.remove();
+      return;
+    }
+    lock.classList.add('is-surfacing');
+    setTimeout(() => lock.remove(), SURFACE_MS);
   }
 
   /** @param {string} reason */
@@ -566,7 +676,7 @@
   // DESIGN.md "Lock screen". The satisfying moment is leaving: "Done for now" is the one primary button and the only
   // thing that moves. Buying more stays neutral gray, and "I need this one" is a quiet link with a typed reason.
   function showLock() {
-    if (!state || disconnected || playerBroken) return;
+    if (!state || disconnected || playerBroken || leavingLock()) return;
     const s = state.settings;
     const needLeft = Math.max(0, s.needThisPerDay - state.unlocked.length);
     const canBuy = state.tokens.watch > 0;
@@ -603,7 +713,10 @@
       h('div', { class: `drip-lock-actions${canBuy ? '' : ' is-alone'}` },
         canBuy && h('button', { class: 'drip-b drip-b-gray drip-lock-add', 'data-k': 'add', onclick: onAddTime, title: `Add ${s.minutesPerToken} minutes for 1 drop` },
           icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop')),
-        h('button', { class: 'drip-b drip-b-primary drip-done', 'data-k': 'done', onclick: onDone }, h('span', {}, 'Done for now'))),
+        h('button', {
+          class: 'drip-b drip-b-primary drip-done', 'data-k': 'done', onclick: onDone,
+          onpointerenter: startRings, onpointerleave: stopRings, onfocus: startRings, onblur: stopRings,
+        }, h('span', {}, 'Done for now'))),
       lockMessage && h('div', { class: 'drip-lock-note', role: 'status' }, lockMessage),
       unlocks,
     );
