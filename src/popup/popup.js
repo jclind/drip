@@ -24,10 +24,11 @@ function show(state) {
   const count = (n, token) => h('div', { class: `count${n ? '' : ' is-zero'}` },
     icon(token, `drip-token-${token}`), h('span', {}, String(n)), h('span', { class: 'sr' }, n === 1 ? ` ${token}` : ` ${token}s`));
   /** @type {HTMLElement} */ (document.getElementById('stats')).replaceChildren(
-    h('div', { class: 'tile' }, glassEl),
-    h('div', { class: 'time-block' },
-      h('div', { class: 'time' }, Drip.formatMinutes(state.watchSecondsLeft)),
-      h('div', { class: 'sub' }, 'left today')),
+    h('div', { class: 'top' },
+      h('div', { class: 'tile' }, glassEl),
+      h('div', { class: 'time-block' },
+        h('div', { class: 'time' }, Drip.formatMinutes(state.watchSecondsLeft)),
+        h('div', { class: 'sub' }, 'left today'))),
     h('div', { class: 'counts' }, count(watch, 'drop'), count(rec, 'card')));
 }
 

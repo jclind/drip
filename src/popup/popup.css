@@ -7,12 +7,19 @@ body {
   padding: 24px 24px 20px;
 }
 
+/* The glass and the time side by side, then the two counts in a row under them, all centered (Jesse's second
+   mockup, 2026-10-11). */
 .stats {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
-  min-height: 56px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .tile {
@@ -27,7 +34,7 @@ body {
 }
 
 .time-block {
-  margin-right: 20px;
+  min-width: 0;
 }
 
 .time {
@@ -47,8 +54,8 @@ body {
 }
 
 .counts {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  gap: 20px;
 }
 
 .count {
