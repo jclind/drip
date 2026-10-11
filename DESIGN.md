@@ -99,6 +99,16 @@ Welcome page (2026-10-09, Jesse's first mockup and this plan):
 - The "What changes on YouTube" bullets: Home and Subscriptions open your drip page instead of a feed, and you can reveal from either. Watch pages have no suggestions sidebar, no end screen, and no autoplay, and comments wait behind a button. Shorts open as regular videos and use minutes like any other. Search shows 10 results at a time, with a button for more. Your channels and playlists work as before, and ads and videos embedded on other sites don't use your minutes. Lucide icons: house, play, smartphone, search, check.
 - The old loosen-later paragraph leaves this page, since the Settings chip teaches it.
 
+Welcome page as built (2026-10-11, step 5). Jesse's draft (a Figma frame shared in chat, not saved to the repo) set the layout: the tiles in a row, the sentence over a dotted blue stage, dots on the left and Skip and Next on the right. He asked for it to be held loosely, especially the walkthrough. Claude's calls, open to his review:
+
+- The tour's screens are working copies run on a throwaway state through the real rules in state.js, drawn with drip.css, glass.js, and common.js's `icon()` and `price()`. Nothing reaches the worker. The markup is copied from home.js and watch.js, because their views live inside those files' closures. A change to the home card, the lock, or the pill needs the same change in `welcome.js`.
+- The steps: (1) the home page, where +15m fills the glass and Reveal video moves on to step 2; (2) a revealed card with Watch, Stash, Reveal next, and ×; (3) a player with the pill, where Play drains the minutes 90 times faster than real ones, and at 0 the tour moves on to (4) the lock rising over the paused video, where +15m drains it and plays on, I need this one takes a typed reason and unlocks, and Done for now plays its rings and falls away onto the home page with "Kept N drops."; (5) the five "What changes" lines. On the last step Next becomes the white Open YouTube button. Back, Skip (to the last step), the dots, and the arrow keys move between steps.
+- The reveal's parting animation isn't in it, since that animation isn't designed yet. The animation pass adds it here too.
+- The videos are made up, with drawn gradient thumbnails, so the page loads nothing from YouTube.
+- The stage is as tall as the step's screen, at least 300px for the lock, and glides between heights.
+- The tiles keep "Stash" and DESIGN.md's text, not the draft's "Saved" and "Watch later, for free", since Save was renamed Stash.
+- The page follows Chrome's light or dark theme and sets YouTube's theme variables itself, so drip.css draws the same colors it does on YouTube.
+
 Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. Where they were silent Claude made the call below, and every one is open to Jesse's review:
 
 - Colors and sizes are CSS custom properties at the top of the home block in `drip.css`, so tuning is mostly editing those. Dark or light comes from YouTube's `html[dark]`.

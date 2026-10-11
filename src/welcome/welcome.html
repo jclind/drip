@@ -1,51 +1,47 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-drip-shown>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Welcome to drip</title>
     <link rel="stylesheet" href="../pages.css" />
-    <link rel="stylesheet" href="../options/options.css" />
+    <!-- The tour's small screens are drawn with drip's own YouTube styles. -->
+    <link rel="stylesheet" href="../content/drip.css" />
+    <link rel="stylesheet" href="welcome.css" />
   </head>
   <body>
     <main>
-      <h1>drip</h1>
-      <p class="muted">YouTube without the endless feed. You get a small allowance each day and spend it on purpose.</p>
+      <header class="hero">
+        <h1 class="brand"><span class="brand-drop" id="brandDrop"></span>drip</h1>
+        <p class="tagline">Make every drop count.</p>
+        <ul class="kinds" id="kinds"></ul>
+        <p class="allowance" id="allowance">You get 4 drops and 10 cards a day. You can change these in Settings.</p>
+      </header>
 
-      <section>
-        <h2>Two kinds of tokens</h2>
-        <ul>
-          <li><strong>Watch tokens</strong> buy <span id="minutes">15</span> minutes of watching each. Minutes only drain while a video plays.</li>
-          <li><strong>Rec tokens</strong> reveal one recommended video at a time. You can watch it, save it for later, or pass.</li>
-        </ul>
-        <p>You get <span id="watch">4</span> watch tokens and <span id="rec">10</span> rec tokens a day. Unspent tokens carry over for up to <span id="rollover">2</span> days. Minutes you've bought end at the daily reset, <span id="reset">4:00am</span>.</p>
-      </section>
-
-      <section>
-        <h2>What changes on YouTube</h2>
-        <ul>
-          <li>The home page is your token page instead of a grid of videos.</li>
-          <li>Watch pages have no suggestions sidebar, no end screen, and no autoplay. Comments wait behind a button.</li>
-          <li>Shorts open as normal videos, so they count like any other.</li>
-          <li>Search shows 10 results at a time.</li>
-          <li>Search, your channels, and your playlists still work as before. Videos embedded on other sites don't use your minutes.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>Start</h2>
-        <p>Open YouTube and click <strong>Add <span class="minutes">15</span> min</strong> before your first video. A video you open with no minutes left pauses until you add some.</p>
-        <p>When you really need one more video, the lock has an <strong>I need this one</strong> button. You type why, and it unlocks that video for the day. It's limited, and every use goes in your log.</p>
-        <p class="muted">Making limits stricter takes effect now. Loosening them waits until the next reset, so a late-night change can't undo the day.</p>
-        <div class="row">
-          <a class="button primary" href="https://www.youtube.com/">Open YouTube</a>
-          <button class="link" id="settings" type="button">Settings</button>
+      <section class="tour" id="tour" aria-label="How drip works">
+        <p class="tour-say" id="say" aria-live="polite"></p>
+        <div class="tour-stage" id="stage"></div>
+        <div class="tour-controls">
+          <div class="tour-dots" id="dots"></div>
+          <div class="tour-buttons">
+            <button class="tour-btn" id="back" type="button">Back</button>
+            <button class="tour-btn" id="skip" type="button">Skip</button>
+            <button class="tour-btn is-primary" id="next" type="button"></button>
+          </div>
         </div>
       </section>
 
-      <p class="muted">Everything drip knows stays in this browser. It sends nothing anywhere.</p>
+      <footer class="foot">
+        <div class="foot-links">
+          <a class="foot-link" id="footYouTube" href="https://www.youtube.com/"></a>
+          <button class="foot-link" id="footSettings" type="button"></button>
+        </div>
+        <p class="foot-note">Everything drip knows stays in this browser.</p>
+      </footer>
     </main>
     <script src="../lib/state.js"></script>
+    <script src="../lib/glass.js"></script>
+    <script src="../content/common.js"></script>
     <script src="welcome.js"></script>
   </body>
 </html>

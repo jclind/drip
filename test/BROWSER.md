@@ -47,6 +47,10 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 30. Turn Developer mode on, then pick each profile under "Show Settings with". Each shows the sample banner, and nothing overflows. Back on Your data, your real settings are unchanged.
 31. History shows this week's bars with today's letter bold, the daily average, and last week's dashed line. ‹ steps back a week and the label and every number follow. Click a bar: the block below names that day and shows its drops, cards, and unlocks. Narrow the window to phone width: nothing overflows.
 
+## Welcome page
+
+32. Open `chrome-extension://<drip's id>/src/welcome/welcome.html`. The tiles and the line under them show your real numbers. Go through all five steps: +15m fills the glass, Reveal video shows a card, Watch opens the player, Play drains the pill until the lock rises, and Done for now falls away to "Kept N drops." Then Open YouTube on the last step goes to youtube.com. The popup shows the same drops and minutes as before the tour.
+
 ## After a day boundary
 
-32. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.
+33. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.
