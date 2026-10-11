@@ -18,8 +18,8 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 
 ## Watch page and clock
 
-10. With 0 minutes left, open a watch page. The video never starts, not even for a moment, and the lock shows "Out of watch time".
-11. Click Add 15 min on the lock. The video plays, and the pill says about 15 min left.
+10. With 0 minutes left, open a watch page. The video never starts, not even for a moment. The water rises and the lock says "Time for a breather." with drops left, or "You've had your fill." with none.
+11. Click +15m on the lock. The water drains, the video plays, and the pill says about 15m left.
 12. Let it play 2 minutes. The pill counts down, and the Settings log's minutes for today rise by 2.
 13. Click Stash on the pill while the video plays, five times in a row on five videos. Every click works.
 14. The page opens in theater mode. There's no sidebar, and the end screen shows no suggestions.
@@ -28,7 +28,7 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 17. Let the minutes run out while a video plays, with grace mode off. It pauses within a second or two of 0 and the lock shows.
 18. Turn grace mode on (it applies at the next reset). The next day, run out of minutes mid-video. That video finishes, and opening another video shows the lock.
 19. With minutes left, play two videos in two tabs for a minute. The minutes go down by about one minute, not two.
-20. On the lock, click I need this one, type a reason, and unlock. The video plays, the pill says unlocked, and the reason shows in the Settings log.
+20. On the lock, click I need this one, type a reason, and unlock. The video plays, the pill says Unlocked, and the reason shows in the Settings log.
 21. On the lock with drops left, hover Done for now: thin blue rings leave the button. Click it: rings cross the panel, the water falls away onto the home page with no blank page between, and "Kept N drops." rises in. Do it twice in one tab; the second time home was already built, and the message still shows.
 
 ## Redirects and blocking

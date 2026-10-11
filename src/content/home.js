@@ -509,7 +509,7 @@
    * @param {HTMLElement} root
    */
   function keptSeen(root) {
-    if (keptMessage && root.getClientRects().length) keptMessage = '';
+    if (keptMessage && root.getClientRects().length && document.documentElement.hasAttribute('data-drip-shown')) keptMessage = '';
   }
 
   /** Shows the drops the lock screen's "Done for now" left unspent, read once (watch.js onDone). */
@@ -527,16 +527,22 @@
     rendered = '';
   }
 
-  /** Puts the drip page into the home browse page if it isn't there yet. */
-  function mount() {
+  /**
+   * Puts the drip page into the home browse page if it isn't there yet.
+   * @param {boolean} [navigated] YouTube just finished a navigation, rather than the half-second check.
+   */
+  function mount(navigated = false) {
     if (location.pathname !== '/') return;
     const browse = document.querySelector(SEL.homeBrowse);
     if (!browse) return;
     if (browse.querySelector('#drip-home')) {
+      const root = /** @type {HTMLElement} */ (browse.querySelector('#drip-home'));
       // "Done for now" came back through YouTube's in-page navigation, to a home page drip had already built.
-      takeKept();
-      render();
-      keptSeen(/** @type {HTMLElement} */ (browse.querySelector('#drip-home')));
+      if (navigated) {
+        takeKept();
+        render();
+      }
+      keptSeen(root);
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;
@@ -564,7 +570,7 @@
     render();
   });
   watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
-  document.addEventListener('yt-navigate-finish', mount);
-  setInterval(mount, 500);
+  document.addEventListener('yt-navigate-finish', () => mount(true));
+  setInterval(() => mount(), 500);
   mount();
 })();

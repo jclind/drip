@@ -394,6 +394,14 @@ html[dark] #drip-lock {
   pointer-events: none;
 }
 
+/* No player to sit in (watch.js renderPill): pinned to the window, below YouTube's 56px top bar and above it. */
+#drip-pill.is-floating {
+  position: fixed;
+  top: 68px;
+  right: 16px;
+  z-index: 2100;
+}
+
 /* The last two minutes: the pill stays up and a slow blue shimmer crosses it, the same sweep as "Done for now". */
 #drip-pill.is-low::after {
   content: "";
@@ -813,6 +821,11 @@ html[dark] #drip-pill {
 /* After "Done for now", "Kept 3 drops." rises in as the lock's water falls away (home.js view). */
 #drip-home .drip-message.is-kept {
   animation: drip-kept-rise 600ms cubic-bezier(0.3, 0.7, 0.2, 1) 400ms both;
+}
+
+/* Held until fade.js starts showing the page, so the rise isn't spent while YouTube's page is still invisible. */
+html:not([data-drip-shown]) #drip-home .drip-message.is-kept {
+  animation-play-state: paused;
 }
 
 /* The reveal card. The 16:9 box and two title lines are reserved before anything loads, so nothing shifts. */

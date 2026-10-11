@@ -325,7 +325,8 @@
     // Storage may arrive before our tick response. Only that response can grant grace.
     if (deferLock && state.settings.graceMode) return;
     pausePlayer(video);
-    if (clockActive() && id) showLock();
+    // Not over the miniplayer, which drip hides: the lock would cover whatever page YouTube moved to.
+    if (location.pathname === '/watch' && id) showLock();
     // A locked video skips theater mode, so let fade.js show the page now.
     theaterDone();
   }
@@ -509,11 +510,14 @@
   const RING_EVERY_MS = 1400;
   /** @type {ReturnType<typeof setInterval> | undefined} */
   let ringTimer;
+  /** @type {HTMLElement | null} */
+  let ringButton = null;
 
   /** @param {HTMLElement} button */
   function ring(button) {
     const panel = button.closest('.drip-lock-panel');
-    if (!panel || button.classList.contains('is-leaving')) {
+    // A panel rebuilt or a lock lifted under the pointer sends no pointerleave, so the timer stops itself here.
+    if (!panel || !button.isConnected || button.classList.contains('is-leaving')) {
       stopRings();
       return;
     }
@@ -529,7 +533,9 @@
   /** @param {Event} e */
   function startRings(e) {
     const button = /** @type {HTMLElement} */ (e.currentTarget);
-    if (ringTimer !== undefined || reducedMotion() || (e.type === 'focus' && !button.matches(':focus-visible'))) return;
+    if ((ringTimer !== undefined && ringButton === button) || reducedMotion() || (e.type === 'focus' && !button.matches(':focus-visible'))) return;
+    stopRings();
+    ringButton = button;
     ring(button);
     ringTimer = setInterval(() => ring(button), RING_EVERY_MS);
   }
@@ -537,6 +543,7 @@
   function stopRings() {
     clearInterval(ringTimer);
     ringTimer = undefined;
+    ringButton = null;
   }
 
   /** The click's rings play this long before the water starts to fall. */
@@ -545,8 +552,10 @@
   const WAIT_RING_MS = 450;
   /** The water falling away, top first (drip.css #drip-lock.is-surfacing). */
   const SURFACE_MS = 1000;
-  /** Past this with YouTube still on the watch page, the in-page navigation didn't happen, so drip loads home instead. */
+  /** Past this with no navigation started, YouTube ignored the logo click, so drip loads home instead. */
   const NAV_WAIT_MS = 1500;
+  /** Set while "Done for now" waits on the home page. Back to a watch page in that time cancels it (yt-navigate-finish). */
+  let cancelLeave = false;
   /** Past this, the water falls even if drip's home page hasn't shown up yet. */
   const HOME_WAIT_MS = 4000;
 
@@ -608,15 +617,19 @@
     const moreRing = reduced ? null : leaveRings(panel, button, e);
     const started = performance.now();
     let lastRing = 140;
+    let navStarted = false;
+    document.addEventListener('yt-navigate-start', () => { navStarted = true; }, { once: true });
+    cancelLeave = false;
     const logo = /** @type {HTMLElement | null} */ (document.querySelector(SEL.homeLink));
     logo?.click();
     while (true) {
       await sleep(50);
+      if (cancelLeave || !lock.isConnected) return;
       const waited = performance.now() - started;
       if (!reduced && waited < LEAVE_MS) continue;
       if (homeShown()) break;
       // No logo, or YouTube ignored the click: the old way, a full page load. The lock stays up until the page goes.
-      if (!logo || (location.pathname === '/watch' && waited > NAV_WAIT_MS)) {
+      if (!logo || (!navStarted && waited > NAV_WAIT_MS)) {
         location.assign('/');
         return;
       }
@@ -776,7 +789,9 @@
     if (!pill) return;
     const playing = !!video && !video.paused;
     pill.classList.toggle('is-low', pillLow && playing);
-    pill.classList.toggle('is-idle', playing && !pillLow && !!document.querySelector(SEL.playerIdle));
+    // Never hidden while it has keyboard focus, or Enter would act on a button nobody can see.
+    const focused = pill.contains(document.activeElement);
+    pill.classList.toggle('is-idle', playing && !pillLow && !focused && !!document.querySelector(SEL.playerIdle));
   }
 
   // DESIGN.md "Minutes and the watch page pill": the glass, minutes left, and Save. It never offers to buy minutes.
@@ -827,10 +842,13 @@
     if (!pill) {
       pill = h('div', { id: 'drip-pill', class: 'drip-ui' });
       for (const ev of ['click', 'dblclick', 'mousedown', 'pointerdown', 'keydown']) pill.addEventListener(ev, keepFromPlayer);
+      for (const ev of ['focusin', 'focusout']) pill.addEventListener(ev, () => setTimeout(pillLook));
     }
     const focused = pill.contains(document.activeElement);
     pill.replaceChildren(...content);
     if (pill.parentElement !== parent) parent.append(pill);
+    // No player found: pinned to the window instead, below YouTube's top bar, where it can still be seen and clicked.
+    pill.classList.toggle('is-floating', parent === document.body);
     if (focused) /** @type {HTMLElement | null} */ (pill.querySelector('[data-k="pill-save"]'))?.focus();
     pillLook();
   }
@@ -850,6 +868,15 @@
   document.addEventListener('yt-navigate-start', bank);
   document.addEventListener('yt-navigate-finish', () => {
     if (disconnected) return;
+    if (leavingLock() && location.pathname === '/watch') {
+      cancelLeave = true;
+      document.getElementById('drip-lock')?.remove();
+      try {
+        sessionStorage.removeItem(KEPT_KEY);
+      } catch {
+        // Storage blocked: nothing was saved.
+      }
+    }
     bank();
     if (runningSince !== null) runId = videoId();
     defaultTheater();
