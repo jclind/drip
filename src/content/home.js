@@ -398,8 +398,8 @@
       h('div', { class: 'drip-card-actions' },
         h('button', {
           class: `drip-b drip-b-gray drip-card-save${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
-          onclick: () => onResolve(saved ? 'unsave' : 'save', video.id), title: saved ? 'In Saved. Click to take it out.' : 'Keep it in Saved for later',
-        }, icon('save'), h('span', { class: 'drip-save-label' }, saved ? 'Saved' : 'Save')),
+          onclick: () => onResolve(saved ? 'unsave' : 'save', video.id), title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
+        }, icon('save'), h('span', { class: 'drip-save-label' }, saved ? 'Stashed' : 'Stash')),
         h('button', {
           class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || state.tokens.rec < 1,
           onclick: () => onRevealNext(video.id),
@@ -415,7 +415,7 @@
     const open = savedOpen[mode];
     const count = state.backlog.length;
     const total = state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + lengthSeconds(v.length), 0);
-    const head = ['Saved'];
+    const head = ['Stash'];
     if (count) head.push(`${count} ${count === 1 ? 'video' : 'videos'}`);
     if (total) head.push(Drip.formatMinutes(total));
 
@@ -430,7 +430,7 @@
         onclick: () => { savedOpen[mode] = !open; render(); },
       }, icon('chevron-down', 'drip-chevron'), h('span', {}, head.join(' · '))),
       open && (rows.length === 0
-        ? h('div', { class: 'drip-saved-empty' }, 'Videos you save show up here.')
+        ? h('div', { class: 'drip-saved-empty' }, 'Videos you stash show up here.')
         : h('ul', { class: 'drip-saved-list' }, ...shown.map(({ video, removed: gone }) => gone
           ? h('li', { class: 'drip-saved-row is-removed' },
             h('span', {}, 'Removed'), h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'),
@@ -453,7 +453,7 @@
           h('span', { class: 'drip-saved-title' }, video.title || 'Untitled'),
           h('span', { class: 'drip-saved-meta' }, [video.channel, video.length].filter(Boolean).join(' · '))),
           h('button', {
-            class: 'drip-saved-x', 'data-k': `x-${video.id}`, title: 'Remove from Saved', 'aria-label': `Remove ${video.title || 'video'} from Saved`,
+            class: 'drip-saved-x', 'data-k': `x-${video.id}`, title: 'Remove from stash', 'aria-label': `Remove ${video.title || 'video'} from stash`,
             onclick: () => onRemove(video.id),
           }, icon('x')),
           h('span', { class: 'drip-saved-play', 'aria-hidden': 'true' }, costsDrop(video.id) && h('span', { class: 'drip-saved-price' }, '-1', icon('drop', 'drip-token-drop')), icon('play')))))),

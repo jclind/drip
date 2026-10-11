@@ -61,7 +61,7 @@
   function paintSave(button) {
     const saved = isSaved(button.dataset.videoId || '');
     // Only write when it changed. Writing the same text still counts as a DOM change and would wake the observer.
-    const label = saved ? 'In backlog' : 'Save';
+    const label = saved ? 'Stashed' : 'Stash';
     if (button.textContent !== label) button.textContent = label;
     /** @type {HTMLButtonElement} */ (button).disabled = saved;
   }

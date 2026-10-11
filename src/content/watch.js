@@ -616,7 +616,7 @@
 
   // The pill with minutes left and the Save button.
 
-  /** Saves the video, or takes it back out of Saved when it's already there, like Save on the home page's card. */
+  /** Stashes the video, or takes it back out of the stash when it's already there, like Stash on the home page's card. */
   async function onSave() {
     const id = videoId();
     if (!id || !state) return;
@@ -708,8 +708,8 @@
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       h('button', {
         class: `drip-pill-save${saved ? ' is-saved' : ''}`, 'data-k': 'pill-save', 'aria-pressed': String(saved), onclick: onSave,
-        title: saved ? 'In Saved. Click to take it out.' : 'Keep it in Saved for later',
-      }, icon(saved ? 'save' : 'save-outline'), h('span', {}, saved ? 'Saved' : 'Save')),
+        title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
+      }, icon(saved ? 'save' : 'save-outline'), h('span', {}, saved ? 'Stashed' : 'Stash')),
     ];
     if (!pill) {
       pill = h('div', { id: 'drip-pill', class: 'drip-ui' });
