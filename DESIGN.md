@@ -106,7 +106,9 @@ Ideas, not decided:
 - A quiet note at rollover like "+2 saved from yesterday", to reward tokens not spent.
 - The drop, in the same style, as the toolbar icon and store tile.
 
-Jesse mocked the empty page, the reveal card, and the Saved list. He won't mock the rest. Claude drafts them from these rules when building starts, and Jesse reviews: the saved state on the card, loading, a failed reveal, out of cards, out of everything, the page inside YouTube's top bar, and light mode. The popup, Settings, welcome page, watch page pill, and lock screen haven't been designed yet.
+Jesse's mockups are in `drip-page-demos/` (2026-10-10): `home-no-thumbnail.png` (the empty page with Saved open), `home-open-thumbnail.png` (a reveal card up, Saved collapsed), `lock-screen-with-time.png` ("Time for a breather." with +15 min), `lock-screen-no-time.png` ("You've had your fill."), `popup.png`, and `settings.png` (Settings with History and the unlock reasons). They set the pattern, not a pixel spec. Screens and states they don't show follow the same look with common sense. Where a mockup and this file disagree, this file wins: the mockups still say "34 min" and "1 h 15 min", and the compact format replaces those.
+
+Not mocked, so Claude drafts them from these rules when building starts, and Jesse reviews: the watch page pill, the welcome page, the saved state on the card, loading, a failed reveal, out of cards, out of everything, the page inside YouTube's top bar, and light mode.
 
 ## v1 and step 2 (both done)
 
