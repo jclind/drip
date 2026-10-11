@@ -56,7 +56,7 @@
     $('kinds').replaceChildren(
       kind('drop', 'drip-token-drop', 'Drops', `1 drop = ${minutes} of watching`),
       kind('card', 'drip-token-card', 'Cards', '1 card = 1 video revealed'),
-      kind('save', '', 'Stash', 'Keep videos for later. Opening one costs no card.'));
+      kind('save', '', 'Stash', 'Watch later, costs no card'));
     /** @param {number} n @param {string} one @param {string} many */
     const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     $('allowance').textContent = `You get ${count(settings.watchTokensPerDay, 'drop', 'drops')} and ${count(settings.recTokensPerDay, 'card', 'cards')} a day. You can change these in Settings.`;
@@ -128,6 +128,7 @@
     step = Math.max(0, Math.min(STEPS.length - 1, n));
     $('say').textContent = STEPS[step].say;
     morph(() => {
+      stage.style.minHeight = '';
       stage.replaceChildren();
       stopStep = STEPS[step].show();
     });
@@ -272,34 +273,55 @@
     return sample(watchedId || SAMPLES[0].id);
   }
 
-  /** @param {boolean} isPlaying */
-  function pill(isPlaying) {
+  /**
+   * The pill, built once per player and updated in place, so its Stash button stays the same element through the
+   * player's ticks and keeps a click or keyboard focus (Codex, 2026-10-11).
+   */
+  function makePill() {
     const video = playing();
-    const saved = sand.backlog.some((/** @type {any} */ v) => v.id === video.id);
-    const unlocked = sand.unlocked.includes(video.id);
-    const left = sand.watchSecondsLeft;
-    const fraction = DripGlass.fraction(sand);
-    if (!pillGlass) pillGlass = DripGlass.make(fraction, PILL_GLASS_PX);
-    else DripGlass.set(pillGlass, fraction, PILL_GLASS_PX);
-    const paused = !unlocked && !isPlaying && left > 0;
-    const el = h('div', { id: 'drip-pill', class: `drip-ui${!unlocked && isPlaying && left > 0 && left <= 120 ? ' is-low' : ''}` },
-      h('span', { class: `drip-pill-time${unlocked ? ' is-unlocked' : ''}${paused ? ' is-paused' : ''}` },
-        !unlocked && pillGlass,
-        h('span', { class: 'drip-pill-label' },
-          h('span', { class: 'drip-pill-minutes' }, unlocked ? 'Unlocked' : Drip.formatMinutes(left)),
-          !unlocked && h('span', { class: 'drip-sr' }, ' left today'),
-          paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'))),
-      h('button', {
-        class: `drip-pill-save${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
-        onclick: () => {
-          if (saved) Drip.removeBacklog(sand, video.id);
-          else Drip.addBacklog(sand, video);
-          const old = stage.querySelector('#drip-pill');
-          old?.replaceWith(pill(isPlaying));
-          /** @type {HTMLElement | null} */ (stage.querySelector('.drip-pill-save'))?.focus();
-        },
-      }, icon(saved ? 'save' : 'save-outline'), h('span', {}, saved ? 'Stashed' : 'Stash')));
-    return el;
+    const minutes = h('span', { class: 'drip-pill-minutes' });
+    const leftToday = h('span', { class: 'drip-sr' }, ' left today');
+    const pausedNote = h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused');
+    const time = h('span', { class: 'drip-pill-time' }, h('span', { class: 'drip-pill-label' }, minutes, leftToday, pausedNote));
+    const save = h('button', { class: 'drip-pill-save' });
+    const el = h('div', { id: 'drip-pill', class: 'drip-ui' }, time, save);
+    let lastPlaying = false;
+    let savedShown = '';
+
+    /** @param {boolean} isPlaying */
+    function update(isPlaying) {
+      lastPlaying = isPlaying;
+      const saved = sand.backlog.some((/** @type {any} */ v) => v.id === video.id);
+      const unlocked = sand.unlocked.includes(video.id);
+      const left = sand.watchSecondsLeft;
+      const paused = !unlocked && !isPlaying && left > 0;
+      const fraction = DripGlass.fraction(sand);
+      if (!pillGlass) pillGlass = DripGlass.make(fraction, PILL_GLASS_PX);
+      else DripGlass.set(pillGlass, fraction, PILL_GLASS_PX);
+      if (unlocked) pillGlass.remove();
+      else if (pillGlass.parentElement !== time) time.prepend(pillGlass);
+      el.classList.toggle('is-low', !unlocked && isPlaying && left > 0 && left <= 120);
+      time.classList.toggle('is-unlocked', unlocked);
+      time.classList.toggle('is-paused', paused);
+      minutes.textContent = unlocked ? 'Unlocked' : Drip.formatMinutes(left);
+      leftToday.hidden = unlocked;
+      pausedNote.hidden = !paused;
+      // The button's insides change only when Stash does.
+      if (savedShown !== String(saved)) {
+        savedShown = String(saved);
+        save.classList.toggle('is-saved', saved);
+        save.setAttribute('aria-pressed', String(saved));
+        save.replaceChildren(icon(saved ? 'save' : 'save-outline'), h('span', {}, saved ? 'Stashed' : 'Stash'));
+      }
+    }
+
+    save.addEventListener('click', () => {
+      if (sand.backlog.some((/** @type {any} */ v) => v.id === video.id)) Drip.removeBacklog(sand, video.id);
+      else Drip.addBacklog(sand, video);
+      update(lastPlaying);
+    });
+    update(false);
+    return { el, update };
   }
 
   /**
@@ -315,12 +337,17 @@
     const length = video.length.split(':').reduce((t, part) => t * 60 + Number(part), 0);
     let at = 0;
     const box = h('div', { class: 'tour-player' });
+    const pill = makePill();
+    let buttonShown = '';
     const draw = () => {
       bar.style.width = `${Math.min(100, (at / length) * 100)}%`;
       box.classList.toggle('is-playing', isPlaying);
-      box.querySelector('#drip-pill')?.replaceWith(pill(isPlaying));
-      button.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
-      button.replaceChildren(icon(isPlaying ? 'pause' : 'play-line'));
+      pill.update(isPlaying);
+      if (buttonShown !== String(isPlaying)) {
+        buttonShown = String(isPlaying);
+        button.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+        button.replaceChildren(icon(isPlaying ? 'pause' : 'play-line'));
+      }
     };
     const stop = () => {
       clearInterval(timer);
@@ -360,14 +387,15 @@
         } else play();
       },
     });
-    box.append(button, h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill(false));
+    box.append(button, h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
     draw();
     if (opts.autoplay) play();
     return { el: box, stop };
   }
 
   function showPlayer() {
-    const p = player({ onEmpty: () => later(() => go(3), 700) });
+    // Play pressed again in the pause before the lock buys more minutes, and then the lock doesn't come (Codex, 2026-10-11).
+    const p = player({ onEmpty: () => later(() => { if (sand.watchSecondsLeft <= 0) go(3); }, 700) });
     stage.append(p.el);
     return p.stop;
   }
@@ -474,7 +502,7 @@
     const drain = () => {
       const lock = /** @type {HTMLElement} */ (stage.querySelector('#drip-lock'));
       stopRings();
-      const p = player({ autoplay: true, onEmpty: () => later(raise, 700) });
+      const p = player({ autoplay: true, onEmpty: () => later(() => { if (sand.watchSecondsLeft <= 0) raise(); }, 700) });
       setUnder(p.el, p);
       if (reducedMotion()) lock.remove();
       else {
@@ -554,7 +582,22 @@
         unlocks);
     };
 
-    const redraw = () => stage.querySelector('#drip-lock .drip-lock-panel')?.replaceWith(panel());
+    /**
+     * The lock sits over the stage without adding to its height, so the stage grows to hold the panel, as when the
+     * reason form opens, and the panel's buttons are never cut off (Codex, 2026-10-11).
+     */
+    const fitLock = () => {
+      const lockPanel = stage.querySelector('#drip-lock .drip-lock-panel');
+      if (!lockPanel) return;
+      // The lock's own padding is 16px on each side.
+      const need = Math.ceil(/** @type {HTMLElement} */ (lockPanel).offsetHeight + 32);
+      morph(() => { stage.style.minHeight = `${Math.max(300, need)}px`; });
+    };
+
+    const redraw = () => {
+      stage.querySelector('#drip-lock .drip-lock-panel')?.replaceWith(panel());
+      fitLock();
+    };
 
     function raise() {
       stage.querySelector('.tour-again')?.remove();
@@ -567,6 +610,7 @@
       const lockPanel = panel();
       lockPanel.classList.add('is-new');
       stage.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), lockPanel));
+      fitLock();
     }
 
     raise();

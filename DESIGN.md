@@ -92,7 +92,7 @@ Settings (2026-10-08, Jesse's mockups):
 
 Welcome page (2026-10-09, Jesse's first mockup and this plan):
 
-- Hero: the drop and "drip", the tagline "Make every drop count." (Jesse's), then three cards: Drops "1 drop = 15m of watching", Cards "1 card = 1 video revealed", Stash "Keep videos for later. Opening one costs no card." Under them: "You get 4 drops and 10 cards a day. You can change these in Settings." Numbers come from settings.
+- Hero: the drop and "drip", the tagline "Make every drop count." (Jesse's), then three cards: Drops "1 drop = 15m of watching", Cards "1 card = 1 video revealed", Stash "Watch later, costs no card". Under them: "You get 4 drops and 10 cards a day. You can change these in Settings." Numbers come from settings.
 - Then one interactive tour panel in 5 steps, each one sentence over a working miniature of the real screen: the stats block where "+15m" fills the glass, a reveal with the parting animation and Save, a fake player with the pill draining fast, the lock panel where Done for now ripples, and the five "what changes" bullets. Step dots, Back, Next, and Skip. The last step ends on the white Open YouTube button.
 - The tour is a sandbox and never touches real state. It reuses the real components, so it has no screenshots or separate art, and it's built last, after those components exist.
 - Footer: gray "Open YouTube ↗" and "⚙ Settings" for people who skip, and "Everything drip knows stays in this browser."
@@ -106,7 +106,8 @@ Welcome page as built (2026-10-11, step 5). Jesse's draft (a Figma frame shared 
 - The reveal's parting animation isn't in it, since that animation isn't designed yet. The animation pass adds it here too.
 - The videos are made up, with drawn gradient thumbnails, so the page loads nothing from YouTube.
 - The stage is as tall as the step's screen, at least 300px for the lock, and glides between heights.
-- The tiles keep "Stash" and DESIGN.md's text, not the draft's "Saved" and "Watch later, for free", since Save was renamed Stash.
+- The tiles say "Stash", not the draft's "Saved", since Save was renamed Stash. Each caption fits one line so the three tiles line up. Stash's first text, "Keep videos for later. Opening one costs no card.", wrapped to three lines (Jesse: "they look very awkward right now because the text doesn't line up", 2026-10-11). The draft's "Watch later, for free" became "Watch later, costs no card", because a stashed video still uses minutes.
+- The stage grows to hold the lock's panel, so the reason form's buttons are never cut off. The pill is built once per player and updated in place, so its Stash button keeps clicks and focus while the video plays. Play pressed again just after the minutes run out cancels the move to the lock (Codex's three findings, 2026-10-11).
 - The page follows Chrome's light or dark theme and sets YouTube's theme variables itself, so drip.css draws the same colors it does on YouTube.
 
 Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. Where they were silent Claude made the call below, and every one is open to Jesse's review:
