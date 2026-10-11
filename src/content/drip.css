@@ -362,18 +362,8 @@ html[dark] #drip-lock {
 }
 
 /* The watch page pill (watch.js): the glass, minutes left, and Save, inside the player's top right. It sits over the
-   video, so it's light on dark in both themes, and it hides along with YouTube's own controls. */
-/* html[dark] here matches the shared token rule's weight, so these win in dark mode too. */
-#drip-pill,
-html[dark] #drip-pill {
-  --drip-text: #fff;
-  --drip-muted: rgba(255, 255, 255, 0.7);
-  --drip-rule: rgba(255, 255, 255, 0.2);
-  --drip-gray: rgba(255, 255, 255, 0.16);
-  --drip-glass-line: #d9d9d9;
-  --drip-shimmer: rgba(66, 165, 246, 0.45);
-}
-
+   video, so it's light on dark in both themes, and it hides along with YouTube's own controls. Its colors are below
+   the shared token rules. */
 #drip-pill {
   position: absolute;
   top: 12px;
@@ -565,6 +555,18 @@ html[dark] :is(#drip-home, #drip-lock, #drip-pill) {
   --drip-row-hover: rgba(255, 255, 255, 0.06);
   --drip-skeleton: rgba(255, 255, 255, 0.08);
   --drip-focus: #3ea6ff;
+}
+
+/* The pill's own colors, light on dark in both themes. They come after the two shared rules above and match their
+   weight (html[dark] for dark mode), so these win. Moving them above those rules gave white on near-white in light. */
+#drip-pill,
+html[dark] #drip-pill {
+  --drip-text: #fff;
+  --drip-muted: rgba(255, 255, 255, 0.7);
+  --drip-rule: rgba(255, 255, 255, 0.2);
+  --drip-gray: rgba(255, 255, 255, 0.16);
+  --drip-glass-line: #d9d9d9;
+  --drip-shimmer: rgba(66, 165, 246, 0.45);
 }
 
 :is(#drip-home, #drip-lock, #drip-pill) *,
