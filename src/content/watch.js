@@ -549,7 +549,7 @@
   /** The click's rings play this long before the water starts to fall. */
   const LEAVE_MS = 700;
   /** While YouTube is still fetching its home page, another ring goes out this often. On air that fetch took 1.2s. */
-  const WAIT_RING_MS = 450;
+  const WAIT_RING_MS = 800;
   /** The water falling away, top first (drip.css #drip-lock.is-surfacing). */
   const SURFACE_MS = 1000;
   /** Past this with no navigation started, YouTube ignored the logo click, so drip loads home instead. */
@@ -579,18 +579,20 @@
     const x = (e.clientX || box.left + box.width / 2) - p.left;
     const y = (e.clientY || box.top + box.height / 2) - p.top;
     const far = Math.hypot(Math.max(x, p.width - x), Math.max(y, p.height - y)) * 2;
-    /** @param {string} cls @param {number} size @param {number} ms @param {number} delay */
-    const grow = (cls, size, ms, delay) => {
+    const burst = 'cubic-bezier(0.2, 0.6, 0.3, 1)';
+    /** @param {string} cls @param {number} size @param {number} ms @param {number} delay @param {string} easing @param {number} opacity */
+    const grow = (cls, size, ms, delay, easing = burst, opacity = 1) => {
       const r = h('span', { class: cls, 'aria-hidden': 'true' });
       r.style.cssText = `left:${x}px;top:${y}px`;
       panel.append(r);
-      r.animate([{ width: '0px', height: '0px', opacity: 1 }, { width: `${size}px`, height: `${size}px`, opacity: 0 }],
-        { duration: ms, delay, easing: 'cubic-bezier(0.2, 0.6, 0.3, 1)', fill: 'both' });
+      r.animate([{ width: '0px', height: '0px', opacity }, { width: `${size}px`, height: `${size}px`, opacity: 0 }],
+        { duration: ms, delay, easing, fill: 'both' });
     };
     grow('drip-leave-ring is-splash', 110, 420, 0);
     grow('drip-leave-ring', far, 900, 0);
     grow('drip-leave-ring', far, 900, 140);
-    return () => grow('drip-leave-ring', far, 900, 0);
+    // The rings that fill a wait are slower and fainter than the click's, so the panel calms down instead of pulsing.
+    return () => grow('drip-leave-ring', far, 1800, 0, 'cubic-bezier(0.3, 0.3, 0.5, 1)', 0.6);
   }
 
   /**
@@ -620,11 +622,16 @@
     let navStarted = false;
     document.addEventListener('yt-navigate-start', () => { navStarted = true; }, { once: true });
     cancelLeave = false;
+    // early.css fades the page behind the water out instead of hiding it at once when YouTube starts navigating.
+    document.documentElement.setAttribute('data-drip-leaving', '');
     const logo = /** @type {HTMLElement | null} */ (document.querySelector(SEL.homeLink));
     logo?.click();
     while (true) {
       await sleep(50);
-      if (cancelLeave || !lock.isConnected) return;
+      if (cancelLeave || !lock.isConnected) {
+        document.documentElement.removeAttribute('data-drip-leaving');
+        return;
+      }
       const waited = performance.now() - started;
       if (!reduced && waited < LEAVE_MS) continue;
       if (homeShown()) break;
@@ -639,6 +646,7 @@
         lastRing = waited;
       }
     }
+    document.documentElement.removeAttribute('data-drip-leaving');
     if (reduced) {
       lock.remove();
       return;
