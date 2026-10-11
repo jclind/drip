@@ -23,9 +23,9 @@
   glass.js, and home.js, over a fake home grid. Serve the repo root and open it:
     python3 -m http.server 8077 --bind 127.0.0.1
     http://localhost:8077/dev/home.html?scenario=card&theme=dark
-  Scenarios are in SCENARIOS below. `click=<data-k>` clicks a control after load, like click=reveal or click=x-<id>.
+  Scenarios are in SCENARIOS below. `click=<data-k>,...` clicks controls after load, 300ms apart, like click=reveal or click=x-<id>.
   `grid=0` leaves the grid empty, so a reveal stays loading for 6 seconds. The page moves its URL to "/" because
-  home.js only mounts there, so reload from the address you opened, not after a navigation.
+  home.js only mounts there, so reload from the address you opened. A tool that reloads the tab gets the folder listing.
 -->
 <div id="masthead"></div>
 <ytd-browse page-subtype="home">
@@ -144,10 +144,11 @@
 <script src="/src/content/home.js"></script>
 <script>
   const click = new URLSearchParams(location.search).get('click');
+  // Clicks run 300ms apart, so each one's message to the worker lands before the next.
   if (click) {
-    setTimeout(() => {
-      for (const k of click.split(',')) /** @type {HTMLElement | null} */ (document.querySelector(`[data-k="${k}"]`))?.click();
-    }, 400);
+    click.split(',').forEach((k, i) => setTimeout(() => {
+      /** @type {HTMLElement | null} */ (document.querySelector(`[data-k="${k}"]`))?.click();
+    }, 400 + i * 300));
   }
 </script>
 </body>

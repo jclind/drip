@@ -200,6 +200,24 @@ test('save keeps the card up, counts once, and unsave takes it back (Q13)', () =
   assert.equal(D.logDay(state).saved, 0);
 });
 
+test('the card counts as saved once, whether Save or the Saved list moves it (Codex)', () => {
+  const state = fresh();
+  D.reveal(state, [video('a')]);
+  D.resolveCurrent(state, 'save');
+  D.removeBacklog(state, 'a');
+  assert.equal(D.logDay(state).saved, 0);
+  D.addBacklog(state, video('a'), 0);
+  assert.equal(D.logDay(state).saved, 1);
+  D.resolveCurrent(state, 'save');
+  assert.equal(D.logDay(state).saved, 1);
+  D.removeBacklog(state, 'a');
+  D.resolveCurrent(state, 'pass');
+  assert.deepEqual([D.logDay(state).saved, D.logDay(state).passed], [0, 1]);
+  D.addBacklog(state, video('b'));
+  D.removeBacklog(state, 'b');
+  assert.equal(D.logDay(state).saved, 0);
+});
+
 test('a saved card that is passed stays saved and counts as saved, not passed', () => {
   const state = fresh();
   D.reveal(state, [video('a')]);

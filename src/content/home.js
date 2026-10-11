@@ -227,13 +227,25 @@
    * @param {string} id
    */
   async function onPlaySaved(id) {
+    // The card showing now, saved and played from the list, ends as Watch, the same as its Watch button (Codex).
+    if (state && state.current && state.current.id === id) return onResolve('watch', id);
     if (state && state.watchSecondsLeft <= 0) absorb(await send({ type: 'buyIfOut', videoId: id }));
     location.assign(watchUrl(id));
   }
 
   /**
-   * Saved rows removed in the last few seconds, shown as "Removed · Undo" where they were.
-   * @type {Map<string, {video: any, index: number, timer: number}>}
+   * Whether watching this video now costs a drop: no minutes left, a drop to spend, and not unlocked (Q18).
+   * @param {string} id
+   */
+  function costsDrop(id) {
+    return state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !state.unlocked.includes(id);
+  }
+
+  /**
+   * Saved rows removed in the last few seconds, shown as "Removed · Undo" where they were. `before` is the ids that sat
+   * before the row, oldest first, counting other rows still waiting on Undo, so several undos in any order restore the
+   * original order (Codex).
+   * @type {Map<string, {video: any, before: string[], timer: number}>}
    */
   const removed = new Map();
   const UNDO_MS = 5000;
@@ -241,14 +253,15 @@
   /** @param {string} id */
   async function onRemove(id) {
     if (!state) return;
-    const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === id);
-    if (index < 0) return;
-    const video = state.backlog[index];
+    const video = state.backlog.find((/** @type {any} */ v) => v.id === id);
+    if (!video) return;
+    const rows = savedRows();
+    const before = rows.slice(0, rows.findIndex((r) => r.video.id === id)).map((r) => r.video.id);
     const timer = window.setTimeout(() => {
       removed.delete(id);
       render();
     }, UNDO_MS);
-    removed.set(id, { video, index, timer });
+    removed.set(id, { video, before, timer });
     absorb(await send({ type: 'removeBacklog', id }));
     render();
   }
@@ -259,8 +272,23 @@
     if (!entry) return;
     clearTimeout(entry.timer);
     removed.delete(id);
-    absorb(await send({ type: 'addBacklog', video: entry.video, index: entry.index }));
+    const index = state ? state.backlog.filter((/** @type {any} */ v) => entry.before.includes(v.id)).length : undefined;
+    absorb(await send({ type: 'addBacklog', video: entry.video, index }));
     render();
+  }
+
+  /**
+   * Saved, oldest first like the backlog, with rows removed in the last few seconds back where they were.
+   * @returns {{video: any, removed: boolean}[]}
+   */
+  function savedRows() {
+    const rows = state.backlog.map((/** @type {any} */ video) => ({ video, removed: false }));
+    for (const entry of removed.values()) {
+      if (rows.some((r) => r.video.id === entry.video.id)) continue;
+      const at = rows.filter((r) => entry.before.includes(r.video.id)).length;
+      rows.splice(at, 0, { video: entry.video, removed: true });
+    }
+    return rows;
   }
 
   // Whether Saved is open, kept separately for the empty page (open by default) and while a card is up (collapsed).
@@ -404,7 +432,7 @@
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === video.id);
     const meta = [video.channel, video.length].filter(Boolean).join(' · ');
     // At 0 minutes Watch buys a drop's minutes and plays (Q18). With no drops either, it goes to the lock screen.
-    const buys = state.watchSecondsLeft <= 0 && state.tokens.watch > 0;
+    const buys = costsDrop(video.id);
     const next = busy === 'next';
     // Only a newly revealed card rises in. Rebuilds for Save and the like leave it still.
     const isNew = video.id !== lastCardId;
@@ -440,16 +468,10 @@
     if (count) head.push(`${count} ${count === 1 ? 'video' : 'videos'}`);
     if (total) head.push(Drip.formatMinutes(total));
 
-    // Newest first, with rows removed in the last few seconds back where they were.
-    /** @type {{video: any, removed: boolean}[]} */
-    const rows = state.backlog.map((/** @type {any} */ video) => ({ video, removed: false }));
-    for (const entry of [...removed.values()].sort((a, b) => a.index - b.index)) {
-      if (!rows.some((r) => r.video.id === entry.video.id)) rows.splice(Math.min(entry.index, rows.length), 0, { video: entry.video, removed: true });
-    }
-    rows.reverse();
+    // Newest first.
+    const rows = savedRows().reverse();
     const shown = savedShowAll ? rows : rows.slice(0, 3);
     const hidden = rows.length - 3;
-    const buys = state.watchSecondsLeft <= 0 && state.tokens.watch > 0;
 
     return h('section', { class: `drip-saved${open ? ' is-open' : ''}` },
       h('button', {
@@ -483,7 +505,7 @@
             class: 'drip-saved-x', 'data-k': `x-${video.id}`, title: 'Remove from Saved', 'aria-label': `Remove ${video.title || 'video'} from Saved`,
             onclick: () => onRemove(video.id),
           }, icon('x')),
-          h('span', { class: 'drip-saved-play', 'aria-hidden': 'true' }, buys && h('span', { class: 'drip-saved-price' }, '-1', icon('drop', 'drip-token-drop')), icon('play')))))),
+          h('span', { class: 'drip-saved-play', 'aria-hidden': 'true' }, costsDrop(video.id) && h('span', { class: 'drip-saved-price' }, '-1', icon('drop', 'drip-token-drop')), icon('play')))))),
       open && hidden > 0 && h('button', {
         class: 'drip-saved-more', 'data-k': 'more', onclick: () => { savedShowAll = !savedShowAll; render(); },
       }, h('span', {}, savedShowAll ? 'Show less' : `Show ${hidden} more`), icon('chevron-down', `drip-chevron${savedShowAll ? ' is-up' : ''}`)));
@@ -511,7 +533,7 @@
     if (!root) return;
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0, DripGlass.fraction(state).toFixed(3),
-      state.tokens, state.current, state.backlog, state.settings.feedSource, state.settings.minutesPerToken,
+      state.tokens, state.current, state.backlog, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
       state.settings.resetHour,
     ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()]]);
     if (root.firstChild && key === rendered) return;

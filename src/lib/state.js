@@ -246,19 +246,13 @@
     if (!['watch', 'save', 'unsave', 'pass'].includes(action)) return { ok: false, error: 'bad-action' };
     if (videoId !== undefined && videoId !== state.current.id) return { ok: false, error: 'stale-card' };
     const video = state.current;
+    // addBacklog and removeBacklog keep the card's saved count, whichever button moved it.
     if (action === 'save') {
-      if (!currentIsSaved(state)) {
-        addBacklog(state, video);
-        logDay(state).saved++;
-      }
+      addBacklog(state, video);
       return { ok: true, video };
     }
     if (action === 'unsave') {
-      if (currentIsSaved(state)) {
-        removeBacklog(state, video.id);
-        const day = logDay(state);
-        day.saved = Math.max(0, day.saved - 1);
-      }
+      removeBacklog(state, video.id);
       return { ok: true, video };
     }
     const bought = action === 'watch' && buyIfOut(state, video.id).bought;
@@ -295,11 +289,17 @@
     if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
     const at = typeof index === 'number' && Number.isInteger(index) ? Math.min(Math.max(index, 0), state.backlog.length) : state.backlog.length;
     state.backlog.splice(at, 0, video);
+    // The card showing now counts as saved while it's in the backlog, however it got there (Codex, 2026-10-10).
+    if (state.current && state.current.id === video.id) logDay(state).saved++;
     return { ok: true };
   }
 
   /** @param {State} state @param {string} id */
   function removeBacklog(state, id) {
+    if (state.current && state.current.id === id && currentIsSaved(state)) {
+      const day = logDay(state);
+      day.saved = Math.max(0, day.saved - 1);
+    }
     state.backlog = state.backlog.filter(video => video.id !== id);
     return { ok: true };
   }
