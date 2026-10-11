@@ -56,7 +56,7 @@ Settled:
 Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Paying stays neutral and justifying stays a little effortful:
 
 - Headline: "You've had your fill." when no watch tokens are left, "Time for a breather." when there are tokens to buy minutes. Jesse's lines.
-- "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds, the only idle animation in drip. Clicking it plays one ripple that settles flat, then goes to the home page.
+- "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds. The pill's low-time shimmer is the only other one. Clicking it plays one ripple that settles flat, then goes to the home page.
 - "+15 min · -1 drop" is the gray secondary button, with white text. "I need this one · 2 left" is a gray text link, and its reason box gets no animation.
 - Layout, top to bottom: headline, a gray line "1 h 15 min watched today · 50 min last Tuesday" (only the first half when last week has no data), the two buttons with Done for now on the right, then the link. No token counts on this screen; the headline already says whether minutes can be bought. Jesse's mockup, 2026-10-07.
 - "+15 min" keeps its clock icon here and on the home page, so it looks the same everywhere.
@@ -123,7 +123,10 @@ Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups 
 - "I need this one" opens a plain textarea with Cancel and a gray "Unlock this video" button with the lock icon. No animation, as the spec says.
 - The watched line reads "0m watched today" on a day with nothing watched yet. `watchedSummary(state)` in state.js supplies it.
 - The pill shows the glass at 20px, the compact minutes, and Save with a lucide outline bookmark that becomes the filled cartoon one once saved (`src/icons/save-outline.svg` is new). Saved can be clicked to take the video back out, like the home card. The proposals "Unlocked" (gray, no glass) and "Ad, not counted" are built as written, pending Jesse.
-- Three pill placements are drafted while Jesse picks, switched with Alt+Shift+P and remembered in the page's localStorage: in the window's bottom right corner, always showing; inside the player's top right, hiding with YouTube's controls and showing in fullscreen; and at the bottom center, fading to 20% three seconds into playback until the mouse moves. The two that live outside the player don't show in fullscreen.
+- The pill sits inside the player's top right and hides along with YouTube's controls, so it shows in fullscreen too. Jesse picked it from three drafts (2026-10-10); the others were a corner of the window and a bottom center bar that faded. In theater mode it sits in the dark band beside the video. Clicks on it don't reach the player.
+- Paused, the pill reads "14m · paused" in gray, so it's clear the minutes aren't draining (Jesse's idea, 2026-10-10).
+- In the last 2 minutes the pill stays up while YouTube's controls hide, and a slow blue shimmer crosses it every 4 seconds while the video plays. No red (Jesse's idea, 2026-10-10).
+- Running out no longer cuts straight to the panel. Blue water rises up the window over 1.1 seconds with a wavy crest, blurring the frame as it climbs, and the panel surfaces once it's most of the way up. Buying minutes or an unlock drains the water back down in 0.6 seconds. The water is a mask on `#drip-lock` itself, because its `view-transition-name` keeps a child's `backdrop-filter` from seeing the page (Jesse asked for a smoother way into the lock, 2026-10-10).
 
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.

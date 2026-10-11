@@ -179,10 +179,7 @@
   }
 
   function showDisconnected() {
-    const panel = h('div', { class: 'drip-lock-panel' }, 'drip was updated. Refresh this page.');
-    const existing = document.getElementById('drip-lock');
-    if (existing) existing.replaceChildren(panel);
-    else document.body.append(h('div', { id: 'drip-lock' }, panel));
+    placeLockPanel(h('div', { class: 'drip-lock-panel' }, 'drip was updated. Refresh this page.'));
   }
 
   function startRun() {
@@ -291,6 +288,7 @@
       video.removeEventListener('playing', onPlay);
       for (const ev of ['pause', 'waiting', 'emptied']) video.removeEventListener(ev, stopAndBank);
       video.removeEventListener('ended', onEnded);
+      for (const ev of ['play', 'pause']) video.removeEventListener(ev, renderPill);
     }
     video = el;
     if (!video) return;
@@ -301,6 +299,7 @@
     video.addEventListener('playing', onPlay);
     for (const ev of ['pause', 'waiting', 'emptied']) video.addEventListener(ev, stopAndBank);
     video.addEventListener('ended', onEnded);
+    for (const ev of ['play', 'pause']) video.addEventListener(ev, renderPill);
     // A video waiting on autoplay isn't paused but hasn't played anything. 'playing' fires once it really starts.
     if (!video.paused && video.readyState >= 3) onPlay();
   }
@@ -411,24 +410,62 @@
   let lockView = '';
   let lockVideoId = '';
 
+  /** The lock overlay showing now, or null. One still draining away doesn't count. */
+  function liveLock() {
+    const lock = document.getElementById('drip-lock');
+    return lock && !lock.classList.contains('is-draining') ? lock : null;
+  }
+
+  /**
+   * Puts a panel in the lock overlay. A new overlay plays the water rising and then the panel surfacing. A panel swapped
+   * into an overlay that's already up just replaces the old one, so the water doesn't rise again.
+   * @param {HTMLElement} panel
+   */
+  function placeLockPanel(panel) {
+    const lock = liveLock();
+    if (lock) {
+      const old = lock.querySelector('.drip-lock-panel');
+      if (old) old.replaceWith(panel);
+      else lock.append(panel);
+      return;
+    }
+    // A lock still draining away goes at once, and a new one rises.
+    document.getElementById('drip-lock')?.remove();
+    panel.classList.add('is-new');
+    document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, panel));
+  }
+
+  /** Set just before buying minutes or an unlock lifts the lock, so the water drains away instead of vanishing. */
+  let drainNext = false;
+  const DRAIN_MS = 600;
+
   function hideLock() {
     if (disconnected) return;
     lockView = '';
     lockVideoId = '';
     reasonText = '';
-    document.getElementById('drip-lock')?.remove();
+    const lock = liveLock();
+    if (lock && drainNext) {
+      lock.classList.add('is-draining');
+      setTimeout(() => lock.remove(), DRAIN_MS);
+    } else lock?.remove();
+    drainNext = false;
     reasonOpen = false;
     lockMessage = '';
   }
 
   async function onAddTime() {
+    // The worker's storage change can lift the lock before this reply arrives, so the drain is asked for up front.
+    drainNext = true;
     const res = await send({ type: 'spendWatch' });
     if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
       applyStatus(Drip.watchStatus(state, videoId()));
+      drainNext = false;
       video?.play();
     } else {
+      drainNext = false;
       lockMessage = 'No drops left.';
       showLock();
     }
@@ -469,14 +506,17 @@
     const id = videoId();
     const title = document.querySelector(SEL.title)?.textContent?.trim() || '';
     if (!id) return;
+    drainNext = true;
     const res = await send({ type: 'needThis', videoId: id, title, reason });
     if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
       applyStatus(Drip.watchStatus(state, videoId()));
+      drainNext = false;
       video?.play();
       return;
     }
+    drainNext = false;
     lockMessage = res && res.error === 'reason-required' ? 'Write a few words about why.' : "You've used all of today's unlocks.";
     showLock();
   }
@@ -508,7 +548,7 @@
     const needLeft = Math.max(0, s.needThisPerDay - state.unlocked.length);
     const canBuy = state.tokens.watch > 0;
     const line = watchedLine();
-    const existing = document.getElementById('drip-lock');
+    const existing = liveLock();
     const view = JSON.stringify([videoId(), canBuy, needLeft, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
     if (existing && lockView === view) return;
     lockView = view;
@@ -544,9 +584,7 @@
       lockMessage && h('div', { class: 'drip-lock-note', role: 'status' }, lockMessage),
       unlocks,
     );
-    const lock = existing || h('div', { id: 'drip-lock', class: 'drip-ui' });
-    lock.replaceChildren(panel);
-    if (!existing) document.body.append(lock);
+    placeLockPanel(panel);
     if (focused && reasonOpen && needLeft > 0) {
       reason.focus();
       reason.setSelectionRange(selectionStart, selectionEnd);
@@ -575,43 +613,12 @@
     renderPill();
   }
 
-  // DRAFTS, to be cut to one once Jesse picks (step 3). 'corner' sits at the bottom right of the window and always shows.
-  // 'player' sits inside the player's top left and hides with YouTube's controls, so it shows in fullscreen too.
-  // 'fade' sits at the bottom center and fades to faint a few seconds into playback until the mouse moves.
-  // Alt+Shift+P cycles them, and localStorage remembers the pick.
-  const PILL_DRAFTS = ['corner', 'player', 'fade'];
-  const PILL_DRAFT_KEY = 'drip-pill-draft';
-  let pillDraft = 'corner';
-  try {
-    pillDraft = PILL_DRAFTS.includes(localStorage.getItem(PILL_DRAFT_KEY) || '') ? /** @type {string} */ (localStorage.getItem(PILL_DRAFT_KEY)) : 'corner';
-  } catch {
-    // Storage blocked: the first draft.
-  }
-  document.addEventListener('keydown', (e) => {
-    if (!e.altKey || !e.shiftKey || e.code !== 'KeyP') return;
-    pillDraft = PILL_DRAFTS[(PILL_DRAFTS.indexOf(pillDraft) + 1) % PILL_DRAFTS.length];
-    try {
-      localStorage.setItem(PILL_DRAFT_KEY, pillDraft);
-    } catch {
-      // Not remembered, still switched.
-    }
-    document.getElementById('drip-pill')?.remove();
-    pillView = '';
-    renderPill();
-  });
-
-  /** How long the 'fade' draft waits, with the mouse still, before it fades. */
-  const PILL_FADE_MS = 3000;
-  let lastMouseMove = 0;
-  document.addEventListener('mousemove', () => {
-    lastMouseMove = performance.now();
-    document.getElementById('drip-pill')?.classList.remove('is-faded');
-  }, { passive: true });
-
   let pillView = '';
   /** @type {SVGSVGElement | null} */
   let pillGlass = null;
   const PILL_GLASS_PX = 20;
+  /** In the last this many seconds, the pill stays up over the video and shimmers. */
+  const LOW_SECONDS = 120;
 
   /**
    * Keeps clicks and keys on the pill away from the player, which would otherwise read a click as play or pause.
@@ -621,22 +628,23 @@
     e.stopPropagation();
   }
 
-  /** Where the pill goes: inside the player for the 'player' draft, so it shows in fullscreen, otherwise the page. */
-  function pillParent() {
-    return (pillDraft === 'player' && document.querySelector(SEL.player)) || document.body;
-  }
+  /** Whether the minutes are nearly gone, set by renderPill and read by pillLook. */
+  let pillLow = false;
 
-  /** The pill's idle and faded looks, checked every tick and whenever the player's class changes. */
+  /**
+   * The pill hides along with YouTube's controls a few seconds into playback, except in the last minutes, when it stays
+   * up and shimmers. Checked every tick and whenever the player's class changes.
+   */
   function pillLook() {
     const pill = document.getElementById('drip-pill');
     if (!pill) return;
     const playing = !!video && !video.paused;
-    pill.classList.toggle('is-idle', pillDraft === 'player' && playing && !!document.querySelector(SEL.playerIdle));
-    const still = performance.now() - lastMouseMove >= PILL_FADE_MS;
-    pill.classList.toggle('is-faded', pillDraft === 'fade' && playing && still);
+    pill.classList.toggle('is-low', pillLow && playing);
+    pill.classList.toggle('is-idle', playing && !pillLow && !!document.querySelector(SEL.playerIdle));
   }
 
   // DESIGN.md "Minutes and the watch page pill": the glass, minutes left, and Save. It never offers to buy minutes.
+  // It sits inside the player's top right, so it shows in fullscreen too (Jesse picked this placement, 2026-10-10).
   function renderPill() {
     const id = videoId();
     let pill = document.getElementById('drip-pill');
@@ -653,22 +661,26 @@
     const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
     const left = Math.max(0, state.watchSecondsLeft - pending);
     const time = unlocked ? 'Unlocked' : Drip.formatMinutes(left);
+    // Paused, the minutes aren't draining, and the pill says so.
+    const paused = !unlocked && !adShowing && !!video && video.paused && left > 0;
+    pillLow = !unlocked && !adShowing && left > 0 && left <= LOW_SECONDS;
     if (!unlocked) {
       const fraction = DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
       if (!pillGlass) pillGlass = DripGlass.make(fraction, PILL_GLASS_PX);
       else DripGlass.set(pillGlass, fraction, PILL_GLASS_PX);
     }
-    const parent = pillParent();
+    const parent = document.querySelector(SEL.player) || document.body;
     // Rebuild only when the text changes. A button replaced mid-click loses the click.
-    const view = JSON.stringify([id, time, saved, adShowing, pillDraft]);
+    const view = JSON.stringify([id, time, saved, adShowing, paused]);
     if (pill && pillView === view && pill.parentElement === parent) return pillLook();
     pillView = view;
     const content = [
-      h('span', { class: `drip-pill-time${unlocked ? ' is-unlocked' : ''}` },
+      h('span', { class: `drip-pill-time${unlocked ? ' is-unlocked' : ''}${paused ? ' is-paused' : ''}` },
         !unlocked && pillGlass,
         h('span', { class: 'drip-pill-minutes' }, time),
         !unlocked && h('span', { class: 'drip-sr' }, ' left today'),
-        adShowing && h('span', { class: 'drip-pill-ad' }, 'Ad, not counted')),
+        paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'), ' paused'),
+        adShowing && h('span', { class: 'drip-pill-note' }, 'Ad, not counted')),
       h('button', {
         class: `drip-pill-save${saved ? ' is-saved' : ''}`, 'data-k': 'pill-save', 'aria-pressed': String(saved), onclick: onSave,
         title: saved ? 'In Saved. Click to take it out.' : 'Keep it in Saved for later',
@@ -679,7 +691,6 @@
       for (const ev of ['click', 'dblclick', 'mousedown', 'pointerdown', 'keydown']) pill.addEventListener(ev, keepFromPlayer);
     }
     const focused = pill.contains(document.activeElement);
-    pill.setAttribute('data-draft', pillDraft);
     pill.replaceChildren(...content);
     if (pill.parentElement !== parent) parent.append(pill);
     if (focused) /** @type {HTMLElement | null} */ (pill.querySelector('[data-k="pill-save"]'))?.focus();

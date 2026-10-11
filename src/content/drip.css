@@ -78,9 +78,39 @@ a.drip-btn {
   align-items: center;
   justify-content: center;
   padding: 16px;
+  overflow: hidden;
   background: var(--drip-tint);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
   backdrop-filter: blur(20px) saturate(1.2);
+  /* Running out: blue water rises up the window, blurring the frame as it climbs, with a wavy crest that drifts. Buying
+     minutes or an unlock drains it back down (watch.js placeLockPanel and hideLock). The water is a mask on the overlay
+     itself: its view-transition-name stops a child's backdrop-filter from seeing the page. Two layers, the crest and
+     the solid water under it, both placed from --drip-water, the crest's top edge. */
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-water) / 640px 26px repeat-x,
+    linear-gradient(#000, #000) 0 calc(var(--drip-water) + 25px) / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-water) / 640px 26px repeat-x,
+    linear-gradient(#000, #000) 0 calc(var(--drip-water) + 25px) / 100% 100% no-repeat;
+  animation: drip-water-rise 1100ms cubic-bezier(0.35, 0.6, 0.25, 1) both, drip-crest 1100ms linear;
+}
+
+#drip-lock.is-draining {
+  pointer-events: none;
+  animation: drip-water-drain 600ms cubic-bezier(0.55, 0, 0.75, 0.45) both, drip-crest 600ms linear;
+}
+
+#drip-lock .drip-lock-panel {
+  position: relative;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+/* The panel surfaces once the water is most of the way up. */
+#drip-lock .drip-lock-panel.is-new {
+  animation: drip-surface 460ms cubic-bezier(0.3, 0.7, 0.2, 1) 650ms both;
+}
+
+#drip-lock.is-draining .drip-lock-panel {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 html[dark] #drip-lock {
@@ -236,23 +266,53 @@ html[dark] #drip-lock {
   height: 18px;
 }
 
-/* The watch page pill (watch.js): the glass, minutes left, and Save. Three drafts while Jesse picks, set by data-draft. */
-#drip-pill {
-  --drip-pill-bg: #fff;
-  position: fixed;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  height: 40px;
-  padding: 0 4px 0 12px;
-  border-radius: 20px;
-  background: var(--drip-pill-bg);
-  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.18);
-  transition: opacity 400ms ease;
+/* The watch page pill (watch.js): the glass, minutes left, and Save, inside the player's top right. It sits over the
+   video, so it's light on dark in both themes, and it hides along with YouTube's own controls. */
+/* html[dark] here matches the shared token rule's weight, so these win in dark mode too. */
+#drip-pill,
+html[dark] #drip-pill {
+  --drip-text: #fff;
+  --drip-muted: rgba(255, 255, 255, 0.7);
+  --drip-rule: rgba(255, 255, 255, 0.2);
+  --drip-gray: rgba(255, 255, 255, 0.16);
+  --drip-glass-line: #d9d9d9;
+  --drip-shimmer: rgba(66, 165, 246, 0.45);
 }
 
-html[dark] #drip-pill {
-  --drip-pill-bg: #212121;
+#drip-pill {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 4px 0 12px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 18px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: opacity 200ms ease;
+}
+
+#drip-pill.is-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The last two minutes: the pill stays up and a slow blue shimmer crosses it, the same sweep as "Done for now". */
+#drip-pill.is-low::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 25%, var(--drip-shimmer) 50%, transparent 75%);
+  transform: translateX(-100%);
+  animation: drip-done-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
 }
 
 #drip-pill .drip-pill-time {
@@ -272,11 +332,13 @@ html[dark] #drip-pill {
 }
 
 #drip-pill .is-unlocked .drip-pill-minutes,
-#drip-pill .drip-pill-ad {
+#drip-pill .is-paused .drip-pill-minutes,
+#drip-pill .drip-pill-note {
   color: var(--drip-muted);
 }
 
-#drip-pill .drip-pill-ad {
+#drip-pill .drip-pill-note {
+  margin-left: -2px;
   font-size: 12px;
 }
 
@@ -284,11 +346,11 @@ html[dark] #drip-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: 30px;
   margin-left: 4px;
   padding: 0 12px 0 10px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 15px;
   font: inherit;
   font-weight: 500;
   color: var(--drip-text);
@@ -304,47 +366,6 @@ html[dark] #drip-pill {
 #drip-pill .drip-pill-save .drip-i {
   width: 13px;
   height: 16px;
-}
-
-#drip-pill[data-draft="corner"] {
-  right: 16px;
-  bottom: 16px;
-}
-
-#drip-pill[data-draft="fade"] {
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-}
-
-#drip-pill[data-draft="fade"].is-faded {
-  opacity: 0.2;
-  transition-duration: 900ms;
-}
-
-/* Inside the player, over the video: always light on dark, and hidden along with YouTube's own controls. */
-#drip-pill[data-draft="player"] {
-  --drip-text: #fff;
-  --drip-muted: rgba(255, 255, 255, 0.7);
-  --drip-rule: rgba(255, 255, 255, 0.2);
-  --drip-gray: rgba(255, 255, 255, 0.16);
-  --drip-glass-line: #d9d9d9;
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 70;
-  height: 36px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.55);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  box-shadow: none;
-  transition-duration: 200ms;
-}
-
-#drip-pill[data-draft="player"].is-idle {
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* YouTube animates navigation with View Transitions. During one, Chrome paints snapshots of the page, and drip's
@@ -1096,6 +1117,45 @@ html[dark] :is(#drip-home, #drip-lock, #drip-pill) {
   }
 }
 
+/* Registered so the water's height and the crest's drift can animate (#drip-lock's mask). The resting water is up past
+   the top, so the whole window is under it. */
+@property --drip-water {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: -26px;
+}
+
+@property --drip-crest-x {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes drip-water-rise {
+  from {
+    --drip-water: 100vh;
+  }
+}
+
+@keyframes drip-water-drain {
+  to {
+    --drip-water: 100vh;
+  }
+}
+
+@keyframes drip-crest {
+  to {
+    --drip-crest-x: -640px;
+  }
+}
+
+@keyframes drip-surface {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
 @keyframes drip-ripple {
   to {
     opacity: 0;
@@ -1111,6 +1171,15 @@ html[dark] :is(#drip-home, #drip-lock, #drip-pill) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  #drip-lock,
+  #drip-lock.is-draining {
+    animation: none;
+  }
+
+  #drip-lock.is-draining {
+    opacity: 0;
+  }
+
   :is(#drip-home, #drip-lock, #drip-pill) *,
   :is(#drip-home, #drip-lock, #drip-pill) *::before,
   :is(#drip-home, #drip-lock, #drip-pill) *::after {

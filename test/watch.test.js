@@ -58,7 +58,20 @@ class FakeElement {
   /** @param {...any} kids */
   replaceChildren(...kids) { this.children = []; this.rebuilds++; this.append(...kids); }
   remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
-  querySelector() { return null; }
+  /** Only `.class` selectors, which is all watch.js asks of its own elements. @param {string} sel */
+  querySelector(sel) {
+    if (!sel.startsWith('.')) return null;
+    return this.all().slice(1).find((el) => el.className.split(' ').includes(sel.slice(1))) || null;
+  }
+  /** @param {any} other */
+  replaceWith(other) {
+    const parent = this.parent;
+    if (!parent) return;
+    const i = parent.children.indexOf(this);
+    other.parent = parent;
+    parent.children[i] = other;
+    this.parent = null;
+  }
   get textContent() { return this.children.map((c) => (c instanceof FakeElement ? c.textContent : String(c))).join(''); }
   /** @returns {FakeElement[]} */
   all() { return [this, ...this.children.flatMap((c) => (c instanceof FakeElement ? c.all() : []))]; }
@@ -154,7 +167,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     },
     /** @param {string} id */
     /** @param {string} id @returns {any} */
-    getElementById: (id) => body.all().find((el) => el.id === id) || null,
+    getElementById: (id) => [...body.all(), ...playerEl.all()].find((el) => el.id === id) || null,
     /** @param {string} ev @param {Function} fn */
     addEventListener: (ev, fn) => { (docHandlers[ev] ||= []).push(fn); },
     /** @param {{type: string}} event */
@@ -169,6 +182,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     performance: { now: () => world.now },
     Date: class extends Date { static now() { return world.epoch + world.now; } },
     CustomEvent: class { /** @param {string} type */ constructor(type) { this.type = type; } },
+    setTimeout, matchMedia: () => ({ matches: false }),
     setInterval: (/** @type {Function} */ fn) => { intervals.set(++nextInterval, fn); return nextInterval; },
     clearInterval: (/** @type {number} */ id) => { intervals.delete(id); },
     chrome: {
@@ -430,6 +444,26 @@ test('a tick the worker refuses is sent again, not lost (finding 17)', async () 
   await tab.tick();
   await tab.tick();
   assert.ok(Math.abs(world.state.watchSecondsLeft - 890) < 0.01, `left ${world.state.watchSecondsLeft}`);
+});
+
+test('the pill says paused while the video is paused, and stays up and shimmers in the last two minutes', async () => {
+  const { world, tab } = await setup(900);
+  assert.doesNotMatch(tab.pill().textContent, /paused/);
+  tab.video.pause();
+  await tab.tick();
+  assert.match(tab.pill().textContent, /^15m left today· paused/);
+  assert.doesNotMatch(tab.pill().className, /is-low/);
+
+  world.state.watchSecondsLeft = 100;
+  // Any message saves the state, and the tab hears about it like a storage change.
+  await world.handle({ type: 'status', videoId: 'aaa' });
+  await tab.video.play();
+  await tab.tick();
+  assert.match(tab.pill().className, /is-low/);
+  assert.doesNotMatch(tab.pill().textContent, /paused/);
+  tab.video.pause();
+  await tab.tick();
+  assert.doesNotMatch(tab.pill().className, /is-low/, 'no shimmer while nothing drains');
 });
 
 test('the Save button is not rebuilt while nothing it shows changes (finding 4)', async () => {
