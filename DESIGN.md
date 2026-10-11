@@ -20,12 +20,12 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q10 | 1 watch token = 15 min, drained only while playing. 1 rec token = 1 reveal. Defaults: 4 watch tokens, 10 rec tokens per day. |
 | Q11 | Tokens roll over up to 2 days' worth. Bought minutes expire at reset. |
 | Q12 | Day resets at 4am, as a setting. |
-| Q13 | The reveal card offers Watch, Save, Pass. Pass is free and final. Planned, not built: Save keeps the card up and the button turns into "Saved ✓". "Reveal next · -1 card" passes and reveals in one click. Pass is a round × button with a tooltip, free and still final. A video saved and then passed stays in the backlog (Jesse, 2026-10-07). |
+| Q13 | The reveal card offers Watch, Save, Pass. Pass is free and final. Save keeps the card up and the button turns into "Saved". "Reveal next · -1 card" passes and reveals in one click. Pass is a round × button with a tooltip, free and still final. A video saved and then passed stays in the backlog (Jesse, 2026-10-07; built 2026-10-10). |
 | Q14 | Backlog videos cost no rec token. Save button on watch pages and search results. Backlog is a text list (title, channel, length), no thumbnails. |
 | Q15 | Search: remove injected shelves, stop at 10 results, free "more" button. |
 | Q16 | Replace subscriptions and Explore with the token page. Channel pages and the bell stay as they are. Watch page comments are hidden behind a "Show comments" button that lasts for that video (Jesse, 2026-10-06). |
 | Q17 | Name: `drip` (tentative). |
-| Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. Planned, not built: while a card is up, Watch is free if minutes are left. At 0 minutes it reads "Watch · -1 drop", and clicking it buys one watch token's minutes and starts the video. "+15 min" shows only when no card is up (Jesse, 2026-10-07). |
+| Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. While a card is up, Watch is free if minutes are left. At 0 minutes it reads "Watch · -1 drop", and clicking it buys one watch token's minutes and starts the video. "+15 min" shows only when no card is up (Jesse, 2026-10-07; built 2026-10-10). |
 | Q19 | Background audio counts like any watching. `music.youtube.com` is out of scope. |
 | Q20 | "I need this one" on the overlay: typed reason, unlocks that one video for the day without draining minutes, 2 per day, every use logged. |
 | Q21 | Log per day: seconds watched, tokens spent, reveals saved or passed, "I need this" reasons. Keep 90 days. Show today plus the 7 days before it, 8 rows, so today sits next to the same weekday last week (Claude's pick, Jesse deferred, 2026-10-06). |
@@ -36,7 +36,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q26 | Finishing a video that's in the backlog removes it from the backlog. Each new video opens in theater mode. Kept as they are for now (Jesse, 2026-10-06). |
 | Q27 | Ads don't use watch minutes. Time the player spends on an ad isn't charged or logged (Jesse, 2026-10-07). |
 
-## Visual design (in progress, nothing built)
+## Visual design (in progress, home page built)
 
 Jesse is designing the look by hand, with Claude reviewing his mockups, started 2026-10-07. The goal is a little character without being distracting. Spending a token can feel satisfying, but restraint should feel good too, so the design doesn't reward spending everything.
 
@@ -87,7 +87,7 @@ Settings (2026-10-08, Jesse's mockups):
   - Top of the card: "Daily average" in gray, the average big and white ("1h 05min"), and on the right a gray down or up arrow with "17% from last week".
   - Chart: 7 blue bars, S M T W T F S, today's letter bold, future days empty. A right gutter has "2h" at the top and "0" at the bottom, centered on the top of the scale and the bar baseline. The scale max rounds up past the tallest bar. A dashed line runs across the bars at last week's daily average and ends at the plot edge. Its label is a key under the chart, "- - Last week's average · 1h 18m", so the gutter holds only "2h" and "0" and nothing can collide or overflow at any value (Jesse, 2026-10-09).
   - Today block: "Today" in gray, the minutes big and white ("23min"), then three equal tiles with the lighter fill: drops used (blue drop), cards used (gold card), unlocks used (gray lock, "0 / 2" with the "/ 2" small and dim). Each tile has the icon and a big number on top and a gray sentence-case label under it. Zero is dimmed, and the unlocks tile needs an active look at 1 or 2 that isn't mocked.
-  - Under the tiles, a left-aligned small gray line: "Of 5 cards, 2 saved and 3 passed." It describes the whole row, not one tile; the versions that hung it under the cards tile or put it inside a tile didn't work. Hide it at 0 cards, say "Of 1 card, 1 saved" in the singular, and drop zero parts. If a reveal can end as Watch, add "1 watched" so the parts add up. The code has to say which outcomes get logged. Checked 2026-10-09: `resolveCurrent` counts `saved` and `passed` but logs nothing for Watch, so "watched" needs a new log field. With the new Q13 card, Save no longer ends the card, so a card saved and then passed with Reveal next would count in both; count each card once by its last outcome. `recSpent` also includes a card still showing, so the parts can be one short of the total.
+  - Under the tiles, a left-aligned small gray line: "Of 5 cards, 2 saved and 3 passed." It describes the whole row, not one tile; the versions that hung it under the cards tile or put it inside a tile didn't work. Hide it at 0 cards, say "Of 1 card, 1 saved" in the singular, and drop zero parts. If a reveal can end as Watch, add "1 watched" so the parts add up. The code has to say which outcomes get logged. Checked 2026-10-09: `resolveCurrent` counts `saved` and `passed` but logs nothing for Watch, so "watched" needs a new log field. Save no longer ends the card (Q13), so each card counts once: Save counts `saved` at once and taking it back uncounts it, Watch counts `watched` (moving a saved card from `saved`), and Pass counts `passed` unless the card was saved, since the video stays in Saved. Built 2026-10-10 with a `watched` log field. `recSpent` also includes a card still showing, so the parts can be one short of the total.
   - Build notes: `logDays` returns 8 days (Q21), which is too few for last week's average, so the chart needs the log's earlier days (90 are kept). The week starts on Sunday for now (Jesse, 2026-10-09). The section header above the card is "History", since the card can show any week. The ‹ This week › control sits at the top of the card, because it changes everything in it. The block under the chart is named after the selected day: "Today", or "Sunday, Sep 21" on another day or week. ‹ › arrows on either side of the "This week" label step back through earlier weeks ("Last week", then dates like "Sep 21 – 27") as far as the log goes, and everything in the card follows the week shown. › is dimmed on the current week. The daily average counts only the days so far, so on Tuesday it divides by 3. This replaces the earlier proposal of 8 bars with the same weekday last week marked. The "I need this one" reasons stay as a list under it. Developer mode stays at the bottom, unchanged.
 
 Welcome page (2026-10-09, Jesse's first mockup and this plan):
@@ -98,6 +98,21 @@ Welcome page (2026-10-09, Jesse's first mockup and this plan):
 - Footer: gray "Open YouTube ↗" and "⚙ Settings" for people who skip, and "Everything drip knows stays in this browser."
 - The "What changes on YouTube" bullets: Home and Subscriptions open your drip page instead of a feed, and you can reveal from either. Watch pages have no suggestions sidebar, no end screen, and no autoplay, and comments wait behind a button. Shorts open as regular videos and use minutes like any other. Search shows 10 results at a time, with a button for more. Your channels and playlists work as before, and ads and videos embedded on other sites don't use your minutes. Lucide icons: house, play, smartphone, search, check.
 - The old loosen-later paragraph leaves this page, since the Settings chip teaches it.
+
+Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. Where they were silent Claude made the call below, and every one is open to Jesse's review:
+
+- Colors and sizes are CSS custom properties at the top of the home block in `drip.css`, so tuning is mostly editing those. Dark or light comes from YouTube's `html[dark]`.
+- Icons live in `src/icons/` and draw as CSS masks filled with the text color, so one SVG serves every background. That's why the manifest lists them as web accessible to youtube.com. The clock, chevron, and × are new files in the same folder. The glass is `src/lib/glass.js`, one SVG built from `cup-icons/` with the water level set from minutes left over minutes bought today. It glides between levels.
+- The From Home / Subscriptions toggle (Q5) isn't in the mockups. It sits as a small gray line under the two buttons, and hides while a card is up.
+- Saved on the card is a slightly lighter gray button with the label "Saved". Clicking it again takes the video back out of Saved.
+- When something runs out, a gray line under the buttons says what and when it comes back: "No cards left. More at 4:00am.", "No drops left. …", or "You're out for today. Drops and cards refill at 4:00am." The spent buttons dim.
+- Loading: a reveal from the empty page shows the card's shape right away with a shimmering box and title bars, and "Finding a video…" or "Checking your subscriptions…". Reveal next dims the old card and reads "Revealing…" until the new one lands. A new card rises in over 260ms. Rebuilds for Save and the like don't replay it.
+- Watch at 0 minutes with no drops left still goes to the video, so the lock screen's "I need this one" stays in reach.
+- The thumbnail is `hq720.jpg`, falling back to `hqdefault.jpg` when YouTube has none. Clicking it is Watch.
+- Durations of a whole number of hours read "2h", not "2h 0m".
+- The column is 400px. Below about 450px of room the gaps and button padding shrink, and below about 370px Save shows only its icon. Container queries measure the column, not the window, so YouTube's open guide counts too.
+- `dev/home.html` runs the real home page outside YouTube, with the real worker on fake storage and a fake grid, in any of a dozen states, light or dark. `dev/home-sizes.html` shows it at several widths at once. See the comment at the top of each.
+- Not built yet: "Kept 3 drops." (it follows the lock screen), the reveal animations under "Ideas", and the "+2 saved from yesterday" note.
 
 Ideas, not decided:
 - A ripple when a reveal lands, with the card rising out of it. It can play in the reserved box while the thumbnail loads.
@@ -123,7 +138,7 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 - `src/lib/state.js` holds all the rules as pure functions over a plain state object. It's a classic script that sets `globalThis.Drip`, so the service worker (`importScripts`), extension pages (`<script>`), content scripts (manifest list), and Node tests (`require`) all load the same file.
 - `src/background.js` is the only writer. Everything else sends it a message. It runs messages one at a time through a promise queue, so two tabs can't overwrite each other. It saves only when a message changed the state, because every save wakes the storage listeners in every YouTube tab. If a save fails, it puts the charge marker back, so the tab's resent time is charged.
 - Every message starts with `rollDay(state, now)`, so the day resets lazily. A laptop asleep at 4am still resets correctly on the next read.
-- `src/content/` replaces the home page and runs the watch clock. `comments.js` adds the "Show comments" button, and the CSS that hides comments is in `early.css`. `src/popup/` and `src/options/` are extension pages.
+- `src/content/` replaces the home page and runs the watch clock. `src/lib/glass.js` draws the glass for the home page, and later the pill and popup. `comments.js` adds the "Show comments" button, and the CSS that hides comments is in `early.css`. `src/popup/` and `src/options/` are extension pages.
 
 ### Feed source
 
@@ -158,6 +173,7 @@ Each tab measures how long its video played and sends it as `seconds`, every 5 s
   day: 'YYYY-MM-DD',        // current logical day
   tokens: { watch: 4, rec: 10 },
   watchSecondsLeft: 0,
+  watchSecondsBought: 0,    // minutes bought today, in seconds. The glass is full at this.
   current: null | Video,    // revealed and not yet resolved
   backlog: Video[],         // newest last
   seen: string[],           // video ids ever revealed, oldest first, max 2000
@@ -165,7 +181,7 @@ Each tab measures how long its video played and sends it as `seconds`, every 5 s
   log: { [day]: LogDay },
 }
 Video  = { id, title, channel, length }   // length is a display string like "14:02", may be ''
-LogDay = { watchedSec, watchSpent, recSpent, saved, passed, needThis: [{ videoId, title, reason, at }] }
+LogDay = { watchedSec, watchSpent, recSpent, saved, passed, watched, needThis: [{ videoId, title, reason, at }] }
 ```
 
 ### Functions
@@ -174,14 +190,16 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, needThis: [{ videoId
 - `dayKey(now, resetHour)` returns the logical day. Times before `resetHour` belong to the previous date. 03:59 on 2026-10-05 with resetHour 4 is `'2026-10-04'`.
 - `addDays(day, n)` and `daysBetween(a, b)` do date math on `YYYY-MM-DD` strings in UTC, so DST can't shift them.
 - `initialState(now)` returns a fresh state with default settings, full daily tokens, 0 seconds, and empty lists.
-- `hydrate(raw, now)` takes whatever came out of storage (possibly `undefined` or missing keys) and returns a complete state. Missing settings get defaults. `undefined` gives `initialState(now)`.
-- `rollDay(state, now)`. If `dayKey(now, settings.resetHour)` is later than `state.day`, it applies `pending` if its `effectiveDay` is on or before the new day, then adds `perDay * elapsedDays` to each balance capped at `perDay * rolloverDays`, sets `watchSecondsLeft` to 0, clears `unlocked`, sets `day`, and removes log days older than 89 days before the new day. If the new day isn't later, it does nothing. It never moves `day` backwards. Returns `true` if it rolled.
+- `hydrate(raw, now)` takes whatever came out of storage (possibly `undefined` or missing keys) and returns a complete state. Missing settings get defaults. `undefined` gives `initialState(now)`. A missing `watchSecondsBought` becomes `watchSecondsLeft`, so state from before the glass shows full.
+- `rollDay(state, now)`. If `dayKey(now, settings.resetHour)` is later than `state.day`, it applies `pending` if its `effectiveDay` is on or before the new day, then adds `perDay * elapsedDays` to each balance capped at `perDay * rolloverDays`, sets `watchSecondsLeft` and `watchSecondsBought` to 0, clears `unlocked`, sets `day`, and removes log days older than 89 days before the new day. If the new day isn't later, it does nothing. It never moves `day` backwards. Returns `true` if it rolled.
 - `logDay(state)` returns `state.log[state.day]`, creating it with zeros.
-- `spendWatch(state)` takes one watch token and adds `minutesPerToken * 60` seconds. Error `'no-watch-tokens'`.
+- `spendWatch(state)` takes one watch token and adds `minutesPerToken * 60` seconds to both `watchSecondsLeft` and `watchSecondsBought`. Error `'no-watch-tokens'`.
+- `buyIfOut(state, videoId)` calls `spendWatch` when no minutes are left and the video isn't unlocked. Returns `{ ok: true, bought }`, and `bought` is false when there were minutes, or no tokens to buy them with.
 - `reveal(state, candidates)` takes the first candidate whose id isn't in `seen` or the backlog, takes one rec token, sets `current`, and pushes the id to `seen` (dropping the oldest past 2000). Errors, checked in order: `'resolve-current'` if `current` is set, `'no-rec-tokens'`, `'pool-empty'` if no candidate qualifies. An error spends nothing. Returns `{ ok: true, video }`.
-- `resolveCurrent(state, action, videoId?)` with action `'watch'`, `'save'`, or `'pass'`. Save adds to the backlog and counts `saved`. Pass counts `passed`. All three clear `current` and return `{ ok: true, video }`. Errors, in order: `'no-current'`, `'bad-action'`, and `'stale-card'` when `videoId` is given and isn't the current card's, because another tab moved on. The new reveal card in Q13 will change this.
+- `resolveCurrent(state, action, videoId?)` with action `'watch'`, `'save'`, `'unsave'`, or `'pass'` (Q13). Save adds the card to the backlog and counts `saved` once. Unsave takes it back out and uncounts it. Both keep the card up. Watch calls `buyIfOut` first (Q18), counts `watched` (taking a saved card out of `saved`), and returns `{ ok: true, video, bought }`. Pass counts `passed`, unless the card was saved. Watch and pass clear `current`. The others return `{ ok: true, video }`. Errors, in order: `'no-current'`, `'bad-action'`, and `'stale-card'` when `videoId` is given and isn't the current card's, because another tab moved on.
+- `revealNext(state, videoId, candidates)` passes the card the way `resolveCurrent` does and reveals the next, as one step. It checks first and changes nothing on an error, so the card stays up. Errors, in order: `'no-current'`, `'stale-card'`, `'no-rec-tokens'`, `'pool-empty'`. Returns what `reveal` returns.
 - `cleanVideo(raw)` returns a `Video` with string fields, or `null` when the id isn't 1 to 64 letters, digits, `_`, or `-`. `hydrate`, `reveal`, and `addBacklog` all pass videos through it.
-- `addBacklog(state, video)` adds the video unless its id is already there (then still `ok`). Error `'bad-video'`. `removeBacklog(state, id)` removes it. Neither touches tokens.
+- `addBacklog(state, video, index?)` adds the video unless its id is already there (then still `ok`). It goes at the end, the newest place, or at `index` (clamped), which is how Undo puts a removed row back. Error `'bad-video'`. `removeBacklog(state, id)` removes it. Neither touches tokens.
 - `charge(state, seconds, videoId)` adds `seconds` to the log's `watchedSec`. Unless `videoId` is unlocked, it subtracts from `watchSecondsLeft`, never below 0. Returns `watchStatus`.
 - `chargeTick(state, clock, now, seconds, videoId, agoMs = 0)` moves `now` back by `agoMs` (clamped to an hour), then clamps seconds to 0..3600. Zero ticks return `watchStatus` without touching the clock. Unlocked videos log those seconds and return `watchStatus` without touching the clock. Paid ticks clear a marker later than `now`, advance `clock.lastChargeEnd` to `now`, and return `charge` for only the interval after the previous end.
 - `watchStatus(state, videoId)` returns `{ secondsLeft, unlocked, locked }`, where `locked` means 0 seconds left and the video isn't unlocked.
@@ -190,7 +208,7 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, needThis: [{ videoId
 - `isLoosening(key, from, to)`. The numeric keys loosen when they go up. `graceMode` loosens going from false to true. Any change to `resetHour` counts as loosening. `feedSource` never does.
 - `updateSettings(state, changes)` cleans the changes, then for each key that differs from the current value it either applies it now (tightening or neutral) or puts it in `pending` with `effectiveDay = addDays(state.day, 1)`. Applying a key now removes any pending value for that key. Setting a key back to its current value removes its pending value too. An empty `pending.changes` becomes `null`. Balances above the new cap (`perDay * rolloverDays`) drop to it at once. Returns `{ ok: true, applied: {...}, pending: {...} }` listing just what this call did.
 - `cancelPending(state, key)` drops one pending key.
-- `formatMinutes(seconds)` returns `'42 min'`, or `'under 1 min'` for 1 to 59 seconds, or `'0 min'`.
+- `formatMinutes(seconds)` returns compact time: `'1h 42m'`, `'42m'`, `'2h'`, `'<1m'` for 1 to 59 seconds, or `'0m'`.
 - `logDays(day)` returns the 8 days the Settings log shows, `day` first (Q21).
 - `redirectTarget(href)` returns where a top-level YouTube URL should go instead, or `''`. Shorts and embeds become watch pages, the feeds in Q16 and `/tv` go to the token page, and `m.youtube.com` moves to `www`. redirect.js applies it, but only in the top frame, so embeds on other sites stay free (Q7).
 - `earlyLocked(raw, now, videoId)` decides, from raw storage, whether a loading watch page holds its video: no state, a day that has rolled over, or 0 seconds without an unlock today. Grace mode doesn't count, because nothing is playing yet. early.js also skips the video watch.js marks with `data-drip-grace` on `<html>`.

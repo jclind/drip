@@ -26,6 +26,9 @@
     "48": "icons/48.png",
     "128": "icons/128.png"
   },
+  "web_accessible_resources": [
+    { "resources": ["src/icons/*.svg"], "matches": ["https://www.youtube.com/*"] }
+  ],
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
@@ -55,7 +58,7 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["src/lib/state.js", "src/content/common.js", "src/content/home.js", "src/content/watch.js", "src/content/search.js", "src/content/comments.js"],
+      "js": ["src/lib/state.js", "src/lib/glass.js", "src/content/common.js", "src/content/home.js", "src/content/watch.js", "src/content/search.js", "src/content/comments.js"],
       "css": ["src/content/drip.css"],
       "run_at": "document_idle"
     },

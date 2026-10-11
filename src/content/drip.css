@@ -18,25 +18,6 @@
   color: var(--drip-text);
 }
 
-#drip-home {
-  max-width: 520px;
-  margin: 72px auto 96px;
-  padding: 0 16px;
-}
-
-.drip-balances {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 20px;
-}
-
-.drip-time {
-  font-size: 28px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-}
-
 .drip-meta {
   color: var(--drip-muted);
   font-size: 13px;
@@ -79,120 +60,9 @@ a.drip-btn {
   background: var(--drip-text);
 }
 
-.drip-source {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.drip-source .drip-meta {
-  margin-right: 2px;
-}
-
-.drip-chip {
-  font: inherit;
-  font-size: 13px;
-  color: var(--drip-muted);
-  background: none;
-  border: 1px solid var(--drip-line);
-  border-radius: 14px;
-  padding: 3px 12px;
-  cursor: pointer;
-}
-
-.drip-chip[aria-pressed="true"] {
-  color: var(--drip-text);
-  background: var(--drip-chip);
-  border-color: transparent;
-}
-
-.drip-chip:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
 .drip-message {
   margin-top: 12px;
   color: var(--drip-muted);
-}
-
-.drip-card {
-  margin-top: 28px;
-}
-
-.drip-thumb img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: 12px;
-  background: var(--drip-chip);
-}
-
-.drip-card-title {
-  margin: 12px 0 2px;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.drip-card .drip-row {
-  margin-top: 12px;
-}
-
-.drip-backlog {
-  margin-top: 36px;
-  border-top: 1px solid var(--drip-line);
-  padding-top: 16px;
-}
-
-.drip-backlog summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.drip-backlog ul {
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-}
-
-.drip-backlog li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  column-gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--drip-line);
-}
-
-.drip-backlog li a {
-  color: var(--drip-text);
-  text-decoration: none;
-}
-
-.drip-backlog li a:hover {
-  text-decoration: underline;
-}
-
-.drip-backlog li .drip-meta {
-  grid-column: 1;
-}
-
-.drip-backlog .drip-x {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: center;
-  font: inherit;
-  font-size: 18px;
-  color: var(--drip-muted);
-  background: none;
-  border: 0;
-  cursor: pointer;
-  padding: 0 4px;
-}
-
-.drip-empty {
-  margin-top: 8px;
 }
 
 #drip-lock {
@@ -306,4 +176,729 @@ a.drip-btn {
   border-radius: 12px;
   background: var(--drip-bg);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* The home page (home.js). DESIGN.md's "Visual design" section is the spec and drip-page-demos/ has Jesse's mockups.
+   Colors that differ by theme key off html[dark], which YouTube sets in dark mode. Sizes are tokens here, so tuning
+   the look is mostly edits to this block. */
+#drip-home {
+  --drip-blue: #42a5f6;
+  --drip-gold: #fdc905;
+  --drip-gold-hover: #ffd633;
+  --drip-on-gold: #0f0f0f;
+  --drip-gray: #f2f2f2;
+  --drip-gray-hover: #e5e5e5;
+  --drip-gray-active: #d9d9d9;
+  --drip-primary-bg: #0f0f0f;
+  --drip-primary-fg: #fff;
+  --drip-primary-hover: #272727;
+  --drip-glass-line: #909090;
+  --drip-rule: rgba(0, 0, 0, 0.1);
+  --drip-row-hover: rgba(0, 0, 0, 0.05);
+  --drip-skeleton: rgba(0, 0, 0, 0.06);
+  --drip-focus: #065fd4;
+  --drip-col: 400px;
+  --drip-btn-h: 42px;
+  --drip-radius: 12px;
+  max-width: calc(var(--drip-col) + 32px);
+  margin: clamp(32px, 16vh, 168px) auto 96px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  container: drip-home / inline-size;
+}
+
+html[dark] #drip-home {
+  --drip-gray: #272727;
+  --drip-gray-hover: #3a3a3a;
+  --drip-gray-active: #474747;
+  --drip-primary-bg: #fff;
+  --drip-primary-fg: #0f0f0f;
+  --drip-primary-hover: #e5e5e5;
+  --drip-glass-line: #d9d9d9;
+  --drip-rule: rgba(255, 255, 255, 0.12);
+  --drip-row-hover: rgba(255, 255, 255, 0.06);
+  --drip-skeleton: rgba(255, 255, 255, 0.08);
+  --drip-focus: #3ea6ff;
+}
+
+#drip-home *,
+#drip-home *::before,
+#drip-home *::after {
+  box-sizing: border-box;
+}
+
+/* Text only screen readers get, like the token names after a price. */
+#drip-home .drip-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Icons from src/icons are masks filled with the text color, so one SVG works on every background. */
+#drip-home .drip-i {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  -webkit-mask: var(--drip-icon) center / contain no-repeat;
+  mask: var(--drip-icon) center / contain no-repeat;
+}
+
+#drip-home .drip-token-drop {
+  color: var(--drip-blue);
+}
+
+#drip-home .drip-token-card {
+  color: var(--drip-gold);
+}
+
+/* Stats: the glass, minutes left, and the two token counts, centered as one group. */
+#drip-home .drip-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 44px;
+}
+
+#drip-home .drip-glass-tile {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 14px;
+  background: var(--drip-gray);
+  color: var(--drip-glass-line);
+}
+
+#drip-home .drip-glass {
+  display: block;
+  overflow: visible;
+}
+
+#drip-home .drip-glass-wave {
+  transition: transform 700ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+#drip-home .drip-glass-surface {
+  transition: opacity 300ms ease;
+}
+
+#drip-home .drip-time-block {
+  min-width: 0;
+  margin-right: 20px;
+}
+
+#drip-home .drip-time {
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 36px;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#drip-home .drip-sub {
+  color: var(--drip-muted);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+#drip-home .drip-counts {
+  display: grid;
+  gap: 6px;
+}
+
+#drip-home .drip-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+#drip-home .drip-count .drip-i {
+  width: 20px;
+  height: 22px;
+}
+
+#drip-home .drip-count.is-zero {
+  color: var(--drip-muted);
+}
+
+#drip-home .drip-count.is-zero .drip-i {
+  opacity: 0.45;
+}
+
+/* Buttons. Every button that spends shows its price ("· -1" and the token). */
+#drip-home .drip-b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  height: var(--drip-btn-h);
+  padding: 0 18px;
+  border: 0;
+  border-radius: calc(var(--drip-btn-h) / 2);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease, opacity 120ms ease;
+}
+
+#drip-home .drip-b:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+#drip-home .drip-b:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+#drip-home :is(button, a):focus-visible {
+  outline: 2px solid var(--drip-focus);
+  outline-offset: 2px;
+}
+
+#drip-home .drip-b-gray {
+  color: var(--drip-text);
+  background: var(--drip-gray);
+}
+
+#drip-home .drip-b-gray:hover:not(:disabled) {
+  background: var(--drip-gray-hover);
+}
+
+#drip-home .drip-b-gold {
+  color: var(--drip-on-gold);
+  background: var(--drip-gold);
+}
+
+#drip-home .drip-b-gold:hover:not(:disabled) {
+  background: var(--drip-gold-hover);
+}
+
+#drip-home .drip-b-gold .drip-token-card {
+  color: var(--drip-on-gold);
+}
+
+#drip-home .drip-b-primary {
+  color: var(--drip-primary-fg);
+  background: var(--drip-primary-bg);
+}
+
+#drip-home .drip-b-primary:hover:not(:disabled) {
+  background: var(--drip-primary-hover);
+}
+
+#drip-home .drip-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#drip-home .drip-price .drip-i {
+  width: 14px;
+  height: 16px;
+  margin-left: -3px;
+}
+
+#drip-home .drip-sep {
+  opacity: 0.7;
+}
+
+/* The empty page: +15m and Reveal video. */
+#drip-home .drip-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#drip-home .drip-add {
+  flex: none;
+}
+
+#drip-home .drip-reveal {
+  flex: 1;
+}
+
+#drip-home .drip-add .drip-i-clock {
+  width: 17px;
+  height: 17px;
+}
+
+/* Where the next reveal comes from (Q5). Quiet, since it rarely changes. */
+#drip-home .drip-source {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 12px;
+  color: var(--drip-muted);
+  font-size: 12px;
+}
+
+#drip-home .drip-source > span {
+  margin-right: 2px;
+}
+
+#drip-home .drip-source-opt {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  color: var(--drip-muted);
+  background: none;
+  cursor: pointer;
+}
+
+#drip-home .drip-source-opt:hover:not(:disabled) {
+  color: var(--drip-text);
+}
+
+#drip-home .drip-source-opt[aria-pressed="true"] {
+  color: var(--drip-text);
+  background: var(--drip-gray);
+}
+
+#drip-home .drip-source-opt:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+#drip-home .drip-message {
+  margin-top: 14px;
+  color: var(--drip-muted);
+  font-size: 13px;
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* The reveal card. The 16:9 box and two title lines are reserved before anything loads, so nothing shifts. */
+#drip-home .drip-card.is-new {
+  animation: drip-rise 260ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+#drip-home .drip-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--drip-radius);
+  background: var(--drip-gray);
+}
+
+#drip-home .drip-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+#drip-home .drip-thumb img.is-loaded {
+  opacity: 1;
+}
+
+#drip-home .drip-thumb:hover img.is-loaded {
+  transform: scale(1.015);
+}
+
+#drip-home .drip-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: 40px;
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+#drip-home .drip-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--drip-btn-h);
+  margin-top: 6px;
+}
+
+#drip-home .drip-card-meta-row .drip-meta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--drip-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#drip-home .drip-watch {
+  flex: none;
+  padding: 0 16px 0 14px;
+}
+
+#drip-home .drip-watch .drip-i-play {
+  width: 16px;
+  height: 17px;
+}
+
+#drip-home .drip-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+#drip-home .drip-card-save {
+  flex: none;
+  padding: 0 16px 0 14px;
+}
+
+#drip-home .drip-card-save .drip-i-save {
+  width: 14px;
+  height: 17px;
+}
+
+#drip-home .drip-card-save.is-saved {
+  background: var(--drip-gray-active);
+}
+
+#drip-home .drip-next {
+  flex: 1;
+  padding: 0 14px;
+}
+
+#drip-home .drip-next-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#drip-home .drip-next .drip-i-arrow {
+  width: 20px;
+  height: 16px;
+}
+
+#drip-home .drip-pass {
+  flex: none;
+  width: var(--drip-btn-h);
+  padding: 0;
+  color: var(--drip-muted);
+}
+
+#drip-home .drip-pass .drip-i {
+  width: 16px;
+  height: 16px;
+}
+
+/* Loading: the reserved box shimmers, and Reveal next dims the card it's replacing. */
+#drip-home .drip-card.is-loading .drip-thumb,
+#drip-home .drip-card.is-next .drip-thumb,
+#drip-home .drip-skel {
+  background: linear-gradient(100deg, var(--drip-gray) 30%, var(--drip-gray-hover) 50%, var(--drip-gray) 70%) 0 0 / 300% 100%;
+  animation: drip-shimmer 1.4s linear infinite;
+}
+
+#drip-home .drip-card.is-next .drip-thumb img {
+  opacity: 0.35;
+}
+
+#drip-home .drip-card.is-next .drip-card-title {
+  opacity: 0.5;
+}
+
+#drip-home .drip-skel {
+  display: block;
+  height: 14px;
+  margin: 3px 0 9px;
+  border-radius: 7px;
+}
+
+#drip-home .drip-skel-short {
+  width: 60%;
+}
+
+#drip-home .drip-loading {
+  height: 56px;
+}
+
+/* Saved: open with 3 rows on the empty page, collapsed while a card is up. */
+#drip-home .drip-saved {
+  margin-top: 36px;
+}
+
+#drip-home .drip-saved-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--drip-rule);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--drip-text);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+#drip-home .drip-chevron {
+  width: 16px;
+  height: 16px;
+  transform: rotate(-90deg);
+  transition: transform 160ms ease;
+}
+
+#drip-home .drip-saved.is-open .drip-saved-head .drip-chevron,
+#drip-home .drip-saved-more .drip-chevron {
+  transform: none;
+}
+
+#drip-home .drip-saved-more .drip-chevron.is-up {
+  transform: rotate(180deg);
+}
+
+#drip-home .drip-saved-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#drip-home .drip-saved-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  isolation: isolate;
+  min-height: 59px;
+  border-bottom: 1px solid var(--drip-rule);
+  cursor: pointer;
+}
+
+/* The hover fill reaches 8px past the text on each side, while the dividers stay the column's width. */
+#drip-home .drip-saved-row::before {
+  content: "";
+  position: absolute;
+  inset: 3px -8px;
+  z-index: -1;
+  border-radius: 8px;
+  transition: background-color 120ms ease;
+}
+
+#drip-home .drip-saved-row:hover::before {
+  background: var(--drip-row-hover);
+}
+
+#drip-home .drip-saved-link {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+#drip-home .drip-saved-title,
+#drip-home .drip-saved-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#drip-home .drip-saved-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#drip-home .drip-saved-meta {
+  color: var(--drip-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* × shows on hover or focus. Touch screens have no hover, so it always shows there. */
+#drip-home .drip-saved-x {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--drip-muted);
+  background: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+#drip-home .drip-saved-x .drip-i {
+  width: 16px;
+  height: 16px;
+}
+
+#drip-home .drip-saved-x:hover {
+  color: var(--drip-text);
+  background: var(--drip-gray);
+}
+
+#drip-home .drip-saved-row:hover .drip-saved-x,
+#drip-home .drip-saved-row:focus-within .drip-saved-x {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  #drip-home .drip-saved-x {
+    opacity: 1;
+  }
+}
+
+#drip-home .drip-saved-play {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--drip-blue);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#drip-home .drip-saved-play > .drip-i-play {
+  width: 24px;
+  height: 26px;
+}
+
+#drip-home .drip-saved-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--drip-text);
+}
+
+#drip-home .drip-saved-price .drip-i {
+  width: 12px;
+  height: 14px;
+}
+
+#drip-home .drip-saved-row.is-removed {
+  display: flex;
+  gap: 6px;
+  color: var(--drip-muted);
+  font-size: 13px;
+  cursor: default;
+}
+
+#drip-home .drip-saved-row.is-removed:hover::before {
+  background: none;
+}
+
+#drip-home .drip-undo {
+  padding: 4px 2px;
+  border: 0;
+  font: inherit;
+  font-weight: 500;
+  color: var(--drip-text);
+  background: none;
+  cursor: pointer;
+}
+
+#drip-home .drip-undo:hover {
+  text-decoration: underline;
+}
+
+#drip-home .drip-saved-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 4px 0;
+  border: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--drip-muted);
+  background: none;
+  cursor: pointer;
+}
+
+#drip-home .drip-saved-more:hover {
+  color: var(--drip-text);
+}
+
+#drip-home .drip-saved-empty {
+  padding: 16px 0;
+  color: var(--drip-muted);
+  font-size: 13px;
+}
+
+/* A narrow column, from a small window or YouTube's guide open beside it: tighter gaps and padding. */
+@container drip-home (max-width: 452px) {
+  #drip-home .drip-stats {
+    gap: 12px;
+  }
+
+  #drip-home .drip-time-block {
+    margin-right: 8px;
+  }
+
+  #drip-home .drip-b {
+    padding: 0 14px;
+  }
+
+  #drip-home .drip-card-save {
+    padding: 0 12px;
+  }
+}
+
+/* Very narrow: the Save label goes, its icon stays, and Reveal next keeps its room. */
+@container drip-home (max-width: 372px) {
+  #drip-home .drip-save-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  #drip-home .drip-card-save {
+    width: var(--drip-btn-h);
+    padding: 0;
+  }
+}
+
+@keyframes drip-shimmer {
+  to {
+    background-position: -150% 0;
+  }
+}
+
+@keyframes drip-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #drip-home *,
+  #drip-home *::before,
+  #drip-home *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
