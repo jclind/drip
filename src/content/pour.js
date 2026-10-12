@@ -101,10 +101,15 @@
   }
 
   /**
-   * The waterline's transform for a fraction, as glass.js sets it.
+   * The waterline's transform for a fraction. glass.js puts a full glass's waterline past the rim, well above where
+   * just under full sits, so the last 5% closes that gap gradually and the water doesn't jump on its way up.
    * @param {number} fraction @param {number} px
    */
-  const level = (fraction, px) => `translateY(${fraction >= 1 ? 0 : DripGlass.waterline(fraction, px)}px)`;
+  function level(fraction, px) {
+    const near = DripGlass.waterline(0.95, px);
+    const y = fraction >= 1 ? 0 : fraction > 0.95 ? near * (1 - fraction) / 0.05 : DripGlass.waterline(fraction, px);
+    return `translateY(${y.toFixed(2)}px)`;
+  }
 
   /**
    * The water's surface on screen.
@@ -127,6 +132,9 @@
     wave.getAnimations().forEach((a) => a.cancel());
     wave.style.transition = 'none';
     DripGlass.set(glass, to, px);
+    // A full glass shows the water's surface through the rim. It appears as the water gets there, not before.
+    const surface = glass.querySelector('.drip-glass-surface');
+    if (surface && to >= 1) play(surface, [{ opacity: 0 }, { opacity: 0, offset: 0.75 }, { opacity: 1 }], { duration: delay + ms, fill: 'none' });
     // A damped bounce, sampled.
     const frames = Array.from({ length: 15 }, (_, i) => {
       const t = i / 14;
