@@ -52,8 +52,20 @@
       ctx.wrap.style.pointerEvents = '';
     }
 
+    /**
+     * Whether keyboard focus is somewhere in drip's page. The buttons that had it get disabled or replaced during an
+     * animation, which drops focus to the page, so each action puts it back on the button that does the same job next.
+     */
+    const focusIn = (api) => api.root.contains(document.activeElement) && document.activeElement !== api.root;
+
+    /** Puts focus on `el` if drip had it before and lost it along the way. */
+    function refocus(api, had, el) {
+      if (had && el && !api.root.contains(document.activeElement)) el.focus();
+    }
+
     app({
       async reveal(api) {
+        const had = focusIn(api);
         ctx = Opening.open(api);
         spendShown(api);
         const landing = source === 'button'
@@ -61,8 +73,11 @@
           : Cards.deal(api, ctx.shell.thumb);
         const formed = Opening.form(ctx, style);
         await show(api, await api.feed(), landing, false, ctx.opened, formed);
+        // Watch is what you'd do next with the card.
+        refocus(api, had, current.watch);
       },
       async next(api) {
+        const had = focusIn(api);
         const from = current.next.getBoundingClientRect();
         const color = getComputedStyle(current.next).backgroundColor;
         current.next.querySelector('.drip-next-label').textContent = 'Revealing…';
@@ -70,20 +85,26 @@
         for (const b of current.row.querySelectorAll('button')) b.disabled = true;
         fadeTexts(current);
         const tossed = Cards.discard(dealt, 'aside');
-        await wait(REDUCED ? 0 : 520);
+        // The next card is dealt while the old one is still being tossed, instead of after: about 1.5s to usable
+        // buttons, down from 2.1s. For a moment both cards are on screen.
+        await wait(REDUCED ? 0 : 300);
         spendShown(api);
-        const landing = source === 'button' ? Cards.lift(api, current.thumb, from, color) : Cards.deal(api, current.thumb);
-        const video = await api.feed();
-        await tossed;
-        await show(api, video, landing, true);
+        const dealing = source === 'button' ? Cards.lift(api, current.thumb, from, color) : Cards.deal(api, current.thumb);
+        // The new card goes into the box only once the old one is gone.
+        const landing = Promise.all([dealing, tossed]).then(([card]) => card);
+        await show(api, await api.feed(), landing, true);
+        // Focus stays on Reveal next, so you can keep pressing it.
+        refocus(api, had, current.next);
       },
       async pass(api) {
+        const had = focusIn(api);
         for (const b of current.row.querySelectorAll('button')) b.disabled = true;
         fadeTexts(current);
         await Cards.discard(dealt, 'down');
         await Opening.close(ctx, current, style);
         current = null;
         dealt = null;
+        refocus(api, had, api.slot.querySelector('.drip-reveal'));
       },
     });
   }
