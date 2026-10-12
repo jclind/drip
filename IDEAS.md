@@ -53,7 +53,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 - ★ Kept drops land. After "Done for now", the home page's "Kept 3 drops." has the three drops fall into the drop counter one at a time, and the count ticks up with a small bounce. This is the payoff for leaving, so it can be the most satisfying motion in drip.
 - ★ Save fills. The bookmark on the card and the pill fills from the bottom up in blue when saved, like the glass, and drains when unsaved.
 - ★ A new day. The first time the home page opens after the reset, the glass fills from empty with the day's minutes.
-- Pass sinks. The × sends the card down and out like it dropped into water, instead of vanishing. Reveal next could do the same before the new card rises.
+- Pass sinks. The × sends the card down and out like it dropped into water, instead of vanishing. Reveal next could do the same before the new card rises. Built another way on 2026-10-12: the card turns face down and drops (DESIGN.md, "Reveal animation as built").
 - Removing a Saved row evaporates it (a short blur and fade upward), and Undo drips it back in.
 - The pill's water surface gets a tiny ripple each time a minute ticks off, so a glance shows it's draining without reading the number.
 - In the last minute, the pill's water wobbles a little on top of the low-time shimmer. Still no red.

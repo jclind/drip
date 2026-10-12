@@ -8,6 +8,8 @@
   const { send, h, onState, hourLabel, watchUrl, icon, price, KEPT_KEY, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
+  /** @type {any} */
+  const DripReveal = /** @type {any} */ (globalThis).DripReveal;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -156,30 +158,100 @@
   let busy = '';
 
   /**
-   * Reads the feed, then sends `msg` with the videos it found. Shared by Reveal and Reveal next.
+   * The reveal animation is running (reveal.js). It draws on the page's own elements until it's done, so render()
+   * waits, and the page is drawn once at the end.
+   */
+  let moving = false;
+
+  /** Reveals, Reveal next, and Pass animate unless the browser asks for reduced motion. */
+  const animates = () => !DripReveal.reduced();
+
+  /**
+   * Reads the feed, then sends `msg` with the videos it found. Resolves with the worker's reply when it worked, or
+   * null after setting the message that says why not.
+   * @param {Record<string, unknown>} msg
+   */
+  async function findWith(msg) {
+    const pool = await readCandidates();
+    // No videos at all, not just none new: the grid's markup changed (Q25).
+    const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
+    if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
+      reportBroken('grid', SEL.item);
+      message = errorText('pool-empty');
+      return null;
+    }
+    const res = absorb(await send({ ...msg, candidates: pool }));
+    if (res && !res.ok) message = errorText(res.error);
+    return res && res.ok ? res : null;
+  }
+
+  /**
+   * Reveal and Reveal next. Shared by both.
    * @param {'reveal' | 'next'} kind
    * @param {Record<string, unknown>} msg
    */
   async function revealWith(kind, msg) {
-    if (busy) return;
+    if (busy || moving) return;
     busy = kind;
     message = '';
+    if (animates()) {
+      const run = kind === 'reveal' ? DripReveal.reveal : DripReveal.next;
+      const { ok, focused } = await animate(run, async () => (await findWith(msg))?.video || null);
+      // The button that had focus is gone. Focus goes to what you'd press next.
+      if (focused) focusOn(ok ? (kind === 'reveal' ? 'watch' : 'next') : kind === 'reveal' ? 'reveal' : 'next');
+      return;
+    }
     render();
     try {
-      const pool = await readCandidates();
-      // No videos at all, not just none new: the grid's markup changed (Q25).
-      const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
-      if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
-        reportBroken('grid', SEL.item);
-        message = errorText('pool-empty');
-        return;
-      }
-      const res = absorb(await send({ ...msg, candidates: pool }));
-      if (res && !res.ok) message = errorText(res.error);
+      await findWith(msg);
     } finally {
       busy = '';
       render();
     }
+  }
+
+  /**
+   * Runs one of reveal.js's animations, then draws the page once. reveal.js's last frame looks like the page this
+   * draws, so nothing jumps.
+   * @param {(o: any) => Promise<boolean | void>} run
+   * @param {() => Promise<any>} find Finds and pays for the video a reveal shows.
+   * @returns {Promise<{ok: boolean, focused: boolean}>} Whether it worked, and whether drip's page had keyboard focus.
+   */
+  async function animate(run, find) {
+    const root = /** @type {HTMLElement} */ (document.getElementById('drip-home'));
+    const page = root.querySelector('.drip-page');
+    const focused = root.contains(document.activeElement);
+    moving = true;
+    let ok = false;
+    try {
+      ok = !!(await run({
+        root, page, find,
+        counter: page?.querySelector('.drip-stats .drip-token-card'),
+        card: (/** @type {any} */ video) => (video ? card(video) : openingCard()),
+        actions,
+        ready: (/** @type {any} */ video) => thumbReady(video.id),
+        saved: {
+          now: () => root.querySelector('.drip-saved'),
+          build: (/** @type {boolean} */ open) => savedList(open ? 'empty' : 'card'),
+        },
+      }));
+    } finally {
+      moving = false;
+      busy = '';
+      rendered = '';
+      render();
+    }
+    return { ok, focused };
+  }
+
+  /**
+   * Puts keyboard focus on a control by its data-k, if nothing on drip's page has it.
+   * @param {string} key
+   */
+  function focusOn(key) {
+    const root = document.getElementById('drip-home');
+    if (!root || root.contains(document.activeElement)) return;
+    /** @type {HTMLElement | null} */ (root.querySelector(`[data-k="${key}"]`))?.focus();
   }
 
   function onReveal() {
@@ -200,7 +272,22 @@
 
   /** @param {'watch' | 'save' | 'unsave' | 'pass'} action @param {string} videoId The card the button was on. */
   async function onResolve(action, videoId) {
+    if (moving) return;
     message = '';
+    if (action === 'pass' && animates() && document.querySelector('#drip-home .drip-card .drip-deal')) {
+      // Redraws wait while the worker answers, so the card is still there to animate.
+      moving = true;
+      const res = absorb(await send({ type: 'resolve', action, videoId }));
+      moving = false;
+      if (!res || !res.ok) {
+        message = errorText(res ? res.error : '');
+        render();
+        return;
+      }
+      const { focused } = await animate(DripReveal.pass, async () => null);
+      if (focused) focusOn('reveal');
+      return;
+    }
     const res = absorb(await send({ type: 'resolve', action, videoId }));
     if (res && !res.ok) message = errorText(res.error);
     if (action === 'watch' && res && res.ok) {
@@ -300,10 +387,20 @@
   const GLASS_PX = 34;
   let lastCardId = '';
 
-  /** @param {string} id */
+  /** Resolves when a thumbnail from thumbnail() has loaded, or failed in both sizes. */
+  /** @type {WeakMap<HTMLElement, Promise<void>>} */
+  const thumbLoads = new WeakMap();
+
+  /**
+   * The card's box for a video: a face-up card (reveal.js) with the thumbnail on its front.
+   * @param {string} id
+   */
   function thumbnail(id) {
     if (thumbCache && thumbCache.id === id) return thumbCache.el;
     const img = /** @type {HTMLImageElement} */ (h('img', { alt: '', decoding: 'async' }));
+    /** @type {() => void} */
+    let loaded = () => {};
+    const done = new Promise((resolve) => { loaded = () => resolve(undefined); });
     // hq720 is 16:9 with no black bars, but some videos don't have it. Then YouTube answers with a 120px gray
     // placeholder, or an error, and hqdefault is the fallback.
     const fallback = () => {
@@ -314,15 +411,29 @@
     img.addEventListener('load', () => {
       if (img.naturalWidth <= 120 && fallback()) return;
       img.classList.add('is-loaded');
+      loaded();
     });
-    img.addEventListener('error', fallback);
+    img.addEventListener('error', () => {
+      if (!fallback()) loaded();
+    });
     img.src = `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hq720.jpg`;
     const el = h('a', {
-      class: 'drip-thumb', href: watchUrl(id), tabindex: '-1', 'aria-hidden': 'true',
+      class: 'drip-thumb is-dealt', href: watchUrl(id), tabindex: '-1', 'aria-hidden': 'true',
       onclick: (/** @type {Event} */ e) => { e.preventDefault(); onResolve('watch', id); },
-    }, img);
+    }, DripReveal.dealCard(img, true));
     thumbCache = { id, el };
+    thumbLoads.set(el, done);
     return el;
+  }
+
+  /**
+   * Resolves once the thumbnail for `id` can show: loaded, failed in both sizes, or still loading after 8 seconds, when
+   * the card turns over onto its gray front rather than wait any longer.
+   * @param {string} id
+   */
+  function thumbReady(id) {
+    const done = thumbLoads.get(thumbnail(id)) || Promise.resolve();
+    return Promise.race([done, new Promise((r) => setTimeout(r, 8000))]);
   }
 
   function glass() {
@@ -365,7 +476,8 @@
         title: `Add ${s.minutesPerToken} minutes for 1 drop`,
       }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop')),
       h('button', {
-        class: 'drip-b drip-b-gold drip-reveal', 'data-k': 'reveal', onclick: onReveal, disabled: state.tokens.rec < 1 || !!busy,
+        // While the animation runs, it draws these buttons as they'll be once it's done.
+        class: 'drip-b drip-b-gold drip-reveal', 'data-k': 'reveal', onclick: onReveal, disabled: state.tokens.rec < 1 || (!!busy && !moving),
       }, h('span', {}, 'Reveal video'), price('card')));
   }
 
@@ -378,13 +490,27 @@
       h('div', { class: 'drip-card-meta-row' }, h('span', { class: 'drip-meta' }, subs ? 'Checking your subscriptions…' : 'Finding a video…')));
   }
 
+  /**
+   * The loading card with the card's buttons under it, which the reveal animation opens up and turns +15m and Reveal
+   * video into (reveal.js). Nothing on it is clickable until the real card replaces it.
+   */
+  function openingCard() {
+    const el = placeholderCard();
+    el.append(h('div', { class: 'drip-card-actions' },
+      h('button', { class: 'drip-b drip-b-gray drip-card-save', tabindex: '-1' }, icon('save'), h('span', { class: 'drip-save-label' }, 'Stash')),
+      h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
+      h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
+    return el;
+  }
+
   /** @param {any} video */
   function card(video) {
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === video.id);
     const meta = [video.channel, video.length].filter(Boolean).join(' · ');
     // At 0 minutes Watch buys a drop's minutes and plays (Q18). With no drops either, it goes to the lock screen.
     const buys = costsDrop(video.id);
-    const next = busy === 'next';
+    // The animation shows Reveal next its own way, and draws the card as it'll be once it's done.
+    const next = busy === 'next' && !moving;
     // Only a newly revealed card rises in. Rebuilds for Save and the like leave it still.
     const isNew = video.id !== lastCardId;
     lastCardId = video.id;
@@ -410,8 +536,9 @@
         }, icon('x'))));
   }
 
-  function savedList() {
-    const mode = state.current || busy === 'reveal' ? 'card' : 'empty';
+  /** @param {'empty' | 'card'} [as] Draw it as on that page. The reveal animation opens and folds it ahead of time. */
+  function savedList(as) {
+    const mode = as || (state.current || busy === 'reveal' ? 'card' : 'empty');
     const open = savedOpen[mode];
     const count = state.backlog.length;
     const total = state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + lengthSeconds(v.length), 0);
@@ -469,7 +596,8 @@
     const showCard = state.current || busy === 'reveal';
     // The kept drops rise in once, as the lock's water falls away. Rebuilds after that leave the message still.
     const rises = !!message && message === keptMessage;
-    return h('div', { class: 'drip-page' },
+    // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
+    return h('div', { class: `drip-page${showCard ? ' is-open' : ''}` },
       stats(),
       !showCard && actions(),
       state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
@@ -482,7 +610,7 @@
   /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
     const root = document.getElementById('drip-home');
-    if (!root) return;
+    if (!root || moving) return;
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0, DripGlass.fraction(state).toFixed(3),
       state.tokens, state.current, state.backlog, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
