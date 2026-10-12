@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reveal: C, Dealt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="drip.css">
+<style>
+/* C, Dealt. A reveal spends a card, so you see the card. It leaves the counter face down, turns and grows as it's
+   dealt into the card's box, and waits there with a sheen while the video loads. Then it flips over, and the face is
+   the thumbnail. Reveal next flips the old one face down and tosses it aside as the next is dealt. Pass flips it and
+   lets it drop. Nothing on the page moves; the slot keeps the card's shape. */
+#drip-home .drip-thumb.c-stage {
+  overflow: visible;
+  background: transparent;
+  animation: none;
+  perspective: 1100px;
+}
+
+/* Where the card will land, until it does. */
+#drip-home .drip-thumb.c-stage.c-empty {
+  box-shadow: inset 0 0 0 1.5px var(--drip-rule);
+}
+
+#drip-home .drip-card.is-loading .drip-skel {
+  animation: none;
+}
+
+.c-card {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.c-card.is-up {
+  pointer-events: auto;
+}
+
+.c-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--drip-radius);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.c-back {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--drip-gold) 14%, var(--drip-gray));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--drip-gold) 55%, transparent);
+}
+
+#drip-home .c-back .drip-i {
+  width: 46px;
+  height: 54px;
+  color: var(--drip-gold);
+}
+
+/* A slow sheen across the back while the video loads. */
+.c-card.is-waiting .c-back::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, color-mix(in srgb, var(--drip-gold) 22%, transparent) 50%, transparent 65%);
+  animation: c-sheen 1.6s ease-in-out infinite;
+}
+
+.c-front {
+  transform: rotateY(180deg);
+  background: var(--drip-gray);
+}
+
+#drip-home .c-front img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 240ms ease;
+}
+
+#drip-home .drip-thumb:hover .c-front img {
+  transform: scale(1.015);
+}
+
+#drip-home .w-hold {
+  opacity: 0;
+}
+
+@keyframes c-sheen {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+</style>
+</head>
+<body>
+<script src="glass.js"></script>
+<script src="base.js"></script>
+<script>
+const { h, icon, app, animate, wait, REDUCED } = Mock;
+const EASE_OUT = 'cubic-bezier(0.2, 0.7, 0.2, 1)';
+let current = null;
+/** The dealt card in the box: { el, front }. */
+let dealt = null;
+
+function makeCard() {
+  const front = h('div', { class: 'c-face c-front' });
+  const back = h('div', { class: 'c-face c-back' }, icon('card'));
+  const el = h('div', { class: 'c-card', 'aria-hidden': 'true' }, back, front);
+  return { el, back, front };
+}
+
+/** Deals a face-down card from the counter's card icon into `thumb`. Resolves when it lands. */
+async function deal(api, thumb) {
+  const card = makeCard();
+  thumb.append(card.el);
+  const box = thumb.getBoundingClientRect();
+  const from = api.recIcon.getBoundingClientRect();
+  const dx = from.left + from.width / 2 - (box.left + box.width / 2);
+  const dy = from.top + from.height / 2 - (box.top + box.height / 2);
+  // Turned a quarter, a landscape box reads as the portrait card icon, so it starts at the icon's size.
+  const k = from.height / box.width;
+  // Fades go on the faces, never the card: opacity on the card flattens its 3D, and then the back shows through.
+  animate(card.back, [{ opacity: 0 }, { opacity: 1 }], { duration: 60 });
+  await animate(card.el, [
+    { transform: `translate(${dx}px, ${dy}px) rotate(-78deg) scale(${k})` },
+    { transform: `translate(${dx * 0.4}px, ${dy * 0.4 - 26}px) rotate(-24deg) scale(0.62)`, offset: 0.55 },
+    { transform: 'translate(0, -3px) rotate(0.6deg) scale(1.02)', offset: 0.85 },
+    { transform: 'none' },
+  ], { duration: 640, easing: 'cubic-bezier(0.3, 0.6, 0.3, 1)' });
+  card.el.getAnimations().forEach((a) => a.cancel());
+  card.back.getAnimations().forEach((a) => a.cancel());
+  thumb.classList.remove('c-empty');
+  card.el.classList.add('is-waiting');
+  return card;
+}
+
+/** Flips the dealt card face up. */
+function flipUp(card) {
+  card.el.classList.remove('is-waiting');
+  return animate(card.el, [
+    { transform: 'rotateY(0deg)' },
+    { transform: 'rotateY(90deg) scale(1.05) translateY(-4px)', offset: 0.5 },
+    { transform: 'rotateY(180deg)' },
+  ], { duration: 560, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
+}
+
+/** Flips a face-up card face down, then tosses it: aside for Reveal next, straight down for Pass. */
+async function discard(card, toward) {
+  card.el.classList.remove('is-up');
+  await animate(card.el, [
+    { transform: 'rotateY(180deg)' },
+    { transform: 'rotateY(270deg) scale(1.03)', offset: 0.5 },
+    { transform: 'rotateY(360deg)' },
+  ], { duration: 420, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
+  const out = toward === 'aside' ? 'translate(-44px, 14px) rotate(-7deg) scale(0.94)' : 'translateY(36px) scale(0.96)';
+  animate(card.back, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-in' });
+  await animate(card.el, [{ transform: 'rotateY(360deg)' }, { transform: `${out} rotateY(360deg)` }], { duration: 300, easing: 'ease-in' });
+  card.el.remove();
+}
+
+/**
+ * Builds the real card for `video` around the dealt card, its text held, and flips it once the picture has loaded.
+ * @param {boolean} rowShown The buttons were already showing (Reveal next).
+ */
+async function show(api, video, landing, rowShown) {
+  const card = api.card(video);
+  card.thumb.classList.add('c-stage');
+  card.img.classList.add('is-loaded');
+  const held = [card.title, card.metaRow, ...(rowShown ? [] : [card.row])];
+  held.forEach((el) => el.classList.add('w-hold'));
+  for (const b of card.row.querySelectorAll('button')) b.disabled = true;
+  const loaded = api.loadThumb(card.img, video);
+  const placed = await landing;
+  // The image moves onto the card's face, and the card into the real card's box.
+  placed.front.append(card.img);
+  card.thumb.append(placed.el);
+  api.slot.replaceChildren(card.el);
+  current = card;
+  dealt = placed;
+  await loaded;
+  const flipped = flipUp(placed);
+  held.forEach((el) => el.classList.remove('w-hold'));
+  held.forEach((el, i) => animate(el, [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 320, delay: 240 + i * 90, easing: EASE_OUT }));
+  await flipped;
+  placed.el.classList.add('is-up');
+  for (const b of card.row.querySelectorAll('button')) b.disabled = false;
+}
+
+/** The count drops as the card leaves it, before the feed answers. */
+function spendShown(api) {
+  api.recNum.textContent = String(api.state.rec - 1);
+}
+
+app({
+  async reveal(api) {
+    const shell = api.shell();
+    shell.thumb.classList.add('c-stage', 'c-empty');
+    api.slot.replaceChildren(shell.el);
+    api.setMode('card');
+    spendShown(api);
+    const landing = deal(api, shell.thumb);
+    const video = await api.feed();
+    // Until the card lands it lives in the shell's box. The real card's box is in the same place.
+    await show(api, video, landing, false);
+  },
+  async next(api) {
+    current.next.querySelector('.drip-next-label').textContent = 'Revealing…';
+    current.next.querySelector('.drip-price').remove();
+    for (const b of current.row.querySelectorAll('button')) b.disabled = true;
+    animate(current.title, [{ opacity: 1 }, { opacity: 0 }], { duration: 220 });
+    animate(current.metaRow, [{ opacity: 1 }, { opacity: 0 }], { duration: 220 });
+    const old = dealt;
+    const thumb = current.thumb;
+    const tossed = discard(old, 'aside');
+    await wait(REDUCED ? 0 : 520);
+    spendShown(api);
+    const landing = deal(api, thumb);
+    const video = await api.feed();
+    await tossed;
+    await show(api, video, landing, true);
+  },
+  async pass(api) {
+    for (const b of current.row.querySelectorAll('button')) b.disabled = true;
+    animate(current.title, [{ opacity: 1 }, { opacity: 0 }], { duration: 220 });
+    animate(current.metaRow, [{ opacity: 1 }, { opacity: 0 }], { duration: 220 });
+    await discard(dealt, 'down');
+    await animate(current.row, [{ opacity: 1 }, { opacity: 0 }], { duration: 160 });
+    const from = api.slot.offsetHeight;
+    const actions = api.actions();
+    api.slot.replaceChildren(actions);
+    const to = api.slot.offsetHeight;
+    api.slot.style.overflow = 'hidden';
+    animate(actions, [{ opacity: 0 }, { opacity: 1 }], { duration: 240, delay: 180 });
+    await animate(api.slot, [{ height: `${from}px` }, { height: `${to}px` }], { duration: 380, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
+    api.slot.getAnimations().forEach((a) => a.cancel());
+    api.slot.style.overflow = '';
+    api.setMode('empty');
+    current = null;
+    dealt = null;
+  },
+});
+</script>
+</body>
+</html>

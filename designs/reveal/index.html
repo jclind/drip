@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reveal variants</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+:root {
+  --bg: #0f0f0f;
+  --bar: #181818;
+  --text: #f1f1f1;
+  --muted: #aaa;
+  --line: rgba(255, 255, 255, 0.12);
+  --on: #42a5f6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font: 14px/1.4 "Roboto", "Arial", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  background: var(--bar);
+  border-bottom: 1px solid var(--line);
+}
+
+.round {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+nav, .opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+button {
+  font: inherit;
+  font-weight: 500;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--text);
+  background: none;
+  cursor: pointer;
+}
+
+button[aria-pressed="true"] {
+  border-color: var(--on);
+  background: rgba(66, 165, 246, 0.16);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--on);
+  outline-offset: 2px;
+}
+
+.opts {
+  margin-left: auto;
+}
+
+.idea {
+  width: 100%;
+  max-width: 900px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.idea a {
+  color: var(--muted);
+}
+
+main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  background: #000;
+}
+
+iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #0f0f0f;
+}
+
+main.is-phone iframe {
+  width: 390px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+</style>
+</head>
+<body>
+<header>
+  <span class="round">Reveal animation · round 1</span>
+  <nav id="tabs"></nav>
+  <div class="opts">
+    <button id="replay" type="button">Start over</button>
+    <button id="slow" type="button" aria-pressed="false">Slow motion ×4</button>
+    <button id="load" type="button" aria-pressed="false">Slow feed (3s)</button>
+    <button id="reduced" type="button" aria-pressed="false">Reduced motion</button>
+    <button id="light" type="button" aria-pressed="false">Light</button>
+    <button id="phone" type="button" aria-pressed="false">Phone</button>
+  </div>
+  <div class="idea" id="idea"></div>
+</header>
+<main id="stage"><iframe id="frame" title="Variant"></iframe></main>
+<script>
+const VARIANTS = [
+  { key: 'a', label: 'A, Surface', idea: 'Only the card\'s box moves. A drop falls into it, rings spread while the video loads, and the picture opens out from the center. Reveal next and Pass close the picture back to a point.' },
+  { key: 'b', label: 'B, Opening', idea: 'Your idea from 2026-10-07. The page opens: stats up, buttons down, a drop falls from the stats into the space and the picture surfaces. +15m shrinks to a bead that grows back out as Stash, and × pinches off the end of Reveal next. Pass runs it backwards.' },
+  { key: 'c', label: 'C, Dealt', idea: 'A reveal spends a card, so you see one. It leaves the counter face down, is dealt into the box, and flips over to show the video. Reveal next tosses the old card aside as the next is dealt. Pass flips it and drops it.' },
+  { key: 'now', label: 'Now', idea: 'As built: a shimmering box, the card rises 6px, and the picture fades in. Pass swaps the buttons back at once.' },
+];
+const params = new URLSearchParams(location.search);
+let current = params.get('v') || 'a';
+const flags = {
+  slow: params.get('slow') === '1', load: params.get('load') === '1', reduced: params.get('reduced') === '1',
+  light: params.get('light') === '1', phone: params.get('phone') === '1',
+};
+const tabs = document.getElementById('tabs');
+const frame = document.getElementById('frame');
+
+function src() {
+  const q = new URLSearchParams();
+  if (flags.slow) q.set('slow', '4');
+  if (flags.load) q.set('load', 'slow');
+  if (flags.reduced) q.set('reduced', '1');
+  if (flags.light) q.set('theme', 'light');
+  q.set('t', Date.now());
+  return `${current}.html?${q}`;
+}
+
+function render() {
+  tabs.replaceChildren(...VARIANTS.map((v) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = v.label;
+    b.setAttribute('aria-pressed', String(v.key === current));
+    b.onclick = () => { current = v.key; render(); };
+    return b;
+  }));
+  const v = VARIANTS.find((x) => x.key === current);
+  const idea = document.getElementById('idea');
+  idea.textContent = `${v.idea} `;
+  const open = document.createElement('a');
+  open.href = `${current}.html`;
+  open.target = '_blank';
+  open.textContent = 'Open alone';
+  idea.append(open);
+  for (const k of Object.keys(flags)) document.getElementById(k).setAttribute('aria-pressed', String(flags[k]));
+  document.getElementById('stage').classList.toggle('is-phone', flags.phone);
+  const q = new URLSearchParams({ v: current });
+  for (const k of Object.keys(flags)) if (flags[k]) q.set(k, '1');
+  history.replaceState(null, '', `?${q}`);
+  frame.src = src();
+}
+
+for (const k of Object.keys(flags)) document.getElementById(k).onclick = () => { flags[k] = !flags[k]; render(); };
+document.getElementById('replay').onclick = () => { frame.src = src(); };
+render();
+</script>
+</body>
+</html>

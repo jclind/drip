@@ -1,0 +1,49 @@
+/* The water in the card's box (water.js), shared by A and B. */
+#drip-home .drip-thumb.w-pool {
+  background: color-mix(in srgb, var(--drip-blue) 7%, var(--drip-gray));
+  animation: none;
+}
+
+#drip-home .drip-card.is-loading .drip-skel {
+  animation: none;
+}
+
+.w-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.w-drop {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 20px;
+  margin: -10px 0 0 -8px;
+  background: var(--drip-blue);
+  -webkit-mask: url("icons/drop.svg") center / contain no-repeat;
+  mask: url("icons/drop.svg") center / contain no-repeat;
+}
+
+.w-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border: 1.5px solid color-mix(in srgb, var(--drip-blue) 75%, transparent);
+  border-radius: 50%;
+}
+
+#drip-home .drip-thumb img.w-img {
+  transition: none;
+}
+
+/* Text held back until the picture opens. */
+#drip-home .w-hold {
+  opacity: 0;
+}

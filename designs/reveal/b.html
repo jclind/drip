@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reveal: B, Opening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="drip.css">
+<link rel="stylesheet" href="water.css">
+<style>
+/* B, Opening. Jesse's idea from 2026-10-07 (DESIGN.md, "Ideas, not decided"). The page opens to make the card's space:
+   the stats slide up and the buttons ride down. A drop falls from under the stats into the space, and the thumbnail
+   surfaces from its ripple. On the way down, Reveal video turns into Reveal next. +15m shrinks to a bead and Stash grows
+   back out of it, and × pinches off the end of Reveal next, like droplets splitting. Pass runs it all backwards. */
+#drip-home.b-root {
+  position: relative;
+}
+
+#drip-home .drip-stats {
+  transition: transform 560ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+#drip-home .drip-page.b-open .drip-stats {
+  transform: translateY(-16px);
+}
+
+/* The thumbnail, title, and meta row, with the 16px above the buttons, open as one block. */
+.b-body {
+  overflow: hidden;
+  padding-bottom: 16px;
+}
+
+#drip-home .b-body + .b-wrap .drip-card-actions {
+  margin-top: 0;
+}
+
+.b-wrap {
+  position: relative;
+}
+
+/* The old buttons' labels, fading out over the blobs. */
+.b-ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+#drip-home .b-ghost .drip-b {
+  background: transparent;
+}
+
+/* Plain pills with no text, run through the goo filter so they merge and pinch apart like water. */
+.b-goo {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  filter: url("#b-goo");
+  pointer-events: none;
+}
+
+.b-goo > span {
+  position: absolute;
+  top: 0;
+  height: var(--drip-btn-h);
+  border-radius: calc(var(--drip-btn-h) / 2);
+}
+
+.b-drop {
+  position: absolute;
+  z-index: 3;
+  width: 16px;
+  height: 20px;
+  margin: -10px 0 0 -8px;
+  background: var(--drip-blue);
+  -webkit-mask: url("icons/drop.svg") center / contain no-repeat;
+  mask: url("icons/drop.svg") center / contain no-repeat;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="b-goo" x="-10%" y="-50%" width="120%" height="200%">
+    <feGaussianBlur id="b-blur" in="SourceGraphic" stdDeviation="0" result="blur" />
+    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" />
+  </filter>
+</svg>
+<script src="glass.js"></script>
+<script src="base.js"></script>
+<script src="water.js"></script>
+<script>
+const { h, app, animate, wait, SLOW, REDUCED } = Mock;
+const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
+const OPEN_MS = 560;
+const MORPH_MS = 950;
+const BLANK = { id: 'blank', title: '', channel: '', length: '' };
+let current = null;
+let body = null;
+let wrap = null;
+/** Where +15m and Reveal video sit on the empty page, for Pass to go back to. */
+let empty = null;
+
+const blurNode = document.getElementById('b-blur');
+/** Eases the goo filter's blur from one value to another. */
+function blur(from, to, ms, delay = 0) {
+  if (REDUCED) { blurNode.setAttribute('stdDeviation', String(to)); return Promise.resolve(); }
+  return new Promise((resolve) => {
+    let start = 0;
+    const step = (now) => {
+      if (!start) start = now + delay * SLOW;
+      const t = Math.min(1, Math.max(0, (now - start) / (ms * SLOW)));
+      blurNode.setAttribute('stdDeviation', (from + (to - from) * t).toFixed(2));
+      if (t < 1) requestAnimationFrame(step); else resolve();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/** Left edge and width of an element inside its row. */
+function rel(el, base) {
+  const r = el.getBoundingClientRect();
+  const b = base.getBoundingClientRect();
+  return { x: r.left - b.left, w: r.width };
+}
+
+const at = (x, w, extra = {}) => ({ left: `${x}px`, width: `${w}px`, ...extra });
+
+/**
+ * Runs three blobs through their keyframes in the goo layer, with the blur up while they merge and split and back to
+ * 0 before they land, so they settle as three clean pills.
+ */
+async function morph(frames) {
+  const goo = h('div', { class: 'b-goo', 'aria-hidden': 'true' });
+  wrap.append(goo);
+  const blobs = frames.map((keys) => {
+    const blob = h('span', {});
+    blob.style.backgroundColor = keys[0].backgroundColor;
+    goo.append(blob);
+    return animate(blob, keys, { duration: MORPH_MS, easing: EASE });
+  });
+  blur(0, 4, MORPH_MS * 0.15);
+  blur(4, 0, MORPH_MS * 0.12, MORPH_MS * 0.74);
+  await Promise.all(blobs);
+  return goo;
+}
+
+/** Fades a row's labels and icons in or out, leaving the buttons' own backgrounds alone. */
+function labels(row, show, ms = 160) {
+  const parts = [...row.querySelectorAll('.drip-b > *')];
+  return Promise.all(parts.map((el) => animate(el, show ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }], { duration: ms })));
+}
+
+/** Drops a drop from just under the stats into the middle of the box, `fall` px below. */
+function dropFromStats(api, thumbTop, thumbH) {
+  if (REDUCED) return Promise.resolve();
+  const rootBox = api.root.getBoundingClientRect();
+  const statsBox = api.stats.getBoundingClientRect();
+  const x = statsBox.left + statsBox.width / 2 - rootBox.left;
+  const y0 = statsBox.bottom - rootBox.top;
+  const y1 = thumbTop + thumbH / 2;
+  const drop = h('span', { class: 'b-drop', 'aria-hidden': 'true' });
+  drop.style.left = `${x}px`;
+  drop.style.top = `${y1}px`;
+  api.root.append(drop);
+  return animate(drop, [
+    { transform: `translateY(${y0 - y1}px) scaleY(1.15)`, opacity: 0 },
+    { opacity: 1, offset: 0.15 },
+    { transform: 'translateY(0) scaleY(1.15)', opacity: 1, offset: 0.92 },
+    { transform: 'translateY(2px) scale(0.2, 0.1)', opacity: 0 },
+  ], { duration: 560, delay: 140, easing: 'cubic-bezier(0.5, 0, 0.9, 0.6)' }).then(() => drop.remove());
+}
+
+/**
+ * Puts `video`'s card into the open space, its text held, and opens the picture once it's loaded and the drop is in.
+ * The buttons don't answer until then. After Reveal next they're dimmed as disabled; after the first reveal they stay
+ * at full strength, since they just finished forming.
+ */
+async function surface(api, video, fx, drop, dim) {
+  const card = api.card(video);
+  card.thumb.append(fx);
+  card.thumb.classList.add('w-pool');
+  const held = [card.title, card.metaRow];
+  held.forEach((el) => el.classList.add('w-hold'));
+  if (dim) for (const b of card.row.querySelectorAll('button')) b.disabled = true;
+  wrap.style.pointerEvents = 'none';
+  body.replaceChildren(card.thumb, card.title, card.metaRow);
+  wrap.replaceChildren(card.row);
+  current = card;
+  await Promise.all([drop.landed, api.loadThumb(card.img, video)]);
+  drop.stop();
+  const opened = Water.open(card.thumb, card.img);
+  held.forEach((el) => el.classList.remove('w-hold'));
+  Water.textIn(held);
+  await opened;
+  for (const b of card.row.querySelectorAll('button')) b.disabled = false;
+  wrap.style.pointerEvents = '';
+}
+
+app({
+  async reveal(api) {
+    api.root.classList.add('b-root');
+    const oldRow = api.slot.firstElementChild;
+    const [add, rev] = oldRow.children;
+    const W = oldRow.offsetWidth;
+    empty = { a: rel(add, oldRow), r: rel(rev, oldRow), aBg: getComputedStyle(add).backgroundColor, rBg: getComputedStyle(rev).backgroundColor };
+    const gray = empty.aBg;
+
+    // The open card: the shell in a block that starts 0px tall, and a stand-in row until the video is known.
+    const shell = api.shell();
+    body = h('div', { class: 'b-body' }, shell.thumb, shell.title, shell.metaRow);
+    const stand = api.card(BLANK);
+    wrap = h('div', { class: 'b-wrap' }, stand.row);
+    api.slot.replaceChildren(h('div', { class: 'drip-card' }, body, wrap));
+    api.setMode('card');
+    const H = body.offsetHeight;
+    const thumbH = shell.thumb.offsetHeight;
+    const fin = { s: rel(stand.save, stand.row), n: rel(stand.next, stand.row), p: rel(stand.pass, stand.row) };
+    stand.row.style.opacity = '0';
+    wrap.style.pointerEvents = 'none';
+
+    // The old labels fade over the blobs.
+    oldRow.classList.add('b-ghost');
+    wrap.append(oldRow);
+    animate(oldRow, [{ opacity: 1 }, { opacity: 0 }], { duration: 150 }).then(() => oldRow.remove());
+
+    const thumbTop = body.getBoundingClientRect().top - api.root.getBoundingClientRect().top;
+    api.page.classList.add('b-open');
+    const opening = animate(body, [{ height: '0px' }, { height: `${H}px` }], { duration: OPEN_MS, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
+    const fx = Water.layer(shell.thumb);
+    const drop = Water.rings(fx, dropFromStats(api, thumbTop, thumbH));
+    const a = empty.a;
+    const sep = 14;
+    const goo = morph([
+      // +15m shrinks to a bead, touches Reveal, then Stash grows back out of it.
+      [at(a.x, a.w, { backgroundColor: gray }), at(a.x, 42, { offset: 0.4 }), at(a.x, fin.s.w - 6, { offset: 0.8 }), at(fin.s.x, fin.s.w)],
+      // × waits under the end of Reveal, and pinches off as Reveal next pulls back.
+      [at(W - 42, 42, { backgroundColor: gray }), at(W - 42, 42, { offset: 0.4 }), at(W - 42, 42, { offset: 0.8 }), at(fin.p.x, fin.p.w)],
+      // Reveal video flows left into the bead's room and turns gray, then pulls back to Reveal next's size.
+      [at(empty.r.x, empty.r.w, { backgroundColor: empty.rBg }), at(a.x + 42, W - a.x - 42, { offset: 0.4, backgroundColor: gray }),
+        at(fin.s.w - 6 + sep, W - 42 - sep - (fin.s.w - 6 + sep), { offset: 0.8, backgroundColor: gray }), at(fin.n.x, fin.n.w, { backgroundColor: gray })],
+    ]);
+    // Once the blobs land, the real buttons take their place and their labels fade in, even if the feed is still loading.
+    const formed = goo.then((g) => {
+      stand.row.style.opacity = '';
+      g.remove();
+      return labels(stand.row, true, 200);
+    });
+    const [video] = await Promise.all([api.feed(), opening, formed]);
+    body.getAnimations().forEach((x) => x.cancel());
+    await surface(api, video, fx, drop, false);
+  },
+  async next(api) {
+    current.next.querySelector('.drip-next-label').textContent = 'Revealing…';
+    for (const b of current.row.querySelectorAll('button')) b.disabled = true;
+    Water.fadeOut([current.title, current.metaRow]);
+    const fx = await Water.sink(current.thumb, current.img);
+    const drop = Water.dropIn(fx);
+    await surface(api, await api.feed(), fx, drop, true);
+  },
+  async pass(api) {
+    const card = current;
+    for (const b of card.row.querySelectorAll('button')) b.disabled = true;
+    Water.fadeOut([card.title, card.metaRow]);
+    await Water.sink(card.thumb, card.img);
+
+    const W = card.row.offsetWidth;
+    const s = rel(card.save, card.row);
+    const n = rel(card.next, card.row);
+    const p = rel(card.pass, card.row);
+    const gray = getComputedStyle(card.save).backgroundColor;
+    const { a, r } = empty;
+    await labels(card.row, false, 120);
+    card.row.style.opacity = '0';
+
+    const H = body.offsetHeight;
+    api.page.classList.remove('b-open');
+    const closing = animate(body, [{ height: `${H}px` }, { height: '0px' }], { duration: OPEN_MS, delay: 120, easing: EASE });
+    const goo = await morph([
+      // Stash shrinks back to the bead, then grows into +15m.
+      [at(s.x, s.w, { backgroundColor: gray }), at(a.x, 42, { offset: 0.5 }), at(a.x, a.w, { backgroundColor: gray })],
+      // × runs back into the end of Reveal next.
+      [at(p.x, p.w, { backgroundColor: gray }), at(W - 42, 42, { offset: 0.5 }), at(W - 42, 42, { backgroundColor: gray })],
+      // Reveal next flows out to both, then settles as the gold Reveal video.
+      [at(n.x, n.w, { backgroundColor: gray }), at(a.x + 42, W - a.x - 42, { offset: 0.5, backgroundColor: gray }), at(r.x, r.w, { backgroundColor: empty.rBg })],
+    ]);
+    await closing;
+    const actions = api.actions();
+    api.slot.replaceChildren(actions);
+    goo.remove();
+    labels(actions, true, 200);
+    api.setMode('empty');
+    current = null;
+  },
+});
+</script>
+</body>
+</html>
