@@ -201,16 +201,20 @@
     if (pours) {
       pouring = true;
       heldLeft = left;
-      const m = motion;
+      // The tour may have moved on and come back by now. Steps 1 and 2 show the stats, so they redraw.
+      const redraw = () => {
+        if (step <= 1) drawHome();
+      };
       DripPour.pour({
         counter: /** @type {Element} */ (counter).getBoundingClientRect(), glass: glassEl, px: GLASS_PX, from, to: DripGlass.fraction(sand),
         onLand: () => {
           heldLeft = null;
-          if (motion === m) drawHome();
+          redraw();
         },
       }).then(() => {
         pouring = false;
-        if (motion === m) drawHome();
+        heldLeft = null;
+        redraw();
       });
     }
     drawHome();

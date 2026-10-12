@@ -446,7 +446,8 @@
     // A lock still draining away goes at once, and a new one rises.
     document.getElementById('drip-lock')?.remove();
     panel.classList.add('is-new');
-    const glass = lastDropGlass();
+    // Only running out drops the last of the water. The "drip was updated" notice goes up at once.
+    const glass = locked && !disconnected ? lastDropGlass() : null;
     if (!glass) {
       document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), panel));
       return;
