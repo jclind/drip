@@ -11,6 +11,8 @@
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
   const { h, icon, price, hourLabel } = /** @type {any} */ (globalThis).DripUI;
+  /** @type {any} */
+  const DripReveal = /** @type {any} */ (globalThis).DripReveal;
 
   /** @param {string} id */
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -125,6 +127,9 @@
 
   /** @param {number} n */
   function go(n) {
+    // A reveal animation still running belongs to the old step's screen, which is about to go.
+    motion++;
+    moving = false;
     stopStep?.();
     for (const t of timers) clearTimeout(t);
     timers.clear();
@@ -207,8 +212,9 @@
     lastCardId = video.id;
     const thumb = h('div', { class: 'tour-thumb' }, icon('play-line'));
     thumb.style.setProperty('--thumb', sample(video.id).thumb);
-    return h('div', { class: `drip-card${isNew ? ' is-new' : ''}` },
-      h('div', { class: 'drip-thumb', 'aria-hidden': 'true' }, thumb),
+    // The reveal animation deals the card itself, so the card doesn't also rise in.
+    return h('div', { class: `drip-card${isNew && !animates() ? ' is-new' : ''}` },
+      h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true)),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
       h('div', { class: 'drip-card-meta-row' },
         h('span', { class: 'drip-meta' }, `${video.channel} · ${video.length}`),
@@ -221,12 +227,76 @@
         }, icon('save'), h('span', { class: 'drip-save-label' }, saved ? 'Stashed' : 'Stash')),
         h('button', {
           class: 'drip-b drip-b-gray drip-next', disabled: sand.tokens.rec < 1,
-          onclick: () => { if (!Drip.revealNext(sand, video.id, pool()).ok) refill(); drawHome(); },
+          onclick: () => {
+            const find = () => {
+              if (!Drip.revealNext(sand, video.id, pool()).ok) refill();
+              return sand.current && sand.current.id !== video.id ? sand.current : null;
+            };
+            if (animates()) animate(DripReveal.next, find, 'next');
+            else {
+              find();
+              drawHome();
+            }
+          },
         }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'aria-label': 'Pass', title: "Pass. It's free, and this video won't come back.",
-          onclick: () => { Drip.resolveCurrent(sand, 'pass', video.id); drawHome(); },
+          onclick: () => {
+            Drip.resolveCurrent(sand, 'pass', video.id);
+            if (animates()) animate(DripReveal.pass, () => null, 'reveal');
+            else drawHome();
+          },
         }, icon('x'))));
+  }
+
+  /** The loading card the reveal animation opens up, with the card's buttons under it (reveal.js). */
+  function openingCard() {
+    return h('div', { class: 'drip-card is-loading' },
+      h('div', { class: 'drip-thumb' }),
+      h('div', { class: 'drip-card-title' }, h('span', { class: 'drip-skel' }), h('span', { class: 'drip-skel drip-skel-short' })),
+      h('div', { class: 'drip-card-meta-row' }, h('span', { class: 'drip-meta' }, 'Finding a video…')),
+      h('div', { class: 'drip-card-actions' },
+        h('button', { class: 'drip-b drip-b-gray drip-card-save', tabindex: '-1' }, icon('save'), h('span', { class: 'drip-save-label' }, 'Stash')),
+        h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
+        h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
+  }
+
+  const animates = () => !DripReveal.reduced();
+  /** A reveal animation is running on the tour's home screen, which it draws until it's done. */
+  let moving = false;
+  /** Counts animations, so one left over from a step that's gone doesn't draw over the new one. */
+  let motion = 0;
+
+  /**
+   * Runs one of reveal.js's animations on the tour's home screen, then draws it once. `find` changes the tour's state
+   * and returns the video it revealed, or null.
+   * @param {(o: any) => Promise<boolean | void>} run
+   * @param {() => any} find
+   * @param {string} focusKey The button keyboard focus goes to afterwards, if the tour had it: watch, next, or reveal.
+   */
+  async function animate(run, find, focusKey) {
+    const root = /** @type {HTMLElement | null} */ (stage.querySelector('#drip-home'));
+    const page = root?.querySelector('.drip-page');
+    if (!root || !page || moving) return;
+    const id = ++motion;
+    const focused = stage.contains(document.activeElement);
+    moving = true;
+    try {
+      await run({
+        // Reveal next finds 300ms in. A step change before then has already redrawn the screen, so it finds nothing.
+        root, page, find: async () => (id === motion ? find() : null),
+        counter: page.querySelector('.drip-stats .drip-token-card'),
+        card: (/** @type {any} */ video) => (video ? card(video) : openingCard()),
+        actions,
+        ready: async () => {},
+      });
+    } finally {
+      if (id === motion) {
+        moving = false;
+        drawHome();
+        if (focused && !stage.contains(document.activeElement)) /** @type {HTMLElement | null} */ (stage.querySelector(`.drip-${focusKey}`))?.focus();
+      }
+    }
   }
 
   /** Samples not revealed yet, starting over once the tour has shown them all. */
@@ -242,14 +312,20 @@
   }
 
   function reveal() {
-    if (!sand.current) Drip.reveal(sand, pool());
-    drawHome();
+    const find = () => (!sand.current && Drip.reveal(sand, pool()).ok ? sand.current : null);
+    if (animates() && !sand.current) animate(DripReveal.reveal, find, 'watch');
+    else {
+      find();
+      drawHome();
+    }
   }
 
   function drawHome() {
+    if (moving) return;
     const focused = document.activeElement && stage.contains(document.activeElement) ? [...stage.querySelectorAll('button')].indexOf(/** @type {any} */ (document.activeElement)) : -1;
+    // With a card up, the page is open: the stats sit a little higher, as the reveal animation leaves them.
     morph(() => stage.replaceChildren(h('div', { id: 'drip-home', class: 'drip-ui' },
-      h('div', { class: 'drip-page' }, stats(), sand.current ? card(sand.current) : actions()))));
+      h('div', { class: `drip-page${sand.current ? ' is-open' : ''}` }, stats(), sand.current ? card(sand.current) : actions()))));
     if (focused >= 0) /** @type {HTMLElement | undefined} */ (stage.querySelectorAll('button')[focused])?.focus();
   }
 
@@ -259,8 +335,11 @@
   }
 
   function showReveal() {
-    if (!sand.current && sand.tokens.rec > 0) Drip.reveal(sand, pool());
+    const deals = !sand.current && sand.tokens.rec > 0;
+    if (deals && !animates()) Drip.reveal(sand, pool());
     drawHome();
+    // Arriving with no card up, the step deals one, so the first thing it shows is a reveal.
+    if (deals && animates()) later(reveal, 250);
     return undefined;
   }
 

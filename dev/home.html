@@ -20,7 +20,7 @@
 <body>
 <!--
   Runs the real home page outside YouTube: state.js, background.js (the real worker, on in-memory storage), common.js,
-  glass.js, and home.js, over a fake home grid. Serve the repo root and open it:
+  glass.js, reveal.js, and home.js, over a fake home grid. Serve the repo root and open it:
     python3 -m http.server 8077 --bind 127.0.0.1
     http://localhost:8077/dev/home.html?scenario=card&theme=dark
   Scenarios are in SCENARIOS below. `click=<data-k>,...` clicks controls after load, 300ms apart, like click=reveal or click=x-<id>.
@@ -84,20 +84,23 @@
   const store = { drip: JSON.parse(JSON.stringify(s)) };
   /** @type {Function[]} */
   const changeListeners = [];
-  /** @type {Function | null} */
-  let onMessage = null;
+  // Every listener, as in Chrome. common.js adds one for the popup's ping, so keeping only the last dropped the worker's.
+  /** @type {Function[]} */
+  const messageListeners = [];
   /** @type {any} */ (globalThis).importScripts = () => {};
   /** @type {any} */ (globalThis).chrome = {
     runtime: {
       id: 'harness',
       getURL: (/** @type {string} */ p) => `/${p}`,
       getManifest: () => ({ version: 'harness', content_scripts: [] }),
-      onMessage: { addListener: (/** @type {Function} */ fn) => { onMessage = fn; } },
+      onMessage: { addListener: (/** @type {Function} */ fn) => { messageListeners.push(fn); } },
       onMessageExternal: { addListener() {} },
       onInstalled: { addListener() {} },
       sendMessage: (/** @type {any} */ msg) => new Promise((resolve) => {
         // A small delay, like a real round trip to the worker.
-        setTimeout(() => { if (onMessage) onMessage(JSON.parse(JSON.stringify(msg)), { tab: { id: 1 }, url: 'https://www.youtube.com/' }, resolve); }, 30);
+        setTimeout(() => {
+          for (const fn of messageListeners) fn(JSON.parse(JSON.stringify(msg)), { tab: { id: 1 }, url: 'https://www.youtube.com/' }, resolve);
+        }, 30);
       }),
     },
     storage: {
@@ -141,6 +144,7 @@
 <script src="/src/background.js"></script>
 <script src="/src/lib/glass.js"></script>
 <script src="/src/content/common.js"></script>
+<script src="/src/content/reveal.js"></script>
 <script src="/src/content/home.js"></script>
 <script>
   const click = new URLSearchParams(location.search).get('click');

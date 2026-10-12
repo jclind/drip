@@ -18,6 +18,11 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - A smaller left sidebar on the home page: only the "You" section (Your channel, History, Playlists, Watch later, Liked videos, Your videos, Downloads, Show more), with the rest gone. Jesse, 2026-10-11.
 - On a watch page, center the video and what's under it, now that the recommendations column is gone, and trim what sits under the video. Jesse, 2026-10-11.
 - Hide live streams and past streams (VODs) in Subscriptions by default, with a Settings toggle to show them. Jesse sees a lot of them there now. Jesse, 2026-10-11.
+- The video's age on the card, the way YouTube's home grid writes it ("3 days ago", "1 year ago"), next to the channel and length. `readPool` in home.js doesn't read it yet, so it needs one more selector at the top of the file. Jesse, 2026-10-12.
+
+## Welcome tour
+
+- Arrows with a short label in the tour, pointing at what to watch. In the watching step, one could point at the glass's water draining while the "video" plays, so the step shows something happening instead of a still frame through the whole countdown. Jesse, 2026-10-12.
 
 ## Watching
 
@@ -53,7 +58,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 - ★ Kept drops land. After "Done for now", the home page's "Kept 3 drops." has the three drops fall into the drop counter one at a time, and the count ticks up with a small bounce. This is the payoff for leaving, so it can be the most satisfying motion in drip.
 - ★ Save fills. The bookmark on the card and the pill fills from the bottom up in blue when saved, like the glass, and drains when unsaved.
 - ★ A new day. The first time the home page opens after the reset, the glass fills from empty with the day's minutes.
-- Pass sinks. The × sends the card down and out like it dropped into water, instead of vanishing. Reveal next could do the same before the new card rises.
+- Pass sinks. The × sends the card down and out like it dropped into water, instead of vanishing. Reveal next could do the same before the new card rises. Built another way on 2026-10-12: the card turns face down and drops (DESIGN.md, "Reveal animation as built").
 - Removing a Saved row evaporates it (a short blur and fade upward), and Undo drips it back in.
 - The pill's water surface gets a tiny ripple each time a minute ticks off, so a glance shows it's draining without reading the number.
 - In the last minute, the pill's water wobbles a little on top of the low-time shimmer. Still no red.

@@ -982,6 +982,161 @@ html:not([data-drip-shown]) #drip-home .drip-message.is-kept {
   height: 56px;
 }
 
+/* The loading title is exactly two title lines, so the card doesn't shrink 9px when the real title arrives. */
+#drip-home .drip-card-title:has(.drip-skel) {
+  height: 40px;
+}
+
+#drip-home .drip-card-title .drip-skel {
+  margin: 3px 0;
+}
+
+/* The reveal animation (reveal.js, DESIGN.md "Reveal animation as built"). The card's box holds a card with a gold
+   back and the picture on its front. Face up (.is-up) it's turned over, which is how every revealed card sits. */
+#drip-home {
+  position: relative;
+}
+
+#drip-home .drip-stats {
+  transition: transform 560ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+/* While a card is up, the stats sit 16px higher: the page opened to make the card's room. */
+#drip-home .drip-page.is-open .drip-stats {
+  transform: translateY(-16px);
+}
+
+#drip-home .drip-thumb.is-dealt {
+  overflow: visible;
+  background: transparent;
+  perspective: 1100px;
+}
+
+/* Where a dealt card is headed, until it lands. */
+#drip-home .drip-thumb.is-empty {
+  overflow: visible;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--drip-rule);
+  animation: none;
+}
+
+#drip-home .drip-deal {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform-style: preserve-3d;
+}
+
+#drip-home .drip-deal.is-up {
+  transform: rotateY(180deg);
+}
+
+/* In flight, the card is in #drip-home's own layer, over the box it's headed for (reveal.js fly). */
+#drip-home .drip-deal.is-flying {
+  inset: auto;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* No opacity on .drip-deal itself: it would flatten the 3D, and the back would show through the front. */
+#drip-home .drip-deal-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--drip-radius);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+#drip-home .drip-deal-back {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--drip-gold) 14%, var(--drip-gray));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--drip-gold) 55%, transparent);
+}
+
+#drip-home .drip-deal-back .drip-i {
+  width: 46px;
+  height: 54px;
+  color: var(--drip-gold);
+}
+
+#drip-home .drip-deal-front {
+  transform: rotateY(180deg);
+  background: var(--drip-gray);
+}
+
+/* Waiting for the video: a slow sheen across the back. --drip-sheen-at comes from the page's clock (reveal.js
+   keepSheen), so when the card moves boxes and Chrome restarts the animation, it picks up where it was. */
+#drip-home .drip-deal.is-waiting .drip-deal-back::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, color-mix(in srgb, var(--drip-gold) 22%, transparent) 50%, transparent 65%);
+  animation: drip-sheen 1.6s ease-in-out var(--drip-sheen-at, 0ms) infinite;
+  transition: opacity 200ms ease;
+}
+
+/* The video is here: the sheen fades while the card turns over, rather than stopping mid-sweep. */
+#drip-home .drip-deal.is-settling .drip-deal-back::after {
+  opacity: 0;
+}
+
+/* While the card's space opens or closes, its picture, title, and meta row are one block over the buttons. */
+#drip-home .drip-open-body {
+  overflow: hidden;
+  padding-bottom: 16px;
+}
+
+#drip-home .drip-open-body .drip-skel {
+  animation: none;
+}
+
+#drip-home .drip-open-row {
+  position: relative;
+}
+
+#drip-home .drip-open-row .drip-card-actions {
+  margin-top: 0;
+}
+
+/* The old buttons' labels, fading over the pills that stand in for the buttons as they change. */
+#drip-home .drip-ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+#drip-home .drip-ghost .drip-b {
+  background: transparent;
+}
+
+#drip-home .drip-blobs {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  filter: url("#drip-goo");
+}
+
+#drip-home .drip-blobs > span {
+  position: absolute;
+  top: 0;
+  height: var(--drip-btn-h);
+  border-radius: calc(var(--drip-btn-h) / 2);
+}
+
+/* Text held back until the card turns over. */
+#drip-home .drip-held {
+  opacity: 0;
+}
+
+/* Reveal next's buttons, dimmed like disabled ones until the new card is up. */
+#drip-home .drip-card-actions.is-waiting .drip-b {
+  opacity: 0.4;
+}
+
 /* Saved: open with 3 rows on the empty page, collapsed while a card is up. */
 #drip-home .drip-saved {
   margin-top: 36px;
@@ -1231,6 +1386,16 @@ html:not([data-drip-shown]) #drip-home .drip-message.is-kept {
 @keyframes drip-shimmer {
   to {
     background-position: -150% 0;
+  }
+}
+
+@keyframes drip-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
   }
 }
 
