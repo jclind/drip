@@ -202,7 +202,8 @@ main {
   background: #f03;
 }
 
-/* The lock, inside the stage instead of the window. Its water rises the stage's height, not the window's. */
+/* The lock, inside the stage instead of the window. Its water rises the stage's height, not the window's: welcome.js
+   sets --tour-depth to it. */
 .tour-stage #drip-lock {
   position: absolute;
   z-index: 2;
@@ -248,13 +249,13 @@ main {
 
 @keyframes tour-water-rise {
   from {
-    --drip-water: 480px;
+    --drip-water: var(--tour-depth, 480px);
   }
 }
 
 @keyframes tour-water-drain {
   to {
-    --drip-water: 480px;
+    --drip-water: var(--tour-depth, 480px);
   }
 }
 

@@ -1,6 +1,6 @@
 // @ts-check
-// The page drip opens once, when it's installed (DESIGN.md, "Welcome page"). The top states the allowance from the real
-// settings. The tour under it runs working copies of drip's screens on a throwaway state, through the real rules in
+// The page drip opens once, when it's installed (DESIGN.md, "Welcome page"). The top states the default allowance.
+// The tour under it runs working copies of drip's screens on a throwaway state, through the real rules in
 // state.js and drip.css's styles. It never sends a change to the worker. The markup copies home.js's stats, actions,
 // and card, and watch.js's lock and pill, so a change to those screens needs the same change here.
 
@@ -33,10 +33,13 @@
   /** @param {string} id */
   const sample = (id) => SAMPLES.find((v) => v.id === id) || SAMPLES[0];
 
-  /** The real settings, for the numbers on the page. Defaults until the worker answers. */
-  let settings = { ...Drip.DEFAULT_SETTINGS };
+  /**
+   * The numbers on the page and in the tour are the defaults, never the saved settings. The page opens on install, when
+   * the two are the same, and a reopened tab after testing showed the test numbers (Jesse, 2026-10-12).
+   */
+  const settings = Drip.DEFAULT_SETTINGS;
   /** The tour's own state. Every button in the tour changes this and nothing else. */
-  let sand = freshState();
+  const sand = freshState();
 
   function freshState() {
     const state = Drip.initialState(Date.now());
@@ -587,11 +590,16 @@
      * reason form opens, and the panel's buttons are never cut off (Codex, 2026-10-11).
      */
     const fitLock = () => {
-      const lockPanel = stage.querySelector('#drip-lock .drip-lock-panel');
-      if (!lockPanel) return;
+      const lock = /** @type {HTMLElement | null} */ (stage.querySelector('#drip-lock'));
+      const lockPanel = lock?.querySelector('.drip-lock-panel');
+      if (!lock || !lockPanel) return;
       // The lock's own padding is 16px on each side.
       const need = Math.ceil(/** @type {HTMLElement} */ (lockPanel).offsetHeight + 32);
-      morph(() => { stage.style.minHeight = `${Math.max(300, need)}px`; });
+      morph(() => {
+        stage.style.minHeight = `${Math.max(300, need)}px`;
+        // The water travels the stage's height, so it rises and falls at the speed it does on YouTube.
+        lock.style.setProperty('--tour-depth', `${stage.offsetHeight}px`);
+      });
     };
 
     const redraw = () => {
@@ -633,13 +641,6 @@
       item('check', "Your channels and playlists work as before, and ads and videos embedded on other sites don't use your minutes.")));
     return undefined;
   }
-
-  chrome.runtime.sendMessage({ type: 'get' }).then((res) => {
-    if (res && res.state) settings = { ...res.state.settings };
-    sand = freshState();
-    fillHero();
-    go(step);
-  }, () => {});
 
   fillHero();
   go(0);
