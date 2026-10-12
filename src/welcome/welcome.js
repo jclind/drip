@@ -501,16 +501,26 @@
       raise();
     } }, 'Show the lock again');
 
+    /**
+     * The stage holds its height while the water moves, so nothing under it jumps mid-animation. Once the lock is gone,
+     * this glides it to the height of what's left (Jesse, 2026-10-12).
+     * @param {HTMLElement} lock
+     */
+    const lift = (lock) => morph(() => {
+      lock.remove();
+      stage.style.minHeight = '';
+    });
+
     /** Lifts the lock the way buying minutes or an unlock does, over a video that plays on. */
     const drain = () => {
       const lock = /** @type {HTMLElement} */ (stage.querySelector('#drip-lock'));
       stopRings();
       const p = player({ autoplay: true, onEmpty: () => later(() => { if (sand.watchSecondsLeft <= 0) raise(); }, 700) });
       setUnder(p.el, p);
-      if (reducedMotion()) lock.remove();
+      if (reducedMotion()) lift(lock);
       else {
         lock.classList.add('is-draining');
-        later(() => lock.remove(), 600);
+        later(() => lift(lock), 600);
       }
     };
 
@@ -523,6 +533,7 @@
       button.classList.add('is-leaving');
       lock.classList.add('is-leaving');
       stopRings();
+      stage.style.minHeight = `${stage.offsetHeight}px`;
       const kept = sand.tokens.watch;
       const home = () => {
         const message = kept > 0 ? `Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.` : '';
@@ -531,15 +542,15 @@
         stage.append(again());
       };
       if (reducedMotion()) {
-        lock.remove();
         home();
+        lift(lock);
         return;
       }
       leaveRings(panel, button, e);
       later(() => {
         home();
         lock.classList.add('is-surfacing');
-        later(() => lock.remove(), 1000);
+        later(() => lift(lock), 1000);
       }, 700);
     };
 
@@ -607,18 +618,20 @@
       fitLock();
     };
 
+    /** Raises the lock over the paused video. From the home page the stage glides to the video's height. */
     function raise() {
-      stage.querySelector('.tour-again')?.remove();
-      stage.querySelector('#drip-lock')?.remove();
-      reasonOpen = false;
-      note = '';
-      // The paused video under the water.
-      const p = player();
-      setUnder(p.el, p);
-      const lockPanel = panel();
-      lockPanel.classList.add('is-new');
-      stage.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), lockPanel));
-      fitLock();
+      morph(() => {
+        stage.querySelector('.tour-again')?.remove();
+        stage.querySelector('#drip-lock')?.remove();
+        reasonOpen = false;
+        note = '';
+        const p = player();
+        setUnder(p.el, p);
+        const lockPanel = panel();
+        lockPanel.classList.add('is-new');
+        stage.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), lockPanel));
+        fitLock();
+      });
     }
 
     raise();
