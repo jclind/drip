@@ -39,6 +39,7 @@
       placed.front.append(card.img);
       card.thumb.append(placed.el);
       Opening.placeBody(ctx, card);
+      Cards.keepSheen(placed);
       current = card;
       dealt = placed;
       const rowIn = formed.then(() => Opening.placeRow(ctx, card));

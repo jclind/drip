@@ -2,7 +2,18 @@
 // flips to show the video, and gets flipped back and tossed when it goes.
 
 (() => {
-  const { h, icon, animate } = Mock;
+  const { h, icon, animate, SLOW } = Mock;
+  const SHEEN_MS = 1600;
+
+  /**
+   * Chrome restarts a CSS animation whenever its element is put back in the page, and the waiting card moves into the
+   * real card's box once the feed answers. A negative delay from the page's clock puts every restart at the same point
+   * of the sweep, so the move doesn't show. Call it right after the card lands in a box that's in the page.
+   */
+  function keepSheen(card) {
+    const now = document.timeline.currentTime / SLOW;
+    card.el.style.setProperty('--sheen-at', `${-(now % SHEEN_MS)}ms`);
+  }
 
   function makeCard() {
     const front = h('div', { class: 'c-face c-front' });
@@ -33,6 +44,7 @@
     thumb.append(card.el);
     thumb.classList.remove('c-empty');
     card.el.classList.add('is-waiting');
+    keepSheen(card);
     return card;
   }
 
@@ -82,14 +94,17 @@
     return land(card, thumb);
   }
 
-  /** Flips the card face up. */
+  /** Flips the card face up. The sheen fades out as it turns, and stops once it's over. */
   function flipUp(card) {
-    card.el.classList.remove('is-waiting');
+    card.el.classList.add('is-settling');
     return animate(card.el, [
       { transform: 'rotateY(0deg)' },
       { transform: 'rotateY(90deg) scale(1.05) translateY(-4px)', offset: 0.5 },
       { transform: 'rotateY(180deg)' },
-    ], { duration: 560, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }).then(() => card.el.classList.add('is-up'));
+    ], { duration: 560, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }).then(() => {
+      card.el.classList.remove('is-waiting', 'is-settling');
+      card.el.classList.add('is-up');
+    });
   }
 
   /** Flips a face-up card face down, then tosses it: aside for Reveal next, straight down for Pass. */
@@ -106,5 +121,5 @@
     card.el.remove();
   }
 
-  globalThis.Cards = { deal, lift, flipUp, discard };
+  globalThis.Cards = { deal, lift, flipUp, discard, keepSheen };
 })();

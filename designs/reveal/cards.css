@@ -62,7 +62,15 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(105deg, transparent 35%, color-mix(in srgb, var(--drip-gold) 22%, transparent) 50%, transparent 65%);
-  animation: c-sheen 1.6s ease-in-out infinite;
+  /* --sheen-at is set from a shared clock (cards.js keepSheen), so a card moved to a new box keeps sweeping from
+     where it was instead of starting over. */
+  animation: c-sheen 1.6s ease-in-out var(--sheen-at, 0ms) infinite;
+  transition: opacity 200ms ease;
+}
+
+/* The video is here: the sheen fades while the card turns, rather than stopping mid-sweep. */
+.c-card.is-settling .c-back::after {
+  opacity: 0;
 }
 
 .c-front {
