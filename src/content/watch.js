@@ -454,13 +454,14 @@
     // The pill's last water falls as a drop, and the lock's water rises from where it lands (pour.js).
     const fall = { panel };
     falling = fall;
-    DripPour.lastDrop(glass, PILL_GLASS_PX, window.innerHeight).then((/** @type {number} */ x) => {
+    // A drop that can't fall (drip was updated under the page) still lets the lock come up.
+    DripPour.lastDrop(glass, PILL_GLASS_PX, window.innerHeight).catch(() => null).then((/** @type {number | null} */ x) => {
       if (falling !== fall) return;
       falling = null;
       if (!locked || location.pathname !== '/watch') return;
       const lock = h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), fall.panel);
       document.body.append(lock);
-      DripPour.riseFrom(lock, x);
+      if (x !== null) DripPour.riseFrom(lock, x);
     });
   }
 
@@ -545,7 +546,11 @@
     const panel = liveLock()?.querySelector('.drip-lock-panel');
     // The button's drop falls past the panel into the water, then the water drains and the pill's glass bobs up.
     const pours = !!panel && !reducedMotion() && !document.hidden;
-    if (pours) landing = DripPour.fallIn(button, Math.min(panel.getBoundingClientRect().bottom + 36, window.innerHeight - 24)).then(() => { landing = null; });
+    if (pours) {
+      landing = DripPour.fallIn(button, Math.min(panel.getBoundingClientRect().bottom + 36, window.innerHeight - 24))
+        .catch(() => {})
+        .then(() => { landing = null; });
+    }
     const res = await send({ type: 'spendWatch' });
     if (landing) await landing;
     if (disconnected) return;

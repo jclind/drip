@@ -307,14 +307,19 @@
       return;
     }
     render();
-    await DripPour.pour({
-      counter: from.counter, glass: glassEl, px: GLASS_PX, from: from.level, to: DripGlass.fraction(state),
-      onLand: () => {
-        heldLeft = null;
-        render();
-      },
-    });
+    try {
+      await DripPour.pour({
+        counter: from.counter, glass: glassEl, px: GLASS_PX, from: from.level, to: DripGlass.fraction(state),
+        onLand: () => {
+          heldLeft = null;
+          render();
+        },
+      });
+    } catch {
+      // drip was updated under the page. The redraw below shows where things stand.
+    }
     pouring = false;
+    heldLeft = null;
     render();
   }
 
