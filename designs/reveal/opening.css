@@ -1,0 +1,57 @@
+/* B's opening page and button morph, shared by D, E, and F (opening.js). */
+#drip-home.b-root {
+  position: relative;
+}
+
+#drip-home .drip-stats {
+  transition: transform 560ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+#drip-home .drip-page.b-open .drip-stats {
+  transform: translateY(-16px);
+}
+
+/* The thumbnail, title, and meta row, with the 16px above the buttons, open as one block. */
+.b-body {
+  overflow: hidden;
+  padding-bottom: 16px;
+}
+
+#drip-home .b-body + .b-wrap .drip-card-actions {
+  margin-top: 0;
+}
+
+.b-wrap {
+  position: relative;
+}
+
+/* The old buttons' labels, fading out over the blobs. */
+.b-ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+#drip-home .b-ghost .drip-b {
+  background: transparent;
+}
+
+/* Plain pills with no text. Under the goo filter they merge and pinch apart like water. */
+.b-blobs {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.b-blobs.is-goo {
+  filter: url("#b-goo");
+}
+
+.b-blobs > span {
+  position: absolute;
+  top: 0;
+  height: var(--drip-btn-h);
+  border-radius: calc(var(--drip-btn-h) / 2);
+}

@@ -109,7 +109,7 @@ main.is-phone iframe {
 </head>
 <body>
 <header>
-  <span class="round">Reveal animation · round 1</span>
+  <span class="round">Reveal animation · round 2</span>
   <nav id="tabs"></nav>
   <div class="opts">
     <button id="replay" type="button">Start over</button>
@@ -124,13 +124,16 @@ main.is-phone iframe {
 <main id="stage"><iframe id="frame" title="Variant"></iframe></main>
 <script>
 const VARIANTS = [
-  { key: 'a', label: 'A, Surface', idea: 'Only the card\'s box moves. A drop falls into it, rings spread while the video loads, and the picture opens out from the center. Reveal next and Pass close the picture back to a point.' },
-  { key: 'b', label: 'B, Opening', idea: 'Your idea from 2026-10-07. The page opens: stats up, buttons down, a drop falls from the stats into the space and the picture surfaces. +15m shrinks to a bead that grows back out as Stash, and × pinches off the end of Reveal next. Pass runs it backwards.' },
-  { key: 'c', label: 'C, Dealt', idea: 'A reveal spends a card, so you see one. It leaves the counter face down, is dealt into the box, and flips over to show the video. Reveal next tosses the old card aside as the next is dealt. Pass flips it and drops it.' },
+  { key: 'd', label: 'D, Dealt open', idea: 'C\'s card dealt from the counter while B\'s page opens. The stats slide up and the buttons ride down, and on the way +15m shrinks to a bead that grows back as Stash, Reveal video turns into Reveal next, and × pinches off its end. All at once.' },
+  { key: 'e', label: 'E, Button becomes card', idea: 'The gold Reveal video button lifts out of the row and grows into the face-down card. +15m stretches across the space it left and splits into Stash, Reveal next, and ×. Reveal next works the same way: the button you press becomes the next card.' },
+  { key: 'f', label: 'F, Dealt open, crisp', idea: 'D without the goo. Each button slides and resizes into its new job, and × grows in. Tells you whether it\'s the liquid look or the buttons changing jobs that you like.' },
+  { key: 'c', label: 'C (r1)', idea: 'Round 1\'s pick. The card is dealt from the counter into a fixed slot and flips. The buttons swap without moving.' },
+  { key: 'b', label: 'B (r1)', idea: 'Round 1. The page opens, a drop falls in, and the buttons turn through the goo.' },
+  { key: 'a', label: 'A (r1)', idea: 'Round 1. Only the card\'s box moves: a drop, rings, and the picture opens from the center.' },
   { key: 'now', label: 'Now', idea: 'As built: a shimmering box, the card rises 6px, and the picture fades in. Pass swaps the buttons back at once.' },
 ];
 const params = new URLSearchParams(location.search);
-let current = params.get('v') || 'a';
+let current = params.get('v') || 'd';
 const flags = {
   slow: params.get('slow') === '1', load: params.get('load') === '1', reduced: params.get('reduced') === '1',
   light: params.get('light') === '1', phone: params.get('phone') === '1',
