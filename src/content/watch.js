@@ -8,6 +8,8 @@
   const { send: sendMessage, h, onState, hourLabel, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
+  /** @type {any} */
+  const DripPour = /** @type {any} */ (globalThis).DripPour;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -430,6 +432,10 @@
    * @param {HTMLElement} panel
    */
   function placeLockPanel(panel) {
+    if (falling) {
+      falling.panel = panel;
+      return;
+    }
     const lock = liveLock();
     if (lock) {
       const old = lock.querySelector('.drip-lock-panel');
@@ -440,7 +446,40 @@
     // A lock still draining away goes at once, and a new one rises.
     document.getElementById('drip-lock')?.remove();
     panel.classList.add('is-new');
-    document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), panel));
+    const glass = lastDropGlass();
+    if (!glass) {
+      document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), panel));
+      return;
+    }
+    // The pill's last water falls as a drop, and the lock's water rises from where it lands (pour.js).
+    const fall = { panel };
+    falling = fall;
+    DripPour.lastDrop(glass, PILL_GLASS_PX, window.innerHeight).then((/** @type {number} */ x) => {
+      if (falling !== fall) return;
+      falling = null;
+      if (!locked || location.pathname !== '/watch') return;
+      const lock = h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), fall.panel);
+      document.body.append(lock);
+      DripPour.riseFrom(lock, x);
+    });
+  }
+
+  /**
+   * While the pill's last drop falls, the lock waits for it to land. This holds the newest panel to show then.
+   * @type {{panel: HTMLElement} | null}
+   */
+  let falling = null;
+
+  /** When the pill's glass last had water in it, so running out can tell itself from arriving with none. */
+  let pillWetAt = -Infinity;
+
+  /** The pill's glass, when the minutes just ran out with it in view, so its last drop can fall. Otherwise null. */
+  function lastDropGlass() {
+    if (!pillGlass?.isConnected || reducedMotion() || document.hidden || document.fullscreenElement) return null;
+    if (performance.now() - pillWetAt > 3000) return null;
+    if (document.getElementById('drip-pill')?.classList.contains('is-idle')) return null;
+    const r = pillGlass.getBoundingClientRect();
+    return r.width > 0 && r.bottom > 0 && r.top < window.innerHeight ? pillGlass : null;
   }
 
   const BUBBLES = 14;
@@ -472,6 +511,12 @@
 
   function hideLock() {
     if (disconnected) return;
+    // +15m's drop is still falling into the water. The lock drains once it lands.
+    if (landing && drainNext) {
+      landing.then(hideLock);
+      return;
+    }
+    falling = null;
     lockView = '';
     lockVideoId = '';
     reasonText = '';
@@ -485,15 +530,31 @@
     lockMessage = '';
   }
 
-  async function onAddTime() {
+  /**
+   * While +15m's drop falls from the lock's button into the water. Resolves once it lands.
+   * @type {Promise<void> | null}
+   */
+  let landing = null;
+
+  /** @param {Event} e */
+  async function onAddTime(e) {
+    if (landing) return;
     // The worker's storage change can lift the lock before this reply arrives, so the drain is asked for up front.
     drainNext = true;
+    const button = /** @type {HTMLElement} */ (e.currentTarget);
+    const panel = liveLock()?.querySelector('.drip-lock-panel');
+    // The button's drop falls past the panel into the water, then the water drains and the pill's glass bobs up.
+    const pours = !!panel && !reducedMotion() && !document.hidden;
+    if (pours) landing = DripPour.fallIn(button, Math.min(panel.getBoundingClientRect().bottom + 36, window.innerHeight - 24)).then(() => { landing = null; });
     const res = await send({ type: 'spendWatch' });
+    if (landing) await landing;
     if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
       applyStatus(Drip.watchStatus(state, videoId()));
       drainNext = false;
+      // The draining water clears the pill near the top of the window about this long in.
+      if (pours && pillGlass?.isConnected) DripPour.refill(pillGlass, PILL_GLASS_PX, DripGlass.fraction(state), 180);
       video?.play();
     } else {
       drainNext = false;
@@ -827,6 +888,7 @@
       const fraction = DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
       if (!pillGlass) pillGlass = DripGlass.make(fraction, PILL_GLASS_PX);
       else DripGlass.set(pillGlass, fraction, PILL_GLASS_PX);
+      if (fraction > 0) pillWetAt = performance.now();
     }
     const parent = document.querySelector(SEL.player) || document.body;
     // Rebuild only when the text changes. A button replaced mid-click loses the click.
