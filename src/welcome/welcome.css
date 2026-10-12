@@ -262,29 +262,86 @@ main {
   }
 }
 
-/* What changes on YouTube. */
+/* What changes on YouTube: one row per place, YouTube's way struck through, drip's in bold. Every row shares one grid,
+   so the columns line up. */
 .tour-changes {
-  display: grid;
-  gap: 14px;
   width: 100%;
-  max-width: 440px;
+}
+
+.tour-changes-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tour-changes li {
-  display: flex;
-  gap: 12px;
-  line-height: 1.4;
+.tour-change {
+  display: grid;
+  grid-template-columns: 108px 148px minmax(0, 1fr);
+  gap: 0 18px;
+  align-items: start;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  line-height: 22px;
 }
 
-.tour-changes .drip-i {
+.tour-changes-head {
+  padding: 0 0 8px;
+  border-top: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.tour-change-place {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tour-change-place .drip-i {
   flex: none;
-  width: 18px;
-  height: 18px;
-  margin-top: 1px;
+  width: 16px;
+  height: 16px;
   color: var(--blue);
+}
+
+.tour-change-before {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tour-change-after {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.tour-change-after small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  text-wrap: balance;
+}
+
+.tour-changes-same {
+  grid-template-columns: 108px minmax(0, 1fr);
+  padding: 16px 0 0;
+}
+
+.tour-changes-same p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .tour-controls {
@@ -429,6 +486,36 @@ button.foot-link:hover {
 
   .kind-what {
     margin-top: 0;
+  }
+
+  .tour-changes-head {
+    display: none;
+  }
+
+  .tour-change {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0 12px;
+    padding: 10px 0;
+  }
+
+  .tour-changes-head + .tour-changes-list .tour-change:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .tour-change-before {
+    text-align: right;
+  }
+
+  .tour-change-after {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
+
+  .tour-changes-same {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding-top: 10px;
   }
 
   /* Two of the sentences wrap here, so every step keeps room for two lines and the stage stays put. */

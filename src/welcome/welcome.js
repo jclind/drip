@@ -641,17 +641,30 @@
     };
   }
 
-  // Step 5: what changes, with the lucide icons DESIGN.md names.
+  // Step 5: what changes, as a table of YouTube's way against drip's. Jesse picked this layout from design variants on
+  // 2026-10-12, over five sentences with an icon each. Each cell is one line at full width; the YouTube column truncates
+  // rather than wraps, so keep its text short.
+
+  const CHANGES = [
+    { icon: 'house', place: 'Home', youtube: 'A feed', drip: 'Your drip page', note: 'Subscriptions too. Reveal from either.' },
+    { icon: 'play-line', place: 'Watch pages', youtube: 'Suggestions, autoplay', drip: 'Just the video', note: 'No end screen. Comments wait behind a button.' },
+    { icon: 'smartphone', place: 'Shorts', youtube: 'The Shorts player', drip: 'Regular videos', note: 'They use minutes like any other.' },
+    { icon: 'search', place: 'Search', youtube: 'One long list', drip: '10 results at a time', note: 'With a button for more.' },
+  ];
 
   function showChanges() {
     /** @param {string} name @param {string} text */
-    const item = (name, text) => h('li', {}, icon(name), h('span', {}, text));
-    stage.append(h('ul', { class: 'tour-changes' },
-      item('house', 'Home and Subscriptions open your drip page instead of a feed, and you can reveal from either.'),
-      item('play-line', 'Watch pages have no suggestions sidebar, no end screen, and no autoplay, and comments wait behind a button.'),
-      item('smartphone', 'Shorts open as regular videos and use minutes like any other.'),
-      item('search', 'Search shows 10 results at a time, with a button for more.'),
-      item('check', "Your channels and playlists work as before, and ads and videos embedded on other sites don't use your minutes.")));
+    const place = (name, text) => h('div', { class: 'tour-change-place' }, icon(name), h('span', {}, text));
+    stage.append(h('div', { class: 'tour-changes' },
+      h('div', { class: 'tour-change tour-changes-head', 'aria-hidden': 'true' }, h('span', {}), h('span', {}, 'YouTube'), h('span', {}, 'With drip')),
+      h('ul', { class: 'tour-changes-list' }, ...CHANGES.map((c) => h('li', { class: 'tour-change' },
+        place(c.icon, c.place),
+        // The column headings are hidden from screen readers, so each cell says which side it is.
+        h('div', { class: 'tour-change-before', title: c.youtube }, h('span', { class: 'sr' }, 'On YouTube: '), c.youtube),
+        h('div', { class: 'tour-change-after' }, h('span', { class: 'sr' }, 'With drip: '), c.drip, h('small', {}, c.note))))),
+      h('div', { class: 'tour-change tour-changes-same' },
+        place('check', 'The same'),
+        h('p', {}, "Your channels and playlists work as before. Ads and videos embedded on other sites don't use your minutes."))));
     return undefined;
   }
 

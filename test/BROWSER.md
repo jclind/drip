@@ -49,7 +49,7 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 
 ## Welcome page
 
-32. Open `chrome-extension://<drip's id>/src/welcome/welcome.html`. The tiles and the line under them show your real numbers. Go through all five steps: +15m fills the glass, Reveal video shows a card, Watch opens the player, Play drains the pill until the lock rises, and Done for now falls away to "Kept N drops." Then Open YouTube on the last step goes to youtube.com. The popup shows the same drops and minutes as before the tour.
+32. Open `chrome-extension://<drip's id>/src/welcome/welcome.html`. The tiles and the line under them show the defaults: 15m a drop, 4 drops and 10 cards a day. Go through all five steps: +15m fills the glass, Reveal video shows a card, Watch opens the player, Play drains the pill until the lock rises, and Done for now falls away to "Kept N drops." The stage stays the same height on every step, so Next never moves. Step 5's table lines up in columns, and at a narrow window it stacks with nothing cut off. Then Open YouTube on the last step goes to youtube.com. The popup shows the same drops and minutes as before the tour.
 
 ## After a day boundary
 
