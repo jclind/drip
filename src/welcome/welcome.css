@@ -99,12 +99,15 @@ main {
   font-weight: 500;
 }
 
-/* As tall as the step's screen, at least 300px for the lock. welcome.js glides between heights when the step changes. */
+/* One height for every step, so the buttons under the stage never move (Jesse, 2026-10-12). 500px holds the tallest
+   screen, the revealed card (494px). The stage only grows past it if the lock's panel needs more, which welcome.js
+   fitLock() handles. */
 .tour-stage {
+  --tour-h: 500px;
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 300px;
+  min-height: var(--tour-h);
   padding: 24px 16px;
   box-sizing: border-box;
   overflow: hidden;
@@ -426,5 +429,10 @@ button.foot-link:hover {
 
   .kind-what {
     margin-top: 0;
+  }
+
+  /* Two of the sentences wrap here, so every step keeps room for two lines and the stage stays put. */
+  .tour-say {
+    min-height: 44px;
   }
 }

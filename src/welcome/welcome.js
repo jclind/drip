@@ -503,7 +503,7 @@
 
     /**
      * The stage holds its height while the water moves, so nothing under it jumps mid-animation. Once the lock is gone,
-     * this glides it to the height of what's left (Jesse, 2026-10-12).
+     * this glides it back to its usual height if the reason form had made it taller (Jesse, 2026-10-12).
      * @param {HTMLElement} lock
      */
     const lift = (lock) => morph(() => {
@@ -607,7 +607,7 @@
       // The lock's own padding is 16px on each side.
       const need = Math.ceil(/** @type {HTMLElement} */ (lockPanel).offsetHeight + 32);
       morph(() => {
-        stage.style.minHeight = `${Math.max(300, need)}px`;
+        stage.style.minHeight = `max(var(--tour-h), ${need}px)`;
         // The water travels the stage's height, so it rises and falls at the speed it does on YouTube.
         lock.style.setProperty('--tour-depth', `${stage.offsetHeight}px`);
       });
@@ -618,7 +618,7 @@
       fitLock();
     };
 
-    /** Raises the lock over the paused video. From the home page the stage glides to the video's height. */
+    /** Raises the lock over the paused video. */
     function raise() {
       morph(() => {
         stage.querySelector('.tour-again')?.remove();
