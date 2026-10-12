@@ -18,6 +18,11 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - A smaller left sidebar on the home page: only the "You" section (Your channel, History, Playlists, Watch later, Liked videos, Your videos, Downloads, Show more), with the rest gone. Jesse, 2026-10-11.
 - On a watch page, center the video and what's under it, now that the recommendations column is gone, and trim what sits under the video. Jesse, 2026-10-11.
 - Hide live streams and past streams (VODs) in Subscriptions by default, with a Settings toggle to show them. Jesse sees a lot of them there now. Jesse, 2026-10-11.
+- The video's age on the card, the way YouTube's home grid writes it ("3 days ago", "1 year ago"), next to the channel and length. `readPool` in home.js doesn't read it yet, so it needs one more selector at the top of the file. Jesse, 2026-10-12.
+
+## Welcome tour
+
+- Arrows with a short label in the tour, pointing at what to watch. In the watching step, one could point at the glass's water draining while the "video" plays, so the step shows something happening instead of a still frame through the whole countdown. Jesse, 2026-10-12.
 
 ## Watching
 
