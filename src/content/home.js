@@ -156,6 +156,11 @@
   /** What's in flight: a reveal from the empty page, or Reveal next on a card. The page shows a placeholder for it. */
   /** @type {'' | 'reveal' | 'next'} */
   let busy = '';
+  /** The read for a reveal has taken longer than SLOW_MS. */
+  let slow = false;
+  const SLOW_MS = 5000;
+  /** Watch was pressed and the watch page is loading. Redraws stop, so the card stays up instead of the empty page. */
+  let leaving = false;
 
   /**
    * The reveal animation is running (reveal.js). It draws on the page's own elements until it's done, so render()
@@ -172,17 +177,29 @@
    * @param {Record<string, unknown>} msg
    */
   async function findWith(msg) {
-    const pool = await readCandidates();
-    // No videos at all, not just none new: the grid's markup changed (Q25).
-    const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
-    if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
-      reportBroken('grid', SEL.item);
-      message = errorText('pool-empty');
-      return null;
+    // A slow read (Subscriptions can take 15 seconds) says so on the loading card. The animation holds redraws, so the
+    // text changes in place.
+    slow = false;
+    const timer = setTimeout(() => {
+      slow = true;
+      for (const el of document.querySelectorAll('#drip-home .drip-card.is-loading .drip-meta')) el.textContent = loadingText();
+    }, SLOW_MS);
+    try {
+      const pool = await readCandidates();
+      // No videos at all, not just none new: the grid's markup changed (Q25).
+      const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
+      if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
+        reportBroken('grid', SEL.item);
+        message = errorText('pool-empty');
+        return null;
+      }
+      const res = absorb(await send({ ...msg, candidates: pool }));
+      if (res && !res.ok) message = errorText(res.error);
+      return res && res.ok ? res : null;
+    } finally {
+      clearTimeout(timer);
+      slow = false;
     }
-    const res = absorb(await send({ ...msg, candidates: pool }));
-    if (res && !res.ok) message = errorText(res.error);
-    return res && res.ok ? res : null;
   }
 
   /**
@@ -288,12 +305,16 @@
       if (focused) focusOn('reveal');
       return;
     }
+    // The worker's save redraws the page through the storage listener, which would show the empty page while the
+    // watch page loads.
+    if (action === 'watch') leaving = true;
     const res = absorb(await send({ type: 'resolve', action, videoId }));
     if (res && !res.ok) message = errorText(res.error);
     if (action === 'watch' && res && res.ok) {
       location.assign(watchUrl(res.video.id));
       return;
     }
+    leaving = false;
     render();
   }
 
@@ -481,13 +502,19 @@
       }, h('span', {}, 'Reveal video'), price('card')));
   }
 
+  /** What the loading card says, which changes once the read has taken SLOW_MS. */
+  function loadingText() {
+    const subs = state.settings.feedSource === 'subscriptions';
+    if (slow) return subs ? 'Still checking. Subscriptions can take 15 seconds.' : 'Still looking…';
+    return subs ? 'Checking your subscriptions…' : 'Finding a video…';
+  }
+
   /** The reveal card while a reveal from the empty page reads the feed. Same size as the real one, so nothing jumps. */
   function placeholderCard() {
-    const subs = state.settings.feedSource === 'subscriptions';
     return h('div', { class: 'drip-card is-loading', 'aria-busy': 'true' },
       h('div', { class: 'drip-thumb' }),
       h('div', { class: 'drip-card-title' }, h('span', { class: 'drip-skel' }), h('span', { class: 'drip-skel drip-skel-short' })),
-      h('div', { class: 'drip-card-meta-row' }, h('span', { class: 'drip-meta' }, subs ? 'Checking your subscriptions…' : 'Finding a video…')));
+      h('div', { class: 'drip-card-meta-row' }, h('span', { class: 'drip-meta' }, loadingText())));
   }
 
   /**
@@ -610,7 +637,7 @@
   /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
     const root = document.getElementById('drip-home');
-    if (!root || moving) return;
+    if (!root || moving || leaving) return;
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0, DripGlass.fraction(state).toFixed(3),
       state.tokens, state.current, state.backlog, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
@@ -699,6 +726,12 @@
   });
   watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
   document.addEventListener('yt-navigate-finish', () => mount(true));
+  // Back from the watch page can bring this page back from Chrome's cache, still waiting on Watch.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted || !leaving) return;
+    leaving = false;
+    mount(true);
+  });
   setInterval(() => mount(), 500);
   mount();
 })();
