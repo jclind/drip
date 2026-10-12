@@ -498,7 +498,7 @@
 
   /**
    * Reveal next, on a card that's up. Resolves true once the new card is face up, or false if nothing new came, after
-   * the dealt card has gone back to the counter.
+   * the dealt card has gone back to the counter and the old one is face up again.
    * @param {Options} o
    */
   async function next(o) {
@@ -522,6 +522,13 @@
     if (!video) {
       putBack();
       await undeal(o.root, await landing, o.counter);
+      // The worker kept the old card, and home.js keeps its box across redraws, so the tossed card goes back in face up.
+      if (old.deal) {
+        stop(old.deal);
+        stop(/** @type {Element} */ (old.deal.firstElementChild));
+        old.thumb.append(old.deal);
+        await Promise.all([flip(old.deal), textIn([old.title, old.meta], 0)]);
+      }
       return false;
     }
     const real = parts(o.card(video));

@@ -283,7 +283,8 @@
     moving = true;
     try {
       await run({
-        root, page, find: async () => find(),
+        // Reveal next finds 300ms in. A step change before then has already redrawn the screen, so it finds nothing.
+        root, page, find: async () => (id === motion ? find() : null),
         counter: page.querySelector('.drip-stats .drip-token-card'),
         card: (/** @type {any} */ video) => (video ? card(video) : openingCard()),
         actions,
