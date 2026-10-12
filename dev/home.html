@@ -77,6 +77,8 @@
     full() { s.watchSecondsLeft = s.watchSecondsBought; },
     longtitle() { s.current = { ...VIDEOS[2], title: 'An extremely long title that goes on and on, the kind YouTube allows, with more words than two lines can hold at this width so it has to cut' , channel: 'A channel with a really quite long name, longer than any sane channel' }; },
     big() { s.watchSecondsLeft = 3 * 3600 + 25 * 60; s.watchSecondsBought = 4 * 3600; s.tokens = { watch: 96, rec: 200 }; },
+    // Reveal from Subscriptions. The frame gets the server's 404, so a reveal reads for 15 seconds and finds nothing.
+    subs() { s.settings.feedSource = 'subscriptions'; },
   };
   (SCENARIOS[params.get('scenario') || 'empty'] || SCENARIOS.empty).call(SCENARIOS);
 
