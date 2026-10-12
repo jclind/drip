@@ -22,9 +22,11 @@
 
     /**
      * Builds the real card for `video` around the landed card, its text held, and flips it once the picture has
-     * loaded. After Reveal next the buttons wait dimmed; after the first reveal they just formed, so they stay bright.
+     * loaded and the space is open. The thumbnail starts loading at once, and the flip doesn't wait for the buttons
+     * to finish turning (`formed`). After Reveal next the buttons wait dimmed; after the first reveal they just formed,
+     * so they stay bright.
      */
-    async function show(api, video, landing, dim) {
+    async function show(api, video, landing, dim, opened = Promise.resolve(), formed = Promise.resolve()) {
       const card = api.card(video);
       card.thumb.classList.add('c-stage');
       card.img.classList.add('is-loaded');
@@ -33,17 +35,18 @@
       if (dim) for (const b of card.row.querySelectorAll('button')) b.disabled = true;
       ctx.wrap.style.pointerEvents = 'none';
       const loaded = api.loadThumb(card.img, video);
-      const placed = await landing;
+      const [placed] = await Promise.all([landing, opened]);
       placed.front.append(card.img);
       card.thumb.append(placed.el);
-      Opening.place(ctx, card);
+      Opening.placeBody(ctx, card);
       current = card;
       dealt = placed;
+      const rowIn = formed.then(() => Opening.placeRow(ctx, card));
       await loaded;
       const flipped = Cards.flipUp(placed);
       held.forEach((el) => el.classList.remove('w-hold'));
       held.forEach((el, i) => animate(el, [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 320, delay: 240 + i * 90, easing: EASE_OUT }));
-      await flipped;
+      await Promise.all([flipped, rowIn]);
       for (const b of card.row.querySelectorAll('button')) b.disabled = false;
       ctx.wrap.style.pointerEvents = '';
     }
@@ -56,8 +59,7 @@
           ? Cards.lift(api, ctx.shell.thumb, ctx.revRect, ctx.e.gold)
           : Cards.deal(api, ctx.shell.thumb);
         const formed = Opening.form(ctx, style);
-        const [video] = await Promise.all([api.feed(), ctx.opened, formed]);
-        await show(api, video, landing, false);
+        await show(api, await api.feed(), landing, false, ctx.opened, formed);
       },
       async next(api) {
         const from = current.next.getBoundingClientRect();

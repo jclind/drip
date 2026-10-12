@@ -9,6 +9,7 @@
   const { h, animate, SLOW, REDUCED } = Mock;
   const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
   const OPEN_MS = 560;
+  const OPEN_EASE = 'cubic-bezier(0.3, 0.7, 0.2, 1)';
   const GOO_MS = 950;
   const CRISP_MS = 420;
   const BLANK = { id: 'blank', title: '', channel: '', length: '' };
@@ -141,7 +142,8 @@
     const stand = api.card(BLANK);
     const wrap = h('div', { class: 'b-wrap' }, stand.row);
     api.slot.replaceChildren(h('div', { class: 'drip-card' }, body, wrap));
-    api.setMode('card');
+    // Stash folds while the space opens, so the two move as one.
+    api.setMode('card', { ms: OPEN_MS, easing: OPEN_EASE });
     const H = body.offsetHeight;
     const fin = { s: rel(stand.save, stand.row), n: rel(stand.next, stand.row), p: rel(stand.pass, stand.row) };
     stand.row.style.opacity = '0';
@@ -152,7 +154,8 @@
     animate(oldRow, [{ opacity: 1 }, { opacity: 0 }], { duration: 150 }).then(() => oldRow.remove());
 
     api.page.classList.add('b-open');
-    const opened = animate(body, [{ height: '0px' }, { height: `${H}px` }], { duration: OPEN_MS, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' }).then(() => {
+    // The padding opens with the height. Left at 16px, it would drop the buttons 16px the moment the space starts opening.
+    const opened = animate(body, [{ height: '0px', paddingBottom: '0px' }, { height: `${H}px`, paddingBottom: '16px' }], { duration: OPEN_MS, easing: OPEN_EASE }).then(() => {
       body.getAnimations().forEach((x) => x.cancel());
       // Open, the card can lift past the box's edge when it flips.
       body.style.overflow = 'visible';
@@ -168,9 +171,13 @@
     await labels(ctx.stand.row, true, 200);
   }
 
-  /** Puts a real card's parts into the open space. */
-  function place(ctx, card) {
+  /** Puts a real card's picture, title, and meta row into the open space. */
+  function placeBody(ctx, card) {
     ctx.body.replaceChildren(card.thumb, card.title, card.metaRow);
+  }
+
+  /** Puts a real card's buttons in, in place of the ones that just formed. They look the same. */
+  function placeRow(ctx, card) {
     ctx.wrap.replaceChildren(card.row);
   }
 
@@ -183,15 +190,17 @@
     body.style.overflow = '';
     const H = body.offsetHeight;
     api.page.classList.remove('b-open');
-    const closing = animate(body, [{ height: `${H}px` }, { height: '0px' }], { duration: OPEN_MS, delay: 120, easing: EASE });
+    // The padding closes with the height, or the buttons jump up 16px when the space is gone. Stash opens in step.
+    const closing = animate(body, [{ height: `${H}px`, paddingBottom: '16px' }, { height: '0px', paddingBottom: '0px' }], { duration: OPEN_MS, delay: 120, easing: EASE });
+    const stash = api.setMode('empty', { ms: OPEN_MS, delay: 120, easing: EASE });
     const layer = await blobs(wrap, backward(style, ctx.e, now), style !== 'crisp');
     await closing;
     const actions = api.actions();
     api.slot.replaceChildren(actions);
     layer.remove();
     labels(actions, true, 200);
-    api.setMode('empty');
+    await stash;
   }
 
-  globalThis.Opening = { open, form, place, close };
+  globalThis.Opening = { open, form, placeBody, placeRow, close };
 })();

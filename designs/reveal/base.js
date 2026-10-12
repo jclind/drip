@@ -173,10 +173,42 @@
 
     const api = {
       root, page, stats, slot, saved, recIcon, recNum, actions, card, shell, state, LOAD,
-      /** Saved opens on the empty page and folds while a card is up, like home.js. */
-      setMode(mode) {
-        savedOpen = mode === 'empty';
-        drawSaved();
+      /**
+       * Saved opens on the empty page and folds while a card is up, like home.js. With `ms`, it opens or folds over that
+       * long, so it can move in step with the card's space instead of jumping when the card's done.
+       * @param {'empty' | 'card'} mode
+       * @param {{ms?: number, delay?: number, easing?: string}} [motion]
+       */
+      async setMode(mode, { ms = 0, delay = 0, easing = 'ease' } = {}) {
+        const open = mode === 'empty';
+        if (open === savedOpen) return;
+        if (!ms || REDUCED) {
+          savedOpen = open;
+          drawSaved();
+          return;
+        }
+        const from = saved.offsetHeight;
+        saved.style.overflow = 'hidden';
+        if (open) {
+          savedOpen = true;
+          drawSaved();
+          const to = saved.offsetHeight;
+          const list = saved.querySelector('.drip-saved-list');
+          if (list) animate(list, [{ opacity: 0 }, { opacity: 1 }], { duration: ms * 0.6, delay: delay + ms * 0.4 });
+          await animate(saved, [{ height: `${from}px` }, { height: `${to}px` }], { duration: ms, delay, easing });
+        } else {
+          // Fold with the rows still in it, then drop them.
+          savedOpen = false;
+          const head = saved.querySelector('.drip-saved-head');
+          head.setAttribute('aria-expanded', 'false');
+          saved.classList.remove('is-open');
+          const list = saved.querySelector('.drip-saved-list');
+          if (list) animate(list, [{ opacity: 1 }, { opacity: 0 }], { duration: ms * 0.4, delay });
+          await animate(saved, [{ height: `${from}px` }, { height: `${head.offsetHeight}px` }], { duration: ms, delay, easing });
+          drawSaved();
+        }
+        saved.getAnimations().forEach((a) => a.cancel());
+        saved.style.overflow = '';
       },
       setRec(n) {
         state.rec = n;

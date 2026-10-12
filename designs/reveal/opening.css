@@ -55,3 +55,13 @@
   height: var(--drip-btn-h);
   border-radius: calc(var(--drip-btn-h) / 2);
 }
+
+/* The loading title is exactly two title lines, 40px, so the buttons don't rise when the real title replaces it.
+   drip.css's bars (14px with 3px and 9px margins) make it about 9px taller. */
+#drip-home .drip-card-title:has(.drip-skel) {
+  height: 40px;
+}
+
+#drip-home .drip-card-title .drip-skel {
+  margin: 3px 0;
+}
