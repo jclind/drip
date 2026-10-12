@@ -1,29 +1,673 @@
 // @ts-check
-// The page drip opens once, when it's installed. Fills in the real numbers from the current settings.
+// The page drip opens once, when it's installed (DESIGN.md, "Welcome page"). The top states the default allowance.
+// The tour under it runs working copies of drip's screens on a throwaway state, through the real rules in
+// state.js and drip.css's styles. It never sends a change to the worker. The markup copies home.js's stats, actions,
+// and card, and watch.js's lock and pill, so a change to those screens needs the same change here.
 
-// var, not const: these page scripts share one type-check program, and only var may be declared twice.
-var Drip = /** @type {any} */ (globalThis).Drip;
+(() => {
+  /** @type {any} */
+  const Drip = /** @type {any} */ (globalThis).Drip;
+  /** @type {any} */
+  const DripGlass = /** @type {any} */ (globalThis).DripGlass;
+  /** @type {any} */
+  const { h, icon, price, hourLabel } = /** @type {any} */ (globalThis).DripUI;
 
-/** @param {string} id @param {string} text */
-function fill(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
+  /** @param {string} id */
+  const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
+  const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** "4:00am" for 4. */
-function hourLabel(/** @type {number} */ hour) {
-  return `${hour % 12 === 0 ? 12 : hour % 12}:00${hour < 12 ? 'am' : 'pm'}`;
-}
+  // drip.css keys dark mode off html[dark], the way YouTube sets it. Here it follows Chrome's theme.
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const applyTheme = () => document.documentElement.toggleAttribute('dark', darkQuery.matches);
+  applyTheme();
+  darkQuery.addEventListener('change', applyTheme);
 
-/** @type {HTMLElement} */ (document.getElementById('settings')).addEventListener('click', () => chrome.runtime.openOptionsPage());
+  // Videos the tour's reveals draw from. Made up, with drawn thumbnails, so the page loads nothing from YouTube.
+  const SAMPLES = [
+    { id: 'tour-joinery', title: 'How Japanese joinery holds without nails', channel: 'Workshop Notes', length: '14:02', thumb: 'linear-gradient(135deg, #8a5a3c, #3d2618)' },
+    { id: 'tour-trail', title: 'Riding the ridge trail before the storm', channel: 'Trail Days', length: '21:35', thumb: 'linear-gradient(135deg, #3a7d5c, #173528)' },
+    { id: 'tour-bread', title: 'Sourdough with a schedule that fits a workday', channel: 'Kitchen Basics', length: '9:08', thumb: 'linear-gradient(135deg, #c08a3e, #5a3a12)' },
+    { id: 'tour-orbit', title: 'Why the Moon always shows the same face', channel: 'Slow Science', length: '12:47', thumb: 'linear-gradient(135deg, #3c4f8a, #141c3d)' },
+    { id: 'tour-redstone', title: 'Building a working clock out of redstone', channel: 'Blockworks', length: '25:33', thumb: 'linear-gradient(135deg, #9a3a3a, #3a1414)' },
+  ];
+  /** @param {string} id */
+  const sample = (id) => SAMPLES.find((v) => v.id === id) || SAMPLES[0];
 
-chrome.runtime.sendMessage({ type: 'get' }).then((res) => {
-  if (!res || !res.state) return;
-  const s = res.state.settings;
-  fill('minutes', String(s.minutesPerToken));
-  for (const el of document.querySelectorAll('.minutes')) el.textContent = String(s.minutesPerToken);
-  fill('watch', String(s.watchTokensPerDay));
-  fill('rec', String(s.recTokensPerDay));
-  fill('rollover', String(s.rolloverDays));
-  fill('reset', hourLabel(s.resetHour));
-});
+  /**
+   * The numbers on the page and in the tour are the defaults, never the saved settings. The page opens on install, when
+   * the two are the same, and a reopened tab after testing showed the test numbers (Jesse, 2026-10-12).
+   */
+  const settings = Drip.DEFAULT_SETTINGS;
+  /** The tour's own state. Every button in the tour changes this and nothing else. */
+  const sand = freshState();
+
+  function freshState() {
+    const state = Drip.initialState(Date.now());
+    Object.assign(state.settings, settings);
+    state.tokens = { watch: settings.watchTokensPerDay, rec: settings.recTokensPerDay };
+    return state;
+  }
+
+  // The top of the page.
+
+  function fillHero() {
+    const minutes = Drip.formatMinutes(settings.minutesPerToken * 60);
+    /** @param {string} name @param {string} cls @param {string} label @param {string} what */
+    const kind = (name, cls, label, what) => h('li', { class: 'kind' },
+      h('div', { class: 'kind-name' }, icon(name, cls), h('span', {}, label)),
+      h('div', { class: 'kind-what' }, what));
+    $('kinds').replaceChildren(
+      kind('drop', 'drip-token-drop', 'Drops', `1 drop = ${minutes} of watching`),
+      kind('card', 'drip-token-card', 'Cards', '1 card = 1 video revealed'),
+      kind('save', '', 'Stash', 'Watch later, costs no card'));
+    /** @param {number} n @param {string} one @param {string} many */
+    const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    $('allowance').textContent = `You get ${count(settings.watchTokensPerDay, 'drop', 'drops')} and ${count(settings.recTokensPerDay, 'card', 'cards')} a day. You can change these in Settings.`;
+  }
+
+  $('brandDrop').replaceWith(icon('drop', 'drip-token-drop'));
+  $('footYouTube').append('Open YouTube', icon('arrow-up-right'));
+  $('footSettings').append(icon('settings'), 'Settings');
+  $('footSettings').addEventListener('click', () => chrome.runtime.openOptionsPage());
+
+  // The tour. Each step is one sentence over one screen. A step's show() draws into the stage and returns a function
+  // that stops its timers when the step changes.
+
+  /** @typedef {{say: string, show: () => (() => void) | undefined}} Step */
+  /** @type {Step[]} */
+  const STEPS = [
+    { say: 'This is your YouTube home now. Try +15m.', show: showHome },
+    { say: 'Reveal video spends a card on one video. Watch it, stash it, or pass.', show: showReveal },
+    { say: 'Minutes only drain while a video plays. Press play.', show: showPlayer },
+    { say: 'When the glass runs dry, the lock comes up. Done for now takes you home.', show: showLock },
+    { say: 'What else changes on YouTube.', show: showChanges },
+  ];
+
+  let step = 0;
+  /** @type {(() => void) | undefined} */
+  let stopStep;
+  /** Timers a step started. Cleared when the step changes, so nothing from an old step draws into a new one. */
+  /** @type {Set<ReturnType<typeof setTimeout>>} */
+  const timers = new Set();
+
+  /** @param {() => void} fn @param {number} ms */
+  function later(fn, ms) {
+    const t = setTimeout(() => {
+      timers.delete(t);
+      fn();
+    }, ms);
+    timers.add(t);
+    return t;
+  }
+
+  const stage = $('stage');
+
+  let morphing = false;
+
+  /**
+   * Redraws the stage with fn and glides its height to the new screen's, so the controls under it move smoothly.
+   * @param {() => void} fn
+   */
+  function morph(fn) {
+    // A step's first draw happens inside go()'s morph, which measures the whole change once.
+    if (morphing) return fn();
+    morphing = true;
+    const before = stage.getBoundingClientRect().height;
+    try {
+      fn();
+    } finally {
+      morphing = false;
+    }
+    const after = stage.getBoundingClientRect().height;
+    if (!before || Math.abs(before - after) < 2 || reducedMotion()) return;
+    stage.animate([{ height: `${before}px` }, { height: `${after}px` }], { duration: 260, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
+  }
+
+  /** @param {number} n */
+  function go(n) {
+    stopStep?.();
+    for (const t of timers) clearTimeout(t);
+    timers.clear();
+    step = Math.max(0, Math.min(STEPS.length - 1, n));
+    $('say').textContent = STEPS[step].say;
+    morph(() => {
+      stage.style.minHeight = '';
+      stage.replaceChildren();
+      stopStep = STEPS[step].show();
+    });
+    renderControls();
+  }
+
+  function renderControls() {
+    const last = step === STEPS.length - 1;
+    $('dots').replaceChildren(...STEPS.map((_, i) => h('button', {
+      type: 'button', 'aria-label': `Step ${i + 1} of ${STEPS.length}`, 'aria-current': i === step ? 'step' : undefined,
+      onclick: () => go(i),
+    })));
+    $('back').hidden = step === 0;
+    $('skip').hidden = last;
+    const next = $('next');
+    next.replaceChildren(...(last ? ['Open YouTube', icon('arrow-up-right')] : ['Next', icon('arrow-right')]));
+  }
+
+  $('back').addEventListener('click', () => go(step - 1));
+  $('skip').addEventListener('click', () => go(STEPS.length - 1));
+  $('next').addEventListener('click', () => {
+    if (step === STEPS.length - 1) location.href = 'https://www.youtube.com/';
+    else go(step + 1);
+  });
+  $('tour').addEventListener('keydown', (e) => {
+    if (/** @type {Element} */ (e.target).closest('textarea, input')) return;
+    if (e.key === 'ArrowRight' && step < STEPS.length - 1) go(step + 1);
+    else if (e.key === 'ArrowLeft' && step > 0) go(step - 1);
+  });
+
+  // Steps 1 and 2: the home page, as home.js draws it.
+
+  /** @type {SVGSVGElement | null} */
+  let glassEl = null;
+  const GLASS_PX = 34;
+  let lastCardId = '';
+  /** The card Watch was clicked on, which the player then plays. */
+  let watchedId = '';
+
+  function glass() {
+    const fraction = DripGlass.fraction(sand);
+    if (!glassEl) glassEl = DripGlass.make(fraction, GLASS_PX);
+    else DripGlass.set(glassEl, fraction, GLASS_PX);
+    return glassEl;
+  }
+
+  function stats() {
+    const { watch, rec } = sand.tokens;
+    return h('div', { class: 'drip-stats' },
+      h('div', { class: 'drip-glass-tile' }, glass()),
+      h('div', { class: 'drip-time-block' },
+        h('div', { class: 'drip-time' }, Drip.formatMinutes(sand.watchSecondsLeft)),
+        h('div', { class: 'drip-sub' }, 'left today')),
+      h('div', { class: 'drip-counts' },
+        h('div', { class: `drip-count${watch ? '' : ' is-zero'}` }, icon('drop', 'drip-token-drop'), h('span', {}, String(watch)), h('span', { class: 'drip-sr' }, watch === 1 ? ' drop' : ' drops')),
+        h('div', { class: `drip-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), h('span', {}, String(rec)), h('span', { class: 'drip-sr' }, rec === 1 ? ' card' : ' cards'))));
+  }
+
+  function actions() {
+    return h('div', { class: 'drip-actions' },
+      h('button', {
+        class: 'drip-b drip-b-gray drip-add', disabled: sand.tokens.watch < 1, onclick: () => { Drip.spendWatch(sand); drawHome(); },
+      }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(sand.settings.minutesPerToken * 60)}`), price('drop')),
+      h('button', {
+        class: 'drip-b drip-b-gold drip-reveal', disabled: sand.tokens.rec < 1, onclick: () => (step === 1 ? reveal() : go(1)),
+      }, h('span', {}, 'Reveal video'), price('card')));
+  }
+
+  /** @param {any} video */
+  function card(video) {
+    const saved = sand.backlog.some((/** @type {any} */ v) => v.id === video.id);
+    const isNew = video.id !== lastCardId;
+    lastCardId = video.id;
+    const thumb = h('div', { class: 'tour-thumb' }, icon('play-line'));
+    thumb.style.setProperty('--thumb', sample(video.id).thumb);
+    return h('div', { class: `drip-card${isNew ? ' is-new' : ''}` },
+      h('div', { class: 'drip-thumb', 'aria-hidden': 'true' }, thumb),
+      h('div', { class: 'drip-card-title', title: video.title }, video.title),
+      h('div', { class: 'drip-card-meta-row' },
+        h('span', { class: 'drip-meta' }, `${video.channel} · ${video.length}`),
+        h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(2); } },
+          icon('play'), h('span', {}, 'Watch'), sand.watchSecondsLeft <= 0 && price('drop'))),
+      h('div', { class: 'drip-card-actions' },
+        h('button', {
+          class: `drip-b drip-b-gray drip-card-save${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
+          onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); },
+        }, icon('save'), h('span', { class: 'drip-save-label' }, saved ? 'Stashed' : 'Stash')),
+        h('button', {
+          class: 'drip-b drip-b-gray drip-next', disabled: sand.tokens.rec < 1,
+          onclick: () => { if (!Drip.revealNext(sand, video.id, pool()).ok) refill(); drawHome(); },
+        }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
+        h('button', {
+          class: 'drip-b drip-b-gray drip-pass', 'aria-label': 'Pass', title: "Pass. It's free, and this video won't come back.",
+          onclick: () => { Drip.resolveCurrent(sand, 'pass', video.id); drawHome(); },
+        }, icon('x'))));
+  }
+
+  /** Samples not revealed yet, starting over once the tour has shown them all. */
+  function pool() {
+    if (SAMPLES.every((v) => sand.seen.includes(v.id))) sand.seen = [];
+    return SAMPLES;
+  }
+
+  /** Reveal next found nothing new: start the samples over and try once more. */
+  function refill() {
+    sand.seen = sand.current ? [sand.current.id] : [];
+    if (sand.current) Drip.revealNext(sand, sand.current.id, SAMPLES);
+  }
+
+  function reveal() {
+    if (!sand.current) Drip.reveal(sand, pool());
+    drawHome();
+  }
+
+  function drawHome() {
+    const focused = document.activeElement && stage.contains(document.activeElement) ? [...stage.querySelectorAll('button')].indexOf(/** @type {any} */ (document.activeElement)) : -1;
+    morph(() => stage.replaceChildren(h('div', { id: 'drip-home', class: 'drip-ui' },
+      h('div', { class: 'drip-page' }, stats(), sand.current ? card(sand.current) : actions()))));
+    if (focused >= 0) /** @type {HTMLElement | undefined} */ (stage.querySelectorAll('button')[focused])?.focus();
+  }
+
+  function showHome() {
+    drawHome();
+    return undefined;
+  }
+
+  function showReveal() {
+    if (!sand.current && sand.tokens.rec > 0) Drip.reveal(sand, pool());
+    drawHome();
+    return undefined;
+  }
+
+  // Step 3: a video playing, with the pill as watch.js draws it. The minutes drain 90 times faster than real ones.
+
+  const SPEED = 90;
+  /** @type {SVGSVGElement | null} */
+  let pillGlass = null;
+  const PILL_GLASS_PX = 20;
+
+  /** The video the player and the lock are about: the card that was watched, or the first sample. */
+  function playing() {
+    return sample(watchedId || SAMPLES[0].id);
+  }
+
+  /**
+   * The pill, built once per player and updated in place, so its Stash button stays the same element through the
+   * player's ticks and keeps a click or keyboard focus (Codex, 2026-10-11).
+   */
+  function makePill() {
+    const video = playing();
+    const minutes = h('span', { class: 'drip-pill-minutes' });
+    const leftToday = h('span', { class: 'drip-sr' }, ' left today');
+    const pausedNote = h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused');
+    const time = h('span', { class: 'drip-pill-time' }, h('span', { class: 'drip-pill-label' }, minutes, leftToday, pausedNote));
+    const save = h('button', { class: 'drip-pill-save' });
+    const el = h('div', { id: 'drip-pill', class: 'drip-ui' }, time, save);
+    let lastPlaying = false;
+    let savedShown = '';
+
+    /** @param {boolean} isPlaying */
+    function update(isPlaying) {
+      lastPlaying = isPlaying;
+      const saved = sand.backlog.some((/** @type {any} */ v) => v.id === video.id);
+      const unlocked = sand.unlocked.includes(video.id);
+      const left = sand.watchSecondsLeft;
+      const paused = !unlocked && !isPlaying && left > 0;
+      const fraction = DripGlass.fraction(sand);
+      if (!pillGlass) pillGlass = DripGlass.make(fraction, PILL_GLASS_PX);
+      else DripGlass.set(pillGlass, fraction, PILL_GLASS_PX);
+      if (unlocked) pillGlass.remove();
+      else if (pillGlass.parentElement !== time) time.prepend(pillGlass);
+      el.classList.toggle('is-low', !unlocked && isPlaying && left > 0 && left <= 120);
+      time.classList.toggle('is-unlocked', unlocked);
+      time.classList.toggle('is-paused', paused);
+      minutes.textContent = unlocked ? 'Unlocked' : Drip.formatMinutes(left);
+      leftToday.hidden = unlocked;
+      pausedNote.hidden = !paused;
+      // The button's insides change only when Stash does.
+      if (savedShown !== String(saved)) {
+        savedShown = String(saved);
+        save.classList.toggle('is-saved', saved);
+        save.setAttribute('aria-pressed', String(saved));
+        save.replaceChildren(icon(saved ? 'save' : 'save-outline'), h('span', {}, saved ? 'Stashed' : 'Stash'));
+      }
+    }
+
+    save.addEventListener('click', () => {
+      if (sand.backlog.some((/** @type {any} */ v) => v.id === video.id)) Drip.removeBacklog(sand, video.id);
+      else Drip.addBacklog(sand, video);
+      update(lastPlaying);
+    });
+    update(false);
+    return { el, update };
+  }
+
+  /**
+   * The player with the pill. Returns the element and a stop function for its timer.
+   * @param {{onEmpty?: () => void, autoplay?: boolean}} [opts]
+   */
+  function player(opts = {}) {
+    const video = playing();
+    let isPlaying = false;
+    /** @type {ReturnType<typeof setInterval> | undefined} */
+    let timer;
+    const bar = h('span', {});
+    const length = video.length.split(':').reduce((t, part) => t * 60 + Number(part), 0);
+    let at = 0;
+    const box = h('div', { class: 'tour-player' });
+    const pill = makePill();
+    let buttonShown = '';
+    const draw = () => {
+      bar.style.width = `${Math.min(100, (at / length) * 100)}%`;
+      box.classList.toggle('is-playing', isPlaying);
+      pill.update(isPlaying);
+      if (buttonShown !== String(isPlaying)) {
+        buttonShown = String(isPlaying);
+        button.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+        button.replaceChildren(icon(isPlaying ? 'pause' : 'play-line'));
+      }
+    };
+    const stop = () => {
+      clearInterval(timer);
+      timer = undefined;
+      isPlaying = false;
+    };
+    const tick = () => {
+      const seconds = SPEED / 10;
+      const unlocked = sand.unlocked.includes(video.id);
+      Drip.charge(sand, unlocked ? seconds : Math.min(seconds, sand.watchSecondsLeft), video.id);
+      at += seconds;
+      if (!unlocked && sand.watchSecondsLeft <= 0) {
+        stop();
+        draw();
+        opts.onEmpty?.();
+        return;
+      }
+      draw();
+    };
+    const play = () => {
+      // Watch at 0 minutes buys a drop's minutes first (Q18).
+      Drip.buyIfOut(sand, video.id);
+      if (sand.watchSecondsLeft <= 0 && !sand.unlocked.includes(video.id)) {
+        opts.onEmpty?.();
+        return;
+      }
+      isPlaying = true;
+      timer = setInterval(tick, 100);
+      draw();
+    };
+    const button = h('button', {
+      type: 'button', class: 'tour-player-play',
+      onclick: () => {
+        if (isPlaying) {
+          stop();
+          draw();
+        } else play();
+      },
+    });
+    box.append(button, h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
+    draw();
+    if (opts.autoplay) play();
+    return { el: box, stop };
+  }
+
+  function showPlayer() {
+    // Play pressed again in the pause before the lock buys more minutes, and then the lock doesn't come (Codex, 2026-10-11).
+    const p = player({ onEmpty: () => later(() => { if (sand.watchSecondsLeft <= 0) go(3); }, 700) });
+    stage.append(p.el);
+    return p.stop;
+  }
+
+  // Step 4: the lock, as watch.js draws it, inside the stage. Under it: the paused video, then whatever the way out
+  // leads to.
+
+  const BUBBLES = 8;
+
+  function sea() {
+    /** @param {number} min @param {number} max */
+    const between = (min, max) => min + Math.random() * (max - min);
+    const bubbles = Array.from({ length: BUBBLES }, () => {
+      const bubble = h('span', { class: 'drip-bubble' }, h('span', {}));
+      bubble.style.setProperty('--x', `${between(3, 97).toFixed(1)}%`);
+      bubble.style.setProperty('--size', `${Math.round(between(4, 11))}px`);
+      bubble.style.setProperty('--rise', `${between(8, 14).toFixed(1)}s`);
+      bubble.style.setProperty('--delay', `${between(0.9, 8).toFixed(1)}s`);
+      bubble.style.setProperty('--sway', `${between(2.4, 4.2).toFixed(1)}s`);
+      return bubble;
+    });
+    return h('div', { class: 'drip-sea', 'aria-hidden': 'true' }, ...bubbles, h('span', { class: 'drip-fish drip-fish-a' }, h('span', {})));
+  }
+
+  /** @type {ReturnType<typeof setInterval> | undefined} */
+  let ringTimer;
+
+  /** @param {HTMLElement} button */
+  function ring(button) {
+    const panel = button.closest('.drip-lock-panel');
+    if (!panel || !button.isConnected || button.classList.contains('is-leaving')) return stopRings();
+    const p = panel.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+    const r = h('span', { class: 'drip-done-ring', 'aria-hidden': 'true' });
+    r.style.cssText = `left:${b.left - p.left}px;top:${b.top - p.top}px;width:${b.width}px;height:${b.height}px`;
+    panel.append(r);
+    r.addEventListener('animationend', () => r.remove());
+  }
+
+  /** @param {Event} e */
+  function startRings(e) {
+    const button = /** @type {HTMLElement} */ (e.currentTarget);
+    if (ringTimer !== undefined || reducedMotion() || (e.type === 'focus' && !button.matches(':focus-visible'))) return;
+    ring(button);
+    ringTimer = setInterval(() => ring(button), 1400);
+  }
+
+  function stopRings() {
+    clearInterval(ringTimer);
+    ringTimer = undefined;
+  }
+
+  /** @param {HTMLElement} panel @param {HTMLElement} button @param {MouseEvent} e */
+  function leaveRings(panel, button, e) {
+    const p = panel.getBoundingClientRect();
+    const box = button.getBoundingClientRect();
+    const x = (e.clientX || box.left + box.width / 2) - p.left;
+    const y = (e.clientY || box.top + box.height / 2) - p.top;
+    const far = Math.hypot(Math.max(x, p.width - x), Math.max(y, p.height - y)) * 2;
+    /** @param {number} size @param {number} ms @param {number} delay @param {string} [cls] */
+    const grow = (size, ms, delay, cls = 'drip-leave-ring') => {
+      const r = h('span', { class: cls, 'aria-hidden': 'true' });
+      r.style.cssText = `left:${x}px;top:${y}px`;
+      panel.append(r);
+      r.animate([{ width: '0px', height: '0px', opacity: 1 }, { width: `${size}px`, height: `${size}px`, opacity: 0 }],
+        { duration: ms, delay, easing: 'cubic-bezier(0.2, 0.6, 0.3, 1)', fill: 'both' });
+    };
+    grow(110, 420, 0, 'drip-leave-ring is-splash');
+    grow(far, 900, 0);
+    grow(far, 900, 140);
+  }
+
+  /** "1h 15m watched today", plus last week's when the tour's log has it, which it never does. */
+  function watchedLine() {
+    const { today } = Drip.watchedSummary(sand);
+    return `${Drip.formatMinutes(today)} watched today`;
+  }
+
+  function showLock() {
+    // Arriving here by Next with minutes left, the minutes run out first, as they would have.
+    sand.watchSecondsLeft = 0;
+    let reasonOpen = false;
+    let note = '';
+    /** @type {{el: HTMLElement, stop: () => void} | null} */
+    let under = null;
+
+    /** @param {HTMLElement} el @param {{el: HTMLElement, stop: () => void} | null} [p] */
+    const setUnder = (el, p = null) => {
+      under?.stop();
+      under = p;
+      const old = stage.querySelector('.tour-under');
+      const wrap = h('div', { class: 'tour-under' }, el);
+      if (old) old.replaceWith(wrap);
+      else stage.prepend(wrap);
+    };
+
+    const again = () => h('button', { type: 'button', class: 'tour-again', onclick: () => {
+      sand.watchSecondsLeft = 0;
+      sand.unlocked = [];
+      raise();
+    } }, 'Show the lock again');
+
+    /**
+     * The stage holds its height while the water moves, so nothing under it jumps mid-animation. Once the lock is gone,
+     * this glides it back to its usual height if the reason form had made it taller (Jesse, 2026-10-12).
+     * @param {HTMLElement} lock
+     */
+    const lift = (lock) => morph(() => {
+      lock.remove();
+      stage.style.minHeight = '';
+    });
+
+    /** Lifts the lock the way buying minutes or an unlock does, over a video that plays on. */
+    const drain = () => {
+      const lock = /** @type {HTMLElement} */ (stage.querySelector('#drip-lock'));
+      stopRings();
+      const p = player({ autoplay: true, onEmpty: () => later(() => { if (sand.watchSecondsLeft <= 0) raise(); }, 700) });
+      setUnder(p.el, p);
+      if (reducedMotion()) lift(lock);
+      else {
+        lock.classList.add('is-draining');
+        later(() => lift(lock), 600);
+      }
+    };
+
+    /** @param {MouseEvent} e */
+    const done = (e) => {
+      const lock = /** @type {HTMLElement} */ (stage.querySelector('#drip-lock'));
+      const button = /** @type {HTMLElement} */ (e.currentTarget);
+      const panel = /** @type {HTMLElement} */ (button.closest('.drip-lock-panel'));
+      if (button.classList.contains('is-leaving')) return;
+      button.classList.add('is-leaving');
+      lock.classList.add('is-leaving');
+      stopRings();
+      stage.style.minHeight = `${stage.offsetHeight}px`;
+      const kept = sand.tokens.watch;
+      const home = () => {
+        const message = kept > 0 ? `Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.` : '';
+        setUnder(h('div', { id: 'drip-home', class: 'drip-ui' },
+          h('div', { class: 'drip-page' }, stats(), actions(), message && h('div', { class: 'drip-message is-kept', role: 'status' }, message))));
+        stage.append(again());
+      };
+      if (reducedMotion()) {
+        home();
+        lift(lock);
+        return;
+      }
+      leaveRings(panel, button, e);
+      later(() => {
+        home();
+        lock.classList.add('is-surfacing');
+        later(() => lift(lock), 1000);
+      }, 700);
+    };
+
+    const panel = () => {
+      const s = sand.settings;
+      const needLeft = Math.max(0, s.needThisPerDay - sand.unlocked.length);
+      const canBuy = sand.tokens.watch > 0;
+      /** @type {HTMLTextAreaElement} */
+      const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?' }));
+      const unlock = () => {
+        const res = Drip.needThis(sand, playing().id, playing().title, reason.value, Date.now());
+        if (res.ok) {
+          reasonOpen = false;
+          note = '';
+          drain();
+          // An unlocked video never runs out, so the lock only comes back from here.
+          stage.append(again());
+        } else {
+          note = res.error === 'reason-required' ? 'Write a few words about why.' : "You've used all of today's unlocks.";
+          redraw();
+        }
+      };
+      const unlocks = needLeft > 0 && !reasonOpen
+        ? h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = true; redraw(); stage.querySelector('textarea')?.focus(); } }, `I need this one · ${needLeft} left`)
+        : needLeft > 0
+          ? h('div', { class: 'drip-reason' }, reason,
+            h('div', { class: 'drip-reason-row' },
+              h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = false; note = ''; redraw(); } }, 'Cancel'),
+              h('button', { class: 'drip-b drip-b-gray', onclick: unlock }, icon('unlock'), h('span', {}, 'Unlock this video'))))
+          : h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`);
+      return h('div', { class: 'drip-lock-panel', role: 'group', 'aria-label': 'The lock' },
+        h('h2', { class: 'drip-lock-title' }, canBuy ? 'Time for a breather.' : "You've had your fill."),
+        h('div', { class: 'drip-lock-sub' }, watchedLine()),
+        h('div', { class: `drip-lock-actions${canBuy ? '' : ' is-alone'}` },
+          canBuy && h('button', {
+            class: 'drip-b drip-b-gray drip-lock-add', onclick: () => { Drip.spendWatch(sand); drain(); },
+          }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop')),
+          h('button', {
+            class: 'drip-b drip-b-primary drip-done', onclick: done,
+            onpointerenter: startRings, onpointerleave: stopRings, onfocus: startRings, onblur: stopRings,
+          }, h('span', {}, 'Done for now'))),
+        note && h('div', { class: 'drip-lock-note', role: 'status' }, note),
+        unlocks);
+    };
+
+    /**
+     * The lock sits over the stage without adding to its height, so the stage grows to hold the panel, as when the
+     * reason form opens, and the panel's buttons are never cut off (Codex, 2026-10-11).
+     */
+    const fitLock = () => {
+      const lock = /** @type {HTMLElement | null} */ (stage.querySelector('#drip-lock'));
+      const lockPanel = lock?.querySelector('.drip-lock-panel');
+      if (!lock || !lockPanel) return;
+      // The lock's own padding is 16px on each side.
+      const need = Math.ceil(/** @type {HTMLElement} */ (lockPanel).offsetHeight + 32);
+      morph(() => {
+        stage.style.minHeight = `max(var(--tour-h), ${need}px)`;
+        // The water travels the stage's height, so it rises and falls at the speed it does on YouTube.
+        lock.style.setProperty('--tour-depth', `${stage.offsetHeight}px`);
+      });
+    };
+
+    const redraw = () => {
+      stage.querySelector('#drip-lock .drip-lock-panel')?.replaceWith(panel());
+      fitLock();
+    };
+
+    /** Raises the lock over the paused video. */
+    function raise() {
+      morph(() => {
+        stage.querySelector('.tour-again')?.remove();
+        stage.querySelector('#drip-lock')?.remove();
+        reasonOpen = false;
+        note = '';
+        const p = player();
+        setUnder(p.el, p);
+        const lockPanel = panel();
+        lockPanel.classList.add('is-new');
+        stage.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), lockPanel));
+        fitLock();
+      });
+    }
+
+    raise();
+    return () => {
+      stopRings();
+      under?.stop();
+    };
+  }
+
+  // Step 5: what changes, as a table of YouTube's way against drip's. Jesse picked this layout from design variants on
+  // 2026-10-12, over five sentences with an icon each. Each cell is one line at full width; the YouTube column truncates
+  // rather than wraps, so keep its text short.
+
+  const CHANGES = [
+    { icon: 'house', place: 'Home', youtube: 'A feed', drip: 'Your drip page', note: 'Subscriptions too. Reveal from either.' },
+    { icon: 'play-line', place: 'Watch pages', youtube: 'Suggestions, autoplay', drip: 'Just the video', note: 'No end screen. Comments wait behind a button.' },
+    { icon: 'smartphone', place: 'Shorts', youtube: 'The Shorts player', drip: 'Regular videos', note: 'They use minutes like any other.' },
+    { icon: 'search', place: 'Search', youtube: 'One long list', drip: '10 results at a time', note: 'With a button for more.' },
+  ];
+
+  function showChanges() {
+    /** @param {string} name @param {string} text */
+    const place = (name, text) => h('div', { class: 'tour-change-place' }, icon(name), h('span', {}, text));
+    stage.append(h('div', { class: 'tour-changes' },
+      h('div', { class: 'tour-change tour-changes-head', 'aria-hidden': 'true' }, h('span', {}), h('span', {}, 'YouTube'), h('span', {}, 'With drip')),
+      h('ul', { class: 'tour-changes-list' }, ...CHANGES.map((c) => h('li', { class: 'tour-change' },
+        place(c.icon, c.place),
+        // The column headings are hidden from screen readers, so each cell says which side it is.
+        h('div', { class: 'tour-change-before', title: c.youtube }, h('span', { class: 'sr' }, 'On YouTube: '), c.youtube),
+        h('div', { class: 'tour-change-after' }, h('span', { class: 'sr' }, 'With drip: '), c.drip, h('small', {}, c.note))))),
+      h('div', { class: 'tour-change tour-changes-same' },
+        place('check', 'The same'),
+        h('p', {}, "Your channels and playlists work as before. Ads and videos embedded on other sites don't use your minutes."))));
+    return undefined;
+  }
+
+  fillHero();
+  go(0);
+})();

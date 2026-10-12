@@ -1,0 +1,525 @@
+/* The welcome page (DESIGN.md, "Welcome page"). drip.css draws the tour's screens and takes its colors from YouTube's
+   theme variables, which this page sets itself: light by default, and dark when welcome.js sets html[dark] from
+   Chrome's theme. */
+
+html[dark] {
+  --yt-spec-text-primary: #f1f1f1;
+  --yt-spec-text-secondary: #aaaaaa;
+  --yt-spec-base-background: #0f0f0f;
+  --yt-spec-badge-chip-background: rgba(255, 255, 255, 0.1);
+  --yt-spec-button-chip-background-hover: rgba(255, 255, 255, 0.2);
+  --yt-spec-10-percent-layer: rgba(255, 255, 255, 0.1);
+}
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 72px 16px 64px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 40px;
+  letter-spacing: -0.01em;
+}
+
+.brand .drip-i {
+  width: 24px;
+  height: 32px;
+}
+
+.tagline {
+  margin: 6px 0 0;
+  font-size: 17px;
+}
+
+/* Drops, Cards, and Stash, one tile each. */
+.kinds {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 36px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each caption fits one line, so the three tiles line up. */
+.kind {
+  padding: 14px 10px 16px;
+  border-radius: 12px;
+  background: var(--gray);
+  text-align: center;
+}
+
+.kind-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.kind-name .drip-i {
+  width: 18px;
+  height: 22px;
+}
+
+.kind-name .drip-i-save {
+  color: var(--text);
+}
+
+.kind-what {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.allowance {
+  margin: 16px 0 0;
+  color: var(--muted);
+}
+
+/* The tour: one sentence, a stage with a working copy of one of drip's screens, then the step controls. */
+.tour {
+  margin-top: 56px;
+}
+
+.tour-say {
+  min-height: 21px;
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* One height for every step, so the buttons under the stage never move (Jesse, 2026-10-12). 500px holds the tallest
+   screen, the revealed card (494px). The stage only grows past it if the lock's panel needs more, which welcome.js
+   fitLock() handles. */
+.tour-stage {
+  --tour-h: 500px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: var(--tour-h);
+  padding: 24px 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1.5px dotted color-mix(in srgb, var(--blue) 70%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--text) 3%, var(--bg));
+}
+
+.tour-stage:focus-visible {
+  outline-offset: 3px;
+}
+
+/* drip's screens, sized for the stage instead of the page. */
+.tour-stage #drip-home {
+  --drip-col: 360px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.tour-stage #drip-home .drip-stats {
+  margin-bottom: 28px;
+}
+
+/* A drawn thumbnail, so the page loads nothing from YouTube. */
+.tour-thumb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--thumb, linear-gradient(135deg, #3a6b8c, #1d3447));
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tour-thumb .drip-i {
+  width: 40px;
+  height: 40px;
+}
+
+/* The fake player for the pill. */
+.tour-player {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3a6b8c, #1d3447 60%, #10202c);
+  color: #fff;
+}
+
+.tour-player-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+}
+
+.tour-player-play:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.tour-player-play .drip-i {
+  width: 56px;
+  height: 56px;
+  padding: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.tour-player.is-playing .tour-player-play .drip-i {
+  opacity: 0;
+  transition: opacity 300ms ease 400ms;
+}
+
+.tour-player-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.tour-player-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: #f03;
+}
+
+/* The lock, inside the stage instead of the window. Its water rises the stage's height, not the window's: welcome.js
+   sets --tour-depth to it. */
+.tour-stage #drip-lock {
+  position: absolute;
+  z-index: 2;
+  animation-name: tour-water-rise, drip-crest;
+}
+
+.tour-stage #drip-lock.is-draining,
+.tour-stage #drip-lock.is-surfacing {
+  animation-name: tour-water-drain, drip-crest;
+}
+
+.tour-stage #drip-lock .drip-lock-panel {
+  max-width: 380px;
+  padding: 30px 28px 24px;
+}
+
+/* Its own stacking layer, so the pill's z-index stays under the lock, as on YouTube. */
+.tour-under {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+}
+
+.tour-again {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  translate: -50% 0;
+  z-index: 1;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+.tour-again:hover {
+  background: none;
+  color: var(--text);
+}
+
+@keyframes tour-water-rise {
+  from {
+    --drip-water: var(--tour-depth, 480px);
+  }
+}
+
+@keyframes tour-water-drain {
+  to {
+    --drip-water: var(--tour-depth, 480px);
+  }
+}
+
+/* What changes on YouTube: one row per place, YouTube's way struck through, drip's in bold. Every row shares one grid,
+   so the columns line up. */
+.tour-changes {
+  width: 100%;
+}
+
+.tour-changes-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tour-change {
+  display: grid;
+  grid-template-columns: 108px 148px minmax(0, 1fr);
+  gap: 0 18px;
+  align-items: start;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  line-height: 22px;
+}
+
+.tour-changes-head {
+  padding: 0 0 8px;
+  border-top: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.tour-change-place {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tour-change-place .drip-i {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--blue);
+}
+
+.tour-change-before {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tour-change-after {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.tour-change-after small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  text-wrap: balance;
+}
+
+.tour-changes-same {
+  grid-template-columns: 108px minmax(0, 1fr);
+  padding: 16px 0 0;
+}
+
+.tour-changes-same p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.tour-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 2px;
+}
+
+.tour-dots button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  background: none;
+}
+
+.tour-dots button::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--muted);
+}
+
+.tour-dots button[aria-current="step"]::before {
+  border-color: var(--text);
+  background: var(--text);
+}
+
+.tour-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+button.tour-btn,
+a.tour-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  background: var(--gray);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+button.tour-btn:hover,
+a.tour-btn:hover {
+  background: var(--gray-hover);
+}
+
+button.tour-btn.is-primary,
+a.tour-btn.is-primary {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+}
+
+button.tour-btn.is-primary:hover,
+a.tour-btn.is-primary:hover {
+  background: var(--primary-hover);
+}
+
+.tour-btn .drip-i {
+  width: 16px;
+  height: 16px;
+}
+
+.foot {
+  margin-top: 56px;
+}
+
+.foot-links {
+  display: flex;
+  gap: 24px;
+}
+
+a.foot-link,
+button.foot-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+a.foot-link:hover,
+button.foot-link:hover {
+  background: none;
+  color: var(--text);
+}
+
+.foot-link .drip-i-arrow-up-right {
+  width: 13px;
+  height: 13px;
+}
+
+.foot-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Below the full column width the tiles stack, so a caption never wraps in a narrowed tile. */
+@media (max-width: 600px) {
+  main {
+    padding-top: 40px;
+  }
+
+  .kinds {
+    grid-template-columns: 1fr;
+  }
+
+  .kind {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+  }
+
+  .kind-name {
+    justify-content: flex-start;
+    min-width: 92px;
+  }
+
+  .kind-what {
+    margin-top: 0;
+  }
+
+  .tour-changes-head {
+    display: none;
+  }
+
+  .tour-change {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0 12px;
+    padding: 10px 0;
+  }
+
+  .tour-changes-head + .tour-changes-list .tour-change:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .tour-change-before {
+    text-align: right;
+  }
+
+  .tour-change-after {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
+
+  .tour-changes-same {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding-top: 10px;
+  }
+
+  /* Two of the sentences wrap here, so every step keeps room for two lines and the stage stays put. */
+  .tour-say {
+    min-height: 44px;
+  }
+}

@@ -92,6 +92,9 @@ a.drip-btn {
     linear-gradient(#000, #000) 0 calc(var(--drip-water) + 25px) / 100% 100% no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") var(--drip-crest-x) var(--drip-water) / 640px 26px repeat-x,
     linear-gradient(#000, #000) 0 calc(var(--drip-water) + 25px) / 100% 100% no-repeat;
+  /* Chrome paints the overlay unmasked once the crest is within a few px of the bottom edge, so a drain flashed the
+     whole lock back on its last frames. The clip cuts everything above the waterline, which the mask already hides. */
+  clip-path: inset(max(0px, var(--drip-water)) 0 0 0);
   animation: drip-water-rise 1100ms cubic-bezier(0.35, 0.6, 0.25, 1) both, drip-crest 1100ms linear;
 }
 
