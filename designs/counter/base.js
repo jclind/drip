@@ -7,9 +7,19 @@
 //   land(api, ctx)          drops (and cards) arriving in the counter, for the kept and new scenes
 //   roll(api, num, from, to) how a count changes from one number to another
 // ?theme=light drops html[dark]. ?slow=4 plays everything 4 times slower. ?reduced=1 previews prefers-reduced-motion.
+// Edge cases: ?drops=3,7 and ?cards=8,18 set a scene's counts as from,to (the kept scene uses the second number as the
+// drops kept). ?cap=8,20 is the most drops and cards the settings allow (a day's worth times the days kept), which sets
+// how many digits the numbers keep room for. The limits are 48 drops and 100 cards a day, kept up to 7 days: 336,700.
 
 (() => {
   const params = new URLSearchParams(location.search);
+  const pair = (key) => {
+    const v = (params.get(key) || '').split(',').map(Number);
+    return v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0) ? v : null;
+  };
+  const DROPS = pair('drops');
+  const CARDS = pair('cards');
+  const CAP = pair('cap') || [8, 20];
   const SLOW = Math.max(1, Number(params.get('slow')) || 1);
   const SCENE = ['kept', 'new', 'spend'].includes(params.get('scene')) ? params.get('scene') : 'kept';
   if (params.get('theme') !== 'light') document.documentElement.setAttribute('dark', '');
@@ -192,14 +202,15 @@
    * days, 15 minutes a drop).
    */
   function homeScene(variant) {
+    const kept = DROPS ? DROPS[1] : 3;
     const start = {
       // Bought 30m, watched it all, hit the lock with 3 drops left, and pressed Done for now. The variants count the kept
       // drops in from 0; as built, the counter already shows 3.
-      kept: { drops: variant.instant ? 3 : 0, cards: 8, left: 0, bought: 30 * 60 },
+      kept: { drops: variant.instant ? kept : 0, cards: CARDS ? CARDS[0] : 8, left: 0, bought: 30 * 60 },
       // The first page after the reset: yesterday's 3 drops and 8 cards are kept, the minutes are back to 0.
-      new: { drops: 3, cards: 8, left: 0, bought: 0 },
+      new: { drops: DROPS ? DROPS[0] : 3, cards: CARDS ? CARDS[0] : 8, left: 0, bought: 0 },
       // Midday: one drop spent, 11 of its 15 minutes watched.
-      spend: { drops: 3, cards: 9, left: 4 * 60, bought: 15 * 60 },
+      spend: { drops: DROPS ? DROPS[0] : 3, cards: CARDS ? CARDS[0] : 9, left: 4 * 60, bought: 15 * 60 },
     }[SCENE];
     const s = { ...start };
     const GLASS_PX = 34;
@@ -264,7 +275,7 @@
       h('div', { class: 'drip-stats' },
         tile,
         h('div', { class: 'drip-time-block' }, time, h('div', { class: 'drip-sub' }, 'left today')),
-        h('div', { class: 'drip-counts' }, dropCount, cardCount)),
+        h('div', { class: 'drip-counts', style: `--mock-room: ${String(Math.max(...CAP)).length}ch` }, dropCount, cardCount)),
       actions,
       saved);
     document.body.append(
@@ -283,15 +294,16 @@
 
     const ctx = {
       kind: SCENE, page, glass, px: GLASS_PX, showMessage,
-      drop: { count: dropCount, icon: dropIcon, num: dropNum, from: s.drops, to: SCENE === 'kept' ? 3 : 7 },
-      card: { count: cardCount, icon: cardIcon, num: cardNum, from: s.cards, to: SCENE === 'new' ? 18 : s.cards },
+      drop: { count: dropCount, icon: dropIcon, num: dropNum, from: s.drops, to: SCENE === 'kept' ? kept : DROPS ? DROPS[1] : 7 },
+      card: { count: cardCount, icon: cardIcon, num: cardNum, from: s.cards, to: SCENE !== 'new' ? s.cards : CARDS ? CARDS[1] : 18 },
     };
 
     async function land() {
-      if (REDUCED) {
+      // A variant with `reduced` plays its own still version.
+      if (REDUCED && !variant.reduced) {
         setNum(dropNum, ctx.drop.to);
         setNum(cardNum, ctx.card.to);
-        if (SCENE === 'kept') showMessage('Kept 3 drops.', { rise: false });
+        if (SCENE === 'kept' && kept > 0) showMessage(`Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.`, { rise: false });
       } else await variant.land(api, ctx);
       s.drops = ctx.drop.to;
       s.cards = ctx.card.to;

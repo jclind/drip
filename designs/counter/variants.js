@@ -281,23 +281,73 @@
     return t;
   }
 
-  // D, Rain and tag: A's rain fills the counter, then the tag slides out to say what it was, and back in.
+  /**
+   * Spins a count through the numbers between, like C's slot machine, but through `most` of them at most, evenly
+   * spaced, so 8 to 708 takes as long as 8 to 18. `settle` is the last number's overshoot.
+   */
+  async function spin(_, el, from, to, { most = 10, settle = 300 } = {}) {
+    const steps = Math.min(Math.abs(to - from), most);
+    const up = to > from;
+    for (let i = 1; i <= steps; i += 1) {
+      const last = i === steps;
+      await api.swap(el, Math.round(from + ((to - from) * i) / steps),
+        [{ transform: 'translateY(0)' }, { transform: `translateY(${up ? -100 : 100}%)` }],
+        [{ transform: `translateY(${up ? 100 : -100}%)` }, { transform: 'translateY(0)' }],
+        last ? { ms: settle, easing: 'cubic-bezier(0.3, 1.45, 0.5, 1)' } : { ms: Math.max(38, 340 / steps), easing: 'linear' });
+    }
+  }
+
+  // D, Rain and tag: A's rain fills the counter, then the tag slides out to say what it was, and back in. The new day's
+  // cards spin through the numbers between like C's, since they jump by 10.
   const D = {
     roll: A.roll,
+    reduced: true,
+
+    /**
+     * At most 5 drops fall. With more to add, each one carries its share and the count spins up by it, quickly enough
+     * (3 numbers, about 0.24s) to be done before the next drop lands.
+     */
     async land(_, ctx) {
       const t = ctx.drop;
-      if (ctx.kind === 'kept') await wait(250);
-      const falls = [];
-      for (let n = t.from + 1; n <= t.to; n += 1) {
-        falls.push(A.rain(t, n));
-        await wait(ctx.kind === 'new' ? 240 : 320);
+      const added = t.to - t.from;
+      if (api.REDUCED) {
+        api.setNum(t.num, t.to);
+        api.setNum(ctx.card.num, ctx.card.to);
+      } else {
+        if (ctx.kind === 'kept') await wait(250);
+        const falls = [];
+        const count = Math.min(added, 5);
+        // The counter takes each drop's number in turn, even when a spin runs longer than the gap to the next drop.
+        let rolled = Promise.resolve();
+        for (let i = 1; i <= count; i += 1) {
+          const from = t.from + Math.round((added * (i - 1)) / count);
+          const to = t.from + Math.round((added * i) / count);
+          falls.push(D.rain(t).then(() => { rolled = rolled.then(() => (to - from > 1 ? spin(api, t.num, from, to, { most: 3, settle: 160 }) : A.roll(api, t.num, from, to))); return rolled; }));
+          await wait(ctx.kind === 'new' ? 240 : 320);
+        }
+        await Promise.all(falls);
+        await rolled;
       }
-      await Promise.all(falls);
-      const dropTag = tag(t, ctx.kind === 'kept' ? '3 kept' : `${t.to - t.from} new`);
-      await tagIn(dropTag);
-      const cardTag = ctx.kind === 'new' ? await newCards(ctx, A.roll) : null;
+      const dropTag = added > 0 ? tag(t, `${added} ${ctx.kind === 'kept' ? 'kept' : 'new'}`) : null;
+      if (dropTag) await tagIn(dropTag);
+      const cardTag = ctx.kind === 'new' ? await newCards(ctx, api.REDUCED ? async () => {} : spin) : null;
+      if (!dropTag && !cardTag) return;
       await wait(3000);
-      await Promise.all([tagOut(dropTag, t), cardTag && wait(120).then(() => tagOut(cardTag, ctx.card))]);
+      await Promise.all([dropTag && tagOut(dropTag, t), cardTag && wait(dropTag ? 120 : 0).then(() => tagOut(cardTag, ctx.card))]);
+    },
+
+    /** A's rain without its count: one drop falls into the counter and splashes. */
+    async rain(t) {
+      const { x, y } = api.center(t.icon);
+      const d = api.dropEl(13);
+      await animate(d, [
+        { transform: api.at(x, -16) },
+        { transform: api.at(x, y - 2, 'scale(0.75, 1.3)') },
+      ], { duration: 460, easing: 'cubic-bezier(0.5, 0, 1, 1)' });
+      d.remove();
+      api.ring(x, y + 7, 30, 7, 560);
+      api.splash(x, y - 4, 3, 9, 10);
+      squash(t);
     },
   };
 

@@ -156,12 +156,13 @@ html.mock-reduced .mock-fx {
   border-radius: 50%;
 }
 
-/* A count's number. Old and new share one grid cell while it changes, so both can move. It keeps room for two digits,
-   so going from 8 to 18 doesn't widen the stats and shift the centered group. */
+/* A count's number. Old and new share one grid cell while it changes, so both can move. It's always as wide as the
+   settings' largest count (--mock-room digits), so going from 8 to 18 doesn't widen the stats and shift the centered
+   group. */
 .mock-num {
   display: inline-grid;
   justify-items: start;
-  min-width: 2ch;
+  width: var(--mock-room, 2ch);
 }
 
 .mock-num.is-clip {
@@ -221,4 +222,13 @@ html.mock-reduced .mock-fx {
 
 .mock-tag img.is-card {
   width: 12px;
+}
+
+/* A narrow column: the tag sits closer and pads less, so "336 kept" still fits beside three-digit counts. */
+@container drip-home (max-width: 452px) {
+  .mock-tag {
+    left: calc(100% + 6px);
+    gap: 4px;
+    padding: 2px 7px 2px 6px;
+  }
 }
