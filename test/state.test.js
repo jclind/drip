@@ -445,6 +445,17 @@ test('Undo of a swap puts the swapped-out video back where it was', () => {
   assert.equal(state.backlog[0].addedAt, undefined);
 });
 
+test('Undo of a swap restores the video even when the new one already left the stash (Codex)', () => {
+  const state = fresh();
+  state.settings.stashMax = 2;
+  D.addBacklog(state, video('a'));
+  D.addBacklog(state, video('b'));
+  D.swapBacklog(state, video('c'), 'a');
+  D.removeBacklog(state, 'c');
+  assert.deepEqual(D.swapBacklog(state, video('a'), 'c', 0), { ok: true });
+  assert.deepEqual(state.backlog.map(v => v.id), ['a', 'b']);
+});
+
 test('stashedAgo counts calendar days', () => {
   assert.equal(D.stashedAgo(undefined, time(10)), '');
   assert.equal(D.stashedAgo(time(10, 0, 5), time(10, 23)), 'Today');

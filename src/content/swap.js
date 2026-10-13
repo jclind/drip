@@ -88,8 +88,11 @@
   let ids = 0;
   /** Lists that are up, so a click anywhere else closes them. @type {Set<{el: HTMLElement, onClose: () => void}>} */
   const open = new Set();
-  // A click on a Stash button (data-swap-anchor) is left to the button, which opens and closes its own list.
-  document.addEventListener('pointerdown', (e) => {
+  // A click on a Stash button (data-swap-anchor) is left to the button, which opens and closes its own list. This
+  // listens for the click itself, not pointerdown: the home page rebuilds when the list closes, and a rebuild between
+  // pointerdown and click would lose the click on whatever button was pressed (Codex, 2026-10-13). By the time a click
+  // is dispatched its path is fixed, so the pressed button's handler runs even if the page is rebuilt now.
+  document.addEventListener('click', (e) => {
     const target = /** @type {Element} */ (e.target);
     for (const entry of [...open]) {
       if (!entry.el.isConnected) {

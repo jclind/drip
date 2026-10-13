@@ -353,7 +353,8 @@
   /**
    * Swaps a stashed video out for a new one in one step, for a full stash (Q28). The new one goes at the end, the
    * newest place, or at `index`, which is how Undo puts the swapped-out one back. A swap never grows the stash, so it
-   * works over a lowered cap too.
+   * works over a lowered cap too. Undo still puts the video back when `dropId` has already left the stash, finished or
+   * taken out within Undo's few seconds, so the swapped-out video is never lost (Codex, 2026-10-13).
    * @param {State} state
    * @param {unknown} raw
    * @param {string} dropId
@@ -364,10 +365,10 @@
     const video = cleanVideo(raw);
     if (!video) return { ok: false, error: 'bad-video' };
     if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
-    const drop = state.backlog.findIndex(saved => saved.id === dropId);
-    if (drop < 0) return { ok: false, error: 'not-stashed' };
-    removeBacklog(state, dropId);
     const undo = typeof index === 'number' && Number.isInteger(index);
+    const drop = state.backlog.findIndex(saved => saved.id === dropId);
+    if (drop < 0 && !undo) return { ok: false, error: 'not-stashed' };
+    if (drop >= 0) removeBacklog(state, dropId);
     if (!undo && !video.addedAt && seconds(now)) video.addedAt = seconds(now);
     return addBacklog(state, video, undo ? index : state.backlog.length);
   }

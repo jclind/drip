@@ -363,7 +363,8 @@
     }
     if (res && !res.ok) message = errorText(res.error);
     if (action === 'watch' && res && res.ok) {
-      location.assign(watchUrl(res.video.id));
+      // A stashed card that was started in another tab opens where it stopped, like its stash row (Codex).
+      location.assign(resumeUrl(res.video.id));
       return;
     }
     leaving = false;
