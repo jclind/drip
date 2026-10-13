@@ -179,7 +179,7 @@
   }
 
   /**
-   * At 0: the glass's last water gathers under it as a drop, hangs, and falls to `floor` (a y on screen), where it
+   * At 0: the glass's last water gathers under it as a drop and falls to `floor` (a y on screen), where it
    * splashes with two rings. Resolves with the x it landed at, as soon as it lands.
    * @param {SVGSVGElement} glass @param {number} px @param {number} floor
    */
@@ -194,11 +194,13 @@
     const x = g.left + g.width / 2;
     const y0 = g.bottom - 1;
     const d = drop(9);
-    await play(d, [{ transform: at(x, y0, 'scale(0)') }, { transform: at(x, y0 + 5, 'scale(1)') }], { duration: 260, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' });
+    // One motion: it swells as it sags, and lets go at the speed it sagged at. Forming and falling as two steps left it
+    // hanging still for about a third of a second, which read as a stall (Jesse, 2026-10-13).
     await play(d, [
-      { transform: at(x, y0 + 5) },
+      { transform: at(x, y0, 'scale(0)'), easing: 'cubic-bezier(0.4, 0, 0.8, 0.6)' },
+      { transform: at(x, y0 + 8, 'scale(1)'), offset: 0.3, easing: 'cubic-bezier(0.5, 0.08, 1, 1)' },
       { transform: at(x, floor - 8, 'scale(0.8, 1.35)') },
-    ], { duration: 560, easing: 'cubic-bezier(0.5, 0, 1, 1)' });
+    ], { duration: 780, easing: 'linear' });
     d.remove();
     ring(x, floor - 8, 120, 18, 800);
     ring(x, floor - 8, 70, 11, 700, 140);
