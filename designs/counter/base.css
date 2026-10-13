@@ -156,10 +156,12 @@ html.mock-reduced .mock-fx {
   border-radius: 50%;
 }
 
-/* A count's number. Old and new share one grid cell while it changes, so both can move. */
+/* A count's number. Old and new share one grid cell while it changes, so both can move. It keeps room for two digits,
+   so going from 8 to 18 doesn't widen the stats and shift the centered group. */
 .mock-num {
   display: inline-grid;
   justify-items: start;
+  min-width: 2ch;
 }
 
 .mock-num.is-clip {
