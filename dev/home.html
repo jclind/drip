@@ -99,6 +99,21 @@
     },
     // Both counts already at the cap: the reset adds nothing, so nothing lands.
     refillCapped() { s.tokens = { watch: 8, rec: 20 }; s.day = D.addDays(s.day, -1); },
+    // A full stash of 10 (Q28), oldest first, with how far each got, for the stash-cap designs.
+    stashFull() {
+      const more = [
+        { id: 'OPf0YbXqDm0', title: 'Mark Ronson - Uptown Funk', channel: 'Mark Ronson', length: '4:30' },
+        { id: 'fJ9rUzIMcZQ', title: 'How a 1950s diner makes 400 pancakes before 9am', channel: 'Eater', length: '14:21' },
+      ];
+      s.backlog = [...VIDEOS.slice(1, 9).reverse(), ...more].reverse().slice(0, 10).reverse();
+      const at = [0, 0.42, 0, 0.9, 0, 0.12, 0, 0, 0.66, 0];
+      s.backlog.forEach((v, i) => {
+        const [m, sec] = v.length.split(':').slice(-2).map(Number);
+        const dur = (v.length.split(':').length === 3 ? Number(v.length.split(':')[0]) * 3600 : 0) + m * 60 + sec;
+        if (at[i]) Object.assign(v, { durationSec: dur, resumeSec: Math.round(dur * at[i]) });
+      });
+    },
+    stashFullCard() { this.stashFull(); s.current = VIDEOS[0]; s.seen.push(VIDEOS[0].id); },
   };
   (SCENARIOS[params.get('scenario') || 'empty'] || SCENARIOS.empty).call(SCENARIOS);
 
