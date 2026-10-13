@@ -111,6 +111,7 @@
         const [m, sec] = v.length.split(':').slice(-2).map(Number);
         const dur = (v.length.split(':').length === 3 ? Number(v.length.split(':')[0]) * 3600 : 0) + m * 60 + sec;
         if (at[i]) Object.assign(v, { durationSec: dur, resumeSec: Math.round(dur * at[i]) });
+        v.addedAt = now - Math.round((10 - i) * 0.7) * 86400000;
       });
     },
     stashFullCard() { this.stashFull(); s.current = VIDEOS[0]; s.seen.push(VIDEOS[0].id); },
@@ -185,6 +186,7 @@
 <script src="/src/content/pour.js"></script>
 <script src="/src/content/counter.js"></script>
 <script src="/src/content/stash.js"></script>
+<script src="/src/content/swap.js"></script>
 <script src="/src/content/home.js"></script>
 <script>
   const click = new URLSearchParams(location.search).get('click');

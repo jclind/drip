@@ -192,7 +192,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   };
   context.globalThis = context;
   vm.createContext(context);
-  for (const file of ['lib/state.js', 'lib/glass.js', 'content/common.js', 'content/stash.js', 'content/watch.js']) {
+  for (const file of ['lib/state.js', 'lib/glass.js', 'content/common.js', 'content/stash.js', 'content/swap.js', 'content/watch.js']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
   }
   const tab = {

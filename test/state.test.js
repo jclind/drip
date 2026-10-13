@@ -23,7 +23,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
-    'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'cleanVideo',
+    'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
@@ -416,6 +416,40 @@ test('swapping the card into the stash counts it as saved once', () => {
   assert.equal(D.logDay(state).saved, 1);
   D.removeBacklog(state, 'b');
   assert.equal(D.logDay(state).saved, 0);
+});
+
+test('stashing keeps when, and Undo and swaps keep the time a video came with', () => {
+  const state = fresh();
+  D.addBacklog(state, video('a'), undefined, time(5, 9));
+  assert.equal(state.backlog[0].addedAt, time(5, 9));
+  D.addBacklog(state, { ...video('b'), addedAt: time(1) }, 0, time(5));
+  assert.equal(state.backlog[0].addedAt, time(1));
+  D.reveal(state, [video('c')]);
+  state.settings.stashMax = 3;
+  D.resolveCurrent(state, 'save', 'c', time(5, 10));
+  assert.equal(state.backlog[2].addedAt, time(5, 10));
+  D.swapBacklog(state, video('d'), 'a', undefined, time(5, 11));
+  assert.deepEqual(state.backlog.map(v => [v.id, v.addedAt]), [['b', time(1)], ['c', time(5, 10)], ['d', time(5, 11)]]);
+});
+
+test('Undo of a swap puts the swapped-out video back where it was', () => {
+  const state = fresh();
+  state.settings.stashMax = 3;
+  for (const id of ['a', 'b', 'c']) D.addBacklog(state, video(id));
+  D.swapBacklog(state, video('d'), 'b');
+  assert.deepEqual(state.backlog.map(v => v.id), ['a', 'c', 'd']);
+  D.swapBacklog(state, video('b'), 'd', 1);
+  assert.deepEqual(state.backlog.map(v => v.id), ['a', 'b', 'c']);
+});
+
+test('stashedAgo counts calendar days', () => {
+  assert.equal(D.stashedAgo(undefined, time(10)), '');
+  assert.equal(D.stashedAgo(time(10, 0, 5), time(10, 23)), 'Today');
+  assert.equal(D.stashedAgo(time(9, 23), time(10, 0, 30)), 'Yesterday');
+  assert.equal(D.stashedAgo(time(4), time(10)), '6 days ago');
+  assert.equal(D.stashedAgo(new Date(2026, 8, 19).getTime(), time(10)), '3 weeks ago');
+  assert.equal(D.stashedAgo(new Date(2026, 6, 1).getTime(), time(10)), '3 months ago');
+  assert.equal(D.stashedAgo(time(12), time(10)), 'Today');
 });
 
 test('markProgress keeps how far a stashed video got, and nothing for other videos', () => {

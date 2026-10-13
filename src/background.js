@@ -74,17 +74,17 @@ function handle(msg, state, now) {
     case 'reveal':
       return Drip.reveal(state, Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'resolve':
-      return Drip.resolveCurrent(state, msg.action, typeof msg.videoId === 'string' ? msg.videoId : undefined);
+      return Drip.resolveCurrent(state, msg.action, typeof msg.videoId === 'string' ? msg.videoId : undefined, now);
     case 'revealNext':
       return Drip.revealNext(state, String(msg.videoId), Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'buyIfOut':
       return Drip.buyIfOut(state, String(msg.videoId));
     case 'addBacklog':
-      return Drip.addBacklog(state, msg.video, msg.index);
+      return Drip.addBacklog(state, msg.video, msg.index, now);
     case 'removeBacklog':
       return Drip.removeBacklog(state, msg.id);
     case 'swapBacklog':
-      return Drip.swapBacklog(state, msg.video, String(msg.dropId));
+      return Drip.swapBacklog(state, msg.video, String(msg.dropId), msg.index, now);
     case 'tick':
       // The tab sends where the player is with each tick, so a stashed video's bar keeps up (Q28).
       if (msg.position !== undefined) Drip.markProgress(state, String(msg.videoId), msg.position, msg.duration);
