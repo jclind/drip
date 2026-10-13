@@ -555,7 +555,8 @@
 
   /** @param {Event} e */
   async function onAddTime(e) {
-    if (landing) return;
+    // A double-click buys one drop, as home's +15m does. Without the drop's fall, nothing else holds the second click.
+    if (landing || /** @type {MouseEvent} */ (e).detail > 1) return;
     // The worker's storage change can lift the lock before this reply arrives, so the drain is asked for up front.
     drainNext = true;
     const button = /** @type {HTMLElement} */ (e.currentTarget);
@@ -935,13 +936,13 @@
     const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
     swapOpen = '';
     const res = await send({ type: 'swapBacklog', video: thisVideo(id), dropId: drop.id });
-    if (res && res.ok) {
+    if (res && res.ok && res.dropped) {
       if (swapped) clearTimeout(swapped.timer);
       const timer = window.setTimeout(() => {
         swapped = null;
         drawSwap();
       }, DripSwap.UNDO_MS);
-      swapped = { dropped: res.dropped || drop, index, newId: id, timer };
+      swapped = { dropped: res.dropped, index, newId: id, timer };
     }
     took(res);
     drawSwap();

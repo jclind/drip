@@ -150,7 +150,10 @@
         return `No cards left. More at ${reset}.`;
       case 'no-watch-tokens':
         return `No drops left. More at ${reset}.`;
+      // Reveal with a card already up, or Reveal next and × on one that's gone: another tab got there first.
       case 'stale-card':
+      case 'resolve-current':
+      case 'no-current':
         return 'That card changed in another tab.';
       case 'not-stashed':
         return 'That video already left your stash, maybe in another tab.';
@@ -439,13 +442,13 @@
     swapFor = '';
     const res = absorb(await send({ type: 'swapBacklog', video, dropId: drop.id }));
     if (res && !res.ok) message = errorText(res.error);
-    else {
+    else if (res && res.dropped) {
       if (swapped) clearTimeout(swapped.timer);
       const timer = window.setTimeout(() => {
         swapped = null;
         render();
       }, DripSwap.UNDO_MS);
-      swapped = { dropped: res.dropped || drop, index, newId: video.id, timer };
+      swapped = { dropped: res.dropped, index, newId: video.id, timer };
     }
     render();
     focusOn('save');
@@ -1012,7 +1015,13 @@
       return;
     }
     const target = browse.querySelector(SEL.mount) || browse;
-    target.prepend(h('div', { id: 'drip-home' }));
+    const root = h('div', { id: 'drip-home' });
+    // A double-click's second click lands on whatever the first one drew there. With reduced motion, +15m bought two
+    // drops and × said "Something went wrong" (2026-10-13). Nothing on the page needs a double-click.
+    root.addEventListener('click', (e) => {
+      if (e.detail > 1) e.stopPropagation();
+    }, true);
+    target.prepend(root);
     takeKept();
     rendered = '';
     render();

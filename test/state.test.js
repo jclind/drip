@@ -398,7 +398,8 @@ test('swapBacklog drops one video and stashes the new one as the newest', () => 
   D.addBacklog(state, video('b'));
   assert.deepEqual(D.swapBacklog(state, video('c'), 'a'), { ok: true, dropped: video('a') });
   assert.deepEqual(state.backlog.map(v => v.id), ['b', 'c']);
-  assert.deepEqual(D.swapBacklog(state, video('c'), 'b'), { ok: true, dropped: video('b') });
+  // Already stashed, as by another tab while the list was open: nothing swapped, so no Undo (Codex).
+  assert.deepEqual(D.swapBacklog(state, video('c'), 'b'), { ok: true });
   assert.deepEqual(state.backlog.map(v => v.id), ['b', 'c']);
   refusesUnchanged(state, () => D.swapBacklog(state, video('d'), 'missing'), 'not-stashed');
   refusesUnchanged(state, () => D.swapBacklog(state, { id: 'bad id' }, 'b'), 'bad-video');

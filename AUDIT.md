@@ -63,3 +63,24 @@ New findings, each checked against the code by Claude. Numbering continues from 
 17. **A failed storage write loses its charge.** `chargeTick` moves `clock.lastChargeEnd` (`state.js:229`) before `withState` writes (`background.js:29`). If the write throws, that interval is never charged. Rare, since drip's state is far below the storage quota.
 
 Codex didn't measure anything in a browser, so it couldn't see that the pill rebuilds every second on a paused video too.
+
+## Reveals that fail partway, 2026-10-13
+
+From `~/ai-context/actions.md`: what happens on the page when a reveal or a purchase fails between the click and the card. Traced through `home.js`, `reveal.js`, `common.js` `send`, and the worker, then double-clicks tried with real clicks in `dev/home.html`.
+
+The worker spends and sets the card in one write (`Drip.reveal`), and the page can't spend any other way, so a failure can't leave a spent card that never shows. The card is `state.current` and shows on the next draw of any tab.
+
+| Failure | What happens |
+|---|---|
+| The home grid is empty or its markup changed | No card spent. "YouTube hasn't loaded anything new" and a broken-markup report (Q25). |
+| The Subscriptions frame never loads or is redirected away | Up to 30 seconds of "Checking your subscriptions…", then "Nothing new", no card spent. |
+| The message to the worker fails (`send-failed`) | `send` never throws. The animation backs out and says "Something went wrong". If the worker had already written, the card shows on the next draw. Nothing is lost. |
+| The extension is reloaded under the page | `disconnected`, and the page asks for a refresh. Nothing is spent. |
+| The thumbnail never loads after the card was spent | Both sizes are tried, and after 8 seconds the card turns over onto its gray front. |
+| The tab closes or navigates mid-reveal | Before the send, nothing is spent. After, the card waits on the home page. |
+| Reveal in a tab whose page is behind another tab's card | Refused (`resolve-current`). It said "Something went wrong". Fixed: it now says "That card changed in another tab." Same for `no-current`. |
+| Double-click on +15m with reduced motion (or a hidden tab) | It bought two drops. The drop's fall is what held the second click, and without it nothing did. Fixed: drip's home page ignores the second click of a double-click, and so does the lock's +15m. |
+| Double-click on × with reduced motion | The second click passed a card that was already gone and said "Something went wrong". Fixed by the same guard. |
+| Double-click on Reveal video or Reveal next | Already safe: `busy` holds the second click. |
+
+Not covered: the lock's +15m guard wasn't tried on real YouTube with reduced motion. No Node tests, because home.js has no fake-page harness like `test/watch.test.js`. The checks are browser checklist item 5.
