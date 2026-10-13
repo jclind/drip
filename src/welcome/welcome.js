@@ -10,6 +10,8 @@
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
+  const DripStash = /** @type {any} */ (globalThis).DripStash;
+  /** @type {any} */
   const { h, icon, price, hourLabel } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
@@ -177,6 +179,8 @@
   let glassEl = null;
   const GLASS_PX = 34;
   let lastCardId = '';
+  /** The card's Stash as last drawn, so a rebuild after stashing fills the bookmark from where it was (stash.js). */
+  let stashDrawn = { id: '', stashed: false };
   /** The card Watch was clicked on, which the player then plays. */
   let watchedId = '';
 
@@ -253,6 +257,10 @@
     const saved = sand.backlog.some((/** @type {any} */ v) => v.id === video.id);
     const isNew = video.id !== lastCardId;
     lastCardId = video.id;
+    const fills = stashDrawn.id === video.id && stashDrawn.stashed !== saved;
+    stashDrawn = { id: video.id, stashed: saved };
+    const stash = DripStash.parts(fills ? !saved : saved, { labelClass: 'drip-save-label' });
+    if (fills) stash.to(saved);
     const thumb = h('div', { class: 'tour-thumb' }, icon('play-line'));
     thumb.style.setProperty('--thumb', sample(video.id).thumb);
     // The reveal animation deals the card itself, so the card doesn't also rise in.
@@ -265,9 +273,9 @@
           icon('play'), h('span', {}, 'Watch'), sand.watchSecondsLeft <= 0 && price('drop'))),
       h('div', { class: 'drip-card-actions' },
         h('button', {
-          class: `drip-b drip-b-gray drip-card-save${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
+          class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
           onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); },
-        }, icon('save'), h('span', { class: 'drip-save-label' }, saved ? 'Stashed' : 'Stash')),
+        }, ...stash.nodes),
         h('button', {
           class: 'drip-b drip-b-gray drip-next', disabled: sand.tokens.rec < 1,
           onclick: () => {
@@ -299,7 +307,7 @@
       h('div', { class: 'drip-card-title' }, h('span', { class: 'drip-skel' }), h('span', { class: 'drip-skel drip-skel-short' })),
       h('div', { class: 'drip-card-meta-row' }, h('span', { class: 'drip-meta' }, 'Finding a video…')),
       h('div', { class: 'drip-card-actions' },
-        h('button', { class: 'drip-b drip-b-gray drip-card-save', tabindex: '-1' }, icon('save'), h('span', { class: 'drip-save-label' }, 'Stash')),
+        h('button', { class: 'drip-b drip-b-gray drip-card-save drip-stash', tabindex: '-1' }, ...DripStash.parts(false, { labelClass: 'drip-save-label' }).nodes),
         h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
         h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
   }
@@ -408,7 +416,9 @@
     const leftToday = h('span', { class: 'drip-sr' }, ' left today');
     const pausedNote = h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused');
     const time = h('span', { class: 'drip-pill-time' }, h('span', { class: 'drip-pill-label' }, minutes, leftToday, pausedNote));
-    const save = h('button', { class: 'drip-pill-save' });
+    const save = h('button', { class: 'drip-pill-save drip-stash' });
+    /** @type {any} */
+    let stash = null;
     const el = h('div', { id: 'drip-pill', class: 'drip-ui' }, time, save);
     let lastPlaying = false;
     let savedShown = '';
@@ -431,12 +441,16 @@
       minutes.textContent = unlocked ? 'Unlocked' : Drip.formatMinutes(left);
       leftToday.hidden = unlocked;
       pausedNote.hidden = !paused;
-      // The button's insides change only when Stash does.
+      // The button's insides are built once. After that, Stash fills or empties the bookmark (stash.js).
       if (savedShown !== String(saved)) {
         savedShown = String(saved);
         save.classList.toggle('is-saved', saved);
         save.setAttribute('aria-pressed', String(saved));
-        save.replaceChildren(icon(saved ? 'save' : 'save-outline'), h('span', {}, saved ? 'Stashed' : 'Stash'));
+        if (stash) stash.to(saved);
+        else {
+          stash = DripStash.parts(saved, { outline: true });
+          save.replaceChildren(...stash.nodes);
+        }
       }
     }
 

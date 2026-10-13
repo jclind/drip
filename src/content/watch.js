@@ -9,6 +9,8 @@
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
+  const DripStash = /** @type {any} */ (globalThis).DripStash;
+  /** @type {any} */
   const DripPour = /** @type {any} */ (globalThis).DripPour;
 
   // YouTube selectors. These break when YouTube changes its markup.
@@ -840,6 +842,8 @@
   }
 
   let pillView = '';
+  /** The pill's Stash as last drawn, so a rebuild after stashing fills the bookmark from where it was (stash.js). */
+  let stashDrawn = { id: '', stashed: false };
   /** @type {SVGSVGElement | null} */
   let pillGlass = null;
   const PILL_GLASS_PX = 20;
@@ -903,6 +907,11 @@
     const view = JSON.stringify([id, time, saved, adShowing, paused]);
     if (pill && pillView === view && pill.parentElement === parent) return pillLook();
     pillView = view;
+    // Stashed or taken out since the last draw: the new button starts as the old one was, and the water moves.
+    const fills = stashDrawn.id === id && stashDrawn.stashed !== saved;
+    stashDrawn = { id, stashed: saved };
+    const stash = DripStash.parts(fills ? !saved : saved, { outline: true });
+    if (fills) stash.to(saved);
     const content = [
       h('span', { class: `drip-pill-time${unlocked ? ' is-unlocked' : ''}${paused ? ' is-paused' : ''}` },
         !unlocked && pillGlass,
@@ -913,9 +922,9 @@
           paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       h('button', {
-        class: `drip-pill-save${saved ? ' is-saved' : ''}`, 'data-k': 'pill-save', 'aria-pressed': String(saved), onclick: onSave,
+        class: `drip-pill-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'pill-save', 'aria-pressed': String(saved), onclick: onSave,
         title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
-      }, icon(saved ? 'save' : 'save-outline'), h('span', {}, saved ? 'Stashed' : 'Stash')),
+      }, ...stash.nodes),
     ];
     if (!pill) {
       pill = h('div', { id: 'drip-pill', class: 'drip-ui' });
