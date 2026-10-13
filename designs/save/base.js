@@ -125,15 +125,19 @@
    * The bookmark: the cartoon shape (card) or the outline (pill) in the text color, and blue water over it clipped by a
    * wavy line. level 0 is empty, 1 is full. amp is the wave's height and tilt leans the line, both in viewBox units.
    */
-  function bookmark(outline) {
+  function bookmark(outline, { dry = false } = {}) {
     const id = `mock-water-${++ids}`;
     const line = s('path');
+    // dry: the outline only shows above the water, so the white line never sits under the blue.
+    const above = s('path');
     const base = outline
-      ? s('path', { d: OUTLINE, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linejoin': 'round', transform: 'scale(37.75 37.25) translate(-4 -2)' })
+      // The outline is in lucide's 24-unit space, scaled inside a group so a clip on the group stays in this SVG's units.
+      ? s('g', {}, s('path', { d: OUTLINE, fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linejoin': 'round', transform: 'scale(37.75 37.25) translate(-4 -2)' }))
       : s('path', { d: SHAPE, fill: 'currentColor' });
     const water = s('path', { d: SHAPE, fill: BLUE, 'clip-path': `url(#${id})` });
     const svg = s('svg', { class: 'mock-bm', viewBox: `0 0 ${W} ${H}`, 'aria-hidden': 'true' },
-      s('defs', {}, s('clipPath', { id, clipPathUnits: 'userSpaceOnUse' }, line)), base, water);
+      s('defs', {}, s('clipPath', { id, clipPathUnits: 'userSpaceOnUse' }, line), s('clipPath', { id: `${id}-dry`, clipPathUnits: 'userSpaceOnUse' }, above)), base, water);
+    if (dry) base.setAttribute('clip-path', `url(#${id}-dry)`);
     const bm = { svg, base, level: 0, amp: 0, tilt: 0, phase: 0 };
     /** Draws the water at bm's level, amp, tilt, and phase. */
     bm.draw = () => {
@@ -144,8 +148,9 @@
         d += `${d ? 'L' : 'M'}${x} ${wy.toFixed(1)}`;
       }
       line.setAttribute('d', `${d}L${W + 40} ${H + 400}L-40 ${H + 400}Z`);
+      above.setAttribute('d', `${d}L${W + 40} -400L-40 -400Z`);
       // Full, the outline would show through the shine. Water covers it instead.
-      base.style.opacity = outline && bm.level >= 1 && !bm.amp ? '0' : '';
+      if (!dry) base.style.opacity = outline && bm.level >= 1 && !bm.amp ? '0' : '';
     };
     bm.set = (level, { amp = 0, tilt = 0, phase = 0 } = {}) => {
       Object.assign(bm, { level, amp, tilt, phase });
@@ -218,9 +223,25 @@
     return `Stash · ${list.length} videos · ${formatMinutes(total)}`;
   }
 
+  /**
+   * Both words in one grid cell, the one not shown hidden, so the button is always as wide as "Stashed" and nothing
+   * beside it moves when the word changes. The same trick as the counts' --drip-room.
+   */
+  function reserved(cls = 'drip-save-label') {
+    const words = ['Stash', 'Stashed'].map((w, i) => h('span', { class: 'mock-word', 'aria-hidden': i ? 'true' : undefined }, w));
+    const el = h('span', { class: `${cls} mock-reserved`.trim() }, ...words);
+    el.show = (on) => words.forEach((w, i) => {
+      w.classList.toggle('is-off', i !== Number(on));
+      if (i === Number(on)) w.removeAttribute('aria-hidden');
+      else w.setAttribute('aria-hidden', 'true');
+    });
+    el.show(false);
+    return el;
+  }
+
   function buildCard() {
     const bm = now ? null : bookmark(false);
-    const label = h('span', { class: 'drip-save-label' }, 'Stash');
+    const label = variant.reserve ? reserved() : h('span', { class: 'drip-save-label' }, 'Stash');
     const btn = h('button', {
       class: 'drip-b drip-b-gray drip-card-save', 'aria-pressed': 'false', title: 'Stash it for later',
     }, now ? icon('save') : bm.svg, label);
@@ -254,8 +275,8 @@
   }
 
   function buildPill() {
-    const bm = now ? null : bookmark(true);
-    const label = h('span', {}, 'Stash');
+    const bm = now ? null : bookmark(true, { dry: !!variant.dry });
+    const label = variant.reserve ? reserved('') : h('span', {}, 'Stash');
     const btn = h('button', { class: 'drip-pill-save', 'aria-pressed': 'false', title: 'Stash it for later' }, now ? icon('save-outline') : bm.svg, label);
     const pill = h('div', { id: 'drip-pill', class: 'drip-ui' },
       h('span', { class: 'drip-pill-time' },
@@ -277,7 +298,8 @@
 
   /** Stash or Stashed, aria-pressed, and the title, as the real button does. */
   ctx.mark = (on) => {
-    ctx.label.textContent = ctx.words[on ? 1 : 0];
+    if (ctx.label.show) ctx.label.show(on);
+    else ctx.label.textContent = ctx.words[on ? 1 : 0];
     ctx.btn.classList.toggle('is-saved', on);
     ctx.btn.setAttribute('aria-pressed', String(on));
     ctx.btn.title = on ? 'In your stash. Click to take it out.' : 'Stash it for later';
@@ -308,5 +330,5 @@
       await toggle();
     })();
   }
-  globalThis.MOCK = { ctx, api, toggle };
+  globalThis.MOCK = { ctx, api, toggle, bookmark };
 })();

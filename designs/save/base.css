@@ -177,3 +177,17 @@ html.mock-reduced .mock-fx {
 #drip-home .drip-card-save.mock-has-tide.is-saved {
   background: var(--drip-gray);
 }
+
+/* D: both words share one cell, so the button keeps the width of the longer one. */
+.mock-reserved {
+  display: inline-grid;
+  justify-items: start;
+}
+
+.mock-word {
+  grid-area: 1 / 1;
+}
+
+.mock-word.is-off {
+  visibility: hidden;
+}

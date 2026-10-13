@@ -81,6 +81,9 @@ globalThis.MOCK_VARIANTS = {
     },
   },
 
+  // D: A with the two fixes. The label keeps room for "Stashed", and the pill's outline only shows above the water.
+  d: null,
+
   now: { now: true },
 };
 
@@ -105,3 +108,5 @@ async function flow(api, ctx, from, to, ms, easing, marking) {
   tide.set(to);
   bm.set(to);
 }
+
+globalThis.MOCK_VARIANTS.d = { ...globalThis.MOCK_VARIANTS.a, reserve: true, dry: true };
