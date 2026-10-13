@@ -108,7 +108,7 @@ main.is-phone iframe {
 </head>
 <body>
 <header>
-  <span class="round">Kept drops · round 1</span>
+  <span class="round">Kept drops · round 2</span>
   <nav id="scenes"></nav>
   <nav id="tabs"></nav>
   <div class="opts">
@@ -122,9 +122,12 @@ main.is-phone iframe {
 <main id="stage"><iframe id="frame" title="Variant"></iframe></main>
 <script>
 const VARIANTS = [
-  { key: 'a', label: 'A, Tag', idea: 'Beside the counter. A small blue tag, "3 kept", slides out of the drop counter as the water leaves, sits there for about 3.5 seconds, and slides back in.' },
-  { key: 'b', label: 'B, Note above', idea: 'Above the stats. "Kept 3 drops." and "Unspent drops carry over to tomorrow." float up with a short wave drawn under them, the lock\'s crest left behind, and lift away after about 4 seconds.' },
-  { key: 'c', label: 'C, Big count', idea: 'In place of the stats. The stats step back and a large "3, drops kept" takes their spot for about 2 seconds, then the 3 shrinks into the drop counter and the stats come back.' },
+  { key: 'a', label: 'A, Tag', idea: 'Round 1\'s pick. A small blue tag, "3 kept" with a drop, slides out of the drop counter as the water leaves, sits there for about 3.5 seconds, and slides back in.' },
+  { key: 'd', label: 'D, Gray tag', idea: 'A in drip\'s gray chip with ordinary text, so the drop is the only blue, plus a small point toward the counter it belongs to.' },
+  { key: 'e', label: 'E, Just the word', idea: 'No tag at all. "kept" slides out from behind the counter\'s own number in gray, so the counter reads "3 kept" for a few seconds.' },
+  { key: 'f', label: 'F, Badge', idea: 'A solid blue badge with dark text and no drop, like a notification count.' },
+  { key: 'b', label: 'B (round 1)', idea: 'Round 1. Above the stats: "Kept 3 drops." and a gray line float up with a short wave under them, then lift away.' },
+  { key: 'c', label: 'C (round 1)', idea: 'Round 1. The stats step back and a large "3, drops kept" takes their spot, then the 3 shrinks into the counter.' },
   { key: 'now', label: 'As built', idea: 'Today: the gray "Kept 3 drops." rises in under the buttons and stays.' },
 ];
 const SCENES = [

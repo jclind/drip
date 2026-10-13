@@ -17,6 +17,40 @@
 
   const drop = (cls) => h('img', { class: cls, src: 'icons/drop.svg', alt: '' });
 
+  /**
+   * A tag slides out of the drop counter, sits beside it, and slides back in. `cls` styles it, `withDrop` puts a drop in
+   * front of the words.
+   */
+  async function slideTag(ctx, cls, withDrop, words = '3 kept') {
+    const tag = h('span', { class: `mock-tag ${cls}`, role: 'status' }, withDrop && drop('mock-tag-drop'), h('span', {}, words), h('span', { class: 'drip-sr' }, '. Kept 3 drops.'));
+    ctx.drop.count.classList.add('mock-has-tag');
+    ctx.drop.count.append(tag);
+    await wait(450);
+    await animate(tag, [
+      { clipPath: 'inset(0 100% 0 0 round 12px)', transform: 'translate(-10px, -50%)', opacity: 0 },
+      { clipPath: 'inset(-2px -2px -2px -10px round 12px)', transform: 'translate(0, -50%)', opacity: 1 },
+    ], { duration: 420, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
+    squash(ctx.drop.icon);
+    await wait(3500);
+    await animate(tag, [
+      { clipPath: 'inset(-2px -2px -2px -10px round 12px)', transform: 'translate(0, -50%)', opacity: 1 },
+      { clipPath: 'inset(0 100% 0 0 round 12px)', transform: 'translate(-14px, -50%)', opacity: 0 },
+    ], { duration: 360, easing: 'cubic-bezier(0.5, 0, 0.75, 0.3)' });
+    tag.remove();
+    squash(ctx.drop.icon);
+  }
+
+  // D, Gray tag: A's tag in drip's gray chip with ordinary text, so the drop is the only blue, and a small point toward
+  // the counter it belongs to.
+  const D = { instant: true, land: (_, ctx) => slideTag(ctx, 'is-gray', true) };
+
+  // E, Just the word: no tag at all. "kept" slides out from behind the counter's own number, in gray, so the counter
+  // reads "3 kept" for a few seconds.
+  const E = { instant: true, land: (_, ctx) => slideTag(ctx, 'is-word', false, 'kept') };
+
+  // F, Badge: a solid blue badge with dark text and no drop, like a notification count, "+3 kept".
+  const F = { instant: true, land: (_, ctx) => slideTag(ctx, 'is-badge', false, '3 kept') };
+
   // A, Tag: a small blue tag slides out of the drop counter, "3 kept", sits beside it, and slides back in.
   const A = {
     instant: true,
@@ -118,5 +152,5 @@
     },
   };
 
-  globalThis.Variants = { a: A, b: B, c: C, now };
+  globalThis.Variants = { a: A, b: B, c: C, d: D, e: E, f: F, now };
 })();
