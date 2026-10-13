@@ -532,8 +532,8 @@
   }
 
   /**
-   * Brings each count to what it shows now: a roll or a spin on a page in view, at once otherwise. A landing moves the
-   * counts itself, so they're left alone while it runs.
+   * Brings each count to what it shows now: a roll or a spin on a page in view, at once otherwise. While a landing
+   * runs, a spend still counts at once, and what's still arriving stays held back.
    */
   function syncCounts() {
     if (!state) return;
@@ -542,17 +542,20 @@
       if (!c) continue;
       const n = shownCount(kind);
       c.sr.textContent = kind === 'watch' ? (n === 1 ? ' drop' : ' drops') : n === 1 ? ' card' : ' cards';
-      if (landing || DripCounter.value(c.num) === n) continue;
-      // Drops held back for a landing leave the count at once, under the lock's water.
-      DripCounter.to(c.num, n, { animate: animates() && !document.hidden && !arriving });
+      if (DripCounter.value(c.num) === n) continue;
+      // Drops held back before a landing leave the count at once, under the lock's water.
+      DripCounter.to(c.num, n, { animate: animates() && !document.hidden && !(arriving && !landing) });
     }
   }
 
-  /** How many digits the counts keep room for: enough for the most the settings allow, so a new digit moves nothing. */
+  /**
+   * How many digits the counts keep room for: enough for the most the settings allow, now or after a waiting change,
+   * so a new digit moves nothing.
+   */
   function countRoom() {
-    const s = state.settings;
-    const most = Math.max(s.watchTokensPerDay * s.rolloverDays, s.recTokensPerDay * s.rolloverDays, state.tokens.watch, state.tokens.rec);
-    return String(most).length;
+    const now = Drip.caps(state.settings);
+    const next = Drip.caps({ ...state.settings, ...state.pending?.changes });
+    return String(Math.max(now.watch, now.rec, next.watch, next.rec, state.tokens.watch, state.tokens.rec)).length;
   }
 
   function stats() {
@@ -719,6 +722,8 @@
   }
 
   let rendered = '';
+  /** The minutes the stats were last drawn with. */
+  let drawnTime = '';
 
   /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
@@ -736,11 +741,14 @@
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
     root.classList.add('drip-ui');
     // The stats are centered as a group, so minutes that get wider ("50m" to "1h 5m") move it. It glides there instead
-    // of jumping.
-    const was = glassEl?.isConnected ? glassEl.getBoundingClientRect().left : null;
+    // of jumping. Measured only when the minutes change, on a page in view.
+    const time = state ? Drip.formatMinutes(heldLeft ?? state.watchSecondsLeft) : '';
+    const glides = !!drawnTime && time !== drawnTime && !!glassEl?.isConnected && animates() && !document.hidden;
+    drawnTime = time;
+    const was = glides ? /** @type {SVGSVGElement} */ (glassEl).getBoundingClientRect().left : null;
     root.replaceChildren(view());
     syncCounts();
-    if (was !== null && glassEl?.isConnected && animates() && !document.hidden) {
+    if (was !== null && glassEl?.isConnected) {
       const dx = was - glassEl.getBoundingClientRect().left;
       if (Math.abs(dx) > 0.5) root.querySelector('.drip-stats')?.animate([{ translate: `${dx}px 0` }, { translate: '0 0' }], { duration: 420, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
     }
@@ -764,6 +772,15 @@
   let waiting = false;
   /** The reset whose refill this page has taken, so it plays once. */
   let refillTaken = '';
+  /** When the lock's water last started falling away (watch.js onDone). */
+  let lockFellAt = 0;
+  document.addEventListener('drip-lock-falling', () => { lockFellAt = Date.now(); });
+
+  /** drip's home page is on screen. */
+  function homeInView() {
+    const root = document.getElementById('drip-home');
+    return !!root?.getClientRects().length && !document.hidden && document.documentElement.hasAttribute('data-drip-shown');
+  }
 
   /** The drops the lock screen's "Done for now" left unspent land in the counter, read once (watch.js onDone). */
   function takeKept() {
@@ -780,10 +797,13 @@
     landWhenShown();
   }
 
-  /** What the day's reset added lands in the counters once, on the first home page that shows it. */
+  /**
+   * What the day's reset added lands in the counters once, on the first home page that shows it. A home page kept
+   * hidden behind a watch page leaves it for when it's back in view.
+   */
   function takeRefill() {
     const r = state && state.refill;
-    if (!r || r.day !== state.day || r.day === refillTaken || arriving) return;
+    if (!r || r.day !== state.day || r.day === refillTaken || arriving || !homeInView()) return;
     refillTaken = r.day;
     arriving = { kind: 'new', watch: r.watch, rec: r.rec };
     rendered = '';
@@ -799,26 +819,23 @@
     if (waiting) return;
     waiting = true;
     const started = Date.now();
-    let fell = false;
     try {
       while (arriving) {
-        if (arriving.kind === 'new' && state && !state.refill) {
+        // Another tab showed the refill first, or the page never came into view: the counts just show the balance.
+        if ((arriving.kind === 'new' && state && !state.refill) || Date.now() - started > 10000) {
           arriving = null;
           rendered = '';
           render();
           return;
         }
-        const lock = document.getElementById('drip-lock');
-        if (lock?.classList.contains('is-surfacing')) fell = true;
+        const fell = lockFellAt >= started;
         // watch.js lets the water fall within 4 seconds of home showing. Past 6, the drops come in anyway.
-        const lockUp = !!lock && !fell && Date.now() - started < 6000;
-        const root = document.getElementById('drip-home');
-        const inView = !!root?.getClientRects().length && !document.hidden && document.documentElement.hasAttribute('data-drip-shown');
-        if (state && counts.watch?.row.isConnected && inView && !lockUp && !moving) break;
+        const lockUp = !!document.getElementById('drip-lock') && !fell && Date.now() - started < 6000;
+        if (state && counts.watch?.row.isConnected && homeInView() && !lockUp && !moving) break;
         await sleep(50);
       }
       if (!arriving) return;
-      await sleep(fell ? 250 : 400);
+      await sleep(lockFellAt >= started ? 250 : 400);
       await land();
     } finally {
       waiting = false;
@@ -827,23 +844,29 @@
 
   async function land() {
     const a = arriving;
-    if (!a || !state || !counts.watch || !counts.rec) return;
-    landing = true;
-    // Kept drops after a reset carry the refill in them already.
-    if (state.refill) {
-      refillTaken = state.refill.day;
-      send({ type: 'refillSeen' }).then(absorb);
-    }
     try {
+      if (!a || !state || !counts.watch || !counts.rec) return;
+      landing = true;
+      // Kept drops after a reset carry the refill in them already.
+      if (state.refill) {
+        refillTaken = state.refill.day;
+        send({ type: 'refillSeen' }).then(absorb);
+      }
+      /** Lets `n` more of what's arriving into a count. @param {'watch' | 'rec'} kind */
+      const release = (kind) => (/** @type {number} */ n, /** @type {any} */ roll = {}) => {
+        if (arriving) arriving[kind] = Math.max(0, arriving[kind] - n);
+        return DripCounter.to(/** @type {any} */ (counts[kind]).num, shownCount(kind), { animate: animates() && !document.hidden, ...roll });
+      };
       await DripCounter.land({
         kind: a.kind,
-        drops: { ...counts.watch, to: state.tokens.watch },
-        cards: a.kind === 'new' ? { ...counts.rec, to: state.tokens.rec } : undefined,
+        drops: { ...counts.watch, add: Math.min(a.watch, state.tokens.watch), release: release('watch') },
+        cards: a.kind === 'new' ? { ...counts.rec, add: Math.min(a.rec, state.tokens.rec), release: release('rec') } : undefined,
       });
     } finally {
       arriving = null;
       landing = false;
-      syncCounts();
+      rendered = '';
+      render();
     }
   }
 
@@ -861,6 +884,8 @@
         takeKept();
         render();
       }
+      // Back home from a watch page after the reset.
+      takeRefill();
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;

@@ -23,7 +23,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
-    'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'formatMinutes', 'cleanVideo',
+    'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
@@ -114,6 +114,11 @@ test('the reset records what it added until refillSeen, and nothing when it adde
   state.tokens = { watch: 8, rec: 20 };
   D.rollDay(state, time(7, 4));
   assert.equal(state.refill, null, 'both at the cap');
+});
+
+test('caps are a day of each token times the days kept', () => {
+  assert.deepEqual(D.caps(D.DEFAULT_SETTINGS), { watch: 8, rec: 20 });
+  assert.deepEqual(D.caps({ ...D.DEFAULT_SETTINGS, watchTokensPerDay: 48, recTokensPerDay: 100, rolloverDays: 7 }), { watch: 336, rec: 700 });
 });
 
 test('hydrate keeps a stored refill and drops a malformed one', () => {

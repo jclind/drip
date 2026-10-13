@@ -11,7 +11,7 @@
 
 (() => {
   const pour = () => /** @type {any} */ (globalThis).DripPour;
-  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduced = () => pour().reduced();
   /** @param {number} ms */
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const OUT = 'cubic-bezier(0.3, 0.7, 0.2, 1)';
@@ -150,29 +150,40 @@
   }
 
   /**
-   * @typedef {object} Counter
+   * A counter that something is arriving in. The caller holds what's arriving back from the count, and `release`
+   * lets `n` more of it in, rolling the count with `roll`. So a drop spent while others are still falling counts at
+   * once, and the count always ends on the balance.
+   * @typedef {object} Arrival
    * @property {HTMLElement} row The .drip-count, which the tag sits beside.
    * @property {Element} icon Its icon.
    * @property {HTMLElement} num Its num().
+   * @property {number} add How many are arriving.
+   * @property {(n: number, roll?: {animate?: boolean, most?: number, settle?: number}) => Promise<void>} release
    */
+
+  /** The counter's page was left or hidden, so nothing should fall into it. @param {Arrival} c */
+  const gone = (c) => !c.row.isConnected || !c.row.getClientRects().length || document.hidden;
 
   /**
    * Drops fall into the counter from the top of the window, one every `gap` ms, and the count rolls up as each lands.
    * Five fall at most. With more to add, each carries its share and the count spins up by it, quickly enough (3
-   * numbers, about 0.24 seconds) to be done before the next one lands.
-   * @param {Counter} c @param {number} n @param {number} gap
+   * numbers, about 0.24 seconds) to be done before the next one lands. If the page goes away meanwhile, the rest come
+   * in at once.
+   * @param {Arrival} c @param {number} gap
    */
-  async function rain(c, n, gap) {
-    const from = value(c.num);
-    const added = n - from;
-    const count = Math.min(added, 5);
+  async function rain(c, gap) {
+    const count = Math.min(c.add, 5);
+    let released = 0;
     const falls = [];
     for (let i = 1; i <= count; i += 1) {
-      const at = from + Math.round((added * i) / count);
-      falls.push(fall(c.icon).then(() => to(c.num, at, { most: 3, settle: 160 })));
+      if (gone(c)) break;
+      const share = Math.round((c.add * i) / count) - Math.round((c.add * (i - 1)) / count);
+      released += share;
+      falls.push(fall(c.icon).then(() => c.release(share, { most: 3, settle: 160 })));
       if (i < count) await sleep(gap);
     }
     await Promise.all(falls);
+    if (released < c.add) await c.release(c.add - released, { animate: false });
   }
 
   const TAG_IN = [
@@ -184,7 +195,7 @@
   /**
    * A gray tag beside a counter, hidden until it slides out. It shows the counter's icon and `words` ("3 kept"), and
    * screen readers hear `said` ("Kept 3 drops.").
-   * @param {Counter} c @param {string} words @param {string} said @param {boolean} still Reduced motion.
+   * @param {Arrival} c @param {string} words @param {string} said @param {boolean} still Reduced motion.
    */
   async function showTag(c, words, said, still) {
     const el = document.createElement('span');
@@ -203,7 +214,7 @@
     return el;
   }
 
-  /** @param {HTMLElement} el @param {Counter} c @param {boolean} still */
+  /** @param {HTMLElement} el @param {Arrival} c @param {boolean} still */
   async function hideTag(el, c, still) {
     if (!still) await pour().play(el, TAG_OUT, { duration: 360, easing: 'cubic-bezier(0.5, 0, 0.75, 0.3)' });
     el.remove();
@@ -216,30 +227,33 @@
   /**
    * Drops arriving in the drop counter, and on a new day cards in the card counter (Jesse's pick, design round 2's D,
    * 2026-10-13). The drops fall in, then a tag says how many. A new day's cards spin up after, with a tag of their own.
-   * The tags stay 3 seconds and slide back in. Each counter starts from the number it shows. The caller holds back
-   * what's arriving until this runs.
-   * @param {{kind: 'kept' | 'new', drops: Counter & {to: number}, cards?: Counter & {to: number}}} o
+   * The tags stay 3 seconds and slide back in. If the page goes away partway, what's left comes in at once, with no
+   * tags.
+   * @param {{kind: 'kept' | 'new', drops: Arrival, cards?: Arrival}} o
    */
   async function land({ kind, drops, cards }) {
     const still = reduced();
-    const addedDrops = drops.to - value(drops.num);
-    const addedCards = cards ? cards.to - value(cards.num) : 0;
-    /** @type {[HTMLElement, Counter][]} */
+    /** @type {[HTMLElement, Arrival][]} */
     const tags = [];
-    if (addedDrops > 0) {
-      if (still) to(drops.num, drops.to, { animate: false });
-      else await rain(drops, drops.to, kind === 'new' ? 240 : 320);
-      const said = kind === 'kept' ? `Kept ${plural(addedDrops, 'drop', 'drops')}.` : `${plural(addedDrops, 'new drop', 'new drops')}.`;
-      tags.push([await showTag(drops, `${addedDrops} ${kind}`, said, still), drops]);
+    if (drops.add > 0) {
+      if (still) await drops.release(drops.add, { animate: false });
+      else await rain(drops, kind === 'new' ? 240 : 320);
+      if (gone(drops)) {
+        if (cards && cards.add > 0) await cards.release(cards.add, { animate: false });
+        return;
+      }
+      const n = drops.add;
+      const said = kind === 'kept' ? `Kept ${plural(n, 'drop', 'drops')}.` : `${plural(n, 'new drop', 'new drops')}.`;
+      tags.push([await showTag(drops, `${n} ${kind}`, said, still), drops]);
     }
-    if (cards && addedCards > 0) {
-      if (still) to(cards.num, cards.to, { animate: false });
+    if (cards && cards.add > 0) {
+      if (still || gone(cards)) await cards.release(cards.add, { animate: false });
       else {
         await sleep(150);
         squash(cards.icon);
-        await to(cards.num, cards.to);
+        await cards.release(cards.add);
       }
-      tags.push([await showTag(cards, `${addedCards} new`, `${plural(addedCards, 'new card', 'new cards')}.`, still), cards]);
+      if (!gone(cards)) tags.push([await showTag(cards, `${cards.add} new`, `${plural(cards.add, 'new card', 'new cards')}.`, still), cards]);
     }
     if (!tags.length) return;
     await sleep(TAG_MS);

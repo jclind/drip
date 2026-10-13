@@ -226,8 +226,8 @@
   function stats(heldDrops = 0) {
     const watch = Math.max(0, sand.tokens.watch - heldDrops);
     const { rec } = sand.tokens;
-    const s = sand.settings;
-    const room = String(Math.max(s.watchTokensPerDay * s.rolloverDays, s.recTokensPerDay * s.rolloverDays, sand.tokens.watch, rec)).length;
+    const cap = Drip.caps(sand.settings);
+    const room = String(Math.max(cap.watch, cap.rec, sand.tokens.watch, rec)).length;
     return h('div', { class: 'drip-stats' },
       h('div', { class: 'drip-glass-tile' }, glass()),
       h('div', { class: 'drip-time-block' },
@@ -688,8 +688,13 @@
         setUnder(h('div', { id: 'drip-home', class: 'drip-ui' }, page));
         stage.append(again());
         const row = /** @type {HTMLElement} */ (page.querySelector('.drip-count'));
-        const drops = { row, icon: row.querySelector('.drip-i'), num: row.querySelector('.drip-num'), to: kept };
-        later(() => DripCounter.land({ kind: 'kept', drops }), reducedMotion() ? 0 : 250);
+        const num = /** @type {HTMLElement} */ (row.querySelector('.drip-num'));
+        let held = kept;
+        const release = (/** @type {number} */ n, /** @type {any} */ roll = {}) => {
+          held = Math.max(0, held - n);
+          return DripCounter.to(num, Math.max(0, sand.tokens.watch - held), roll);
+        };
+        later(() => DripCounter.land({ kind: 'kept', drops: { row, icon: row.querySelector('.drip-i'), num, add: kept, release } }), reducedMotion() ? 0 : 250);
       };
       if (reducedMotion()) {
         home();

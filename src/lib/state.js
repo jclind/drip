@@ -156,6 +156,14 @@
     return state;
   }
 
+  /**
+   * The most drops and cards a balance can hold: a day's worth times the days unspent ones are kept.
+   * @param {Settings} settings @returns {{watch: number, rec: number}}
+   */
+  function caps(settings) {
+    return { watch: settings.watchTokensPerDay * settings.rolloverDays, rec: settings.recTokensPerDay * settings.rolloverDays };
+  }
+
   /** @param {State} state @param {number} now */
   function rollDay(state, now) {
     const nextDay = dayKey(now, state.settings.resetHour);
@@ -167,8 +175,9 @@
     }
     const settings = state.settings;
     const before = { ...state.tokens };
-    state.tokens.watch = Math.min(state.tokens.watch + settings.watchTokensPerDay * elapsed, settings.watchTokensPerDay * settings.rolloverDays);
-    state.tokens.rec = Math.min(state.tokens.rec + settings.recTokensPerDay * elapsed, settings.recTokensPerDay * settings.rolloverDays);
+    const cap = caps(settings);
+    state.tokens.watch = Math.min(state.tokens.watch + settings.watchTokensPerDay * elapsed, cap.watch);
+    state.tokens.rec = Math.min(state.tokens.rec + settings.recTokensPerDay * elapsed, cap.rec);
     // The home page shows what came in once, as drops falling into the counter (home.js), then sends refillSeen.
     const added = { watch: Math.max(0, state.tokens.watch - before.watch), rec: Math.max(0, state.tokens.rec - before.rec) };
     state.refill = added.watch || added.rec ? { day: nextDay, ...added } : null;
@@ -420,9 +429,9 @@
       }
     }
     // A lowered cap is a hard limit now, not at the next reset (Q6, Q11).
-    const { watchTokensPerDay, recTokensPerDay, rolloverDays } = state.settings;
-    state.tokens.watch = Math.min(state.tokens.watch, watchTokensPerDay * rolloverDays);
-    state.tokens.rec = Math.min(state.tokens.rec, recTokensPerDay * rolloverDays);
+    const cap = caps(state.settings);
+    state.tokens.watch = Math.min(state.tokens.watch, cap.watch);
+    state.tokens.rec = Math.min(state.tokens.rec, cap.rec);
     return { ok: true, applied, pending };
   }
 
@@ -620,7 +629,7 @@
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
-    isLoosening, updateSettings, cancelPending, refillSeen, formatMinutes, cleanVideo,
+    isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction,
   };
 })();
