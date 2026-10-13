@@ -108,7 +108,7 @@ main.is-phone iframe {
 </head>
 <body>
 <header>
-  <span class="round">Save fills · round 2</span>
+  <span class="round">Save fills · round 3</span>
   <nav id="scenes"></nav>
   <nav id="tabs"></nav>
   <div class="opts">
@@ -122,6 +122,8 @@ main.is-phone iframe {
 <main id="stage"><iframe id="frame" title="Variant"></iframe></main>
 <script>
 const VARIANTS = [
+  { key: 'e', label: 'E, Centered', idea: 'D with the room split evenly. The button stays as wide as "Stashed", and the icon and "Stash" sit in its middle, so there\'s no gap after the word. Nothing beside it moves.' },
+  { key: 'f', label: 'F, Slide', idea: 'D without the reserved room. The button fits its word, and when the word changes it eases to the new width in a quarter second, so Reveal next and the pill\'s glass slide instead of jumping.' },
   { key: 'd', label: 'D, A fixed', idea: 'A with two fixes. The button keeps room for "Stashed", so nothing beside it moves when the word changes. On the pill, the white outline only shows above the water, so no white lines sit under the blue and nothing pops at the end.' },
   { key: 'a', label: 'A, Rise', idea: 'The bookmark is a small glass. Blue water rises from the bottom with a wave that sloshes and settles, and the bookmark bobs once when full. Taking it out lowers the water.' },
   { key: 'b', label: 'B, Drop', idea: 'The glass\'s picked motion. One drop falls into the top of the bookmark with a small ring, the water rises fast, and the bookmark bobs. Taking it out, the water drains and a drop falls out of the notch.' },
@@ -133,7 +135,7 @@ const SCENES = [
   { key: 'pill', label: 'Watch page pill' },
 ];
 const params = new URLSearchParams(location.search);
-let current = params.get('v') || 'd';
+let current = params.get('v') || 'e';
 let scene = params.get('scene') === 'pill' ? 'pill' : 'card';
 const flags = { slow: params.get('slow') === '1', light: params.get('light') === '1', phone: params.get('phone') === '1' };
 const tabs = document.getElementById('tabs');

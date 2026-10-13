@@ -191,3 +191,14 @@ html.mock-reduced .mock-fx {
 .mock-word.is-off {
   visibility: hidden;
 }
+
+/* E: the icon and word centered in a button kept as wide as "Stashed". */
+#drip-pill .drip-pill-save.mock-centered {
+  justify-content: center;
+}
+
+/* F: while the width eases, the word doesn't wrap and nothing spills out. */
+.mock-sliding {
+  overflow: hidden;
+  white-space: nowrap;
+}

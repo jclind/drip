@@ -110,3 +110,8 @@ async function flow(api, ctx, from, to, ms, easing, marking) {
 }
 
 globalThis.MOCK_VARIANTS.d = { ...globalThis.MOCK_VARIANTS.a, reserve: true, dry: true };
+
+// E: A's motion and D's pill, with the button as wide as "Stashed" and its icon and word centered in it.
+globalThis.MOCK_VARIANTS.e = { ...globalThis.MOCK_VARIANTS.a, dry: true, fit: 'center' };
+// F: A's motion and D's pill, with the button easing to its new width when the word changes.
+globalThis.MOCK_VARIANTS.f = { ...globalThis.MOCK_VARIANTS.a, dry: true, fit: 'slide' };

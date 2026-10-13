@@ -297,9 +297,29 @@
   if (variant.tide) ctx.tide = tide(ctx.btn);
 
   /** Stash or Stashed, aria-pressed, and the title, as the real button does. */
+  // E: the button is as wide as it is with "Stashed", and the icon and word sit centered in it.
+  // Measured once Roboto has loaded, or the width would be the fallback font's.
+  if (variant.fit === 'center') {
+    ctx.btn.classList.add('mock-centered');
+    document.fonts.ready.then(() => {
+      const shown = ctx.label.textContent;
+      ctx.label.textContent = ctx.words[1];
+      ctx.btn.style.minWidth = `${ctx.btn.getBoundingClientRect().width}px`;
+      ctx.label.textContent = shown;
+    });
+  }
+
   ctx.mark = (on) => {
+    // F: the button eases to its new width, and what's beside it slides along.
+    const from = variant.fit === 'slide' ? ctx.btn.getBoundingClientRect().width : 0;
     if (ctx.label.show) ctx.label.show(on);
     else ctx.label.textContent = ctx.words[on ? 1 : 0];
+    if (from) {
+      const to = ctx.btn.getBoundingClientRect().width;
+      ctx.btn.classList.add('mock-sliding');
+      api.animate(ctx.btn, [{ width: `${from}px` }, { width: `${to}px` }], { duration: 240, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)', fill: 'none' })
+        .then(() => ctx.btn.classList.remove('mock-sliding'));
+    }
     ctx.btn.classList.toggle('is-saved', on);
     ctx.btn.setAttribute('aria-pressed', String(on));
     ctx.btn.title = on ? 'In your stash. Click to take it out.' : 'Stash it for later';
