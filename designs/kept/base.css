@@ -1,0 +1,309 @@
+/* The mock YouTube around drip's real CSS. YouTube's own theme variables, which drip.css reads. */
+html {
+  --yt-sys-color-baseline--text-primary: #0f0f0f;
+  --yt-sys-color-baseline--text-secondary: #606060;
+  --yt-sys-color-baseline--base-background: #fff;
+  --yt-sys-color-baseline--additive-background: rgba(0, 0, 0, 0.05);
+  --yt-sys-color-baseline--button-chip-background-hover: rgba(0, 0, 0, 0.1);
+  --yt-sys-color-baseline--outline: rgba(0, 0, 0, 0.1);
+}
+
+html[dark] {
+  --yt-sys-color-baseline--text-primary: #f1f1f1;
+  --yt-sys-color-baseline--text-secondary: #aaa;
+  --yt-sys-color-baseline--base-background: #0f0f0f;
+  --yt-sys-color-baseline--additive-background: rgba(255, 255, 255, 0.1);
+  --yt-sys-color-baseline--button-chip-background-hover: rgba(255, 255, 255, 0.2);
+  --yt-sys-color-baseline--outline: rgba(255, 255, 255, 0.2);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Roboto", "Arial", sans-serif;
+  color: var(--yt-sys-color-baseline--text-primary);
+  background: var(--yt-sys-color-baseline--base-background);
+}
+
+.mock-mast {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+
+.mock-logo {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.5px;
+}
+
+.mock-watch {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* The player: the pill sits inside its top right, as on YouTube. */
+.mock-player {
+  position: relative;
+  margin: 0 24px;
+  aspect-ratio: 16 / 9;
+  max-height: 72vh;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+}
+
+.mock-player > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mock-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.mock-bar-fill {
+  width: 38%;
+  height: 100%;
+  background: #f00;
+}
+
+.mock-title {
+  margin: 12px 24px 4px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.mock-channel {
+  margin: 0 24px;
+  color: var(--yt-sys-color-baseline--text-secondary);
+  font-size: 14px;
+}
+
+.mock-play {
+  padding: 2px 10px;
+  border: 1px solid var(--yt-sys-color-baseline--outline);
+  border-radius: 12px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+/* Drops, streams, and rings that travel between elements, above everything, the lock included. */
+.mock-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 200001;
+  pointer-events: none;
+}
+
+.mock-fx > * {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.mock-drop {
+  display: block;
+  height: auto;
+}
+
+.mock-stream {
+  width: 3px;
+  border-radius: 2px;
+  background: #42a5f6;
+}
+
+.mock-ring {
+  border: 1.5px solid #42a5f6;
+  border-radius: 50%;
+}
+
+.mock-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 200002;
+  translate: -50% 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font: 13px "Roboto", "Arial", sans-serif;
+  color: #fff;
+  background: rgba(40, 40, 40, 0.95);
+  pointer-events: none;
+}
+
+html.mock-reduced .mock-fx {
+  display: none;
+}
+
+.mock-splash {
+  border-radius: 50%;
+  background: #42a5f6;
+}
+
+.mock-bubble {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+}
+
+/* A count's number. Old and new share one grid cell while it changes, so both can move. */
+.mock-num {
+  display: inline-grid;
+  justify-items: start;
+}
+
+.mock-num.is-clip {
+  overflow-y: clip;
+  overflow-clip-margin: 2px;
+}
+
+.mock-digit {
+  grid-area: 1 / 1;
+}
+
+/* Drops in the message line (C). */
+.mock-msg-drops {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 6px;
+  vertical-align: -2px;
+}
+
+.mock-msg-drops img {
+  width: 11px;
+  height: auto;
+}
+
+.mock-msg-card {
+  width: 13px;
+  height: auto;
+}
+
+/* A, Tag. */
+#drip-home .drip-count.mock-has-tag {
+  position: relative;
+}
+
+.mock-tag {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  color: #1565c0;
+  background: rgba(66, 165, 246, 0.16);
+  transform: translate(0, -50%);
+}
+
+html[dark] .mock-tag {
+  color: #8cc8fa;
+  background: rgba(66, 165, 246, 0.18);
+}
+
+.mock-tag-drop {
+  width: 11px;
+  height: auto;
+}
+
+/* B, Note above. */
+#drip-home .drip-stats {
+  position: relative;
+}
+
+.mock-note {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 18px);
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  transform: translate(-50%, 0);
+}
+
+.mock-note-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.mock-note-drop {
+  width: 13px;
+  height: auto;
+}
+
+.mock-note-sub {
+  color: var(--drip-muted);
+  font-size: 13px;
+}
+
+.mock-note-wave {
+  display: block;
+  margin-top: 6px;
+  line-height: 0;
+}
+
+/* C, Big count. */
+.mock-big {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  justify-items: center;
+  transform: translate(-50%, -50%);
+}
+
+.mock-big-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mock-big-drop {
+  width: 30px;
+  height: auto;
+}
+
+.mock-big-num {
+  font: 700 56px/1 "Roboto", "Arial", sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+}
+
+.mock-big-sub {
+  margin-top: 4px;
+  color: var(--drip-muted);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.mock-fx > .mock-big-ghost {
+  transform-origin: 0 0;
+  color: #0f0f0f;
+}
+
+html[dark] .mock-fx > .mock-big-ghost {
+  color: #f1f1f1;
+}
