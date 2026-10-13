@@ -13,6 +13,8 @@
   const { h, icon, price, hourLabel } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
+  /** @type {any} */
+  const DripPour = /** @type {any} */ (globalThis).DripPour;
 
   /** @param {string} id */
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -179,8 +181,43 @@
   function glass() {
     const fraction = DripGlass.fraction(sand);
     if (!glassEl) glassEl = DripGlass.make(fraction, GLASS_PX);
-    else DripGlass.set(glassEl, fraction, GLASS_PX);
+    else if (!pouring) DripGlass.set(glassEl, fraction, GLASS_PX);
     return glassEl;
+  }
+
+  /** While +15m's drop is in the air, the glass is pour.js's and the minutes read what they were until it lands. */
+  let pouring = false;
+  /** @type {number | null} */
+  let heldLeft = null;
+
+  /** +15m, as on the home page: a drop leaves the counter and falls into the glass (pour.js). */
+  function addTime() {
+    if (pouring) return;
+    const counter = stage.querySelector('.drip-stats .drip-token-drop');
+    const pours = animates() && !!counter && !!glassEl?.isConnected;
+    const from = DripGlass.fraction(sand);
+    const left = sand.watchSecondsLeft;
+    if (!Drip.spendWatch(sand).ok) return;
+    if (pours) {
+      pouring = true;
+      heldLeft = left;
+      // The tour may have moved on and come back by now. Steps 1 and 2 show the stats, so they redraw.
+      const redraw = () => {
+        if (step <= 1) drawHome();
+      };
+      DripPour.pour({
+        counter: /** @type {Element} */ (counter).getBoundingClientRect(), glass: glassEl, px: GLASS_PX, from, to: DripGlass.fraction(sand),
+        onLand: () => {
+          heldLeft = null;
+          redraw();
+        },
+      }).then(() => {
+        pouring = false;
+        heldLeft = null;
+        redraw();
+      });
+    }
+    drawHome();
   }
 
   function stats() {
@@ -188,7 +225,7 @@
     return h('div', { class: 'drip-stats' },
       h('div', { class: 'drip-glass-tile' }, glass()),
       h('div', { class: 'drip-time-block' },
-        h('div', { class: 'drip-time' }, Drip.formatMinutes(sand.watchSecondsLeft)),
+        h('div', { class: 'drip-time' }, Drip.formatMinutes(heldLeft ?? sand.watchSecondsLeft)),
         h('div', { class: 'drip-sub' }, 'left today')),
       h('div', { class: 'drip-counts' },
         h('div', { class: `drip-count${watch ? '' : ' is-zero'}` }, icon('drop', 'drip-token-drop'), h('span', {}, String(watch)), h('span', { class: 'drip-sr' }, watch === 1 ? ' drop' : ' drops')),
@@ -198,7 +235,7 @@
   function actions() {
     return h('div', { class: 'drip-actions' },
       h('button', {
-        class: 'drip-b drip-b-gray drip-add', disabled: sand.tokens.watch < 1, onclick: () => { Drip.spendWatch(sand); drawHome(); },
+        class: 'drip-b drip-b-gray drip-add', disabled: sand.tokens.watch < 1, onclick: addTime,
       }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(sand.settings.minutesPerToken * 60)}`), price('drop')),
       h('button', {
         class: 'drip-b drip-b-gold drip-reveal', disabled: sand.tokens.rec < 1, onclick: () => (step === 1 ? reveal() : go(1)),
@@ -477,9 +514,34 @@
 
   function showPlayer() {
     // Play pressed again in the pause before the lock buys more minutes, and then the lock doesn't come (Codex, 2026-10-11).
-    const p = player({ onEmpty: () => later(() => { if (sand.watchSecondsLeft <= 0) go(3); }, 700) });
+    const p = player({ onEmpty: () => lastDrop((x) => {
+      dropX = x;
+      go(3);
+    }) });
     stage.append(p.el);
     return p.stop;
+  }
+
+  /** Where step 3's last drop landed, so step 4's lock rises from there. Read once. */
+  /** @type {number | null} */
+  let dropX = null;
+
+  /**
+   * At 0, the pill's last water falls to the bottom of the stage (pour.js), and then `raise` brings the lock up from
+   * where it landed. Without motion it waits 700ms instead, and passes null. Play pressed in the meantime buys more
+   * minutes, and then the lock doesn't come (Codex, 2026-10-11).
+   * @param {(x: number | null) => void} raise
+   */
+  function lastDrop(raise) {
+    const m = motion;
+    const land = (/** @type {number | null} */ x) => {
+      if (motion === m && sand.watchSecondsLeft <= 0) raise(x);
+    };
+    if (!animates() || !pillGlass?.isConnected) {
+      later(() => land(null), 700);
+      return;
+    }
+    DripPour.lastDrop(pillGlass, PILL_GLASS_PX, stage.getBoundingClientRect().bottom).then(land);
   }
 
   // Step 4: the lock, as watch.js draws it, inside the stage. Under it: the paused video, then whatever the way out
@@ -594,7 +656,7 @@
     const drain = () => {
       const lock = /** @type {HTMLElement} */ (stage.querySelector('#drip-lock'));
       stopRings();
-      const p = player({ autoplay: true, onEmpty: () => later(() => { if (sand.watchSecondsLeft <= 0) raise(); }, 700) });
+      const p = player({ autoplay: true, onEmpty: () => lastDrop(raise) });
       setUnder(p.el, p);
       if (reducedMotion()) lift(lock);
       else {
@@ -665,7 +727,7 @@
         h('div', { class: 'drip-lock-sub' }, watchedLine()),
         h('div', { class: `drip-lock-actions${canBuy ? '' : ' is-alone'}` },
           canBuy && h('button', {
-            class: 'drip-b drip-b-gray drip-lock-add', onclick: () => { Drip.spendWatch(sand); drain(); },
+            class: 'drip-b drip-b-gray drip-lock-add', onclick: (/** @type {Event} */ e) => addTime(/** @type {HTMLElement} */ (e.currentTarget)),
           }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop')),
           h('button', {
             class: 'drip-b drip-b-primary drip-done', onclick: done,
@@ -697,8 +759,36 @@
       fitLock();
     };
 
-    /** Raises the lock over the paused video. */
-    function raise() {
+    let adding = false;
+    /**
+     * +15m on the lock, as on YouTube: the button's drop falls into the water, the water drains, and the pill's glass
+     * bobs up (pour.js).
+     * @param {HTMLElement} button
+     */
+    const addTime = (button) => {
+      if (adding) return;
+      Drip.spendWatch(sand);
+      const lockPanel = button.closest('.drip-lock-panel');
+      if (reducedMotion() || !lockPanel) {
+        drain();
+        return;
+      }
+      adding = true;
+      const m = motion;
+      const floor = Math.min(lockPanel.getBoundingClientRect().bottom + 36, stage.getBoundingClientRect().bottom - 12);
+      DripPour.fallIn(button, floor).then(() => {
+        adding = false;
+        if (motion !== m) return;
+        drain();
+        if (pillGlass?.isConnected) DripPour.refill(pillGlass, PILL_GLASS_PX, DripGlass.fraction(sand), 180);
+      });
+    };
+
+    /**
+     * Raises the lock over the paused video, its water rising from where the pill's last drop landed when there was one.
+     * @param {number | null} [x]
+     */
+    function raise(x = null) {
       morph(() => {
         stage.querySelector('.tour-again')?.remove();
         stage.querySelector('#drip-lock')?.remove();
@@ -708,12 +798,15 @@
         setUnder(p.el, p);
         const lockPanel = panel();
         lockPanel.classList.add('is-new');
-        stage.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), lockPanel));
+        const lock = h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), lockPanel);
+        stage.append(lock);
         fitLock();
+        if (x !== null) DripPour.riseFrom(lock, x);
       });
     }
 
-    raise();
+    raise(dropX);
+    dropX = null;
     return () => {
       stopRings();
       under?.stop();

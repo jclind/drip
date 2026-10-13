@@ -10,6 +10,8 @@
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
+  /** @type {any} */
+  const DripPour = /** @type {any} */ (globalThis).DripPour;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -280,10 +282,44 @@
     return revealWith('next', { type: 'revealNext', videoId });
   }
 
+  /** While +15m's drop is in the air, the glass is pour.js's and the minutes read what they were until it lands. */
+  let pouring = false;
+  /** @type {number | null} */
+  let heldLeft = null;
+
   async function onAddTime() {
+    if (pouring) return;
     message = '';
+    const counter = document.querySelector('#drip-home .drip-stats .drip-token-drop');
+    // A tab in the background has nobody to watch the drop.
+    const pours = animates() && !document.hidden && !!counter && !!glassEl?.isConnected && !!state;
+    const from = pours ? { counter: /** @type {Element} */ (counter).getBoundingClientRect(), level: DripGlass.fraction(state) } : null;
+    if (from) {
+      pouring = true;
+      heldLeft = state.watchSecondsLeft;
+    }
     const res = absorb(await send({ type: 'spendWatch' }));
-    if (res && !res.ok) message = errorText(res.error);
+    if (!from || !res || !res.ok) {
+      pouring = false;
+      heldLeft = null;
+      if (res && !res.ok) message = errorText(res.error);
+      render();
+      return;
+    }
+    render();
+    try {
+      await DripPour.pour({
+        counter: from.counter, glass: glassEl, px: GLASS_PX, from: from.level, to: DripGlass.fraction(state),
+        onLand: () => {
+          heldLeft = null;
+          render();
+        },
+      });
+    } catch {
+      // drip was updated under the page. The redraw below shows where things stand.
+    }
+    pouring = false;
+    heldLeft = null;
     render();
   }
 
@@ -460,12 +496,12 @@
   function glass() {
     const fraction = DripGlass.fraction(state);
     if (!glassEl) glassEl = DripGlass.make(fraction, GLASS_PX);
-    else DripGlass.set(glassEl, fraction, GLASS_PX);
+    else if (!pouring) DripGlass.set(glassEl, fraction, GLASS_PX);
     return glassEl;
   }
 
   function stats() {
-    const left = Drip.formatMinutes(state.watchSecondsLeft);
+    const left = Drip.formatMinutes(heldLeft ?? state.watchSecondsLeft);
     const { watch, rec } = state.tokens;
     return h('div', { class: 'drip-stats' },
       h('div', { class: 'drip-glass-tile' }, glass()),
@@ -642,7 +678,7 @@
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0, DripGlass.fraction(state).toFixed(3),
       state.tokens, state.current, state.backlog, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
       state.settings.resetHour,
-    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()]]);
+    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring]);
     if (root.firstChild && key === rendered) return;
     rendered = key;
     // Keep keyboard focus on the same control across the rebuild.
