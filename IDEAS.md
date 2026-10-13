@@ -55,9 +55,9 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 
 - ★ The last drop. When the pill hits 0, one drop falls out of the pill's glass and the lock's water rises from where it lands, so the pill and the lock feel like one moment instead of two. Built on 2026-10-12 (DESIGN.md, "The glass's motion as built").
 - ★ Pouring in. Buying +15m on the home page or the lock pours a short stream into the glass, and the water settles with one small wobble. On the lock it plays as the water drains. Built another way on 2026-10-12: one drop falls in and the water bobs (DESIGN.md, "The glass's motion as built").
-- ★ Kept drops land. After "Done for now", the home page's "Kept 3 drops." has the three drops fall into the drop counter one at a time, and the count ticks up with a small bounce. This is the payoff for leaving, so it can be the most satisfying motion in drip.
+- ★ Kept drops land. After "Done for now", the home page's "Kept 3 drops." has the three drops fall into the drop counter one at a time, and the count ticks up with a small bounce. This is the payoff for leaving, so it can be the most satisfying motion in drip. Built on 2026-10-13, with a gray "3 kept" tag in place of the line (DESIGN.md, "The counter's motion as built").
 - ★ Save fills. The bookmark on the card and the pill fills from the bottom up in blue when saved, like the glass, and drains when unsaved.
-- ★ A new day. The first time the home page opens after the reset, the glass fills from empty with the day's minutes. As written it can't happen: the reset sets minutes to 0. The day's new drops landing in the counter fits with "Kept drops land" instead (2026-10-12).
+- ★ A new day. The first time the home page opens after the reset, the glass fills from empty with the day's minutes. As written it can't happen: the reset sets minutes to 0. The day's new drops landing in the counter fits with "Kept drops land" instead (2026-10-12). Built that way on 2026-10-13, with "4 new" and "10 new" tags (DESIGN.md, "The counter's motion as built").
 - Pass sinks. The × sends the card down and out like it dropped into water, instead of vanishing. Reveal next could do the same before the new card rises. Built another way on 2026-10-12: the card turns face down and drops (DESIGN.md, "Reveal animation as built").
 - Removing a Saved row evaporates it (a short blur and fade upward), and Undo drips it back in.
 - The pill's water surface gets a tiny ripple each time a minute ticks off, so a glance shows it's draining without reading the number.
@@ -70,3 +70,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 - Fish that drift away from the pointer on the lock. Cute; maybe too much to watch.
 - A soft water "plip" on "Done for now", off by default. drip has no sound anywhere yet, so it's a bigger decision than it looks.
 - Grace mode: while a video finishes on grace, the pill shows an empty glass with a dotted outline and "Finishing this one".
+
+## Efficiency
+
+- An efficiency pass over the whole extension, which Jesse wants later, not now (2026-10-13). One known lead: the lock's water rise hitches every so often on the MacBook while the motion keeps its timing. On air it runs at 60fps (80 frames, the slowest 29ms, no long tasks). The rise animates `--drip-water`, a registered property, which moves `#drip-lock`'s mask and clip every frame. That repaints a full-window `backdrop-filter: blur(20px)` on the main thread, so any of YouTube's scripts can delay a frame. Running out mid-video also grows an ellipse clip (pour.js `riseFrom`), which costs more than the flat edge. Compare a watch page opened at 0 minutes, which rises flat, with minutes running out: if only the second hitches, the ellipse is the cause. Otherwise move the rise onto the compositor, with the water sliding up as a transform instead of being repainted.

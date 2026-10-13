@@ -253,5 +253,6 @@
     return done;
   }
 
-  /** @type {any} */ (globalThis).DripPour = { reduced, pour, lastDrop, riseFrom, fallIn, refill };
+  // The drop, ring, and splash are counter.js's too, for drops falling into the drop counter.
+  /** @type {any} */ (globalThis).DripPour = { reduced, pour, lastDrop, riseFrom, fallIn, refill, play, drop, ring, splash, at };
 })();

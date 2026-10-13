@@ -29,7 +29,7 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 18. Turn grace mode on (it applies at the next reset). The next day, run out of minutes mid-video. That video finishes, and opening another video shows the lock.
 19. With minutes left, play two videos in two tabs for a minute. The minutes go down by about one minute, not two.
 20. On the lock, click I need this one, type a reason, and unlock. The video plays, the pill says Unlocked, and the reason shows under Why you needed one in Settings.
-21. On the lock with drops left, hover Done for now: thin blue rings leave the button. Click it: rings cross the panel, the water falls away onto the home page with no blank page between, and "Kept N drops." rises in. Do it twice in one tab; the second time home was already built, and the message still shows.
+21. On the lock with drops left, hover Done for now: thin blue rings leave the button. Click it: rings cross the panel, the water falls away onto the home page with no blank page between, the kept drops fall into the drop counter one at a time as the count rolls up, and a gray "N kept" tag slides out beside it for 3 seconds. Do it twice in one tab; the second time home was already built, and the drops still land. Then Run reset now in the dev panel: the new drops fall in with an "N new" tag, and the cards spin up with their own. Refresh: nothing lands again.
 
 ## Redirects and blocking
 
@@ -49,7 +49,7 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 
 ## Welcome page
 
-32. Open `chrome-extension://<drip's id>/src/welcome/welcome.html`. The tiles and the line under them show the defaults: 15m a drop, 4 drops and 10 cards a day. Go through all five steps: +15m fills the glass, Reveal video shows a card, Watch opens the player, Play drains the pill until the lock rises, and Done for now falls away to "Kept N drops." The stage stays the same height on every step, so Next never moves. Step 5's table lines up in columns, and at a narrow window it stacks with nothing cut off. Then Open YouTube on the last step goes to youtube.com. The popup shows the same drops and minutes as before the tour.
+32. Open `chrome-extension://<drip's id>/src/welcome/welcome.html`. The tiles and the line under them show the defaults: 15m a drop, 4 drops and 10 cards a day. Go through all five steps: +15m fills the glass, Reveal video shows a card, Watch opens the player, Play drains the pill until the lock rises, and Done for now falls away to the home page, where the kept drops land with an "N kept" tag. The stage stays the same height on every step, so Next never moves. Step 5's table lines up in columns, and at a narrow window it stacks with nothing cut off. Then Open YouTube on the last step goes to youtube.com. The popup shows the same drops and minutes as before the tour.
 
 ## After a day boundary
 

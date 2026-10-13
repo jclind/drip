@@ -23,7 +23,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
-    'isLoosening', 'updateSettings', 'cancelPending', 'formatMinutes', 'cleanVideo',
+    'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
@@ -58,7 +58,7 @@ test('initialState has the specified shape and independent mutable values', () =
   assert.deepEqual(state, {
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
-    current: null, backlog: [], seen: [], unlocked: [], log: {},
+    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null,
   });
   state.settings.recTokensPerDay = 1;
   state.backlog.push(video('a'));
@@ -101,6 +101,32 @@ test('skipping five days caps balances at two days of allowance', () => {
   state.tokens = { watch: 0, rec: 0 };
   assert.equal(D.rollDay(state, time(10)), true);
   assert.deepEqual(state.tokens, { watch: 8, rec: 20 });
+  assert.deepEqual(state.refill, { day: '2026-10-10', watch: 8, rec: 20 });
+});
+
+test('the reset records what it added until refillSeen, and nothing when it added nothing', () => {
+  const state = fresh();
+  state.tokens = { watch: 3, rec: 20 };
+  D.rollDay(state, time(6, 4));
+  assert.deepEqual(state.refill, { day: '2026-10-06', watch: 4, rec: 0 }, 'cards were already at the cap');
+  assert.deepEqual(D.refillSeen(state), { ok: true });
+  assert.equal(state.refill, null);
+  state.tokens = { watch: 8, rec: 20 };
+  D.rollDay(state, time(7, 4));
+  assert.equal(state.refill, null, 'both at the cap');
+});
+
+test('caps are a day of each token times the days kept', () => {
+  assert.deepEqual(D.caps(D.DEFAULT_SETTINGS), { watch: 8, rec: 20 });
+  assert.deepEqual(D.caps({ ...D.DEFAULT_SETTINGS, watchTokensPerDay: 48, recTokensPerDay: 100, rolloverDays: 7 }), { watch: 336, rec: 700 });
+});
+
+test('hydrate keeps a stored refill and drops a malformed one', () => {
+  const stored = { ...fresh(), refill: { day: '2026-10-05', watch: 4, rec: 10 } };
+  assert.deepEqual(D.hydrate(stored, time(5, 12)).refill, { day: '2026-10-05', watch: 4, rec: 10 });
+  assert.deepEqual(D.hydrate({ ...stored, refill: { day: '2026-10-05', watch: -1, rec: 'x' } }, time(5, 12)).refill, { day: '2026-10-05', watch: 0, rec: 0 });
+  assert.equal(D.hydrate({ ...stored, refill: { watch: 4 } }, time(5, 12)).refill, null);
+  assert.equal(D.hydrate({ ...stored, refill: undefined }, time(5, 12)).refill, null);
 });
 
 test('logDay creates a zero entry only for the current day and reuses it', () => {

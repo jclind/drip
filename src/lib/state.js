@@ -14,6 +14,13 @@
  * @property {string[]} seen
  * @property {string[]} unlocked
  * @property {Object<string, LogDay>} log
+ * @property {Refill | null} refill What the last reset added, until a home page has shown it.
+ */
+/**
+ * @typedef {Object} Refill
+ * @property {string} day The day the reset started.
+ * @property {number} watch Drops it added.
+ * @property {number} rec Cards it added.
  */
 /**
  * @typedef {Object} Settings
@@ -89,6 +96,7 @@
       day: dayKey(now, DEFAULT_SETTINGS.resetHour),
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
+      refill: null,
     };
   }
 
@@ -138,12 +146,22 @@
       const changes = cleanSettings(stored.pending.changes);
       if (Object.keys(changes).length) state.pending = { effectiveDay: stored.pending.effectiveDay, changes };
     }
+    const refill = /** @type {Partial<Refill> | null | undefined} */ (stored.refill);
+    if (refill && typeof refill.day === 'string') state.refill = { day: refill.day, watch: count(refill.watch, 0), rec: count(refill.rec, 0) };
     if (stored.log && typeof stored.log === 'object') {
       for (const [day, entry] of Object.entries(stored.log)) {
         state.log[day] = { ...emptyLog(), ...entry, needThis: Array.isArray(entry?.needThis) ? entry.needThis.map(use => ({ ...use })) : [] };
       }
     }
     return state;
+  }
+
+  /**
+   * The most drops and cards a balance can hold: a day's worth times the days unspent ones are kept.
+   * @param {Settings} settings @returns {{watch: number, rec: number}}
+   */
+  function caps(settings) {
+    return { watch: settings.watchTokensPerDay * settings.rolloverDays, rec: settings.recTokensPerDay * settings.rolloverDays };
   }
 
   /** @param {State} state @param {number} now */
@@ -156,8 +174,13 @@
       state.pending = null;
     }
     const settings = state.settings;
-    state.tokens.watch = Math.min(state.tokens.watch + settings.watchTokensPerDay * elapsed, settings.watchTokensPerDay * settings.rolloverDays);
-    state.tokens.rec = Math.min(state.tokens.rec + settings.recTokensPerDay * elapsed, settings.recTokensPerDay * settings.rolloverDays);
+    const before = { ...state.tokens };
+    const cap = caps(settings);
+    state.tokens.watch = Math.min(state.tokens.watch + settings.watchTokensPerDay * elapsed, cap.watch);
+    state.tokens.rec = Math.min(state.tokens.rec + settings.recTokensPerDay * elapsed, cap.rec);
+    // The home page shows what came in once, as drops falling into the counter (home.js), then sends refillSeen.
+    const added = { watch: Math.max(0, state.tokens.watch - before.watch), rec: Math.max(0, state.tokens.rec - before.rec) };
+    state.refill = added.watch || added.rec ? { day: nextDay, ...added } : null;
     state.watchSecondsLeft = 0;
     state.watchSecondsBought = 0;
     state.unlocked = [];
@@ -406,9 +429,9 @@
       }
     }
     // A lowered cap is a hard limit now, not at the next reset (Q6, Q11).
-    const { watchTokensPerDay, recTokensPerDay, rolloverDays } = state.settings;
-    state.tokens.watch = Math.min(state.tokens.watch, watchTokensPerDay * rolloverDays);
-    state.tokens.rec = Math.min(state.tokens.rec, recTokensPerDay * rolloverDays);
+    const cap = caps(state.settings);
+    state.tokens.watch = Math.min(state.tokens.watch, cap.watch);
+    state.tokens.rec = Math.min(state.tokens.rec, cap.rec);
     return { ok: true, applied, pending };
   }
 
@@ -418,6 +441,12 @@
       delete state.pending.changes[/** @type {keyof Settings} */ (key)];
       if (!Object.keys(state.pending.changes).length) state.pending = null;
     }
+    return { ok: true };
+  }
+
+  /** A home page has shown what the reset added, so no other one shows it again. @param {State} state */
+  function refillSeen(state) {
+    state.refill = null;
     return { ok: true };
   }
 
@@ -600,7 +629,7 @@
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
-    isLoosening, updateSettings, cancelPending, formatMinutes, cleanVideo,
+    isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction,
   };
 })();

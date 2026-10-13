@@ -719,6 +719,8 @@
       return;
     }
     lock.classList.add('is-surfacing');
+    // The home page's kept drops land as the water falls (home.js).
+    document.dispatchEvent(new CustomEvent('drip-lock-falling'));
     setTimeout(() => lock.remove(), SURFACE_MS);
   }
 
