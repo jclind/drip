@@ -82,14 +82,15 @@
       if (existing.dataset.videoId === video.id) return paintSave(existing);
       existing.remove();
     }
-    const button = h('button', { class: 'drip-btn drip-save', 'data-video-id': video.id, 'data-swap-anchor': true, onclick: async () => {
+    const button = h('button', { class: 'drip-btn drip-save', 'data-video-id': video.id, 'data-swap-anchor': true, onclick: async (/** @type {MouseEvent} */ e) => {
       if (swap && swap.button === button) return closeSwap();
       const current = readVideo(row) || video;
       const res = await send({ type: 'addBacklog', video: current });
       // A full stash asks which video to swap out instead (Q28).
       if (res && !res.ok && res.error === 'stash-full') {
         if (res.state) state = res.state;
-        openSwap(button, current);
+        // detail is 0 for a click from the keyboard (Enter or Space).
+        openSwap(button, current, e.detail === 0);
       }
     } });
     paintSave(button);
@@ -102,14 +103,15 @@
   /** @type {{el: HTMLElement, dropped: any, index: number, newId: string, timer: number} | null} */
   let swapped = null;
 
-  /** @param {HTMLElement} button @param {any} video */
-  function openSwap(button, video) {
+  /** @param {HTMLElement} button @param {any} video @param {boolean} keyboard Opened from the keyboard, so it takes focus. */
+  function openSwap(button, video, keyboard) {
     closeSwap();
     const el = DripSwap.picker({ backlog: state.backlog, onPick: (/** @type {any} */ drop) => onSwap(button, video, drop), onClose: closeSwap });
     button.setAttribute('aria-expanded', 'true');
     button.parentElement?.append(el);
     swap = { button, el };
-    el.focusFirst();
+    DripSwap.place(el, button);
+    if (keyboard) el.focusFirst();
   }
 
   function closeSwap() {

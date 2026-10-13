@@ -1691,9 +1691,11 @@ html[dark] .drip-swap {
 .drip-swap-list {
   max-height: 300px;
   margin: 0;
-  padding: 0 8px;
+  padding: 4px 8px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
+  border-top: 1px solid var(--drip-rule);
 }
 
 .drip-swap-item {
@@ -1832,6 +1834,12 @@ html[dark] .drip-swap {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
+}
+
+/* With more room above its button than below, the list opens upward (swap.js place). */
+:is(#drip-home .drip-card-actions, .drip-save-row) .drip-swap.is-above {
+  top: auto;
+  bottom: calc(100% + 8px);
 }
 
 /* On the watch page, under the pill in the player's corner (watch.js), or under the floating pill. */

@@ -331,8 +331,11 @@
     render();
   }
 
-  /** @param {'watch' | 'save' | 'unsave' | 'pass'} action @param {string} videoId The card the button was on. */
-  async function onResolve(action, videoId) {
+  /**
+   * @param {'watch' | 'save' | 'unsave' | 'pass'} action @param {string} videoId The card the button was on.
+   * @param {boolean} [keyboard] Pressed from the keyboard, so a full stash's list takes focus.
+   */
+  async function onResolve(action, videoId, keyboard = false) {
     if (moving) return;
     message = '';
     if (action === 'pass' && animates() && document.querySelector('#drip-home .drip-card .drip-deal')) {
@@ -358,7 +361,7 @@
       leaving = false;
       swapFor = videoId;
       render();
-      /** @type {any} */ (document.querySelector('#drip-home .drip-swap'))?.focusFirst();
+      if (keyboard) /** @type {any} */ (swapEl)?.focusFirst();
       return;
     }
     if (res && !res.ok) message = errorText(res.error);
@@ -393,6 +396,27 @@
 
   /** The card whose full-stash list is up, or ''. */
   let swapFor = '';
+  /**
+   * The list as built, kept across redraws like the thumbnail, so its scroll stays put and a click on a row isn't lost
+   * when the page redraws mid-press. Minutes ticking down in another tab redraw the page every few seconds.
+   * @type {HTMLElement | null}
+   */
+  let swapEl = null;
+  /** What swapEl was built from: the card and the stash's ids. */
+  let swapBuilt = '';
+
+  /** The full-stash list for the card, built again only when the stash changes. */
+  function swapList() {
+    const built = JSON.stringify([swapFor, state.backlog.map((/** @type {any} */ v) => [v.id, v.resumeSec || 0])]);
+    if (!swapEl || built !== swapBuilt) {
+      swapEl = DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap });
+      swapBuilt = built;
+      swapPlaced = false;
+    }
+    return swapEl;
+  }
+  /** Whether swapEl has been placed above or below its button since it was built. */
+  let swapPlaced = false;
   /**
    * The last swap, for its "Swapped out … · Undo" note under the card: who went out, where it sat, and who came in.
    * @type {{dropped: any, index: number, newId: string, timer: number} | null}
@@ -713,7 +737,8 @@
         h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
           'data-swap-anchor': true, 'aria-expanded': swapping ? 'true' : undefined,
-          onclick: () => (swapping ? closeSwap() : onResolve(saved ? 'unsave' : 'save', video.id)),
+          // detail is 0 for a click from the keyboard (Enter or Space).
+          onclick: (/** @type {MouseEvent} */ e) => (swapping ? closeSwap() : onResolve(saved ? 'unsave' : 'save', video.id, e.detail === 0)),
           title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
         }, ...stash.nodes),
         h('button', {
@@ -724,7 +749,7 @@
           class: 'drip-b drip-b-gray drip-pass', 'data-k': 'pass', disabled: next, onclick: () => onResolve('pass', video.id),
           title: "Pass. It's free, and this video won't come back.", 'aria-label': 'Pass',
         }, icon('x')),
-        swapping && DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap })),
+        swapping && swapList()),
       swapped && swapped.newId === video.id && DripSwap.note(swapped.dropped, onSwapUndo));
   }
 
@@ -822,13 +847,26 @@
     const glides = !!drawnTime && time !== drawnTime && !!glassEl?.isConnected && animates() && !document.hidden;
     drawnTime = time;
     const was = glides ? /** @type {SVGSVGElement} */ (glassEl).getBoundingClientRect().left : null;
+    // Moving the kept list out and back in resets its scroll, so it's put back after.
+    const listTop = swapEl?.querySelector('.drip-swap-list')?.scrollTop || 0;
     root.replaceChildren(view());
     syncCounts();
+    if (swapEl && swapEl.isConnected) {
+      if (!swapPlaced) {
+        DripSwap.place(swapEl, root.querySelector('[data-k="save"]'));
+        swapPlaced = true;
+      }
+      const list = swapEl.querySelector('.drip-swap-list');
+      if (list) list.scrollTop = listTop;
+    } else if (!swapFor) {
+      swapEl = null;
+    }
     if (was !== null && glassEl?.isConnected) {
       const dx = was - glassEl.getBoundingClientRect().left;
       if (Math.abs(dx) > 0.5) root.querySelector('.drip-stats')?.animate([{ translate: `${dx}px 0` }, { translate: '0 0' }], { duration: 420, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
     }
-    if (focused) /** @type {HTMLElement | null} */ (root.querySelector(`[data-k="${CSS.escape(focused)}"]`))?.focus();
+    // Without scrolling: a control kept across the redraw is already where it was.
+    if (focused) /** @type {HTMLElement | null} */ (root.querySelector(`[data-k="${CSS.escape(focused)}"]`))?.focus({ preventScroll: true });
   }
 
   let refreshing = false;

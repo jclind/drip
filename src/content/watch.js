@@ -835,16 +835,19 @@
   // The pill with minutes left and the Save button.
 
   /** Stashes the video, or takes it back out of the stash when it's already there, like Stash on the home page's card. */
-  async function onSave() {
+  /** @param {MouseEvent} [e] */
+  async function onSave(e) {
     const id = videoId();
     if (!id || !state) return;
     if (swapOpen) return closeSwap();
+    // detail is 0 for a click from the keyboard (Enter or Space).
+    const keyboard = !!e && e.detail === 0;
     let res;
     if (state.backlog.some((/** @type {any} */ v) => v.id === id)) res = await send({ type: 'removeBacklog', id });
     else res = await send({ type: 'addBacklog', video: thisVideo(id) });
     if (res && !res.ok && res.error === 'stash-full' && !disconnected) {
       state = res.state;
-      openSwap();
+      openSwap(keyboard);
       return;
     }
     took(res);
@@ -904,10 +907,16 @@
     if (swapLayer.parentElement !== parent) parent.append(swapLayer);
   }
 
-  function openSwap() {
+  /** @param {boolean} keyboard Opened from the keyboard, so the list takes focus. */
+  function openSwap(keyboard) {
     swapOpen = videoId();
     drawSwap();
-    /** @type {any} */ (swapLayer?.querySelector('.drip-swap'))?.focusFirst();
+    const list = /** @type {any} */ (swapLayer?.querySelector('.drip-swap'));
+    if (list) {
+      list.dataset.flips = 'false';
+      DripSwap.place(list, document.querySelector('#drip-pill'));
+      if (keyboard) list.focusFirst();
+    }
     renderPill();
   }
 

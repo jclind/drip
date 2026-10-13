@@ -81,8 +81,37 @@
       h('button', { class: 'drip-swap-cancel', 'data-k': 'swap-cancel', onclick: onClose }, 'Cancel')));
     open.add({ el, onClose });
     return Object.assign(el, {
-      focusFirst: () => /** @type {HTMLElement | null} */ (el.querySelector('.drip-swap-item'))?.focus(),
+      // Without scrolling: the page stays where it was, and only keyboard users get here.
+      focusFirst: () => /** @type {HTMLElement | null} */ (el.querySelector('.drip-swap-item'))?.focus({ preventScroll: true }),
     });
+  }
+
+  // Room the list keeps clear of the window's edges, and of YouTube's 56px top bar above it.
+  const EDGE = 16;
+  const TOP_BAR = 56;
+  // The list never gets shorter than about two and a half rows.
+  const MIN_LIST = 130;
+
+  /**
+   * Opens the list below its button, or above it when there's more room there, and shortens it to fit the window, so
+   * it never runs off the bottom of the screen and the page doesn't have to scroll to show it. Call it once the list
+   * is in the page. The card and search lists flip; the pill's always hangs down inside the player.
+   * @param {HTMLElement} el The list from picker(). @param {Element | null} anchor Its Stash button.
+   */
+  function place(el, anchor) {
+    const list = /** @type {HTMLElement | null} */ (el.querySelector('.drip-swap-list'));
+    if (!list || !anchor) return;
+    el.classList.remove('is-above');
+    list.style.maxHeight = '';
+    const a = anchor.getBoundingClientRect();
+    const chrome = el.offsetHeight - list.offsetHeight;
+    const below = window.innerHeight - a.bottom - 8 - EDGE;
+    const above = a.top - 8 - Math.max(EDGE, TOP_BAR + 8);
+    const flips = el.dataset.flips !== 'false';
+    const up = flips && el.offsetHeight > below && above > below;
+    el.classList.toggle('is-above', up);
+    const room = (up ? above : below) - chrome;
+    if (list.scrollHeight > room) list.style.maxHeight = `${Math.max(MIN_LIST, Math.floor(room))}px`;
   }
 
   let ids = 0;
@@ -120,5 +149,5 @@
   /** How long the note and its Undo stay, like a removed row's. */
   const UNDO_MS = 5000;
 
-  /** @type {any} */ (globalThis).DripSwap = { picker, note, bar, meta, fraction, leftSec, lengthSec, UNDO_MS };
+  /** @type {any} */ (globalThis).DripSwap = { picker, place, note, bar, meta, fraction, leftSec, lengthSec, UNDO_MS };
 })();
