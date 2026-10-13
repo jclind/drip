@@ -10,7 +10,7 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 2. Click Reveal video. A gray placeholder holds the card's place, then one card appears with a thumbnail, title, channel, and length, and cards drop by 1. +15m and Reveal video go, and Stash collapses to its header.
 3. Click Stash. The card stays up, the button says Stashed, and the Stash list's count goes up by 1. Click Stashed and it comes back out. Click Reveal next. A new card takes this one's place, cards drop by 1, and the first card is gone for good. Click ×. The card goes and the empty page comes back.
 4. In Settings, set Reveal from to Subscriptions, then click Reveal video on the home page. "Checking your subscriptions…" shows, then a card from a subscribed channel, or "Nothing new from your subscriptions" with no card spent.
-5. Open a second YouTube tab and play a video in it. Back on the home page, hover a button and click it a few times. Every click works, and the button doesn't flicker.
+5. Open a second YouTube tab and play a video in it. Back on the home page, hover a button and click it a few times. Every click works, and the button doesn't flicker. Double-click +15m: it buys one drop, not two. Double-click × on a card: the card goes, with no error.
 6. With 0 minutes and a card up, Watch reads "Watch · -1" with a drop. Clicking it spends a drop and the video plays. Stash rows show "-1" and a drop by their play icon, and work the same way.
 7. Hover a Stash row and click its ×. The row reads "Removed · Undo" for 5 seconds. Undo puts it back where it was.
 8. With YouTube in light mode and in dark mode, the page reads well: the glass outline is visible, Watch is black in light and white in dark, and Reveal video stays gold.

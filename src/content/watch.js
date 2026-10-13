@@ -555,7 +555,8 @@
 
   /** @param {Event} e */
   async function onAddTime(e) {
-    if (landing) return;
+    // A double-click buys one drop, as home's +15m does. Without the drop's fall, nothing else holds the second click.
+    if (landing || /** @type {MouseEvent} */ (e).detail > 1) return;
     // The worker's storage change can lift the lock before this reply arrives, so the drain is asked for up front.
     drainNext = true;
     const button = /** @type {HTMLElement} */ (e.currentTarget);
