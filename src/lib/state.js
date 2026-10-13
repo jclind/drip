@@ -356,7 +356,9 @@
    * works over a lowered cap too. Undo still puts the video back when `dropId` has already left the stash, finished or
    * taken out within Undo's few seconds, so the swapped-out video is never lost, and still takes `dropId` out when the
    * video is already back, stashed again in another tab (Codex, 2026-10-13). Returns the video it took out as
-   * `dropped`, as it was then, so Undo puts back the latest progress, not a copy from when the list opened.
+   * `dropped`, as it was then, so Undo puts back the latest progress, not a copy from when the list opened. A swap
+   * whose new video another tab already stashed takes nothing out and returns no `dropped`, so pages offer Undo
+   * only when there's a `dropped`.
    * @param {State} state
    * @param {unknown} raw
    * @param {string} dropId
@@ -370,7 +372,9 @@
     const drop = state.backlog.findIndex(saved => saved.id === dropId);
     const dropped = drop >= 0 ? { ...state.backlog[drop] } : null;
     if (state.backlog.some(saved => saved.id === video.id)) {
-      if (undo && drop >= 0) removeBacklog(state, dropId);
+      // Already stashed in another tab, so nothing was swapped and there's nothing for Undo to put back.
+      if (!undo) return { ok: true };
+      if (drop >= 0) removeBacklog(state, dropId);
       return { ok: true, dropped };
     }
     if (drop < 0 && !undo) return { ok: false, error: 'not-stashed' };

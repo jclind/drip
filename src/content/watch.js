@@ -935,13 +935,13 @@
     const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
     swapOpen = '';
     const res = await send({ type: 'swapBacklog', video: thisVideo(id), dropId: drop.id });
-    if (res && res.ok) {
+    if (res && res.ok && res.dropped) {
       if (swapped) clearTimeout(swapped.timer);
       const timer = window.setTimeout(() => {
         swapped = null;
         drawSwap();
       }, DripSwap.UNDO_MS);
-      swapped = { dropped: res.dropped || drop, index, newId: id, timer };
+      swapped = { dropped: res.dropped, index, newId: id, timer };
     }
     took(res);
     drawSwap();

@@ -439,13 +439,13 @@
     swapFor = '';
     const res = absorb(await send({ type: 'swapBacklog', video, dropId: drop.id }));
     if (res && !res.ok) message = errorText(res.error);
-    else {
+    else if (res && res.dropped) {
       if (swapped) clearTimeout(swapped.timer);
       const timer = window.setTimeout(() => {
         swapped = null;
         render();
       }, DripSwap.UNDO_MS);
-      swapped = { dropped: res.dropped || drop, index, newId: video.id, timer };
+      swapped = { dropped: res.dropped, index, newId: video.id, timer };
     }
     render();
     focusOn('save');

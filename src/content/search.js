@@ -129,9 +129,9 @@
     const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
     closeSwap();
     const res = await send({ type: 'swapBacklog', video, dropId: drop.id });
-    if (!res || !res.ok) return;
+    if (!res || !res.ok || !res.dropped) return;
     clearSwapped();
-    const dropped = res.dropped || drop;
+    const dropped = res.dropped;
     const el = DripSwap.note(dropped, onSwapUndo);
     button.parentElement?.append(el);
     swapped = { el, dropped, index, newId: video.id, timer: window.setTimeout(clearSwapped, DripSwap.UNDO_MS) };
