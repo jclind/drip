@@ -69,13 +69,13 @@ ytd-guide-section-renderer:has(a[href^="/feed/storefront"]) {
 }
 
 /* Search: the injected shelves, ads, and "people also" rows go. Results past the first 10 wait behind search.js's
-   "More results" button, and YouTube's next-page loader is held back until the buffer runs low. */
+   "More results" button, and YouTube's next-page loader is held back until the buffer runs low.
+   ytd-background-promo-renderer stays: it's YouTube's "No results found" message. */
 ytd-search ytd-shelf-renderer,
 ytd-search grid-shelf-view-model,
 ytd-search ytd-horizontal-card-list-renderer,
 ytd-search ytd-search-pyv-renderer,
 ytd-search ytd-ad-slot-renderer,
-ytd-search ytd-background-promo-renderer,
 ytd-search [data-drip-over],
 ytd-search ytd-continuation-item-renderer[data-drip-hold] {
   display: none !important;
