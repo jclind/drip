@@ -276,6 +276,16 @@ test('the home page messages: revealNext, buyIfOut, and addBacklog with an index
   assert.deepEqual(w.store.drip.backlog.map((/** @type {any} */ v) => v.id), ['x0', 'x1', 'x2']);
 });
 
+test('the worker applies a raise at once in the first day after install (Q6)', async () => {
+  const w = worker();
+  const res = await w.send({ type: 'updateSettings', changes: { stashMax: 20 } });
+  assert.equal(res.applied.stashMax, 20);
+  assert.equal(w.store.drip.settings.stashMax, 20);
+  const old = worker({ ...w.store.drip, installedAt: Date.now() - 2 * 86400000 });
+  assert.equal((await old.send({ type: 'updateSettings', changes: { stashMax: 30 } })).pending.stashMax, 30);
+  assert.equal(old.store.drip.settings.stashMax, 20);
+});
+
 test('swapBacklog and a tick with the player position reach the stash (Q28)', async () => {
   const w = worker();
   await w.send({ type: 'updateSettings', changes: { stashMax: 1 } });

@@ -22,7 +22,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
-    'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
+    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction',
   ].sort());
@@ -58,7 +58,7 @@ test('initialState has the specified shape and independent mutable values', () =
   assert.deepEqual(state, {
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
-    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null,
+    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, installedAt: time(5),
   });
   state.settings.recTokensPerDay = 1;
   state.backlog.push(video('a'));
@@ -593,6 +593,46 @@ test('updateSettings stages raises, applies decreases, and cancels pending keys'
   D.updateSettings(state, { recTokensPerDay: 20 });
   assert.deepEqual(D.updateSettings(state, { recTokensPerDay: 5 }), { ok: true, applied: {}, pending: {} });
   assert.equal(state.pending, null);
+});
+
+test('the first day after install applies every change at once, and moves today\'s balance with the allowance (Q6)', () => {
+  const state = fresh();
+  assert.equal(state.installedAt, time(5));
+  assert.equal(D.firstDayUntil(state, time(5, 13)), time(6));
+  const res = D.updateSettings(state, { watchTokensPerDay: 6, stashMax: 20, graceMode: true }, time(5, 13));
+  assert.deepEqual(res, { ok: true, applied: { watchTokensPerDay: 6, stashMax: 20, graceMode: true }, pending: {} });
+  assert.equal(state.pending, null);
+  assert.equal(state.tokens.watch, 6);
+  state.tokens.watch = 1;
+  D.updateSettings(state, { watchTokensPerDay: 4, recTokensPerDay: 3 }, time(5, 14));
+  assert.deepEqual(state.tokens, { watch: 0, rec: 3 });
+});
+
+test('a day after install, and for state from before installedAt, raises wait for the reset again (Q6)', () => {
+  const state = fresh();
+  assert.equal(D.firstDayUntil(state, time(6)), 0);
+  assert.deepEqual(D.updateSettings(state, { stashMax: 20 }, time(6)).pending, { stashMax: 20 });
+  assert.deepEqual(D.updateSettings(fresh(), { stashMax: 20 }).pending, { stashMax: 20 });
+  const old = D.hydrate({ ...fresh(), installedAt: undefined }, time(5, 13));
+  assert.equal(old.installedAt, 0);
+  assert.equal(D.firstDayUntil(old, time(5, 13)), 0);
+  assert.deepEqual(D.updateSettings(old, { stashMax: 20 }, time(5, 13)).pending, { stashMax: 20 });
+  assert.equal(D.hydrate(fresh(), time(5, 13)).installedAt, time(5));
+});
+
+test('an earlier reset hour on the first day ends today at the new hour, without a refill', () => {
+  const state = D.initialState(time(5, 2));
+  assert.equal(state.day, '2026-10-04');
+  state.tokens.watch = 1;
+  state.watchSecondsLeft = 600;
+  D.updateSettings(state, { resetHour: 0 }, time(5, 2, 30));
+  assert.equal(state.day, '2026-10-05');
+  assert.equal(D.rollDay(state, time(5, 3)), false);
+  assert.equal(state.tokens.watch, 1);
+  assert.equal(state.watchSecondsLeft, 600);
+  D.updateSettings(state, { resetHour: 6 }, time(5, 3));
+  assert.equal(state.day, '2026-10-05');
+  assert.equal(D.rollDay(state, time(5, 7)), false);
 });
 
 test('settings result lists only this call, preserves other pending keys, and feeds apply now', () => {

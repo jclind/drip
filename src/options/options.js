@@ -84,7 +84,7 @@ let sample = null;
 /** Messages that change settings go through here, so a sample profile never touches the real state. @param {any} msg */
 async function send(msg) {
   if (!sample) return chrome.runtime.sendMessage(msg);
-  const result = msg.type === 'updateSettings' ? Drip.updateSettings(state, msg.changes)
+  const result = msg.type === 'updateSettings' ? Drip.updateSettings(state, msg.changes, Date.now())
     : msg.type === 'cancelPending' ? Drip.cancelPending(state, msg.key)
       : { ok: false, error: 'sample' };
   return { ...result, state };
@@ -194,8 +194,19 @@ function chip(/** @type {Field} */ f) {
     h('button', { type: 'button', class: 'chip-undo', 'aria-label': `Undo the waiting change to ${f.label}`, onclick: () => cancel(f.key) }, 'Undo'));
 }
 
+/** "3:10pm tomorrow", for the end of the first day after install. @param {number} until */
+function untilLabel(until) {
+  const d = new Date(until);
+  const time = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'am' : 'pm'}`;
+  return `${time} ${d.toDateString() === new Date().toDateString() ? 'today' : 'tomorrow'}`;
+}
+
 function renderForm() {
   const { h } = DripPage;
+  // The first day after install, every change applies at once (Q6), so trying settings out doesn't wait a day.
+  const until = Drip.firstDayUntil(state, Date.now());
+  $('firstDay').hidden = !until;
+  $('firstDay').textContent = until ? `Changes apply right away until ${untilLabel(until)}, while you try drip out. After that, raising a limit waits for the reset.` : '';
   $('settings').replaceChildren(...SECTIONS.map((section) => h('section', { class: 'group' },
     h('h2', { class: 'caps' }, section.title),
     ...section.fields.map((f) => {

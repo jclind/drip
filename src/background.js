@@ -94,7 +94,7 @@ function handle(msg, state, now) {
     case 'needThis':
       return Drip.needThis(state, msg.videoId, msg.title || '', msg.reason || '', now);
     case 'updateSettings':
-      return Drip.updateSettings(state, msg.changes || {});
+      return Drip.updateSettings(state, msg.changes || {}, now);
     case 'cancelPending':
       return Drip.cancelPending(state, msg.key);
     case 'refillSeen':

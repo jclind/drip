@@ -15,6 +15,8 @@
  * @property {string[]} unlocked
  * @property {Object<string, LogDay>} log
  * @property {Refill | null} refill What the last reset added, until a home page has shown it.
+ * @property {number} installedAt When drip was installed, in ms. Every settings change applies at once for a day after
+ * (Q6). 0 for state saved before this was kept, which counts as installed long ago.
  */
 /**
  * @typedef {Object} Refill
@@ -101,7 +103,7 @@
       day: dayKey(now, DEFAULT_SETTINGS.resetHour),
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
-      refill: null,
+      refill: null, installedAt: now,
     };
   }
 
@@ -163,6 +165,7 @@
     }
     const refill = /** @type {Partial<Refill> | null | undefined} */ (stored.refill);
     if (refill && typeof refill.day === 'string') state.refill = { day: refill.day, watch: count(refill.watch, 0), rec: count(refill.rec, 0) };
+    state.installedAt = count(stored.installedAt, 0);
     if (stored.log && typeof stored.log === 'object') {
       for (const [day, entry] of Object.entries(stored.log)) {
         state.log[day] = { ...emptyLog(), ...entry, needThis: Array.isArray(entry?.needThis) ? entry.needThis.map(use => ({ ...use })) : [] };
@@ -479,17 +482,46 @@
     return typeof from === 'number' && typeof to === 'number' && to > from;
   }
 
-  /** @param {State} state @param {unknown} changes */
-  function updateSettings(state, changes) {
+  /** How long after install every settings change applies at once (Q6). */
+  const FIRST_DAY_MS = 24 * 3600 * 1000;
+
+  /**
+   * When the first day's "every change at once" ends, in ms, or 0 once it's over or for state from before installedAt.
+   * @param {State} state @param {number} [now]
+   */
+  function firstDayUntil(state, now) {
+    const until = state.installedAt ? state.installedAt + FIRST_DAY_MS : 0;
+    return now && now < until ? until : 0;
+  }
+
+  /**
+   * Tightening applies at once and loosening waits for the reset (Q6), except in the first day after install, when
+   * everything applies at once. There a new daily allowance moves today's balance by the same amount, so trying 6 drops
+   * a day shows 6 today, and going back to 4 takes them away again. A new reset hour never starts a new day by itself.
+   * @param {State} state @param {unknown} changes @param {number} [now] Without it, the first day doesn't count.
+   */
+  function updateSettings(state, changes, now) {
     /** @type {Partial<Settings>} */
     const applied = {};
     /** @type {Partial<Settings>} */
     const pending = {};
+    const firstDay = firstDayUntil(state, now) > 0;
     const cleaned = cleanSettings(changes);
     for (const key of /** @type {(keyof Settings)[]} */ (Object.keys(cleaned))) {
       const value = cleaned[key];
       if (value === state.settings[key]) {
         cancelPending(state, key);
+      } else if (firstDay) {
+        if (key === 'watchTokensPerDay') state.tokens.watch = Math.max(0, state.tokens.watch + Number(value) - state.settings.watchTokensPerDay);
+        if (key === 'recTokensPerDay') state.tokens.rec = Math.max(0, state.tokens.rec + Number(value) - state.settings.recTokensPerDay);
+        Object.assign(state.settings, { [key]: value });
+        Object.assign(applied, { [key]: value });
+        cancelPending(state, key);
+        // An earlier hour would make the next message see a new day and refill. Today just ends at the new hour.
+        if (key === 'resetHour' && now) {
+          const day = dayKey(now, state.settings.resetHour);
+          if (day > state.day) state.day = day;
+        }
       } else if (isLoosening(key, state.settings[key], /** @type {Settings[keyof Settings]} */ (value))) {
         if (!state.pending) state.pending = { effectiveDay: addDays(state.day, 1), changes: {} };
         state.pending.effectiveDay = addDays(state.day, 1);
@@ -719,7 +751,7 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
+    firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction,
   };

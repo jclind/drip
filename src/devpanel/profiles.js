@@ -61,6 +61,8 @@
   /** @param {number} now @param {Record<string, any>} [settings] */
   function start(now, settings = {}) {
     const state = Drip.initialState(now);
+    // Installed long ago, so a loosening change waits for the reset. "Just installed" moves this up.
+    state.installedAt = now - 90 * 86400000;
     Object.assign(state.settings, settings);
     state.tokens = { watch: state.settings.watchTokensPerDay, rec: state.settings.recTokensPerDay };
     return state;
@@ -97,6 +99,7 @@
       /** @param {number} now */
       build(now) {
         const state = start(now);
+        state.installedAt = now - 2 * 3600000;
         // One card revealed and still showing, so nothing has ended: "1 card revealed."
         state.log[state.day] = entry(4, { watchSpent: 1, recSpent: 1 });
         return state;
