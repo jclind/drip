@@ -941,7 +941,7 @@
         swapped = null;
         drawSwap();
       }, DripSwap.UNDO_MS);
-      swapped = { dropped: drop, index, newId: id, timer };
+      swapped = { dropped: res.dropped || drop, index, newId: id, timer };
     }
     took(res);
     drawSwap();

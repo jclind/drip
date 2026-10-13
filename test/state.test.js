@@ -396,14 +396,14 @@ test('swapBacklog drops one video and stashes the new one as the newest', () => 
   state.settings.stashMax = 2;
   D.addBacklog(state, video('a'));
   D.addBacklog(state, video('b'));
-  assert.deepEqual(D.swapBacklog(state, video('c'), 'a'), { ok: true });
+  assert.deepEqual(D.swapBacklog(state, video('c'), 'a'), { ok: true, dropped: video('a') });
   assert.deepEqual(state.backlog.map(v => v.id), ['b', 'c']);
-  assert.deepEqual(D.swapBacklog(state, video('c'), 'b'), { ok: true });
+  assert.deepEqual(D.swapBacklog(state, video('c'), 'b'), { ok: true, dropped: video('b') });
   assert.deepEqual(state.backlog.map(v => v.id), ['b', 'c']);
   refusesUnchanged(state, () => D.swapBacklog(state, video('d'), 'missing'), 'not-stashed');
   refusesUnchanged(state, () => D.swapBacklog(state, { id: 'bad id' }, 'b'), 'bad-video');
   state.settings.stashMax = 1;
-  assert.deepEqual(D.swapBacklog(state, video('d'), 'b'), { ok: true });
+  assert.deepEqual(D.swapBacklog(state, video('d'), 'b'), { ok: true, dropped: video('b') });
   assert.deepEqual(state.backlog.map(v => v.id), ['c', 'd']);
 });
 
@@ -452,8 +452,31 @@ test('Undo of a swap restores the video even when the new one already left the s
   D.addBacklog(state, video('b'));
   D.swapBacklog(state, video('c'), 'a');
   D.removeBacklog(state, 'c');
-  assert.deepEqual(D.swapBacklog(state, video('a'), 'c', 0), { ok: true });
+  assert.deepEqual(D.swapBacklog(state, video('a'), 'c', 0), { ok: true, dropped: null });
   assert.deepEqual(state.backlog.map(v => v.id), ['a', 'b']);
+});
+
+test('Undo of a swap takes the new video out even when the old one is already back (Codex)', () => {
+  const state = fresh();
+  state.settings.stashMax = 2;
+  D.addBacklog(state, video('a'));
+  D.addBacklog(state, video('b'));
+  D.swapBacklog(state, video('c'), 'a');
+  D.removeBacklog(state, 'b');
+  D.addBacklog(state, video('a'));
+  assert.equal(D.swapBacklog(state, video('a'), 'c', 0).ok, true);
+  assert.deepEqual(state.backlog.map(v => v.id), ['a']);
+});
+
+test('a swap returns the video it took out with its latest progress, for Undo (Codex)', () => {
+  const state = fresh();
+  state.settings.stashMax = 1;
+  D.addBacklog(state, video('a'));
+  D.markProgress(state, 'a', 450, 900);
+  const res = D.swapBacklog(state, video('b'), 'a');
+  assert.equal(res.dropped.resumeSec, 450);
+  D.swapBacklog(state, res.dropped, 'b', 0);
+  assert.equal(state.backlog[0].resumeSec, 450);
 });
 
 test('stashedAgo counts calendar days', () => {

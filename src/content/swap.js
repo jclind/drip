@@ -65,14 +65,7 @@
         h('span', { class: 'drip-swap-meta' }, [Drip.stashedAgo(v.addedAt, now), meta(v)].filter(Boolean).join(' · '))),
       h('span', { class: 'drip-swap-go', 'aria-hidden': 'true' }, 'Swap out'),
       bar(v))));
-    const el = h('div', {
-      class: 'drip-swap drip-ui', role: 'dialog', 'aria-labelledby': title,
-      onkeydown: (/** @type {KeyboardEvent} */ e) => {
-        if (e.key !== 'Escape') return;
-        e.stopPropagation();
-        onClose();
-      },
-    },
+    const el = h('div', { class: 'drip-swap drip-ui', role: 'dialog', 'aria-labelledby': title },
     h('div', { class: 'drip-swap-head' },
       h('div', { class: 'drip-swap-title', id: title }, 'Your stash is full'),
       h('div', { class: 'drip-swap-sub' }, 'Swap one out to stash this. Oldest first.')),
@@ -115,19 +108,32 @@
   }
 
   let ids = 0;
-  /** Lists that are up, so a click anywhere else closes them. @type {Set<{el: HTMLElement, onClose: () => void}>} */
+  /** Lists that are up, so a click anywhere else, or Escape, closes them. @type {Set<{el: HTMLElement, onClose: () => void}>} */
   const open = new Set();
+
+  /** The lists still in the page, newest last. Ones a redraw or a close took out are forgotten. */
+  function shown() {
+    for (const entry of [...open]) if (!entry.el.isConnected) open.delete(entry);
+    return [...open];
+  }
+
+  // Escape closes the newest list, wherever focus is. A list opened with the mouse leaves focus on its Stash button,
+  // outside the list, so a listener on the list alone never heard it (Codex, 2026-10-13).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const entry = shown().pop();
+    if (!entry) return;
+    e.stopPropagation();
+    open.delete(entry);
+    entry.onClose();
+  }, true);
   // A click on a Stash button (data-swap-anchor) is left to the button, which opens and closes its own list. This
   // listens for the click itself, not pointerdown: the home page rebuilds when the list closes, and a rebuild between
   // pointerdown and click would lose the click on whatever button was pressed (Codex, 2026-10-13). By the time a click
   // is dispatched its path is fixed, so the pressed button's handler runs even if the page is rebuilt now.
   document.addEventListener('click', (e) => {
     const target = /** @type {Element} */ (e.target);
-    for (const entry of [...open]) {
-      if (!entry.el.isConnected) {
-        open.delete(entry);
-        continue;
-      }
+    for (const entry of shown()) {
       if (entry.el.contains(target) || target.closest?.('[data-swap-anchor]')) continue;
       open.delete(entry);
       entry.onClose();

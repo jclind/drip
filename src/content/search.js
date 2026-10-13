@@ -131,9 +131,10 @@
     const res = await send({ type: 'swapBacklog', video, dropId: drop.id });
     if (!res || !res.ok) return;
     clearSwapped();
-    const el = DripSwap.note(drop, onSwapUndo);
+    const dropped = res.dropped || drop;
+    const el = DripSwap.note(dropped, onSwapUndo);
     button.parentElement?.append(el);
-    swapped = { el, dropped: drop, index, newId: video.id, timer: window.setTimeout(clearSwapped, DripSwap.UNDO_MS) };
+    swapped = { el, dropped, index, newId: video.id, timer: window.setTimeout(clearSwapped, DripSwap.UNDO_MS) };
   }
 
   function clearSwapped() {

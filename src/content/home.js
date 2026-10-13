@@ -445,7 +445,7 @@
         swapped = null;
         render();
       }, DripSwap.UNDO_MS);
-      swapped = { dropped: drop, index, newId: video.id, timer };
+      swapped = { dropped: res.dropped || drop, index, newId: video.id, timer };
     }
     render();
     focusOn('save');
