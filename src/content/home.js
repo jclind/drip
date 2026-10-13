@@ -9,6 +9,8 @@
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
+  const DripStash = /** @type {any} */ (globalThis).DripStash;
+  /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
   /** @type {any} */
   const DripPour = /** @type {any} */ (globalThis).DripPour;
@@ -445,6 +447,8 @@
   let glassEl = null;
   const GLASS_PX = 34;
   let lastCardId = '';
+  /** The card's Stash as last drawn, so a rebuild after stashing fills the bookmark from where it was (stash.js). */
+  let stashDrawn = { id: '', stashed: false };
 
   /** Resolves when a thumbnail from thumbnail() has loaded, or failed in both sizes. */
   /** @type {WeakMap<HTMLElement, Promise<void>>} */
@@ -615,7 +619,7 @@
   function openingCard() {
     const el = placeholderCard();
     el.append(h('div', { class: 'drip-card-actions' },
-      h('button', { class: 'drip-b drip-b-gray drip-card-save', tabindex: '-1' }, icon('save'), h('span', { class: 'drip-save-label' }, 'Stash')),
+      h('button', { class: 'drip-b drip-b-gray drip-card-save drip-stash', tabindex: '-1' }, ...DripStash.parts(false, { labelClass: 'drip-save-label' }).nodes),
       h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
       h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
     return el;
@@ -632,6 +636,11 @@
     // Only a newly revealed card rises in. Rebuilds for Save and the like leave it still.
     const isNew = video.id !== lastCardId;
     lastCardId = video.id;
+    // Stashed or taken out since the last draw: the new button starts as the old one was, and the water moves.
+    const fills = stashDrawn.id === video.id && stashDrawn.stashed !== saved;
+    stashDrawn = { id: video.id, stashed: saved };
+    const stash = DripStash.parts(fills ? !saved : saved, { labelClass: 'drip-save-label' });
+    if (fills) stash.to(saved);
     return h('div', { class: `drip-card${next ? ' is-next' : ''}${isNew ? ' is-new' : ''}`, 'aria-busy': next ? 'true' : undefined },
       thumbnail(video.id),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
@@ -641,9 +650,9 @@
           icon('play'), h('span', {}, 'Watch'), buys && price('drop'))),
       h('div', { class: 'drip-card-actions' },
         h('button', {
-          class: `drip-b drip-b-gray drip-card-save${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
+          class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
           onclick: () => onResolve(saved ? 'unsave' : 'save', video.id), title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
-        }, icon('save'), h('span', { class: 'drip-save-label' }, saved ? 'Stashed' : 'Stash')),
+        }, ...stash.nodes),
         h('button', {
           class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || state.tokens.rec < 1,
           onclick: () => onRevealNext(video.id),

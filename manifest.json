@@ -58,7 +58,7 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["src/lib/state.js", "src/lib/glass.js", "src/content/common.js", "src/content/reveal.js", "src/content/pour.js", "src/content/counter.js", "src/content/home.js", "src/content/watch.js", "src/content/search.js", "src/content/comments.js"],
+      "js": ["src/lib/state.js", "src/lib/glass.js", "src/content/common.js", "src/content/reveal.js", "src/content/pour.js", "src/content/counter.js", "src/content/stash.js", "src/content/home.js", "src/content/watch.js", "src/content/search.js", "src/content/comments.js"],
       "css": ["src/content/drip.css"],
       "run_at": "document_idle"
     },

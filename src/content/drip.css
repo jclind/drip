@@ -469,7 +469,7 @@ html[dark] #drip-lock {
   background: var(--drip-gray);
 }
 
-#drip-pill .drip-pill-save .drip-i {
+#drip-pill .drip-pill-save .drip-stash-icon {
   width: 13px;
   height: 16px;
 }
@@ -949,13 +949,39 @@ html[dark] #drip-pill {
   padding: 0 16px 0 14px;
 }
 
-#drip-home .drip-card-save .drip-i-save {
+#drip-home .drip-card-save .drip-stash-icon {
   width: 14px;
   height: 17px;
 }
 
 #drip-home .drip-card-save.is-saved {
   background: var(--drip-gray-active);
+}
+
+/* Stash on the card and the pill (stash.js): the bookmark and the word, and under them in the same cell a hidden
+   "Stashed" that keeps the button that wide. Both are centered, so "Stash" has even room on both sides, and nothing
+   beside the button moves when the word changes (Jesse's pick, E, 2026-10-13). */
+:is(#drip-home, #drip-pill) .drip-stash {
+  display: inline-grid;
+  place-items: center;
+}
+
+:is(#drip-home, #drip-pill) .drip-stash-row,
+:is(#drip-home, #drip-pill) .drip-stash-ghost {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+}
+
+:is(#drip-home, #drip-pill) .drip-stash-ghost {
+  visibility: hidden;
+}
+
+:is(#drip-home, #drip-pill) .drip-stash-icon {
+  display: inline-block;
+  flex: none;
+  overflow: visible;
 }
 
 #drip-home .drip-next {
@@ -1416,6 +1442,10 @@ html[dark] #drip-pill {
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
+  }
+
+  #drip-home .drip-stash-ghost {
+    display: none;
   }
 
   #drip-home .drip-card-save {
