@@ -188,3 +188,35 @@ html.mock-reduced .mock-fx {
   width: 13px;
   height: auto;
 }
+
+/* The kept tag (kept round 2's D, without its point): drip's gray chip beside a counter. */
+#drip-home .drip-count.mock-has-tag {
+  position: relative;
+}
+
+.mock-tag {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  color: var(--drip-text);
+  background: var(--drip-chip);
+  transform: translate(0, -50%);
+}
+
+.mock-tag img {
+  width: 11px;
+  height: auto;
+}
+
+.mock-tag img.is-card {
+  width: 12px;
+}

@@ -108,7 +108,7 @@ main.is-phone iframe {
 </head>
 <body>
 <header>
-  <span class="round">Counter · round 1 (animation pass round 2)</span>
+  <span class="round">Counter · round 2</span>
   <nav id="scenes"></nav>
   <nav id="tabs"></nav>
   <div class="opts">
@@ -122,9 +122,12 @@ main.is-phone iframe {
 <main id="stage"><iframe id="frame" title="Variant"></iframe></main>
 <script>
 const VARIANTS = [
-  { key: 'a', label: 'A, Rain', idea: 'Drops fall from the top of the window, straight down into the drop counter, one at a time, each with a ring and a splash. The icon squashes and the count rolls like an odometer: up when it grows, down when something is spent.' },
-  { key: 'b', label: 'B, Left behind', idea: 'The drops are what the water leaves on the window. On Done for now, beads stay beside the counter as the lock\'s water falls past them, then run into it one by one. On a new day they gather out of nothing, like dew. Counts drip: the new number always falls in from above and the old one sinks away.' },
-  { key: 'c', label: 'C, Thrown in', idea: 'The message line carries the drops. "Kept 3 drops." rises with three drops after it, and they arc up into the counter, the way +15m\'s drop arcs from the counter into the glass. A new day gets a line of its own (new copy). Counts spin through every number between, like a slot machine settling.' },
+  { key: 'd', label: 'D, Rain and tag', idea: 'Round 1\'s A with the gray tag. Drops fall from the top of the window into the counter, one at a time, and the count rolls like an odometer. Then the tag slides out ("3 kept", or "4 new" and "10 new" on a new day), stays 3 seconds, and slides back in.' },
+  { key: 'e', label: 'E, Left behind and tag', idea: 'Round 1\'s B with the gray tag. Beads stay where the tag will be as the lock\'s water falls past, run into the counter, and the count drips up. Then the tag slides out from the spot they left. On a new day the beads gather like dew.' },
+  { key: 'f', label: 'F, Handed over', idea: 'Round 1\'s C with the gray tag. The tag comes out first, and its drops hop out of it into the counter one at a time, the count spinning up. Then the tag stays a moment and slides back in.' },
+  { key: 'a', label: 'A (round 1)', idea: 'Round 1. Rain into the counter, with the gray "Kept 3 drops." line under the buttons.' },
+  { key: 'b', label: 'B (round 1)', idea: 'Round 1. Beads left behind by the water run into the counter, with the gray line.' },
+  { key: 'c', label: 'C (round 1)', idea: 'Round 1. Drops arc out of the message line into the counter.' },
   { key: 'now', label: 'As built', idea: 'Today: "Kept 3 drops." rises in under the buttons, and every count changes at once.' },
 ];
 const SCENES = [
@@ -133,7 +136,7 @@ const SCENES = [
   { key: 'spend', label: 'Spend: +15m, Reveal' },
 ];
 const params = new URLSearchParams(location.search);
-let current = params.get('v') || 'a';
+let current = params.get('v') || 'd';
 let scene = ['kept', 'new', 'spend'].includes(params.get('scene')) ? params.get('scene') : 'kept';
 const flags = { slow: params.get('slow') === '1', light: params.get('light') === '1', phone: params.get('phone') === '1' };
 const tabs = document.getElementById('tabs');
@@ -174,9 +177,9 @@ function render() {
   open.textContent = 'Open alone';
   idea.append(open, ' · ');
   const prev = document.createElement('a');
-  prev.href = 'glass/b.html?scene=home';
+  prev.href = '/kept/d.html';
   prev.target = '_blank';
-  prev.textContent = 'Glass round 1 pick, B Drop';
+  prev.textContent = 'Kept round 2 pick, D';
   idea.append(prev);
   for (const k of Object.keys(flags)) document.getElementById(k).setAttribute('aria-pressed', String(flags[k]));
   document.getElementById('stage').classList.toggle('is-phone', flags.phone);

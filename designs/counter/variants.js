@@ -237,5 +237,157 @@
     },
   };
 
-  globalThis.Variants = { a: A, b: B, c: C, now };
+  // Round 2: the kept round's pick, D without its point, a gray tag beside the counter, in place of the message line.
+  // Each of round 1's motions is rebuilt around it.
+
+  /**
+   * A gray tag, "3 kept" or "4 new", hidden beside a counter until tagIn(). It starts hidden, so it never shows before
+   * it slides out (kept round 2 flashed it for 0.45s).
+   */
+  function tag(token, words, name = 'drop') {
+    const img = api.h('img', { src: `icons/${name}.svg`, alt: '', class: name === 'card' ? 'is-card' : '' });
+    const el = api.h('span', { class: 'mock-tag', role: 'status' }, img, api.h('span', {}, words));
+    el.style.opacity = '0';
+    token.count.classList.add('mock-has-tag');
+    token.count.append(el);
+    return { el, img };
+  }
+
+  const TAG_IN = [
+    { clipPath: 'inset(0 100% 0 0 round 12px)', transform: 'translate(-10px, -50%)', opacity: 0 },
+    { clipPath: 'inset(0 0 0 0 round 12px)', transform: 'translate(0, -50%)', opacity: 1 },
+  ];
+
+  async function tagIn(t) {
+    t.el.style.opacity = '';
+    await animate(t.el, TAG_IN, { duration: 420, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
+  }
+
+  async function tagOut(t, token) {
+    await animate(t.el, [...TAG_IN].reverse().map((k, i) => (i === 1 ? { ...k, transform: 'translate(-14px, -50%)' } : k)), { duration: 360, easing: 'cubic-bezier(0.5, 0, 0.75, 0.3)' });
+    t.el.remove();
+    squash(token);
+  }
+
+  /** The new day's card count changes, then its own tag, "10 new", slides out and back in. */
+  async function newCards(ctx, roll) {
+    const c = ctx.card;
+    if (c.to === c.from) return;
+    await wait(150);
+    squash(c);
+    await roll(api, c.num, c.from, c.to);
+    const t = tag(c, `${c.to - c.from} new`, 'card');
+    await tagIn(t);
+    return t;
+  }
+
+  // D, Rain and tag: A's rain fills the counter, then the tag slides out to say what it was, and back in.
+  const D = {
+    roll: A.roll,
+    async land(_, ctx) {
+      const t = ctx.drop;
+      if (ctx.kind === 'kept') await wait(250);
+      const falls = [];
+      for (let n = t.from + 1; n <= t.to; n += 1) {
+        falls.push(A.rain(t, n));
+        await wait(ctx.kind === 'new' ? 240 : 320);
+      }
+      await Promise.all(falls);
+      const dropTag = tag(t, ctx.kind === 'kept' ? '3 kept' : `${t.to - t.from} new`);
+      await tagIn(dropTag);
+      const cardTag = ctx.kind === 'new' ? await newCards(ctx, A.roll) : null;
+      await wait(3000);
+      await Promise.all([tagOut(dropTag, t), cardTag && wait(120).then(() => tagOut(cardTag, ctx.card))]);
+    },
+  };
+
+  // E, Left behind and tag: B's beads stay where the tag will be as the water falls past, run into the counter, and
+  // the tag slides out from the spot they left.
+  const E = {
+    roll: B.roll,
+    async land(_, ctx) {
+      const t = ctx.drop;
+      const count = t.to - t.from;
+      const spots = B.spots(ctx, count);
+      let beads;
+      if (ctx.kind === 'kept') {
+        const shown = new Array(count).fill(null);
+        await new Promise((resolve) => {
+          const started = performance.now();
+          const look = () => {
+            const top = api.waterTop(ctx.lock);
+            spots.forEach((s, i) => { if (!shown[i] && top > s.y + 6) shown[i] = B.bead(s, 300); });
+            if (shown.every(Boolean) || performance.now() - started > 1500 * api.SLOW) resolve();
+            else requestAnimationFrame(look);
+          };
+          look();
+        });
+        beads = shown.map((d, i) => d || B.bead(spots[i], 300));
+        await wait(900);
+      } else {
+        beads = [];
+        for (const s of spots) {
+          beads.push(B.bead(s, 460));
+          await wait(150);
+        }
+        await wait(500);
+      }
+      const runs = [];
+      for (let i = 0; i < count; i += 1) {
+        runs.push(B.run(t, beads[i], spots[i], t.from + i + 1));
+        await wait(210);
+      }
+      await Promise.all(runs);
+      const dropTag = tag(t, ctx.kind === 'kept' ? '3 kept' : `${count} new`);
+      await tagIn(dropTag);
+      const cardTag = ctx.kind === 'new' ? await newCards(ctx, B.roll) : null;
+      await wait(3000);
+      await Promise.all([tagOut(dropTag, t), cardTag && wait(120).then(() => tagOut(cardTag, ctx.card))]);
+    },
+  };
+
+  // F, Handed over: the tag comes out first, holding the drops, and they hop out of its drop into the counter one at a
+  // time, the way C's drops left the message line. Then the tag slides back in.
+  const F = {
+    roll: C.roll,
+    async hop(token, from, n) {
+      const a = api.center(from);
+      const b = api.center(token.icon);
+      const d = flyer('drop', 11);
+      await frames(380, (p) => {
+        const e = ease.inOut(p);
+        api.place(d, mix(a.x, b.x, e), mix(a.y, b.y, e) - Math.sin(Math.PI * p) * 22, `rotate(${(-25 * Math.sin(Math.PI * p)).toFixed(1)}deg)`);
+      });
+      d.remove();
+      api.ring(b.x, b.y, 26, 26, 420);
+      api.splash(b.x, b.y - 8, 3, 8, 8);
+      squash(token);
+      await C.roll(api, token.num, n - 1, n);
+    },
+
+    async land(_, ctx) {
+      const t = ctx.drop;
+      const count = t.to - t.from;
+      if (ctx.kind === 'kept') await wait(200);
+      const dropTag = tag(t, ctx.kind === 'kept' ? '3 kept' : `${count} new`);
+      await tagIn(dropTag);
+      await wait(350);
+      const hops = [];
+      for (let i = 0; i < count; i += 1) {
+        // The tag's own drop stays until the last one leaves it.
+        if (i === count - 1) dropTag.img.style.visibility = 'hidden';
+        hops.push(F.hop(t, dropTag.img, t.from + i + 1));
+        await wait(260);
+      }
+      await Promise.all(hops);
+      // Its drop fills back in, so the tag still reads as drops.
+      dropTag.img.style.visibility = '';
+      animate(dropTag.img, [{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 260, easing: 'cubic-bezier(0.3, 1.5, 0.5, 1)', fill: 'none' });
+      const cardTag = ctx.kind === 'new' ? await newCards(ctx, C.roll) : null;
+      await wait(2400);
+      await Promise.all([tagOut(dropTag, t), cardTag && wait(120).then(() => tagOut(cardTag, ctx.card))]);
+    },
+  };
+
+  globalThis.Variants = { a: A, b: B, c: C, d: D, e: E, f: F, now };
 })();

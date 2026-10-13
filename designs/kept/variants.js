@@ -23,9 +23,12 @@
    */
   async function slideTag(ctx, cls, withDrop, words = '3 kept') {
     const tag = h('span', { class: `mock-tag ${cls}`, role: 'status' }, withDrop && drop('mock-tag-drop'), h('span', {}, words), h('span', { class: 'drip-sr' }, '. Kept 3 drops.'));
+    // Hidden until it slides out. It used to show for the 0.45s wait first, then jump.
+    tag.style.opacity = '0';
     ctx.drop.count.classList.add('mock-has-tag');
     ctx.drop.count.append(tag);
     await wait(450);
+    tag.style.opacity = '';
     await animate(tag, [
       { clipPath: 'inset(0 100% 0 0 round 12px)', transform: 'translate(-10px, -50%)', opacity: 0 },
       { clipPath: 'inset(-2px -2px -2px -10px round 12px)', transform: 'translate(0, -50%)', opacity: 1 },
@@ -56,9 +59,11 @@
     instant: true,
     async land(_, ctx) {
       const tag = h('span', { class: 'mock-tag', role: 'status' }, drop('mock-tag-drop'), h('span', {}, '3 kept'), h('span', { class: 'drip-sr' }, '. Kept 3 drops.'));
+      tag.style.opacity = '0';
       ctx.drop.count.classList.add('mock-has-tag');
       ctx.drop.count.append(tag);
       await wait(450);
+      tag.style.opacity = '';
       await animate(tag, [
         { clipPath: 'inset(0 100% 0 0 round 12px)', transform: 'translate(-10px, -50%)', opacity: 0 },
         { clipPath: 'inset(0 0 0 0 round 12px)', transform: 'translate(0, -50%)', opacity: 1 },
