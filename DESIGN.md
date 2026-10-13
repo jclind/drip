@@ -169,7 +169,7 @@ The stash fill as built (2026-10-13). Jesse picked it in three rounds of design 
 - Taking it out: the word changes to "Stash" at once, and the water falls out the bottom over 0.48 seconds.
 - Stash buttons stay as wide as "Stashed": the word sits over a hidden "Stashed" in the same grid cell, and the icon and word are centered. So "Stash" has about 7px more room on each side, and nothing beside it moves when the word changes. It used to jump 15px. Reveal next shrank and the pill grew to the left (Jesse, 2026-10-13). On a card too narrow for the word, the button is the square icon-only one, as before.
 - The card and the pill are rebuilt when a video is stashed. Each remembers what it last drew for that video, so the new button starts as the old one was, and the water moves from there. A video stashed in another tab fills the same way. A rebuild partway through, like the pill's minutes changing, shows the end state.
-- The water is drawn every frame while it moves, so in a hidden tab it waits. With reduced motion, the water and the word change at once.
+- The water is drawn every frame while it moves, and its clock starts on the first frame drawn. A stash made while the tab is hidden waits, and the whole fill plays when the tab shows. With reduced motion, the water and the word change at once.
 
 Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups and the rules above. Claude's calls, open to Jesse's review:
 

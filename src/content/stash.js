@@ -6,8 +6,9 @@
 // sloshes and settles, and the bookmark bobs once. Taking it out lowers the water. The word under it says "Stash" or
 // "Stashed", over a hidden "Stashed" that keeps the button that wide, so nothing beside it moves when the word changes.
 //
-// A classic script that sets globalThis.DripStash. The water is drawn every frame while it moves, so it waits while
-// the tab is hidden. Reduced motion changes it at once.
+// A classic script that sets globalThis.DripStash. The water is drawn every frame while it moves, and its clock starts
+// on the first frame, so a fill started while the tab is hidden waits and plays when the tab shows. Reduced motion
+// changes it at once.
 
 (() => {
   const NS = 'http://www.w3.org/2000/svg';
@@ -89,16 +90,18 @@
 
   /**
    * Runs step(t, ms) every frame for `ms`, t from 0 to 1. Stops early, without the last step, if `live()` turns false.
+   * The clock starts on the first frame, so a fill started in a hidden tab plays in full when the tab shows.
    * @param {number} ms @param {(t: number, elapsed: number) => void} step @param {() => boolean} live
    * @returns {Promise<boolean>} Whether it ran to the end.
    */
   function frames(ms, step, live) {
     return new Promise((resolve) => {
-      const start = performance.now();
+      let start = -1;
       /** @param {number} now */
       const loop = (now) => {
         if (!live()) return resolve(false);
-        const elapsed = Math.max(0, now - start);
+        if (start < 0) start = now;
+        const elapsed = now - start;
         const t = Math.min(1, elapsed / ms);
         step(t, elapsed);
         if (t < 1) requestAnimationFrame(loop);

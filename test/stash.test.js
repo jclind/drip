@@ -59,7 +59,9 @@ function load({ reduced = false } = {}) {
       await new Promise((resolve) => setImmediate(resolve));
     }
   }
-  return { DripStash: context.DripStash, run };
+  /** Lets `ms` pass with no frames drawn, as in a hidden tab. */
+  const hide = (/** @type {number} */ ms) => { now += ms; };
+  return { DripStash: context.DripStash, run, hide };
 }
 
 test('the word sits over a hidden "Stashed" with a gap the bookmark\'s size, so the button keeps one width', () => {
@@ -86,6 +88,18 @@ test('stashing changes the word to "Stashed" only once the bookmark is full, and
   await done;
   assert.equal(stash.word.textContent, 'Stashed');
   assert.equal(stash.icon.animations.length, 1);
+});
+
+test('a stash made in a hidden tab waits, and fills in full once the tab shows', async () => {
+  const { DripStash, run, hide } = load();
+  const stash = DripStash.parts(false);
+  const done = stash.to(true);
+  hide(5000);
+  await run(16, 5);
+  assert.equal(stash.word.textContent, 'Stash', 'still filling a few frames after the tab shows');
+  await run();
+  await done;
+  assert.equal(stash.word.textContent, 'Stashed');
 });
 
 test('taking it out changes the word to "Stash" as the water starts to fall', async () => {
