@@ -510,6 +510,18 @@ html[dark] #drip-lock {
   padding: 24px 0 48px;
 }
 
+/* search.js's note for a search whose only rows were ads. */
+#drip-no-results {
+  text-align: center;
+  padding: 64px 0 48px;
+}
+
+.drip-no-results-title {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
 /* The banner when YouTube's markup changed and drip can't find something (common.js, Q25). */
 #drip-broken {
   position: fixed;

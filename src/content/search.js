@@ -1,5 +1,6 @@
 // @ts-check
 // Search results: shows 10 at a time with a free "More results" button, and adds a Save button to each video.
+// A search with nothing left to show gets a "No results found" note.
 // The injected shelves and ads are hidden in early.css.
 
 (function () {
@@ -19,6 +20,8 @@
     channel: 'ytd-channel-name a, #channel-name a, #channel-name',
     length: 'ytd-thumbnail-overlay-time-status-renderer, .ytBadgeShapeText, .yt-badge-shape__text',
     saveSlot: '#meta, .text-wrapper',
+    // "Did you mean" and "Showing results for" sit above results. On their own they mean nothing was found.
+    hint: 'yt-did-you-mean-renderer, ytd-showing-results-for-renderer',
   };
   // The shelves, ads, and promos in the list are hidden by early.css, so any other row that's on screen is a result.
   // Rows this script hid itself keep their mark so they stay counted.
@@ -34,6 +37,8 @@
   let query = '';
   /** @type {HTMLElement | null} */
   let moreButton = null;
+  /** @type {HTMLElement | null} */
+  let emptyNote = null;
   /** @type {Element | null} */
   let watched = null;
   let queued = false;
@@ -92,13 +97,16 @@
     if (location.pathname !== '/results') {
       moreButton?.remove();
       moreButton = null;
+      emptyNote?.remove();
+      emptyNote = null;
       return;
     }
     if (location.search !== query) {
       query = location.search;
       shown = PAGE;
     }
-    const items = [...document.querySelectorAll(SEL.results)].flatMap((c) => [...c.children]).filter(isResult);
+    const rows = [...document.querySelectorAll(SEL.results)].flatMap((c) => [...c.children]);
+    const items = rows.filter(isResult);
     items.forEach((el, i) => {
       el.toggleAttribute('data-drip-over', i >= shown);
       if (i < shown && el.matches(SEL.video)) addSave(el);
@@ -127,6 +135,16 @@
     } else if (moreButton) {
       moreButton.remove();
       moreButton = null;
+    }
+    // Signed in, a search with no results comes back as only ads, which early.css hides, so the page is blank.
+    // Say so ourselves once rows have arrived and nothing but a hint is shown. Signed out, YouTube's own message is a row.
+    const empty = rows.some((el) => !el.matches(SEL.continuation)) && items.every((el) => el.matches(SEL.hint)) && !document.querySelector(SEL.continuation);
+    if (empty && primary) {
+      if (!emptyNote) emptyNote = h('div', { id: 'drip-no-results', class: 'drip-ui' }, h('div', { class: 'drip-no-results-title' }, 'No results found'), h('div', { class: 'drip-meta' }, 'Try different keywords or remove search filters'));
+      if (emptyNote.parentElement !== primary) primary.append(emptyNote);
+    } else if (emptyNote) {
+      emptyNote.remove();
+      emptyNote = null;
     }
   }
 
