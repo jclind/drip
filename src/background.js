@@ -83,7 +83,11 @@ function handle(msg, state, now) {
       return Drip.addBacklog(state, msg.video, msg.index);
     case 'removeBacklog':
       return Drip.removeBacklog(state, msg.id);
+    case 'swapBacklog':
+      return Drip.swapBacklog(state, msg.video, String(msg.dropId));
     case 'tick':
+      // The tab sends where the player is with each tick, so a stashed video's bar keeps up (Q28).
+      if (msg.position !== undefined) Drip.markProgress(state, String(msg.videoId), msg.position, msg.duration);
       return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, msg.videoId, msg.ago) };
     case 'status':
       return { ok: true, ...Drip.watchStatus(state, msg.videoId) };

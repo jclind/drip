@@ -32,6 +32,7 @@
  * @property {boolean} graceMode
  * @property {number} needThisPerDay
  * @property {'home' | 'subscriptions'} feedSource
+ * @property {number} stashMax The most videos the stash holds (Q28).
  */
 /**
  * @typedef {Object} Video
@@ -39,6 +40,8 @@
  * @property {string} title
  * @property {string} channel
  * @property {string} length
+ * @property {number} [resumeSec] How far in the video got, for the stash's progress bar and resuming there.
+ * @property {number} [durationSec] The player's length in seconds, for the same bar.
  */
 /**
  * @typedef {Object} LogDay
@@ -62,12 +65,13 @@
     graceMode: false,
     needThisPerDay: 2,
     feedSource: 'home',
+    stashMax: 10,
   });
   /** @type {Object<string, [number, number]>} */
   const ranges = {
     watchTokensPerDay: [0, 48], minutesPerToken: [1, 120],
     recTokensPerDay: [0, 100], rolloverDays: [1, 7],
-    resetHour: [0, 23], needThisPerDay: [0, 10],
+    resetHour: [0, 23], needThisPerDay: [0, 10], stashMax: [1, 50],
   };
 
   /** @param {number} now @param {number} resetHour */
@@ -116,7 +120,16 @@
     if (typeof v.id !== 'string' || !/^[\w-]{1,64}$/.test(v.id)) return null;
     /** @param {unknown} x */
     const str = (x) => (typeof x === 'string' ? x : '');
-    return { id: v.id, title: str(v.title), channel: str(v.channel), length: str(v.length) };
+    /** @type {Video} */
+    const video = { id: v.id, title: str(v.title), channel: str(v.channel), length: str(v.length) };
+    if (seconds(v.durationSec)) video.durationSec = seconds(v.durationSec);
+    if (seconds(v.resumeSec)) video.resumeSec = video.durationSec ? Math.min(seconds(v.resumeSec), video.durationSec) : seconds(v.resumeSec);
+    return video;
+  }
+
+  /** Whole seconds, or 0 for anything that isn't a positive finite number. @param {unknown} n */
+  function seconds(n) {
+    return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
   }
 
   /** @param {unknown} n @param {number} fallback */
@@ -271,8 +284,8 @@
     const video = state.current;
     // addBacklog and removeBacklog keep the card's saved count, whichever button moved it.
     if (action === 'save') {
-      addBacklog(state, video);
-      return { ok: true, video };
+      const added = addBacklog(state, video);
+      return added.ok ? { ok: true, video } : added;
     }
     if (action === 'unsave') {
       removeBacklog(state, video.id);
@@ -302,6 +315,8 @@
   }
 
   /**
+   * A full stash refuses a new video with 'stash-full' (Q28). Undo, which passes an index, always puts the row back,
+   * even when a lowered cap leaves the stash over it.
    * @param {State} state
    * @param {unknown} raw
    * @param {number} [index] Where to put it, for undoing a removal. New videos go at the end, the newest place.
@@ -310,6 +325,8 @@
     const video = cleanVideo(raw);
     if (!video) return { ok: false, error: 'bad-video' };
     if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
+    const undo = typeof index === 'number' && Number.isInteger(index);
+    if (!undo && state.backlog.length >= state.settings.stashMax) return { ok: false, error: 'stash-full' };
     const at = typeof index === 'number' && Number.isInteger(index) ? Math.min(Math.max(index, 0), state.backlog.length) : state.backlog.length;
     state.backlog.splice(at, 0, video);
     // The card showing now counts as saved while it's in the backlog, however it got there (Codex, 2026-10-10).
@@ -324,6 +341,39 @@
       day.saved = Math.max(0, day.saved - 1);
     }
     state.backlog = state.backlog.filter(video => video.id !== id);
+    return { ok: true };
+  }
+
+  /**
+   * Swaps a stashed video out for a new one in one step, for a full stash (Q28). The new one goes at the end, the
+   * newest place. A swap never grows the stash, so it works over a lowered cap too.
+   * @param {State} state
+   * @param {unknown} raw
+   * @param {string} dropId
+   */
+  function swapBacklog(state, raw, dropId) {
+    const video = cleanVideo(raw);
+    if (!video) return { ok: false, error: 'bad-video' };
+    if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
+    const drop = state.backlog.findIndex(saved => saved.id === dropId);
+    if (drop < 0) return { ok: false, error: 'not-stashed' };
+    removeBacklog(state, dropId);
+    return addBacklog(state, video, state.backlog.length);
+  }
+
+  /**
+   * Records how far into a stashed video playback got, for the stash's bar and for resuming there. Videos that
+   * aren't stashed keep nothing.
+   * @param {State} state
+   * @param {string} videoId
+   * @param {unknown} position
+   * @param {unknown} duration
+   */
+  function markProgress(state, videoId, position, duration) {
+    const video = state.backlog.find(saved => saved.id === videoId);
+    if (!video || !seconds(position)) return { ok: true };
+    if (seconds(duration)) video.durationSec = seconds(duration);
+    video.resumeSec = video.durationSec ? Math.min(seconds(position), video.durationSec) : seconds(position);
     return { ok: true };
   }
 
@@ -628,7 +678,7 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
+    removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction,
   };

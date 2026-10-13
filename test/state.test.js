@@ -22,14 +22,14 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
-    'removeBacklog', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
+    'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
     watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10,
-    rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home',
+    rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home', stashMax: 10,
   });
 });
 
@@ -356,6 +356,89 @@ test('backlog operations preserve order, do not duplicate, and cost nothing', ()
   assert.deepEqual(state.log, {});
 });
 
+test('a full stash refuses a new video, and Undo still puts a row back (Q28)', () => {
+  const state = fresh();
+  state.settings.stashMax = 2;
+  D.addBacklog(state, video('a'));
+  D.addBacklog(state, video('b'));
+  refusesUnchanged(state, () => D.addBacklog(state, video('c')), 'stash-full');
+  assert.deepEqual(D.addBacklog(state, video('a')), { ok: true });
+  D.removeBacklog(state, 'a');
+  D.addBacklog(state, video('c'));
+  assert.deepEqual(D.addBacklog(state, video('a'), 0), { ok: true });
+  assert.deepEqual(state.backlog.map(v => v.id), ['a', 'b', 'c']);
+});
+
+test('Stash on a card in a full stash refuses, keeps the card up, and counts nothing', () => {
+  const state = fresh();
+  state.settings.stashMax = 1;
+  D.addBacklog(state, video('a'));
+  D.reveal(state, [video('b')]);
+  refusesUnchanged(state, () => D.resolveCurrent(state, 'save', 'b'), 'stash-full');
+  assert.equal(state.current?.id, 'b');
+});
+
+test('a lowered cap keeps every stashed video and blocks new ones until under it', () => {
+  const state = fresh();
+  for (const id of ['a', 'b', 'c']) D.addBacklog(state, video(id));
+  assert.deepEqual(D.updateSettings(state, { stashMax: 2 }).applied, { stashMax: 2 });
+  assert.equal(state.backlog.length, 3);
+  refusesUnchanged(state, () => D.addBacklog(state, video('d')), 'stash-full');
+  D.removeBacklog(state, 'a');
+  refusesUnchanged(state, () => D.addBacklog(state, video('d')), 'stash-full');
+  D.removeBacklog(state, 'b');
+  assert.deepEqual(D.addBacklog(state, video('d')), { ok: true });
+  assert.deepEqual(D.updateSettings(state, { stashMax: 20 }).pending, { stashMax: 20 });
+});
+
+test('swapBacklog drops one video and stashes the new one as the newest', () => {
+  const state = fresh();
+  state.settings.stashMax = 2;
+  D.addBacklog(state, video('a'));
+  D.addBacklog(state, video('b'));
+  assert.deepEqual(D.swapBacklog(state, video('c'), 'a'), { ok: true });
+  assert.deepEqual(state.backlog.map(v => v.id), ['b', 'c']);
+  assert.deepEqual(D.swapBacklog(state, video('c'), 'b'), { ok: true });
+  assert.deepEqual(state.backlog.map(v => v.id), ['b', 'c']);
+  refusesUnchanged(state, () => D.swapBacklog(state, video('d'), 'missing'), 'not-stashed');
+  refusesUnchanged(state, () => D.swapBacklog(state, { id: 'bad id' }, 'b'), 'bad-video');
+  state.settings.stashMax = 1;
+  assert.deepEqual(D.swapBacklog(state, video('d'), 'b'), { ok: true });
+  assert.deepEqual(state.backlog.map(v => v.id), ['c', 'd']);
+});
+
+test('swapping the card into the stash counts it as saved once', () => {
+  const state = fresh();
+  state.settings.stashMax = 1;
+  D.addBacklog(state, video('a'));
+  D.reveal(state, [video('b')]);
+  D.swapBacklog(state, video('b'), 'a');
+  assert.equal(D.logDay(state).saved, 1);
+  D.removeBacklog(state, 'b');
+  assert.equal(D.logDay(state).saved, 0);
+});
+
+test('markProgress keeps how far a stashed video got, and nothing for other videos', () => {
+  const state = fresh();
+  D.addBacklog(state, video('a'));
+  D.markProgress(state, 'a', 61.6, 842.2);
+  assert.deepEqual(state.backlog[0], { ...video('a'), resumeSec: 62, durationSec: 842 });
+  D.markProgress(state, 'a', 900, undefined);
+  assert.equal(state.backlog[0].resumeSec, 842);
+  D.markProgress(state, 'a', NaN, 842);
+  assert.equal(state.backlog[0].resumeSec, 842);
+  const before = structuredClone(state);
+  assert.deepEqual(D.markProgress(state, 'zzz', 30, 100), { ok: true });
+  assert.deepEqual(state, before);
+});
+
+test('cleanVideo keeps valid progress fields and drops bad ones', () => {
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 30.4, durationSec: 20 }), { ...video('a'), resumeSec: 20, durationSec: 20 });
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: -5, durationSec: 'long' }), video('a'));
+  const state = D.hydrate({ backlog: [{ ...video('a'), resumeSec: 12 }] }, time(5));
+  assert.equal(state.backlog[0].resumeSec, 12);
+});
+
 test('charge drains seconds, floors at zero, logs actual watched time, and reports lock status', () => {
   const state = fresh();
   assert.deepEqual(D.watchStatus(state, 'a'), { secondsLeft: 0, unlocked: false, locked: true });
@@ -401,20 +484,20 @@ test('needThis allowance zero refuses without creating a log', () => {
 });
 
 test('cleanSettings rounds and clamps every numeric range, drops unknown and invalid values', () => {
-  assert.deepEqual(D.cleanSettings({ minutesPerToken: 0, recTokensPerDay: 500, watchTokensPerDay: 2.6, rolloverDays: 0, resetHour: 30, needThisPerDay: -1, unknown: 5, feedSource: 'bad', graceMode: 1 }), {
+  assert.deepEqual(D.cleanSettings({ minutesPerToken: 0, recTokensPerDay: 500, watchTokensPerDay: 2.6, rolloverDays: 0, resetHour: 30, needThisPerDay: -1, stashMax: 0, unknown: 5, feedSource: 'bad', graceMode: 1 }), {
     minutesPerToken: 1, recTokensPerDay: 100, watchTokensPerDay: 3,
-    rolloverDays: 1, resetHour: 23, needThisPerDay: 0, graceMode: true,
+    rolloverDays: 1, resetHour: 23, needThisPerDay: 0, stashMax: 1, graceMode: true,
   });
-  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerDay: 99, feedSource: 'subscriptions', graceMode: 0 }), {
+  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerDay: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: 0 }), {
     minutesPerToken: 120, recTokensPerDay: 0, watchTokensPerDay: 48,
-    rolloverDays: 7, resetHour: 0, needThisPerDay: 10, feedSource: 'subscriptions', graceMode: false,
+    rolloverDays: 7, resetHour: 0, needThisPerDay: 10, stashMax: 50, feedSource: 'subscriptions', graceMode: false,
   });
   assert.deepEqual(D.cleanSettings({ recTokensPerDay: NaN, minutesPerToken: Infinity, resetHour: '5', watchTokensPerDay: null }), {});
   assert.deepEqual(D.cleanSettings(undefined), {});
 });
 
 test('isLoosening classifies numeric limits, reset hour, grace mode, and feed', () => {
-  for (const key of /** @type {const} */ (['watchTokensPerDay', 'minutesPerToken', 'recTokensPerDay', 'rolloverDays', 'needThisPerDay'])) {
+  for (const key of /** @type {const} */ (['watchTokensPerDay', 'minutesPerToken', 'recTokensPerDay', 'rolloverDays', 'needThisPerDay', 'stashMax'])) {
     assert.equal(D.isLoosening(key, 1, 2), true);
     assert.equal(D.isLoosening(key, 2, 1), false);
     assert.equal(D.isLoosening(key, 2, 2), false);
