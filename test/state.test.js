@@ -438,8 +438,11 @@ test('Undo of a swap puts the swapped-out video back where it was', () => {
   for (const id of ['a', 'b', 'c']) D.addBacklog(state, video(id));
   D.swapBacklog(state, video('d'), 'b');
   assert.deepEqual(state.backlog.map(v => v.id), ['a', 'c', 'd']);
-  D.swapBacklog(state, video('b'), 'd', 1);
+  D.swapBacklog(state, video('b'), 'd', 1, time(6));
   assert.deepEqual(state.backlog.map(v => v.id), ['a', 'b', 'c']);
+  assert.equal(state.backlog[1].addedAt, undefined);
+  D.addBacklog(state, video('e'), 0, time(6));
+  assert.equal(state.backlog[0].addedAt, undefined);
 });
 
 test('stashedAgo counts calendar days', () => {

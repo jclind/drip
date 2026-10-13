@@ -331,7 +331,8 @@
     if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
     const undo = typeof index === 'number' && Number.isInteger(index);
     if (!undo && state.backlog.length >= state.settings.stashMax) return { ok: false, error: 'stash-full' };
-    if (!video.addedAt && seconds(now)) video.addedAt = seconds(now);
+    // Undo puts back the video as it was, so one stashed before addedAt existed stays undated.
+    if (!undo && !video.addedAt && seconds(now)) video.addedAt = seconds(now);
     const at = typeof index === 'number' && Number.isInteger(index) ? Math.min(Math.max(index, 0), state.backlog.length) : state.backlog.length;
     state.backlog.splice(at, 0, video);
     // The card showing now counts as saved while it's in the backlog, however it got there (Codex, 2026-10-10).
@@ -366,8 +367,9 @@
     const drop = state.backlog.findIndex(saved => saved.id === dropId);
     if (drop < 0) return { ok: false, error: 'not-stashed' };
     removeBacklog(state, dropId);
-    if (!video.addedAt && seconds(now)) video.addedAt = seconds(now);
-    return addBacklog(state, video, typeof index === 'number' && Number.isInteger(index) ? index : state.backlog.length);
+    const undo = typeof index === 'number' && Number.isInteger(index);
+    if (!undo && !video.addedAt && seconds(now)) video.addedAt = seconds(now);
+    return addBacklog(state, video, undo ? index : state.backlog.length);
   }
 
   /**
