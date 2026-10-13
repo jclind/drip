@@ -197,6 +197,18 @@ test('a new install opens the welcome page once, and an update does not', () => 
   assert.deepEqual([...w.opened], ['src/welcome/welcome.html']);
 });
 
+test('a new install saves the state, so the first day starts then, not at the first visit (Q6, Codex)', async () => {
+  const w = worker();
+  const before = Date.now();
+  w.install('install');
+  await new Promise((r) => setTimeout(r, 10));
+  assert.ok(w.store.drip && w.store.drip.installedAt >= before, 'installedAt saved on install');
+  const updated = worker();
+  updated.install('update');
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(updated.store.drip, undefined);
+});
+
 test('the dev panel stays hidden and its buttons do nothing without dev/ENABLED', async () => {
   const w = worker();
   assert.equal((await w.send({ type: 'devStatus' })).enabled, false);

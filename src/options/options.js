@@ -201,12 +201,21 @@ function untilLabel(until) {
   return `${time} ${d.toDateString() === new Date().toDateString() ? 'today' : 'tomorrow'}`;
 }
 
-function renderForm() {
-  const { h } = DripPage;
-  // The first day after install, every change applies at once (Q6), so trying settings out doesn't wait a day.
+/**
+ * The first day after install, every change applies at once (Q6), so trying settings out doesn't wait a day. Runs
+ * every minute too, so a page left open turns "tomorrow" into "today" at midnight and drops the line when it ends.
+ */
+function renderFirstDay() {
+  if (!state) return;
   const until = Drip.firstDayUntil(state, Date.now());
   $('firstDay').hidden = !until;
   $('firstDay').textContent = until ? `Changes apply right away until ${untilLabel(until)}, while you try drip out. After that, raising a limit waits for the reset.` : '';
+}
+setInterval(renderFirstDay, 60000);
+
+function renderForm() {
+  const { h } = DripPage;
+  renderFirstDay();
   $('settings').replaceChildren(...SECTIONS.map((section) => h('section', { class: 'group' },
     h('h2', { class: 'caps' }, section.title),
     ...section.fields.map((f) => {
