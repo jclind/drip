@@ -16,6 +16,8 @@
   const DripPour = /** @type {any} */ (globalThis).DripPour;
   /** @type {any} */
   const DripCounter = /** @type {any} */ (globalThis).DripCounter;
+  /** @type {any} */
+  const DripSwap = /** @type {any} */ (globalThis).DripSwap;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -150,6 +152,8 @@
         return `No drops left. More at ${reset}.`;
       case 'stale-card':
         return 'That card changed in another tab.';
+      case 'not-stashed':
+        return 'That video already left your stash, maybe in another tab.';
       case 'pool-empty':
         return state && state.settings.feedSource === 'subscriptions'
           ? 'Nothing new from your subscriptions. No card spent.'
@@ -327,8 +331,11 @@
     render();
   }
 
-  /** @param {'watch' | 'save' | 'unsave' | 'pass'} action @param {string} videoId The card the button was on. */
-  async function onResolve(action, videoId) {
+  /**
+   * @param {'watch' | 'save' | 'unsave' | 'pass'} action @param {string} videoId The card the button was on.
+   * @param {boolean} [keyboard] Pressed from the keyboard, so a full stash's list takes focus.
+   */
+  async function onResolve(action, videoId, keyboard = false) {
     if (moving) return;
     message = '';
     if (action === 'pass' && animates() && document.querySelector('#drip-home .drip-card .drip-deal')) {
@@ -349,9 +356,18 @@
     // watch page loads.
     if (action === 'watch') leaving = true;
     const res = absorb(await send({ type: 'resolve', action, videoId }));
+    // A full stash asks which video to swap out instead (Q28).
+    if (res && !res.ok && res.error === 'stash-full') {
+      leaving = false;
+      swapFor = videoId;
+      render();
+      if (keyboard) /** @type {any} */ (swapEl)?.focusFirst();
+      return;
+    }
     if (res && !res.ok) message = errorText(res.error);
     if (action === 'watch' && res && res.ok) {
-      location.assign(watchUrl(res.video.id));
+      // A stashed card that was started in another tab opens where it stopped, like its stash row (Codex).
+      location.assign(resumeUrl(res.video.id));
       return;
     }
     leaving = false;
@@ -366,7 +382,84 @@
     // The card showing now, saved and played from the list, ends as Watch, the same as its Watch button (Codex).
     if (state && state.current && state.current.id === id) return onResolve('watch', id);
     if (state && state.watchSecondsLeft <= 0) absorb(await send({ type: 'buyIfOut', videoId: id }));
-    location.assign(watchUrl(id));
+    location.assign(resumeUrl(id));
+  }
+
+  /**
+   * A stashed video's watch page, at the second it stopped, if it was started (Q28).
+   * @param {string} id
+   */
+  function resumeUrl(id) {
+    const video = state && state.backlog.find((/** @type {any} */ v) => v.id === id);
+    return video && video.resumeSec ? `${watchUrl(id)}&t=${video.resumeSec}s` : watchUrl(id);
+  }
+
+  /** The card whose full-stash list is up, or ''. */
+  let swapFor = '';
+  /**
+   * The list as built, kept across redraws like the thumbnail, so its scroll stays put and a click on a row isn't lost
+   * when the page redraws mid-press. Minutes ticking down in another tab redraw the page every few seconds.
+   * @type {HTMLElement | null}
+   */
+  let swapEl = null;
+  /** What swapEl was built from: the card and the stash's ids. */
+  let swapBuilt = '';
+
+  /** The full-stash list for the card, built again only when the stash changes. */
+  function swapList() {
+    const built = JSON.stringify([swapFor, state.backlog.map((/** @type {any} */ v) => [v.id, v.resumeSec || 0])]);
+    if (!swapEl || built !== swapBuilt) {
+      swapEl = DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap });
+      swapBuilt = built;
+      swapPlaced = false;
+    }
+    return swapEl;
+  }
+  /** Whether swapEl has been placed above or below its button since it was built. */
+  let swapPlaced = false;
+  /**
+   * The last swap, for its "Swapped out … · Undo" note under the card: who went out, where it sat, and who came in.
+   * @type {{dropped: any, index: number, newId: string, timer: number} | null}
+   */
+  let swapped = null;
+
+  /** Closes the full-stash list. Focus goes back to Stash if it was in the list. */
+  function closeSwap() {
+    const had = !!document.querySelector('#drip-home .drip-swap')?.contains(document.activeElement);
+    swapFor = '';
+    render();
+    if (had) /** @type {HTMLElement | null} */ (document.querySelector('#drip-home [data-k="save"]'))?.focus();
+  }
+
+  /** Swaps `drop` out of the stash for the card. @param {any} drop */
+  async function onSwap(drop) {
+    const video = state && state.current;
+    if (!video) return;
+    const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
+    swapFor = '';
+    const res = absorb(await send({ type: 'swapBacklog', video, dropId: drop.id }));
+    if (res && !res.ok) message = errorText(res.error);
+    else {
+      if (swapped) clearTimeout(swapped.timer);
+      const timer = window.setTimeout(() => {
+        swapped = null;
+        render();
+      }, DripSwap.UNDO_MS);
+      swapped = { dropped: res.dropped || drop, index, newId: video.id, timer };
+    }
+    render();
+    focusOn('save');
+  }
+
+  /** Puts the swapped-out video back where it was, and takes the card's video back out. */
+  async function onSwapUndo() {
+    if (!swapped) return;
+    const { dropped, index, newId, timer } = swapped;
+    clearTimeout(timer);
+    swapped = null;
+    absorb(await send({ type: 'swapBacklog', video: dropped, dropId: newId, index }));
+    render();
+    focusOn('save');
   }
 
   /**
@@ -430,15 +523,6 @@
   // Whether Saved is open, kept separately for the empty page (open by default) and while a card is up (collapsed).
   const savedOpen = { empty: true, card: false };
   let savedShowAll = false;
-
-  /**
-   * Seconds in a length string like "8:31" or "1:02:03", or 0 when there's none.
-   * @param {string} length
-   */
-  function lengthSeconds(length) {
-    if (!/^\d+(:\d{1,2}){1,2}$/.test(length || '')) return 0;
-    return length.split(':').reduce((total, part) => total * 60 + Number(part), 0);
-  }
 
   // Kept across renders, so a rebuild doesn't reload the thumbnail or jump the glass's water.
   /** @type {{id: string, el: HTMLElement} | null} */
@@ -641,6 +725,7 @@
     stashDrawn = { id: video.id, stashed: saved };
     const stash = DripStash.parts(fills ? !saved : saved, { labelClass: 'drip-save-label' });
     if (fills) stash.to(saved);
+    const swapping = swapFor === video.id && !saved && !next;
     return h('div', { class: `drip-card${next ? ' is-next' : ''}${isNew ? ' is-new' : ''}`, 'aria-busy': next ? 'true' : undefined },
       thumbnail(video.id),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
@@ -651,7 +736,10 @@
       h('div', { class: 'drip-card-actions' },
         h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
-          onclick: () => onResolve(saved ? 'unsave' : 'save', video.id), title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
+          'data-swap-anchor': true, 'aria-expanded': swapping ? 'true' : undefined,
+          // detail is 0 for a click from the keyboard (Enter or Space).
+          onclick: (/** @type {MouseEvent} */ e) => (swapping ? closeSwap() : onResolve(saved ? 'unsave' : 'save', video.id, e.detail === 0)),
+          title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
         }, ...stash.nodes),
         h('button', {
           class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || state.tokens.rec < 1,
@@ -660,7 +748,9 @@
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'data-k': 'pass', disabled: next, onclick: () => onResolve('pass', video.id),
           title: "Pass. It's free, and this video won't come back.", 'aria-label': 'Pass',
-        }, icon('x'))));
+        }, icon('x')),
+        swapping && swapList()),
+      swapped && swapped.newId === video.id && DripSwap.note(swapped.dropped, onSwapUndo));
   }
 
   /** @param {'empty' | 'card'} [as] Draw it as on that page. The reveal animation opens and folds it ahead of time. */
@@ -668,9 +758,10 @@
     const mode = as || (state.current || busy === 'reveal' ? 'card' : 'empty');
     const open = savedOpen[mode];
     const count = state.backlog.length;
-    const total = state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + lengthSeconds(v.length), 0);
+    // What's left to watch, so a half-watched video counts only its unwatched part.
+    const total = state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0);
     const head = ['Stash'];
-    if (count) head.push(`${count} ${count === 1 ? 'video' : 'videos'}`);
+    if (count) head.push(`${count} of ${state.settings.stashMax}`);
     if (total) head.push(Drip.formatMinutes(total));
 
     // Newest first.
@@ -690,14 +781,14 @@
             h('span', {}, 'Removed'), h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'),
             h('button', { class: 'drip-undo', 'data-k': `undo-${video.id}`, onclick: () => onUndo(video.id) }, 'Undo'))
           : h('li', {
-            class: 'drip-saved-row',
+            class: `drip-saved-row${DripSwap.fraction(video) > 0 ? ' has-bar' : ''}`,
             onclick: (/** @type {MouseEvent} */ e) => {
               if (/** @type {Element} */ (e.target).closest('.drip-saved-x, a')) return;
               onPlaySaved(video.id);
             },
           },
           h('a', {
-            class: 'drip-saved-link', href: watchUrl(video.id), 'data-k': `play-${video.id}`,
+            class: 'drip-saved-link', href: resumeUrl(video.id), 'data-k': `play-${video.id}`,
             onclick: (/** @type {MouseEvent} */ e) => {
               if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
               e.preventDefault();
@@ -705,12 +796,13 @@
             },
           },
           h('span', { class: 'drip-saved-title' }, video.title || 'Untitled'),
-          h('span', { class: 'drip-saved-meta' }, [video.channel, video.length].filter(Boolean).join(' · '))),
+          h('span', { class: 'drip-saved-meta' }, DripSwap.meta(video))),
           h('button', {
             class: 'drip-saved-x', 'data-k': `x-${video.id}`, title: 'Remove from stash', 'aria-label': `Remove ${video.title || 'video'} from stash`,
             onclick: () => onRemove(video.id),
           }, icon('x')),
-          h('span', { class: 'drip-saved-play', 'aria-hidden': 'true' }, costsDrop(video.id) && h('span', { class: 'drip-saved-price' }, '-1', icon('drop', 'drip-token-drop')), icon('play')))))),
+          h('span', { class: 'drip-saved-play', 'aria-hidden': 'true' }, costsDrop(video.id) && h('span', { class: 'drip-saved-price' }, '-1', icon('drop', 'drip-token-drop')), icon('play')),
+          DripSwap.bar(video))))),
       open && hidden > 0 && h('button', {
         class: 'drip-saved-more', 'data-k': 'more', onclick: () => { savedShowAll = !savedShowAll; render(); },
       }, h('span', {}, savedShowAll ? 'Show less' : `Show ${hidden} more`), icon('chevron-down', `drip-chevron${savedShowAll ? ' is-up' : ''}`)));
@@ -742,8 +834,8 @@
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0, DripGlass.fraction(state).toFixed(3),
       state.tokens, state.current, state.backlog, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
-      state.settings.resetHour,
-    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving]);
+      state.settings.resetHour, state.settings.stashMax,
+    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId]);
     if (root.firstChild && key === rendered) return;
     rendered = key;
     // Keep keyboard focus on the same control across the rebuild.
@@ -755,13 +847,26 @@
     const glides = !!drawnTime && time !== drawnTime && !!glassEl?.isConnected && animates() && !document.hidden;
     drawnTime = time;
     const was = glides ? /** @type {SVGSVGElement} */ (glassEl).getBoundingClientRect().left : null;
+    // Moving the kept list out and back in resets its scroll, so it's put back after.
+    const listTop = swapEl?.querySelector('.drip-swap-list')?.scrollTop || 0;
     root.replaceChildren(view());
     syncCounts();
+    if (swapEl && swapEl.isConnected) {
+      if (!swapPlaced) {
+        DripSwap.place(swapEl, root.querySelector('[data-k="save"]'));
+        swapPlaced = true;
+      }
+      const list = swapEl.querySelector('.drip-swap-list');
+      if (list) list.scrollTop = listTop;
+    } else if (!swapFor) {
+      swapEl = null;
+    }
     if (was !== null && glassEl?.isConnected) {
       const dx = was - glassEl.getBoundingClientRect().left;
       if (Math.abs(dx) > 0.5) root.querySelector('.drip-stats')?.animate([{ translate: `${dx}px 0` }, { translate: '0 0' }], { duration: 420, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
     }
-    if (focused) /** @type {HTMLElement | null} */ (root.querySelector(`[data-k="${CSS.escape(focused)}"]`))?.focus();
+    // Without scrolling: a control kept across the redraw is already where it was.
+    if (focused) /** @type {HTMLElement | null} */ (root.querySelector(`[data-k="${CSS.escape(focused)}"]`))?.focus({ preventScroll: true });
   }
 
   let refreshing = false;

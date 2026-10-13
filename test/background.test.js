@@ -275,3 +275,18 @@ test('the home page messages: revealNext, buyIfOut, and addBacklog with an index
   await w.send({ type: 'addBacklog', video: { id: 'x0', title: 'x0' }, index: 0 });
   assert.deepEqual(w.store.drip.backlog.map((/** @type {any} */ v) => v.id), ['x0', 'x1', 'x2']);
 });
+
+test('swapBacklog and a tick with the player position reach the stash (Q28)', async () => {
+  const w = worker();
+  await w.send({ type: 'updateSettings', changes: { stashMax: 1 } });
+  await w.send({ type: 'addBacklog', video: { id: 'aaa', title: 'A' } });
+  const full = await w.send({ type: 'addBacklog', video: { id: 'bbb', title: 'B' } });
+  assert.equal(full.error, 'stash-full');
+  const swap = await w.send({ type: 'swapBacklog', video: { id: 'bbb', title: 'B' }, dropId: 'aaa' });
+  assert.equal(swap.ok, true);
+  assert.deepEqual(w.store.drip.backlog.map((/** @type {any} */ v) => v.id), ['bbb']);
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'tick', seconds: 5, videoId: 'bbb', position: 125.4, duration: 600 });
+  assert.equal(w.store.drip.backlog[0].resumeSec, 125);
+  assert.equal(w.store.drip.backlog[0].durationSec, 600);
+});

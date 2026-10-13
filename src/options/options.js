@@ -42,6 +42,10 @@ const SECTIONS = [
       { key: 'rolloverDays', label: 'Save unspent for', kind: 'stepper', min: 1, max: 7,
         unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days'),
         hint: 'Unspent drops and cards carry over up to this many days.' },
+      // Q28. Lowering it keeps every stashed video; a full stash asks which one to swap out.
+      { key: 'stashMax', label: 'Stash holds', kind: 'stepper', min: 1, max: 50,
+        unit: (n) => [n === 1 ? 'video' : 'videos'], say: (n) => plural(n, 'video', 'videos'),
+        hint: 'A full stash asks which video to swap out.' },
     ],
   },
   {

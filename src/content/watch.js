@@ -11,6 +11,8 @@
   /** @type {any} */
   const DripStash = /** @type {any} */ (globalThis).DripStash;
   /** @type {any} */
+  const DripSwap = /** @type {any} */ (globalThis).DripSwap;
+  /** @type {any} */
   const DripPour = /** @type {any} */ (globalThis).DripPour;
 
   // YouTube selectors. These break when YouTube changes its markup.
@@ -373,6 +375,17 @@
     renderPill();
   }
 
+  /**
+   * Where the player is, for a stashed video's progress bar (Q28). Only for the video on the page, and not during an
+   * ad, when the player's time is the ad's.
+   * @param {string} id
+   */
+  function position(id) {
+    if (id !== videoId() || !video || adShowing || document.querySelector(SEL.ads)) return {};
+    if (!Number.isFinite(video.currentTime) || !(video.currentTime > 0)) return {};
+    return { position: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : undefined };
+  }
+
   /** Sends the oldest unsent time. If the worker doesn't confirm it, it stays unsent and goes again next tick. */
   async function sendTick() {
     const entry = unsent[0];
@@ -383,7 +396,7 @@
     const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && playing), startedAt: performance.now() };
     pendingTick = request;
     try {
-      const res = await send({ type: 'tick', seconds, videoId: id, ago: Math.round(performance.now() - entry.endedAt) });
+      const res = await send({ type: 'tick', seconds, videoId: id, ago: Math.round(performance.now() - entry.endedAt), ...position(id) });
       if (res && res.ok && !disconnected) {
         entry.seconds -= seconds;
         if (entry.seconds <= 0.001 && unsent[0] === entry) unsent.shift();
@@ -822,23 +835,126 @@
   // The pill with minutes left and the Save button.
 
   /** Stashes the video, or takes it back out of the stash when it's already there, like Stash on the home page's card. */
-  async function onSave() {
+  /** @param {MouseEvent} [e] */
+  async function onSave(e) {
     const id = videoId();
     if (!id || !state) return;
+    if (swapOpen) return closeSwap();
+    // detail is 0 for a click from the keyboard (Enter or Space).
+    const keyboard = !!e && e.detail === 0;
     let res;
     if (state.backlog.some((/** @type {any} */ v) => v.id === id)) res = await send({ type: 'removeBacklog', id });
-    else {
-      const title = document.querySelector(SEL.title)?.textContent?.trim() || document.title.replace(/ - YouTube$/, '');
-      const channel = document.querySelector(SEL.channel)?.textContent?.trim() || '';
-      const secs = video && Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
-      const length = secs ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '';
-      res = await send({ type: 'addBacklog', video: { id, title, channel, length } });
+    else res = await send({ type: 'addBacklog', video: thisVideo(id) });
+    if (res && !res.ok && res.error === 'stash-full' && !disconnected) {
+      state = res.state;
+      openSwap(keyboard);
+      return;
     }
+    took(res);
+  }
+
+  /** Takes the worker's answer to a stash change and redraws. @param {any} res */
+  function took(res) {
     if (res && res.ok && !disconnected) {
       state = res.state;
       applyStatus(Drip.watchStatus(state, videoId()));
     }
     renderPill();
+  }
+
+  /** This page's video as the stash keeps it, with how far in it is. @param {string} id */
+  function thisVideo(id) {
+    const title = document.querySelector(SEL.title)?.textContent?.trim() || document.title.replace(/ - YouTube$/, '');
+    const channel = document.querySelector(SEL.channel)?.textContent?.trim() || '';
+    const secs = video && Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
+    const length = secs ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '';
+    const at = position(id);
+    return { id, title, channel, length, resumeSec: at.position, durationSec: at.duration };
+  }
+
+  // A full stash (Q28): the list under the pill that asks which video to swap out, and the note after a swap. They sit
+  // in their own layer in the player, since the pill clips what overflows it.
+  /** @type {HTMLElement | null} */
+  let swapLayer = null;
+  /** The video whose list is up, or ''. */
+  let swapOpen = '';
+  /** @type {{dropped: any, index: number, newId: string, timer: number} | null} */
+  let swapped = null;
+
+  function drawSwap() {
+    const id = videoId();
+    if (swapped && swapped.newId !== id) {
+      clearTimeout(swapped.timer);
+      swapped = null;
+    }
+    if (swapOpen && (!state || swapOpen !== id || state.backlog.some((/** @type {any} */ v) => v.id === id))) swapOpen = '';
+    const parts = [
+      swapOpen && DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap }),
+      swapped && DripSwap.note(swapped.dropped, onSwapUndo),
+    ].filter(Boolean);
+    if (!parts.length) {
+      swapLayer?.remove();
+      swapLayer = null;
+      return;
+    }
+    if (!swapLayer) {
+      swapLayer = h('div', { class: 'drip-swap-layer' });
+      for (const ev of ['click', 'dblclick', 'mousedown', 'pointerdown', 'keydown']) swapLayer.addEventListener(ev, keepFromPlayer);
+    }
+    const parent = document.querySelector(SEL.player) || document.body;
+    swapLayer.classList.toggle('is-floating', parent === document.body);
+    swapLayer.replaceChildren(...parts);
+    if (swapLayer.parentElement !== parent) parent.append(swapLayer);
+  }
+
+  /** @param {boolean} keyboard Opened from the keyboard, so the list takes focus. */
+  function openSwap(keyboard) {
+    swapOpen = videoId();
+    drawSwap();
+    const list = /** @type {any} */ (swapLayer?.querySelector('.drip-swap'));
+    if (list) {
+      list.dataset.flips = 'false';
+      DripSwap.place(list, document.querySelector('#drip-pill'));
+      if (keyboard) list.focusFirst();
+    }
+    renderPill();
+  }
+
+  function closeSwap() {
+    const had = !!swapLayer?.contains(document.activeElement);
+    swapOpen = '';
+    drawSwap();
+    renderPill();
+    if (had) /** @type {HTMLElement | null} */ (document.querySelector('#drip-pill [data-k="pill-save"]'))?.focus();
+  }
+
+  /** @param {any} drop */
+  async function onSwap(drop) {
+    const id = videoId();
+    if (!id || !state) return;
+    const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
+    swapOpen = '';
+    const res = await send({ type: 'swapBacklog', video: thisVideo(id), dropId: drop.id });
+    if (res && res.ok) {
+      if (swapped) clearTimeout(swapped.timer);
+      const timer = window.setTimeout(() => {
+        swapped = null;
+        drawSwap();
+      }, DripSwap.UNDO_MS);
+      swapped = { dropped: res.dropped || drop, index, newId: id, timer };
+    }
+    took(res);
+    drawSwap();
+    /** @type {HTMLElement | null} */ (document.querySelector('#drip-pill [data-k="pill-save"]'))?.focus();
+  }
+
+  async function onSwapUndo() {
+    if (!swapped) return;
+    const { dropped, index, newId, timer } = swapped;
+    clearTimeout(timer);
+    swapped = null;
+    took(await send({ type: 'swapBacklog', video: dropped, dropId: newId, index }));
+    drawSwap();
   }
 
   let pillView = '';
@@ -883,8 +999,14 @@
     if (!id || !state) {
       pill?.remove();
       pillView = '';
+      if (swapOpen || swapped) {
+        swapOpen = '';
+        drawSwap();
+      }
       return;
     }
+    // Moved on to another video: its list and note were for the last one.
+    if ((swapOpen && swapOpen !== id) || (swapped && swapped.newId !== id)) drawSwap();
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === id);
     const unlocked = state.unlocked.includes(id);
     // Count down between ticks, which only go out every few seconds. During an ad, the time not banked yet is all ad
@@ -904,7 +1026,7 @@
     }
     const parent = document.querySelector(SEL.player) || document.body;
     // Rebuild only when the text changes. A button replaced mid-click loses the click.
-    const view = JSON.stringify([id, time, saved, adShowing, paused]);
+    const view = JSON.stringify([id, time, saved, adShowing, paused, swapOpen]);
     if (pill && pillView === view && pill.parentElement === parent) return pillLook();
     pillView = view;
     // Stashed or taken out since the last draw: the new button starts as the old one was, and the water moves.
@@ -923,6 +1045,7 @@
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       h('button', {
         class: `drip-pill-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'pill-save', 'aria-pressed': String(saved), onclick: onSave,
+        'data-swap-anchor': true, 'aria-expanded': swapOpen ? 'true' : undefined,
         title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
       }, ...stash.nodes),
     ];

@@ -67,7 +67,7 @@
     $('kinds').replaceChildren(
       kind('drop', 'drip-token-drop', 'Drops', `1 drop = ${minutes} of watching`),
       kind('card', 'drip-token-card', 'Cards', '1 card = 1 video revealed'),
-      kind('save', '', 'Stash', 'Watch later, costs no card'));
+      kind('save', '', 'Stash', `Holds ${settings.stashMax} videos for later`));
     /** @param {number} n @param {string} one @param {string} many */
     const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     $('allowance').textContent = `You get ${count(settings.watchTokensPerDay, 'drop', 'drops')} and ${count(settings.recTokensPerDay, 'card', 'cards')} a day. You can change these in Settings.`;

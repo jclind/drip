@@ -32,6 +32,7 @@
  * @property {boolean} graceMode
  * @property {number} needThisPerDay
  * @property {'home' | 'subscriptions'} feedSource
+ * @property {number} stashMax The most videos the stash holds (Q28).
  */
 /**
  * @typedef {Object} Video
@@ -39,6 +40,9 @@
  * @property {string} title
  * @property {string} channel
  * @property {string} length
+ * @property {number} [resumeSec] How far in the video got, for the stash's progress bar and resuming there.
+ * @property {number} [durationSec] The player's length in seconds, for the same bar.
+ * @property {number} [addedAt] When it went into the stash, in ms, for the full stash's "6 days ago".
  */
 /**
  * @typedef {Object} LogDay
@@ -62,12 +66,13 @@
     graceMode: false,
     needThisPerDay: 2,
     feedSource: 'home',
+    stashMax: 10,
   });
   /** @type {Object<string, [number, number]>} */
   const ranges = {
     watchTokensPerDay: [0, 48], minutesPerToken: [1, 120],
     recTokensPerDay: [0, 100], rolloverDays: [1, 7],
-    resetHour: [0, 23], needThisPerDay: [0, 10],
+    resetHour: [0, 23], needThisPerDay: [0, 10], stashMax: [1, 50],
   };
 
   /** @param {number} now @param {number} resetHour */
@@ -116,7 +121,17 @@
     if (typeof v.id !== 'string' || !/^[\w-]{1,64}$/.test(v.id)) return null;
     /** @param {unknown} x */
     const str = (x) => (typeof x === 'string' ? x : '');
-    return { id: v.id, title: str(v.title), channel: str(v.channel), length: str(v.length) };
+    /** @type {Video} */
+    const video = { id: v.id, title: str(v.title), channel: str(v.channel), length: str(v.length) };
+    if (seconds(v.durationSec)) video.durationSec = seconds(v.durationSec);
+    if (seconds(v.resumeSec)) video.resumeSec = video.durationSec ? Math.min(seconds(v.resumeSec), video.durationSec) : seconds(v.resumeSec);
+    if (seconds(v.addedAt)) video.addedAt = seconds(v.addedAt);
+    return video;
+  }
+
+  /** Whole seconds, or 0 for anything that isn't a positive finite number. @param {unknown} n */
+  function seconds(n) {
+    return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
   }
 
   /** @param {unknown} n @param {number} fallback */
@@ -263,16 +278,17 @@
    * @param {State} state
    * @param {'watch' | 'save' | 'unsave' | 'pass'} action
    * @param {string} [videoId] The card the action was shown for. Another tab may have moved on since.
+   * @param {number} [now] When, for a save's addedAt.
    */
-  function resolveCurrent(state, action, videoId) {
+  function resolveCurrent(state, action, videoId, now) {
     if (!state.current) return { ok: false, error: 'no-current' };
     if (!['watch', 'save', 'unsave', 'pass'].includes(action)) return { ok: false, error: 'bad-action' };
     if (videoId !== undefined && videoId !== state.current.id) return { ok: false, error: 'stale-card' };
     const video = state.current;
     // addBacklog and removeBacklog keep the card's saved count, whichever button moved it.
     if (action === 'save') {
-      addBacklog(state, video);
-      return { ok: true, video };
+      const added = addBacklog(state, video, undefined, now);
+      return added.ok ? { ok: true, video } : added;
     }
     if (action === 'unsave') {
       removeBacklog(state, video.id);
@@ -302,14 +318,21 @@
   }
 
   /**
+   * A full stash refuses a new video with 'stash-full' (Q28). Undo, which passes an index, always puts the row back,
+   * even when a lowered cap leaves the stash over it.
    * @param {State} state
    * @param {unknown} raw
    * @param {number} [index] Where to put it, for undoing a removal. New videos go at the end, the newest place.
+   * @param {number} [now] When, kept as addedAt. A video put back by Undo keeps the addedAt it came with.
    */
-  function addBacklog(state, raw, index) {
+  function addBacklog(state, raw, index, now) {
     const video = cleanVideo(raw);
     if (!video) return { ok: false, error: 'bad-video' };
     if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
+    const undo = typeof index === 'number' && Number.isInteger(index);
+    if (!undo && state.backlog.length >= state.settings.stashMax) return { ok: false, error: 'stash-full' };
+    // Undo puts back the video as it was, so one stashed before addedAt existed stays undated.
+    if (!undo && !video.addedAt && seconds(now)) video.addedAt = seconds(now);
     const at = typeof index === 'number' && Number.isInteger(index) ? Math.min(Math.max(index, 0), state.backlog.length) : state.backlog.length;
     state.backlog.splice(at, 0, video);
     // The card showing now counts as saved while it's in the backlog, however it got there (Codex, 2026-10-10).
@@ -324,6 +347,52 @@
       day.saved = Math.max(0, day.saved - 1);
     }
     state.backlog = state.backlog.filter(video => video.id !== id);
+    return { ok: true };
+  }
+
+  /**
+   * Swaps a stashed video out for a new one in one step, for a full stash (Q28). The new one goes at the end, the
+   * newest place, or at `index`, which is how Undo puts the swapped-out one back. A swap never grows the stash, so it
+   * works over a lowered cap too. Undo still puts the video back when `dropId` has already left the stash, finished or
+   * taken out within Undo's few seconds, so the swapped-out video is never lost, and still takes `dropId` out when the
+   * video is already back, stashed again in another tab (Codex, 2026-10-13). Returns the video it took out as
+   * `dropped`, as it was then, so Undo puts back the latest progress, not a copy from when the list opened.
+   * @param {State} state
+   * @param {unknown} raw
+   * @param {string} dropId
+   * @param {number} [index]
+   * @param {number} [now]
+   */
+  function swapBacklog(state, raw, dropId, index, now) {
+    const video = cleanVideo(raw);
+    if (!video) return { ok: false, error: 'bad-video' };
+    const undo = typeof index === 'number' && Number.isInteger(index);
+    const drop = state.backlog.findIndex(saved => saved.id === dropId);
+    const dropped = drop >= 0 ? { ...state.backlog[drop] } : null;
+    if (state.backlog.some(saved => saved.id === video.id)) {
+      if (undo && drop >= 0) removeBacklog(state, dropId);
+      return { ok: true, dropped };
+    }
+    if (drop < 0 && !undo) return { ok: false, error: 'not-stashed' };
+    if (drop >= 0) removeBacklog(state, dropId);
+    if (!undo && !video.addedAt && seconds(now)) video.addedAt = seconds(now);
+    const added = addBacklog(state, video, undo ? index : state.backlog.length);
+    return added.ok ? { ...added, dropped } : added;
+  }
+
+  /**
+   * Records how far into a stashed video playback got, for the stash's bar and for resuming there. Videos that
+   * aren't stashed keep nothing.
+   * @param {State} state
+   * @param {string} videoId
+   * @param {unknown} position
+   * @param {unknown} duration
+   */
+  function markProgress(state, videoId, position, duration) {
+    const video = state.backlog.find(saved => saved.id === videoId);
+    if (!video || !seconds(position)) return { ok: true };
+    if (seconds(duration)) video.durationSec = seconds(duration);
+    video.resumeSec = video.durationSec ? Math.min(seconds(position), video.durationSec) : seconds(position);
     return { ok: true };
   }
 
@@ -461,6 +530,24 @@
     const hours = Math.floor(minutes / 60);
     if (!hours) return `${minutes}m`;
     return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
+  }
+
+  /**
+   * How long ago a video went into the stash, for the full stash's list: "Today", "Yesterday", "6 days ago",
+   * "3 weeks ago". Calendar days on this computer's clock, not drip's reset hour. '' when it's not known.
+   * @param {number | undefined} addedAt
+   * @param {number} now
+   */
+  function stashedAgo(addedAt, now) {
+    if (!seconds(addedAt)) return '';
+    /** @param {number} t */
+    const midnight = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+    const days = Math.max(0, Math.round((midnight(now) - midnight(/** @type {number} */ (addedAt))) / 86400000));
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 14) return `${days} days ago`;
+    if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
+    return `${Math.floor(days / 30)} months ago`;
   }
 
   const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -628,8 +715,8 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    removeBacklog, charge, chargeTick, watchStatus, needThis, cleanSettings,
-    isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, cleanVideo,
+    removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
+    isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction,
   };
 })();

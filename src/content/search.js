@@ -6,6 +6,8 @@
 (function () {
   /** @type {any} */
   const { send, h, onState, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  /** @type {any} */
+  const DripSwap = /** @type {any} */ (globalThis).DripSwap;
 
   const PAGE = 10;
 
@@ -80,12 +82,73 @@
       if (existing.dataset.videoId === video.id) return paintSave(existing);
       existing.remove();
     }
-    const button = h('button', { class: 'drip-btn drip-save', 'data-video-id': video.id, onclick: async () => {
+    const button = h('button', { class: 'drip-btn drip-save', 'data-video-id': video.id, 'data-swap-anchor': true, onclick: async (/** @type {MouseEvent} */ e) => {
+      if (swap && swap.button === button) return closeSwap();
       const current = readVideo(row) || video;
-      await send({ type: 'addBacklog', video: current });
+      const res = await send({ type: 'addBacklog', video: current });
+      // A full stash asks which video to swap out instead (Q28).
+      if (res && !res.ok && res.error === 'stash-full') {
+        if (res.state) state = res.state;
+        // detail is 0 for a click from the keyboard (Enter or Space).
+        openSwap(button, current, e.detail === 0);
+      }
     } });
     paintSave(button);
     (row.querySelector(SEL.saveSlot) || row).append(h('div', { class: 'drip-save-row drip-ui' }, button));
+  }
+
+  // A full stash (Q28): the list under one result's Stash, and the note after a swap.
+  /** @type {{button: HTMLElement, el: HTMLElement} | null} */
+  let swap = null;
+  /** @type {{el: HTMLElement, dropped: any, index: number, newId: string, timer: number} | null} */
+  let swapped = null;
+
+  /** @param {HTMLElement} button @param {any} video @param {boolean} keyboard Opened from the keyboard, so it takes focus. */
+  function openSwap(button, video, keyboard) {
+    closeSwap();
+    const el = DripSwap.picker({ backlog: state.backlog, onPick: (/** @type {any} */ drop) => onSwap(button, video, drop), onClose: closeSwap });
+    button.setAttribute('aria-expanded', 'true');
+    button.parentElement?.append(el);
+    swap = { button, el };
+    DripSwap.place(el, button);
+    if (keyboard) el.focusFirst();
+  }
+
+  function closeSwap() {
+    if (!swap) return;
+    const { button, el } = swap;
+    const had = el.contains(document.activeElement);
+    swap = null;
+    el.remove();
+    button.removeAttribute('aria-expanded');
+    if (had) button.focus();
+  }
+
+  /** @param {HTMLElement} button @param {any} video @param {any} drop */
+  async function onSwap(button, video, drop) {
+    const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
+    closeSwap();
+    const res = await send({ type: 'swapBacklog', video, dropId: drop.id });
+    if (!res || !res.ok) return;
+    clearSwapped();
+    const dropped = res.dropped || drop;
+    const el = DripSwap.note(dropped, onSwapUndo);
+    button.parentElement?.append(el);
+    swapped = { el, dropped, index, newId: video.id, timer: window.setTimeout(clearSwapped, DripSwap.UNDO_MS) };
+  }
+
+  function clearSwapped() {
+    if (!swapped) return;
+    clearTimeout(swapped.timer);
+    swapped.el.remove();
+    swapped = null;
+  }
+
+  async function onSwapUndo() {
+    if (!swapped) return;
+    const { dropped, index, newId } = swapped;
+    clearSwapped();
+    await send({ type: 'swapBacklog', video: dropped, dropId: newId, index });
   }
 
   function showMore() {
@@ -95,6 +158,8 @@
 
   function apply() {
     if (location.pathname !== '/results') {
+      closeSwap();
+      clearSwapped();
       moreButton?.remove();
       moreButton = null;
       emptyNote?.remove();
@@ -104,6 +169,8 @@
     if (location.search !== query) {
       query = location.search;
       shown = PAGE;
+      closeSwap();
+      clearSwapped();
     }
     const rows = [...document.querySelectorAll(SEL.results)].flatMap((c) => [...c.children]);
     const items = rows.filter(isResult);

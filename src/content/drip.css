@@ -1640,3 +1640,275 @@ html[dark] #drip-pill {
     transition: none !important;
   }
 }
+
+/* A full stash (swap.js, Q28): the list that asks which video to swap out, the note after a swap, and a stashed
+   video's progress bar. DESIGN.md, "The full stash as built". The list sits on the home card, the watch page's player,
+   and search results, so it brings its own colors: a raised surface like YouTube's menus, in the page's theme. */
+.drip-swap {
+  --drip-swap-bg: #fff;
+  --drip-swap-shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --drip-blue: #42a5f6;
+  --drip-rule: rgba(0, 0, 0, 0.1);
+  --drip-row-hover: rgba(0, 0, 0, 0.05);
+  --drip-gray: #f2f2f2;
+  --drip-gray-hover: #e5e5e5;
+  --drip-focus: #065fd4;
+  z-index: 2050;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: left;
+  background: var(--drip-swap-bg);
+  box-shadow: var(--drip-swap-shadow);
+}
+
+html[dark] .drip-swap {
+  --drip-swap-bg: #282828;
+  --drip-swap-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --drip-rule: rgba(255, 255, 255, 0.12);
+  --drip-row-hover: rgba(255, 255, 255, 0.08);
+  --drip-gray: #3a3a3a;
+  --drip-gray-hover: #474747;
+  --drip-focus: #3ea6ff;
+}
+
+.drip-swap-head {
+  padding: 14px 16px 10px;
+}
+
+.drip-swap-title {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.drip-swap-sub {
+  color: var(--drip-muted);
+  font-size: 13px;
+}
+
+.drip-swap-list {
+  max-height: 300px;
+  margin: 0;
+  padding: 4px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  border-top: 1px solid var(--drip-rule);
+}
+
+.drip-swap-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  color: var(--drip-text);
+  text-align: left;
+  background: none;
+  cursor: pointer;
+}
+
+.drip-swap-item:hover {
+  background: var(--drip-row-hover);
+}
+
+.drip-swap-text {
+  display: grid;
+  min-width: 0;
+}
+
+.drip-swap-name,
+.drip-swap-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drip-swap-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.drip-swap-meta {
+  color: var(--drip-muted);
+  font-size: 12px;
+}
+
+/* "Swap out" shows on the row under the pointer or focus. Touch screens have no hover, so it always shows there. */
+.drip-swap-go {
+  color: var(--drip-muted);
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+}
+
+.drip-swap-item:hover .drip-swap-go,
+.drip-swap-item:focus-visible .drip-swap-go {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .drip-swap-go {
+    opacity: 1;
+  }
+}
+
+.drip-swap-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--drip-rule);
+}
+
+.drip-swap-cancel {
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 18px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--drip-text);
+  background: var(--drip-gray);
+  cursor: pointer;
+}
+
+.drip-swap-cancel:hover {
+  background: var(--drip-gray-hover);
+}
+
+.drip-swap :is(button):focus-visible {
+  outline: 2px solid var(--drip-focus);
+  outline-offset: -2px;
+}
+
+/* A started video's progress: a thin blue line along the bottom of its row, over the divider, like YouTube's red one.
+   The rest of the line is the divider's color, so the rows still read as separated. */
+.drip-stash-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--drip-blue, #42a5f6) calc(var(--drip-at) * 100%), var(--drip-rule) 0);
+  pointer-events: none;
+}
+
+#drip-home .drip-saved-row.has-bar {
+  border-bottom-color: transparent;
+}
+
+.drip-swap-item .drip-stash-bar {
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  height: 2px;
+}
+
+/* Where the list hangs: under the card's buttons, which it covers the width of. */
+#drip-home .drip-card-actions {
+  position: relative;
+}
+
+#drip-home .drip-card-actions .drip-swap {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  max-width: none;
+}
+
+/* Under a search result's Stash. */
+.drip-save-row {
+  position: relative;
+}
+
+.drip-save-row .drip-swap {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+}
+
+/* With more room above its button than below, the list opens upward (swap.js place). */
+:is(#drip-home .drip-card-actions, .drip-save-row) .drip-swap.is-above {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+/* On the watch page, under the pill in the player's corner (watch.js), or under the floating pill. */
+.drip-swap-layer {
+  position: absolute;
+  top: 56px;
+  right: 12px;
+  z-index: 71;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+}
+
+.drip-swap-layer.is-floating {
+  position: fixed;
+  top: 112px;
+  right: 16px;
+  z-index: 2100;
+}
+
+/* "Swapped out <title> · Undo". */
+.drip-swapped {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 10px;
+  color: var(--drip-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.drip-swapped-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--drip-text);
+  font-weight: 500;
+}
+
+.drip-swapped .drip-undo {
+  flex: none;
+  padding: 4px 2px;
+  border: 0;
+  font: inherit;
+  font-weight: 500;
+  color: var(--drip-text);
+  background: none;
+  cursor: pointer;
+}
+
+.drip-swapped .drip-undo:hover {
+  text-decoration: underline;
+}
+
+/* On the video, the note gets the pill's dark glass so it reads over any picture. */
+.drip-swap-layer .drip-swapped {
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 14px;
+  --drip-text: #fff;
+  --drip-muted: rgba(255, 255, 255, 0.75);
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.drip-save-row .drip-swapped {
+  margin-top: 0;
+}
