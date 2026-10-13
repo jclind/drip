@@ -422,14 +422,14 @@
    * @property {Saved} [saved] Stash, which folds while a card is up.
    */
 
-  /** Shows the count one card lower as the card leaves it. Returns a function that puts it back. */
+  /** The count rolls one card lower as the card leaves it (counter.js). Returns a function that rolls it back. */
   function spendShown(/** @type {Element} */ counter) {
-    const count = counter.nextElementSibling;
-    if (!count) return () => {};
-    const was = count.textContent;
-    const n = Number(was);
-    if (Number.isFinite(n) && n > 0) count.textContent = String(n - 1);
-    return () => { count.textContent = was; };
+    const DripCounter = /** @type {any} */ (globalThis).DripCounter;
+    const count = /** @type {HTMLElement | null} */ (counter.nextElementSibling);
+    if (!count || !count.classList.contains('drip-num')) return () => {};
+    const was = DripCounter.value(count);
+    if (was > 0) DripCounter.to(count, was - 1);
+    return () => DripCounter.to(count, was);
   }
 
   /**

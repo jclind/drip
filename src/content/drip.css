@@ -681,6 +681,7 @@ html[dark] #drip-pill {
 }
 
 #drip-home .drip-count {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -701,6 +702,49 @@ html[dark] #drip-pill {
 
 #drip-home .drip-count.is-zero .drip-i {
   opacity: 0.45;
+}
+
+/* A count's number (counter.js). It's as wide as the settings' largest count (--drip-room digits, set by home.js), so a
+   count that gains a digit, like 8 to 18, doesn't widen the stats and move the centered group. While it changes, the
+   old and new digits share one grid cell, clipped to the line like an odometer. */
+#drip-home .drip-num {
+  display: inline-grid;
+  justify-items: start;
+  width: calc(var(--drip-room, 2) * 1ch);
+}
+
+#drip-home .drip-num.is-clip {
+  overflow-y: clip;
+  overflow-clip-margin: 2px;
+}
+
+#drip-home .drip-digit {
+  grid-area: 1 / 1;
+}
+
+/* The gray tag beside a counter after drops or cards arrive, "3 kept" or "4 new" (counter.js). The counter's icon is the
+   only color in it. It sits outside the stats' layout, so it moves nothing. */
+#drip-home .drip-tag {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 12px;
+  color: var(--drip-text);
+  background: var(--drip-chip);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  transform: translate(0, -50%);
+}
+
+#drip-home .drip-tag .drip-i {
+  width: 12px;
+  height: 13px;
 }
 
 /* Buttons. Every button that spends shows its price ("· -1" and the token). */
@@ -819,16 +863,6 @@ html[dark] #drip-pill {
   font-size: 13px;
   text-align: center;
   text-wrap: balance;
-}
-
-/* After "Done for now", "Kept 3 drops." rises in as the lock's water falls away (home.js view). */
-#drip-home .drip-message.is-kept {
-  animation: drip-kept-rise 600ms cubic-bezier(0.3, 0.7, 0.2, 1) 400ms both;
-}
-
-/* Held until fade.js starts showing the page, so the rise isn't spent while YouTube's page is still invisible. */
-html:not([data-drip-shown]) #drip-home .drip-message.is-kept {
-  animation-play-state: paused;
 }
 
 /* The reveal card. The 16:9 box and two title lines are reserved before anything loads, so nothing shifts. */
@@ -1358,6 +1392,13 @@ html:not([data-drip-shown]) #drip-home .drip-message.is-kept {
     margin-right: 8px;
   }
 
+  /* So "336 kept" still fits beside three-digit counts. */
+  #drip-home .drip-tag {
+    left: calc(100% + 6px);
+    gap: 4px;
+    padding: 2px 7px 2px 6px;
+  }
+
   #drip-home .drip-b {
     padding: 0 14px;
   }
@@ -1518,13 +1559,6 @@ html:not([data-drip-shown]) #drip-home .drip-message.is-kept {
   to {
     opacity: 0;
     outline-offset: 8px;
-  }
-}
-
-@keyframes drip-kept-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
   }
 }
 

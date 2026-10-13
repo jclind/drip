@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="/src/content/drip.css">
 <style>
   /* Stand-ins for YouTube's theme variables, light by default and dark with html[dark] as on YouTube. */
-  html { --yt-sys-color-baseline--text-primary: #0f0f0f; --yt-sys-color-baseline--text-secondary: #606060; --yt-sys-color-baseline--base-background: #fff; }
-  html[dark] { --yt-sys-color-baseline--text-primary: #f1f1f1; --yt-sys-color-baseline--text-secondary: #aaa; --yt-sys-color-baseline--base-background: #0f0f0f; }
+  html { --yt-sys-color-baseline--text-primary: #0f0f0f; --yt-sys-color-baseline--text-secondary: #606060; --yt-sys-color-baseline--base-background: #fff; --yt-sys-color-baseline--additive-background: rgba(0, 0, 0, 0.05); }
+  html[dark] { --yt-sys-color-baseline--text-primary: #f1f1f1; --yt-sys-color-baseline--text-secondary: #aaa; --yt-sys-color-baseline--base-background: #0f0f0f; --yt-sys-color-baseline--additive-background: rgba(255, 255, 255, 0.1); }
   body { margin: 0; background: var(--yt-sys-color-baseline--base-background); font-family: Roboto, Arial, sans-serif; }
   #masthead { height: 56px; border-bottom: 1px solid rgba(128, 128, 128, 0.2); }
   ytd-browse, ytd-two-column-browse-results-renderer, #primary { display: block; }
@@ -24,7 +24,7 @@
     python3 -m http.server 8077 --bind 127.0.0.1
     http://localhost:8077/dev/home.html?scenario=card&theme=dark
   Scenarios are in SCENARIOS below. `click=<data-k>,...` clicks controls after load, 300ms apart, like click=reveal or click=x-<id>.
-  `grid=0` leaves the grid empty, so a reveal stays loading for 6 seconds. The page moves its URL to "/" because
+  `grid=0` leaves the grid empty, so a reveal stays loading for 6 seconds. `reduced=1` plays it as with reduced motion. The page moves its URL to "/" because
   home.js only mounts there, so reload from the address you opened. A tool that reloads the tab gets the folder listing.
 -->
 <div id="masthead"></div>
@@ -40,6 +40,13 @@
   const params = new URLSearchParams(location.search);
   const theme = params.get('theme') || 'dark';
   if (theme === 'dark') document.documentElement.setAttribute('dark', '');
+  // fade.js sets this on YouTube once the page shows. The kept and new-day landings wait for it.
+  document.documentElement.setAttribute('data-drip-shown', '');
+  // reduced=1 answers prefers-reduced-motion as the system setting would.
+  if (params.get('reduced') === '1') {
+    const media = window.matchMedia.bind(window);
+    window.matchMedia = (q) => (q.includes('prefers-reduced-motion') ? /** @type {any} */ ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} }) : media(q));
+  }
   document.getElementById('harness-bar').textContent = `${params.get('scenario') || 'empty'} · ${theme}`;
 
   // Real video ids, so thumbnails load. Titles and channels are made up, like the mockups.
@@ -79,6 +86,19 @@
     big() { s.watchSecondsLeft = 3 * 3600 + 25 * 60; s.watchSecondsBought = 4 * 3600; s.tokens = { watch: 96, rec: 200 }; },
     // Reveal from Subscriptions. The frame gets the server's 404, so a reveal reads for 15 seconds and finds nothing.
     subs() { s.settings.feedSource = 'subscriptions'; },
+    // Back from the lock's "Done for now" with 3 drops (watch.js leaves the count in sessionStorage). There's no lock
+    // here, so they land as soon as the page shows.
+    kept() { s.tokens = { watch: 3, rec: 8 }; sessionStorage.setItem('drip-kept', '3'); },
+    // The first page after the reset, on the default settings: 3 drops and 8 cards kept, 4 and 10 new.
+    refill() { s.tokens = { watch: 3, rec: 8 }; s.day = D.addDays(s.day, -1); s.watchSecondsLeft = 0; },
+    // The same at the settings' maximums: 48 drops and 100 cards a day, kept 7 days, so 336 and 700 at most.
+    refillMax() {
+      Object.assign(s.settings, { watchTokensPerDay: 48, recTokensPerDay: 100, rolloverDays: 7 });
+      s.tokens = { watch: 288, rec: 600 };
+      s.day = D.addDays(s.day, -1);
+    },
+    // Both counts already at the cap: the reset adds nothing, so nothing lands.
+    refillCapped() { s.tokens = { watch: 8, rec: 20 }; s.day = D.addDays(s.day, -1); },
   };
   (SCENARIOS[params.get('scenario') || 'empty'] || SCENARIOS.empty).call(SCENARIOS);
 
@@ -148,6 +168,7 @@
 <script src="/src/content/common.js"></script>
 <script src="/src/content/reveal.js"></script>
 <script src="/src/content/pour.js"></script>
+<script src="/src/content/counter.js"></script>
 <script src="/src/content/home.js"></script>
 <script>
   const click = new URLSearchParams(location.search).get('click');

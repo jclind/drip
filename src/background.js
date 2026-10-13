@@ -93,6 +93,8 @@ function handle(msg, state, now) {
       return Drip.updateSettings(state, msg.changes || {});
     case 'cancelPending':
       return Drip.cancelPending(state, msg.key);
+    case 'refillSeen':
+      return Drip.refillSeen(state);
     default:
       return { ok: false, error: 'unknown-message' };
   }

@@ -12,6 +12,8 @@
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
   /** @type {any} */
   const DripPour = /** @type {any} */ (globalThis).DripPour;
+  /** @type {any} */
+  const DripCounter = /** @type {any} */ (globalThis).DripCounter;
 
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
@@ -500,17 +502,67 @@
     return glassEl;
   }
 
+  /**
+   * The drop and card counts, kept across redraws like the glass, so a count can roll while the page redraws around it.
+   * @type {Record<'watch' | 'rec', {row: HTMLElement, icon: HTMLElement, num: HTMLElement, sr: HTMLElement} | null>}
+   */
+  const counts = { watch: null, rec: null };
+
+  /**
+   * What a count shows: the balance, less what's still on its way in.
+   * @param {'watch' | 'rec'} kind
+   */
+  function shownCount(kind) {
+    const held = arriving ? Math.min(arriving[kind], state.tokens[kind]) : 0;
+    return Math.max(0, state.tokens[kind] - held);
+  }
+
+  /** @param {'watch' | 'rec'} kind */
+  function countRow(kind) {
+    let c = counts[kind];
+    if (!c) {
+      const token = kind === 'watch' ? 'drop' : 'card';
+      const n = shownCount(kind);
+      const ic = icon(token, `drip-token-${token}`);
+      const num = DripCounter.num(n);
+      const sr = h('span', { class: 'drip-sr' });
+      c = counts[kind] = { row: h('div', { class: `drip-count${n ? '' : ' is-zero'}` }, ic, num, sr), icon: ic, num, sr };
+    }
+    return c.row;
+  }
+
+  /**
+   * Brings each count to what it shows now: a roll or a spin on a page in view, at once otherwise. A landing moves the
+   * counts itself, so they're left alone while it runs.
+   */
+  function syncCounts() {
+    if (!state) return;
+    for (const kind of /** @type {const} */ (['watch', 'rec'])) {
+      const c = counts[kind];
+      if (!c) continue;
+      const n = shownCount(kind);
+      c.sr.textContent = kind === 'watch' ? (n === 1 ? ' drop' : ' drops') : n === 1 ? ' card' : ' cards';
+      if (landing || DripCounter.value(c.num) === n) continue;
+      // Drops held back for a landing leave the count at once, under the lock's water.
+      DripCounter.to(c.num, n, { animate: animates() && !document.hidden && !arriving });
+    }
+  }
+
+  /** How many digits the counts keep room for: enough for the most the settings allow, so a new digit moves nothing. */
+  function countRoom() {
+    const s = state.settings;
+    const most = Math.max(s.watchTokensPerDay * s.rolloverDays, s.recTokensPerDay * s.rolloverDays, state.tokens.watch, state.tokens.rec);
+    return String(most).length;
+  }
+
   function stats() {
     const left = Drip.formatMinutes(heldLeft ?? state.watchSecondsLeft);
-    const { watch, rec } = state.tokens;
     return h('div', { class: 'drip-stats' },
       h('div', { class: 'drip-glass-tile' }, glass()),
       h('div', { class: 'drip-time-block' },
         h('div', { class: 'drip-time' }, left),
         h('div', { class: 'drip-sub' }, 'left today')),
-      h('div', { class: 'drip-counts' },
-        h('div', { class: `drip-count${watch ? '' : ' is-zero'}` }, icon('drop', 'drip-token-drop'), h('span', {}, String(watch)), h('span', { class: 'drip-sr' }, watch === 1 ? ' drop' : ' drops')),
-        h('div', { class: `drip-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), h('span', {}, String(rec)), h('span', { class: 'drip-sr' }, rec === 1 ? ' card' : ' cards'))));
+      h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, countRow('watch'), countRow('rec')));
   }
 
   /** The gray line under the buttons when something has run out. */
@@ -657,14 +709,12 @@
     if (!state) return h('div', { class: 'drip-loading', 'aria-busy': 'true' });
     const note = outNote();
     const showCard = state.current || busy === 'reveal';
-    // The kept drops rise in once, as the lock's water falls away. Rebuilds after that leave the message still.
-    const rises = !!message && message === keptMessage;
     // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
     return h('div', { class: `drip-page${showCard ? ' is-open' : ''}` },
       stats(),
       !showCard && actions(),
       state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
-      (message || note) && h('div', { class: `drip-message${rises ? ' is-kept' : ''}`, role: 'status' }, message || note),
+      (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
       savedList());
   }
 
@@ -674,48 +724,127 @@
   function render() {
     const root = document.getElementById('drip-home');
     if (!root || moving || leaving) return;
+    takeRefill();
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0, DripGlass.fraction(state).toFixed(3),
       state.tokens, state.current, state.backlog, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
       state.settings.resetHour,
-    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring]);
+    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving]);
     if (root.firstChild && key === rendered) return;
     rendered = key;
     // Keep keyboard focus on the same control across the rebuild.
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
     root.classList.add('drip-ui');
+    // The stats are centered as a group, so minutes that get wider ("50m" to "1h 5m") move it. It glides there instead
+    // of jumping.
+    const was = glassEl?.isConnected ? glassEl.getBoundingClientRect().left : null;
     root.replaceChildren(view());
-    keptSeen(root);
+    syncCounts();
+    if (was !== null && glassEl?.isConnected && animates() && !document.hidden) {
+      const dx = was - glassEl.getBoundingClientRect().left;
+      if (Math.abs(dx) > 0.5) root.querySelector('.drip-stats')?.animate([{ translate: `${dx}px 0` }, { translate: '0 0' }], { duration: 420, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
+    }
     if (focused) /** @type {HTMLElement | null} */ (root.querySelector(`[data-k="${CSS.escape(focused)}"]`))?.focus();
   }
 
   let refreshing = false;
 
-  /** "Kept 3 drops." until it has been drawn once with its rise. */
-  let keptMessage = '';
+  /** @param {number} ms */
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   /**
-   * The message has risen once it's drawn on a page that shows. YouTube keeps the home page hidden until its data
-   * arrives, and builds drawn before then keep the rise for when it shows.
-   * @param {HTMLElement} root
+   * Drops and cards on their way into the counters, which the counts hold back until they land (counter.js): the drops
+   * "Done for now" kept, or what the day's reset added. Set until the landing is over.
+   * @type {{kind: 'kept' | 'new', watch: number, rec: number} | null}
    */
-  function keptSeen(root) {
-    if (keptMessage && root.getClientRects().length && document.documentElement.hasAttribute('data-drip-shown')) keptMessage = '';
-  }
+  let arriving = null;
+  /** The landing is running. */
+  let landing = false;
+  /** The landing is waiting for the page to show. */
+  let waiting = false;
+  /** The reset whose refill this page has taken, so it plays once. */
+  let refillTaken = '';
 
-  /** Shows the drops the lock screen's "Done for now" left unspent, read once (watch.js onDone). */
+  /** The drops the lock screen's "Done for now" left unspent land in the counter, read once (watch.js onDone). */
   function takeKept() {
     let kept = 0;
     try {
       kept = Number(sessionStorage.getItem(KEPT_KEY));
       sessionStorage.removeItem(KEPT_KEY);
     } catch {
-      // Storage blocked: no message.
+      // Storage blocked: the drops are just there.
     }
-    if (kept <= 0) return;
-    message = keptMessage = `Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.`;
-    // The same words may already be on the page from last time. Rebuild anyway, so they rise now.
+    if (kept <= 0 || landing) return;
+    arriving = { kind: 'kept', watch: kept, rec: 0 };
     rendered = '';
+    landWhenShown();
+  }
+
+  /** What the day's reset added lands in the counters once, on the first home page that shows it. */
+  function takeRefill() {
+    const r = state && state.refill;
+    if (!r || r.day !== state.day || r.day === refillTaken || arriving) return;
+    refillTaken = r.day;
+    arriving = { kind: 'new', watch: r.watch, rec: r.rec };
+    rendered = '';
+    landWhenShown();
+  }
+
+  /**
+   * Waits until the home page is in view, then lands what's arriving. After "Done for now" that's 250ms after the
+   * lock's water starts falling away, as Jesse picked it (design round 2's D, 2026-10-13). Another tab that shows the
+   * day's refill first takes it from this one.
+   */
+  async function landWhenShown() {
+    if (waiting) return;
+    waiting = true;
+    const started = Date.now();
+    let fell = false;
+    try {
+      while (arriving) {
+        if (arriving.kind === 'new' && state && !state.refill) {
+          arriving = null;
+          rendered = '';
+          render();
+          return;
+        }
+        const lock = document.getElementById('drip-lock');
+        if (lock?.classList.contains('is-surfacing')) fell = true;
+        // watch.js lets the water fall within 4 seconds of home showing. Past 6, the drops come in anyway.
+        const lockUp = !!lock && !fell && Date.now() - started < 6000;
+        const root = document.getElementById('drip-home');
+        const inView = !!root?.getClientRects().length && !document.hidden && document.documentElement.hasAttribute('data-drip-shown');
+        if (state && counts.watch?.row.isConnected && inView && !lockUp && !moving) break;
+        await sleep(50);
+      }
+      if (!arriving) return;
+      await sleep(fell ? 250 : 400);
+      await land();
+    } finally {
+      waiting = false;
+    }
+  }
+
+  async function land() {
+    const a = arriving;
+    if (!a || !state || !counts.watch || !counts.rec) return;
+    landing = true;
+    // Kept drops after a reset carry the refill in them already.
+    if (state.refill) {
+      refillTaken = state.refill.day;
+      send({ type: 'refillSeen' }).then(absorb);
+    }
+    try {
+      await DripCounter.land({
+        kind: a.kind,
+        drops: { ...counts.watch, to: state.tokens.watch },
+        cards: a.kind === 'new' ? { ...counts.rec, to: state.tokens.rec } : undefined,
+      });
+    } finally {
+      arriving = null;
+      landing = false;
+      syncCounts();
+    }
   }
 
   /**
@@ -727,13 +856,11 @@
     const browse = document.querySelector(SEL.homeBrowse);
     if (!browse) return;
     if (browse.querySelector('#drip-home')) {
-      const root = /** @type {HTMLElement} */ (browse.querySelector('#drip-home'));
       // "Done for now" came back through YouTube's in-page navigation, to a home page drip had already built.
       if (navigated) {
         takeKept();
         render();
       }
-      keptSeen(root);
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;

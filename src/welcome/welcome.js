@@ -15,6 +15,8 @@
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
   /** @type {any} */
   const DripPour = /** @type {any} */ (globalThis).DripPour;
+  /** @type {any} */
+  const DripCounter = /** @type {any} */ (globalThis).DripCounter;
 
   /** @param {string} id */
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -220,16 +222,20 @@
     drawHome();
   }
 
-  function stats() {
-    const { watch, rec } = sand.tokens;
+  /** The home page's stats. `heldDrops` are drops still on their way into the counter, which it doesn't show yet. */
+  function stats(heldDrops = 0) {
+    const watch = Math.max(0, sand.tokens.watch - heldDrops);
+    const { rec } = sand.tokens;
+    const s = sand.settings;
+    const room = String(Math.max(s.watchTokensPerDay * s.rolloverDays, s.recTokensPerDay * s.rolloverDays, sand.tokens.watch, rec)).length;
     return h('div', { class: 'drip-stats' },
       h('div', { class: 'drip-glass-tile' }, glass()),
       h('div', { class: 'drip-time-block' },
         h('div', { class: 'drip-time' }, Drip.formatMinutes(heldLeft ?? sand.watchSecondsLeft)),
         h('div', { class: 'drip-sub' }, 'left today')),
-      h('div', { class: 'drip-counts' },
-        h('div', { class: `drip-count${watch ? '' : ' is-zero'}` }, icon('drop', 'drip-token-drop'), h('span', {}, String(watch)), h('span', { class: 'drip-sr' }, watch === 1 ? ' drop' : ' drops')),
-        h('div', { class: `drip-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), h('span', {}, String(rec)), h('span', { class: 'drip-sr' }, rec === 1 ? ' card' : ' cards'))));
+      h('div', { class: 'drip-counts', style: `--drip-room: ${room}` },
+        h('div', { class: `drip-count${watch ? '' : ' is-zero'}` }, icon('drop', 'drip-token-drop'), DripCounter.num(watch), h('span', { class: 'drip-sr' }, watch === 1 ? ' drop' : ' drops')),
+        h('div', { class: `drip-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), DripCounter.num(rec), h('span', { class: 'drip-sr' }, rec === 1 ? ' card' : ' cards'))));
   }
 
   function actions() {
@@ -676,11 +682,14 @@
       stopRings();
       stage.style.minHeight = `${stage.offsetHeight}px`;
       const kept = sand.tokens.watch;
+      /** The kept drops land in the counter as on YouTube (counter.js), 250ms after the water starts falling. */
       const home = () => {
-        const message = kept > 0 ? `Kept ${kept} ${kept === 1 ? 'drop' : 'drops'}.` : '';
-        setUnder(h('div', { id: 'drip-home', class: 'drip-ui' },
-          h('div', { class: 'drip-page' }, stats(), actions(), message && h('div', { class: 'drip-message is-kept', role: 'status' }, message))));
+        const page = h('div', { class: 'drip-page' }, stats(kept), actions());
+        setUnder(h('div', { id: 'drip-home', class: 'drip-ui' }, page));
         stage.append(again());
+        const row = /** @type {HTMLElement} */ (page.querySelector('.drip-count'));
+        const drops = { row, icon: row.querySelector('.drip-i'), num: row.querySelector('.drip-num'), to: kept };
+        later(() => DripCounter.land({ kind: 'kept', drops }), reducedMotion() ? 0 : 250);
       };
       if (reducedMotion()) {
         home();
