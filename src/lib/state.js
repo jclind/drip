@@ -42,6 +42,8 @@
  * @property {string} title
  * @property {string} channel
  * @property {string} length
+ * @property {string} [views] The view count, as the feed wrote it when it was read ("394K views"). It isn't updated after.
+ * @property {string} [age] How old the video is, as the feed wrote it when it was read ("3d ago"). It isn't updated after.
  * @property {number} [resumeSec] How far in the video got, for the stash's progress bar and resuming there.
  * @property {number} [durationSec] The player's length in seconds, for the same bar.
  * @property {number} [addedAt] When it went into the stash, in ms, for the full stash's "6 days ago".
@@ -131,6 +133,8 @@
     const str = (x) => (typeof x === 'string' ? x : '');
     /** @type {Video} */
     const video = { id: v.id, title: str(v.title), channel: str(v.channel), length: str(v.length) };
+    if (str(v.views)) video.views = str(v.views);
+    if (str(v.age)) video.age = str(v.age);
     if (seconds(v.durationSec)) video.durationSec = seconds(v.durationSec);
     if (seconds(v.resumeSec)) video.resumeSec = video.durationSec ? Math.min(seconds(v.resumeSec), video.durationSec) : seconds(v.resumeSec);
     if (seconds(v.addedAt)) video.addedAt = seconds(v.addedAt);

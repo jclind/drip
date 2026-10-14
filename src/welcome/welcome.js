@@ -32,11 +32,11 @@
 
   // Videos the tour's reveals draw from. Made up, with drawn thumbnails, so the page loads nothing from YouTube.
   const SAMPLES = [
-    { id: 'tour-joinery', title: 'How Japanese joinery holds without nails', channel: 'Workshop Notes', length: '14:02', thumb: 'linear-gradient(135deg, #8a5a3c, #3d2618)' },
-    { id: 'tour-trail', title: 'Riding the ridge trail before the storm', channel: 'Trail Days', length: '21:35', thumb: 'linear-gradient(135deg, #3a7d5c, #173528)' },
-    { id: 'tour-bread', title: 'Sourdough with a schedule that fits a workday', channel: 'Kitchen Basics', length: '9:08', thumb: 'linear-gradient(135deg, #c08a3e, #5a3a12)' },
-    { id: 'tour-orbit', title: 'Why the Moon always shows the same face', channel: 'Slow Science', length: '12:47', thumb: 'linear-gradient(135deg, #3c4f8a, #141c3d)' },
-    { id: 'tour-redstone', title: 'Building a working clock out of redstone', channel: 'Blockworks', length: '25:33', thumb: 'linear-gradient(135deg, #9a3a3a, #3a1414)' },
+    { id: 'tour-joinery', title: 'How Japanese joinery holds without nails', channel: 'Workshop Notes', length: '14:02', views: '214K views', age: '3d ago', thumb: 'linear-gradient(135deg, #8a5a3c, #3d2618)' },
+    { id: 'tour-trail', title: 'Riding the ridge trail before the storm', channel: 'Trail Days', length: '21:35', views: '1.2M views', age: '1w ago', thumb: 'linear-gradient(135deg, #3a7d5c, #173528)' },
+    { id: 'tour-bread', title: 'Sourdough with a schedule that fits a workday', channel: 'Kitchen Basics', length: '9:08', views: '48K views', age: '2mo ago', thumb: 'linear-gradient(135deg, #c08a3e, #5a3a12)' },
+    { id: 'tour-orbit', title: 'Why the Moon always shows the same face', channel: 'Slow Science', length: '12:47', views: '3.4M views', age: '5d ago', thumb: 'linear-gradient(135deg, #3c4f8a, #141c3d)' },
+    { id: 'tour-redstone', title: 'Building a working clock out of redstone', channel: 'Blockworks', length: '25:33', views: '612K views', age: '1y ago', thumb: 'linear-gradient(135deg, #9a3a3a, #3a1414)' },
   ];
   /** @param {string} id */
   const sample = (id) => SAMPLES.find((v) => v.id === id) || SAMPLES[0];
@@ -261,14 +261,14 @@
     stashDrawn = { id: video.id, stashed: saved };
     const stash = DripStash.parts(fills ? !saved : saved, { labelClass: 'drip-save-label' });
     if (fills) stash.to(saved);
-    const thumb = h('div', { class: 'tour-thumb' }, icon('play-line'));
+    const thumb = h('div', { class: 'tour-thumb' }, icon('play-line'), h('span', { class: 'drip-length' }, video.length));
     thumb.style.setProperty('--thumb', sample(video.id).thumb);
     // The reveal animation deals the card itself, so the card doesn't also rise in.
     return h('div', { class: `drip-card${isNew && !animates() ? ' is-new' : ''}` },
       h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true)),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
       h('div', { class: 'drip-card-meta-row' },
-        h('span', { class: 'drip-meta' }, `${video.channel} · ${video.length}`),
+        h('span', { class: 'drip-meta drip-meta-split' }, h('span', { class: 'drip-meta-channel' }, video.channel), h('span', { class: 'drip-meta-rest' }, ` · ${video.views} · ${video.age}`), h('span', { class: 'drip-sr' }, `, length ${video.length}`)),
         h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(2); } },
           icon('play'), h('span', {}, 'Watch'), sand.watchSecondsLeft <= 0 && price('drop'))),
       h('div', { class: 'drip-card-actions' },

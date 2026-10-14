@@ -940,6 +940,37 @@ html[dark] #drip-pill {
   white-space: nowrap;
 }
 
+/* Channel, then views and age. Only the channel gives way to the "…", so a long name can't push the age off. */
+#drip-home .drip-meta-split {
+  display: flex;
+}
+
+#drip-home .drip-meta-channel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#drip-home .drip-meta-rest {
+  flex: none;
+  white-space: pre;
+}
+
+/* The length on the thumbnail's corner, as on YouTube's grid. It's on the card's front, so it turns over with it. */
+#drip-home .drip-length {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  pointer-events: none;
+}
+
 #drip-home .drip-watch {
   flex: none;
   padding: 0 16px 0 14px;

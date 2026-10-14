@@ -30,9 +30,14 @@
     // Late 2026 markup uses camelCase classes (checked 2026-10-05); the kebab-case ones are the older markup.
     channel: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, ytd-channel-name a, ytd-channel-name #text',
     length: '.ytBadgeShapeText, .yt-badge-shape__text, .badge-shape-wiz__text, ytd-thumbnail-overlay-time-status-renderer #text',
+    // The line after the title: channel, views, and age. Late 2026 writes "184K" and "3d ago", the older markup
+    // "184K views" and "3 days ago". The parts are told apart by VIEWS and AGE, so the age is English only (checked 2026-10-14).
+    metaPart: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, #metadata-line span',
     watched: 'ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHost',
     ad: 'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer',
   };
+  const AGE = /\bago$/i;
+  const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
 
   /** @type {any} */
   let state = null;
@@ -52,6 +57,22 @@
   }
 
   /**
+   * The views and age from a grid item's line under the title, as YouTube writes them, or '' for a part it lacks.
+   * @param {Element} item
+   * @param {string} channel Left out, in case a channel's name is a number.
+   */
+  function viewsAndAge(item, channel) {
+    let views = '';
+    let age = '';
+    for (const el of item.querySelectorAll(SEL.metaPart)) {
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!views && text !== channel && VIEWS.test(text)) views = /views?$/i.test(text) ? text : `${text} views`;
+      else if (!age && AGE.test(text)) age = text;
+    }
+    return { views, age };
+  }
+
+  /**
    * Videos currently in a feed's grid, minus ads, Shorts, mixes, and ones already watched.
    * @param {ParentNode} root The page, or a hidden frame's document.
    * @param {string} browseSelector
@@ -59,7 +80,7 @@
   function readPool(root = document, browseSelector = SEL.homeBrowse) {
     const browse = root.querySelector(browseSelector);
     if (!browse) return [];
-    /** @type {{id: string, title: string, channel: string, length: string}[]} */
+    /** @type {{id: string, title: string, channel: string, length: string, views: string, age: string}[]} */
     const pool = [];
     const ids = new Set();
     for (const item of browse.querySelectorAll(SEL.item)) {
@@ -72,7 +93,8 @@
       const title = firstText(item, SEL.title) || link.getAttribute('title') || '';
       if (!title) continue;
       ids.add(id);
-      pool.push({ id, title, channel: firstText(item, SEL.channel), length: firstText(item, SEL.length) });
+      const channel = firstText(item, SEL.channel);
+      pool.push({ id, title, channel, length: firstText(item, SEL.length), ...viewsAndAge(item, channel) });
     }
     return pool;
   }
@@ -259,7 +281,7 @@
         counter: page?.querySelector('.drip-stats .drip-token-card'),
         card: (/** @type {any} */ video) => (video ? card(video) : openingCard()),
         actions,
-        ready: (/** @type {any} */ video) => thumbReady(video.id),
+        ready: (/** @type {any} */ video) => thumbReady(video),
         saved: {
           now: () => root.querySelector('.drip-saved'),
           build: (/** @type {boolean} */ open) => savedList(open ? 'empty' : 'card'),
@@ -543,9 +565,10 @@
 
   /**
    * The card's box for a video: a face-up card (reveal.js) with the thumbnail on its front.
-   * @param {string} id
+   * @param {{id: string, length?: string}} video
    */
-  function thumbnail(id) {
+  function thumbnail(video) {
+    const id = video.id;
     if (thumbCache && thumbCache.id === id) return thumbCache.el;
     const img = /** @type {HTMLImageElement} */ (h('img', { alt: '', decoding: 'async' }));
     /** @type {() => void} */
@@ -571,18 +594,20 @@
       class: 'drip-thumb is-dealt', href: watchUrl(id), tabindex: '-1', 'aria-hidden': 'true',
       onclick: (/** @type {Event} */ e) => { e.preventDefault(); onResolve('watch', id); },
     }, DripReveal.dealCard(img, true));
+    // The length sits on the picture, as on YouTube's grid, so it turns over with the card.
+    if (video.length) el.querySelector('.drip-deal-front')?.append(h('span', { class: 'drip-length' }, video.length));
     thumbCache = { id, el };
     thumbLoads.set(el, done);
     return el;
   }
 
   /**
-   * Resolves once the thumbnail for `id` can show: loaded, failed in both sizes, or still loading after 8 seconds, when
+   * Resolves once the video's thumbnail can show: loaded, failed in both sizes, or still loading after 8 seconds, when
    * the card turns over onto its gray front rather than wait any longer.
-   * @param {string} id
+   * @param {{id: string, length?: string}} video
    */
-  function thumbReady(id) {
-    const done = thumbLoads.get(thumbnail(id)) || Promise.resolve();
+  function thumbReady(video) {
+    const done = thumbLoads.get(thumbnail(video)) || Promise.resolve();
     return Promise.race([done, new Promise((r) => setTimeout(r, 8000))]);
   }
 
@@ -712,10 +737,22 @@
     return el;
   }
 
+  /**
+   * "Channel · 394K views · 3d ago". A long channel name is cut short before the views and age are. The length badge
+   * is on the thumbnail, which screen readers skip, so they get the length here.
+   * @param {any} video
+   */
+  function metaLine(video) {
+    const rest = [video.views, video.age].filter(Boolean).join(' · ');
+    return h('span', { class: 'drip-meta drip-meta-split' },
+      h('span', { class: 'drip-meta-channel' }, video.channel),
+      rest && h('span', { class: 'drip-meta-rest' }, video.channel ? ` · ${rest}` : rest),
+      video.length && h('span', { class: 'drip-sr' }, `, length ${video.length}`));
+  }
+
   /** @param {any} video */
   function card(video) {
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === video.id);
-    const meta = [video.channel, video.length].filter(Boolean).join(' · ');
     // At 0 minutes Watch buys a drop's minutes and plays (Q18). With no drops either, it goes to the lock screen.
     const buys = costsDrop(video.id);
     // The animation shows Reveal next its own way, and draws the card as it'll be once it's done.
@@ -730,10 +767,10 @@
     if (fills) stash.to(saved);
     const swapping = swapFor === video.id && !saved && !next;
     return h('div', { class: `drip-card${next ? ' is-next' : ''}${isNew ? ' is-new' : ''}`, 'aria-busy': next ? 'true' : undefined },
-      thumbnail(video.id),
+      thumbnail(video),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
       h('div', { class: 'drip-card-meta-row' },
-        h('span', { class: 'drip-meta' }, meta),
+        metaLine(video),
         h('button', { class: 'drip-b drip-b-primary drip-watch', 'data-k': 'watch', disabled: next, onclick: () => onResolve('watch', video.id) },
           icon('play'), h('span', {}, 'Watch'), buys && price('drop'))),
       h('div', { class: 'drip-card-actions' },
