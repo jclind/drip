@@ -21,14 +21,18 @@ function sortKeys(value) {
 /**
  * Loads background.js in a fresh context with in-memory storage.
  * @param {any} [initial]
- * @param {{dev?: boolean, panel?: boolean}} [opts] dev: the checkout has dev/ENABLED. panel: false for a store build,
- *   which has no dev panel.
+ * @param {{dev?: boolean, panel?: boolean, stores?: {local: Record<string, any>, session: Record<string, any>}}} [opts]
+ *   dev: the checkout has dev/ENABLED. panel: false for a store build, which has no dev panel. stores: storage kept
+ *   from an earlier worker, as when Chrome stops the worker and starts it again.
  */
-function worker(initial = undefined, { dev = false, panel = true } = {}) {
+function worker(initial = undefined, { dev = false, panel = true, stores = undefined } = {}) {
   /** @type {Record<string, any>} */
-  const store = initial === undefined ? {} : { drip: structuredClone(initial) };
+  const store = stores ? stores.local : initial === undefined ? {} : { drip: structuredClone(initial) };
+  /** @type {Record<string, any>} */
+  const session = stores ? stores.session : {};
   let writes = 0;
   let failNext = 0;
+  let failSession = 0;
   /** @type {Function | null} */
   let onMessage = null;
   /** @type {Function | null} */
@@ -60,6 +64,16 @@ function worker(initial = undefined, { dev = false, panel = true } = {}) {
           Object.assign(store, structuredClone(items));
         },
       },
+      session: {
+        get: async (/** @type {string} */ key) => (key in session ? { [key]: structuredClone(session[key]) } : {}),
+        set: async (/** @type {Record<string, any>} */ items) => {
+          if (failSession > 0) {
+            failSession--;
+            throw new Error('session write failed');
+          }
+          Object.assign(session, structuredClone(items));
+        },
+      },
     },
     tabs: { create: (/** @type {{url: string}} */ opts) => { opened.push(opts.url); } },
   };
@@ -75,7 +89,8 @@ function worker(initial = undefined, { dev = false, panel = true } = {}) {
     if (async !== true) setTimeout(() => resolve(undefined), 0);
   });
   const install = (/** @type {string} */ reason) => /** @type {Function} */ (onInstalled)({ reason });
-  return { send, install, opened, store, writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, Drip: context.Drip };
+  const restart = () => worker(undefined, { dev, panel, stores: { local: store, session } });
+  return { send, install, restart, opened, store, session, writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
 }
 
 test('every reply carries the saved state', async () => {
@@ -311,4 +326,61 @@ test('swapBacklog and a tick with the player position reach the stash (Q28)', as
   await w.send({ type: 'tick', seconds: 5, videoId: 'bbb', position: 125.4, duration: 600 });
   assert.equal(w.store.drip.backlog[0].resumeSec, 125);
   assert.equal(w.store.drip.backlog[0].durationSec, 600);
+});
+
+// Codex, 2026-10-13: Chrome stops an idle worker and drops its variables. The clock lives in session storage, so two
+// tabs playing at once aren't both charged after a restart.
+test('the clock survives a worker restart, so overlapping time from two tabs is charged once', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'tick', seconds: 5, videoId: 'aaa' });
+  const w2 = w.restart();
+  await w2.send({ type: 'tick', seconds: 5, videoId: 'bbb' });
+  assert.ok(w2.store.drip.watchSecondsLeft >= 894, `left ${w2.store.drip.watchSecondsLeft}`);
+});
+
+test('a resent tick key is charged only for its new seconds, and a failed write records nothing', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  w.failWrites(1);
+  await w.send({ type: 'tick', seconds: 5, videoId: 'aaa', key: 'k1', ago: 60000 });
+  assert.equal(w.store.drip.watchSecondsLeft, 900);
+  await w.send({ type: 'tick', seconds: 5, videoId: 'aaa', key: 'k1', ago: 60000 });
+  assert.equal(w.store.drip.watchSecondsLeft, 895);
+  // Two more seconds played under the same key, ending two seconds later.
+  await w.send({ type: 'tick', seconds: 7, videoId: 'aaa', key: 'k1', ago: 58000 });
+  assert.equal(w.store.drip.watchSecondsLeft, 893);
+});
+
+test('a tick whose state saved but whose clock did not is still ok, so the tab does not resend it (Codex, 2026-10-14)', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  w.failSessionWrites(1);
+  const res = await w.send({ type: 'tick', seconds: 5, videoId: 'aaa', key: 'k1', ago: 60000 });
+  assert.equal(res.ok, true);
+  assert.equal(w.store.drip.watchSecondsLeft, 895);
+});
+
+// Codex, 2026-10-13: only drip's own scripts can send these, but a bad shape mustn't get around a limit.
+test('needThis refuses an id that is not a video id', async () => {
+  const w = worker();
+  for (const videoId of [{}, ['a'], 42, '', 'has space']) {
+    const res = await w.send({ type: 'needThis', videoId, reason: 'for school' });
+    assert.equal(res.error, 'bad-video', JSON.stringify(videoId));
+  }
+  assert.deepEqual([...w.store.drip.unlocked], []);
+  const ok = await w.send({ type: 'needThis', videoId: 'abc', reason: 42 });
+  assert.equal(ok.error, 'reason-required');
+});
+
+test('a message that is not an object is refused', async () => {
+  const w = worker();
+  for (const msg of [null, 'get', 7]) assert.equal((await w.send(msg, PAGE)).error, 'unknown-message');
+});
+
+test('Undo can go over the stash cap, but not past the highest cap Settings allows', async () => {
+  const w = worker();
+  await w.send({ type: 'updateSettings', changes: { stashMax: 1 } });
+  for (let i = 0; i < 60; i++) await w.send({ type: 'addBacklog', video: { id: `v${i}`, title: '' }, index: 0 });
+  assert.equal(w.store.drip.backlog.length, 50);
 });

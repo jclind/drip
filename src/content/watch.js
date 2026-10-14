@@ -67,7 +67,8 @@
   /**
    * Played time measured but not yet charged, oldest first, one entry per video. It goes to the worker every
    * SEND_EVERY seconds, at once when it would use up the balance, and whenever playback stops or the video changes.
-   * @type {{id: string, seconds: number, endedAt: number}[]}
+   * The key stays the same on a resend, so the worker can tell time it already charged from new time.
+   * @type {{id: string, seconds: number, endedAt: number, key: string}[]}
    */
   const unsent = [];
   const SEND_EVERY = 5;
@@ -244,7 +245,7 @@
     if (last && last.id === runId && !splitNext) {
       last.seconds += seconds;
       last.endedAt = endedAt;
-    } else unsent.push({ id: runId, seconds, endedAt });
+    } else unsent.push({ id: runId, seconds, endedAt, key: crypto.randomUUID() });
     splitNext = false;
   }
 
@@ -396,9 +397,11 @@
     const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && playing), startedAt: performance.now() };
     pendingTick = request;
     try {
-      const res = await send({ type: 'tick', seconds, videoId: id, ago: Math.round(performance.now() - entry.endedAt), ...position(id) });
+      const res = await send({ type: 'tick', seconds, videoId: id, key: entry.key, ago: Math.round(performance.now() - entry.endedAt), ...position(id) });
       if (res && res.ok && !disconnected) {
         entry.seconds -= seconds;
+        // Time that played while the tick was out is new, so it goes under a new key.
+        entry.key = crypto.randomUUID();
         if (entry.seconds <= 0.001 && unsent[0] === entry) unsent.shift();
         state = res.state;
         if (id === videoId()) {

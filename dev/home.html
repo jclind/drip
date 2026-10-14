@@ -120,6 +120,8 @@
 
   /** @type {Record<string, any>} */
   const store = { drip: JSON.parse(JSON.stringify(s)) };
+  /** @type {Record<string, any>} */
+  const sessionStore = {};
   /** @type {Function[]} */
   const changeListeners = [];
   // Every listener, as in Chrome. common.js adds one for the popup's ping, so keeping only the last dropped the worker's.
@@ -151,6 +153,10 @@
             for (const fn of changeListeners) fn({ [key]: { oldValue, newValue: store[key] } }, 'local');
           }
         },
+      },
+      session: {
+        get: async (/** @type {string} */ key) => (key in sessionStore ? { [key]: JSON.parse(JSON.stringify(sessionStore[key])) } : {}),
+        set: async (/** @type {Record<string, any>} */ items) => { Object.assign(sessionStore, JSON.parse(JSON.stringify(items))); },
       },
       onChanged: { addListener: (/** @type {Function} */ fn) => { changeListeners.push(fn); } },
     },

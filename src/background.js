@@ -8,8 +8,10 @@ importScripts('lib/state.js');
 var Drip = /** @type {any} */ (globalThis).Drip;
 const KEY = 'drip';
 
-/** End of the last stretch of watching we charged for, in ms. See DESIGN.md, "The clock with several tabs". */
-const clock = { lastChargeEnd: 0 };
+// The clock for watching in several tabs (DESIGN.md, "The clock with several tabs"). Chrome stops an idle worker and
+// drops its variables, and a lost clock charges overlapping time twice, so it lives in session storage (Codex,
+// 2026-10-13). Session storage clears when the browser restarts or drip reloads, when no old tick can arrive.
+const CLOCK_KEY = 'dripClock';
 
 /** @type {Promise<unknown>} */
 let queue = Promise.resolve();
@@ -30,30 +32,29 @@ function stableJson(value) {
 }
 
 /**
- * Runs fn on the current state, saves it if it changed, and returns fn's result. Calls run one at a time.
- * Every save wakes the storage listeners in every YouTube tab, so a call that changes nothing doesn't save.
+ * Runs fn on the current state and clock, saves them if they changed, and returns fn's result. Calls run one at a
+ * time. Every save wakes the storage listeners in every YouTube tab, so a call that changes nothing doesn't save.
  * @template T
- * @param {(state: any, now: number) => T} fn
+ * @param {(state: any, now: number, clock: any) => T} fn
  * @returns {Promise<T>}
  */
 function withState(fn) {
   const run = queue.then(async () => {
     const now = Date.now();
-    const stored = await chrome.storage.local.get(KEY);
+    const [stored, session] = await Promise.all([chrome.storage.local.get(KEY), chrome.storage.session.get(CLOCK_KEY)]);
     const state = Drip.hydrate(stored[KEY], now);
     Drip.rollDay(state, now);
     const before = stableJson(stored[KEY]);
-    const chargedUntil = clock.lastChargeEnd;
-    const result = fn(state, now);
-    if (stableJson(state) !== before) {
-      try {
-        await chrome.storage.local.set({ [KEY]: state });
-      } catch (err) {
-        // The charge didn't stick, so the tab's resent time must be charged again.
-        clock.lastChargeEnd = chargedUntil;
-        throw err;
-      }
-    }
+    /** @type {any} */
+    const saved = session[CLOCK_KEY];
+    const clock = { lastChargeEnd: Number(saved?.lastChargeEnd) || 0, ticks: Array.isArray(saved?.ticks) ? saved.ticks : [] };
+    const clockBefore = stableJson(clock);
+    const result = fn(state, now, clock);
+    // A failed state write throws before the clock is saved, so the tab's resent time is charged again.
+    if (stableJson(state) !== before) await chrome.storage.local.set({ [KEY]: state });
+    // Once the state is saved, the charge stuck, so a clock that fails to save mustn't fail the message: the tab
+    // would resend time already charged (Codex, 2026-10-14). That loses only the clock, as a stopped worker used to.
+    if (stableJson(clock) !== clockBefore) await chrome.storage.session.set({ [CLOCK_KEY]: clock }).catch(() => {});
     return result;
   });
   queue = run.catch(() => {});
@@ -64,8 +65,9 @@ function withState(fn) {
  * @param {any} msg
  * @param {any} state
  * @param {number} now
+ * @param {any} clock
  */
-function handle(msg, state, now) {
+function handle(msg, state, now, clock) {
   switch (msg.type) {
     case 'get':
       return { ok: true };
@@ -88,7 +90,7 @@ function handle(msg, state, now) {
     case 'tick':
       // The tab sends where the player is with each tick, so a stashed video's bar keeps up (Q28).
       if (msg.position !== undefined) Drip.markProgress(state, String(msg.videoId), msg.position, msg.duration);
-      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, msg.videoId, msg.ago) };
+      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, String(msg.videoId), msg.ago, msg.key) };
     case 'status':
       return { ok: true, ...Drip.watchStatus(state, msg.videoId) };
     case 'needThis':
@@ -141,7 +143,7 @@ function handleDev(msg, sendResponse) {
   } else if (msg.type === 'devAction') {
     runDevAction(msg, sendResponse);
   } else if (DEV_TYPES.includes(msg.type)) {
-    withState((state, now) => ({ result: handle(msg, state, now), state }))
+    withState((state, now, clock) => ({ result: handle(msg, state, now, clock), state }))
       .then(({ result, state }) => sendResponse({ ...result, state }))
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
   } else {
@@ -188,11 +190,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }).catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true;
   }
-  if (msg && msg.type === 'tick' && (!sender.tab || !sender.url?.startsWith('https://www.youtube.com/'))) {
+  if (!msg || typeof msg !== 'object') {
+    sendResponse({ ok: false, error: 'unknown-message' });
+    return;
+  }
+  if (msg.type === 'tick' && (!sender.tab || !sender.url?.startsWith('https://www.youtube.com/'))) {
     sendResponse({ ok: false, error: 'bad-sender' });
     return;
   }
-  withState((state, now) => ({ result: handle(msg, state, now), state }))
+  withState((state, now, clock) => ({ result: handle(msg, state, now, clock), state }))
     .then(({ result, state }) => sendResponse({ ...result, state }))
     .catch((err) => sendResponse({ ok: false, error: String(err) }));
   return true;
