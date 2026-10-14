@@ -32,11 +32,11 @@
 
   // Videos the tour's reveals draw from. Made up, with drawn thumbnails, so the page loads nothing from YouTube.
   const SAMPLES = [
-    { id: 'tour-joinery', title: 'How Japanese joinery holds without nails', channel: 'Workshop Notes', length: '14:02', thumb: 'linear-gradient(135deg, #8a5a3c, #3d2618)' },
-    { id: 'tour-trail', title: 'Riding the ridge trail before the storm', channel: 'Trail Days', length: '21:35', thumb: 'linear-gradient(135deg, #3a7d5c, #173528)' },
-    { id: 'tour-bread', title: 'Sourdough with a schedule that fits a workday', channel: 'Kitchen Basics', length: '9:08', thumb: 'linear-gradient(135deg, #c08a3e, #5a3a12)' },
-    { id: 'tour-orbit', title: 'Why the Moon always shows the same face', channel: 'Slow Science', length: '12:47', thumb: 'linear-gradient(135deg, #3c4f8a, #141c3d)' },
-    { id: 'tour-redstone', title: 'Building a working clock out of redstone', channel: 'Blockworks', length: '25:33', thumb: 'linear-gradient(135deg, #9a3a3a, #3a1414)' },
+    { id: 'tour-joinery', title: 'How Japanese joinery holds without nails', channel: 'Workshop Notes', length: '14:02', age: '3d ago', thumb: 'linear-gradient(135deg, #8a5a3c, #3d2618)' },
+    { id: 'tour-trail', title: 'Riding the ridge trail before the storm', channel: 'Trail Days', length: '21:35', age: '1w ago', thumb: 'linear-gradient(135deg, #3a7d5c, #173528)' },
+    { id: 'tour-bread', title: 'Sourdough with a schedule that fits a workday', channel: 'Kitchen Basics', length: '9:08', age: '2mo ago', thumb: 'linear-gradient(135deg, #c08a3e, #5a3a12)' },
+    { id: 'tour-orbit', title: 'Why the Moon always shows the same face', channel: 'Slow Science', length: '12:47', age: '5d ago', thumb: 'linear-gradient(135deg, #3c4f8a, #141c3d)' },
+    { id: 'tour-redstone', title: 'Building a working clock out of redstone', channel: 'Blockworks', length: '25:33', age: '1y ago', thumb: 'linear-gradient(135deg, #9a3a3a, #3a1414)' },
   ];
   /** @param {string} id */
   const sample = (id) => SAMPLES.find((v) => v.id === id) || SAMPLES[0];
@@ -268,7 +268,7 @@
       h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true)),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
       h('div', { class: 'drip-card-meta-row' },
-        h('span', { class: 'drip-meta' }, `${video.channel} · ${video.length}`),
+        h('span', { class: 'drip-meta' }, [video.channel, video.length, video.age].filter(Boolean).join(' · ')),
         h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(2); } },
           icon('play'), h('span', {}, 'Watch'), sand.watchSecondsLeft <= 0 && price('drop'))),
       h('div', { class: 'drip-card-actions' },

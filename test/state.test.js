@@ -504,9 +504,12 @@ test('markProgress keeps how far a stashed video got, and nothing for other vide
   assert.deepEqual(state, before);
 });
 
-test('cleanVideo keeps valid progress fields and drops bad ones', () => {
+test('cleanVideo keeps valid optional fields and drops bad ones', () => {
   assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 30.4, durationSec: 20 }), { ...video('a'), resumeSec: 20, durationSec: 20 });
   assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: -5, durationSec: 'long' }), video('a'));
+  assert.deepEqual(D.cleanVideo({ ...video('a'), age: '3d ago' }), { ...video('a'), age: '3d ago' });
+  assert.deepEqual(D.cleanVideo({ ...video('a'), age: '' }), video('a'));
+  assert.deepEqual(D.cleanVideo({ ...video('a'), age: 3 }), video('a'));
   const state = D.hydrate({ backlog: [{ ...video('a'), resumeSec: 12 }] }, time(5));
   assert.equal(state.backlog[0].resumeSec, 12);
 });

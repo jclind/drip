@@ -30,9 +30,13 @@
     // Late 2026 markup uses camelCase classes (checked 2026-10-05); the kebab-case ones are the older markup.
     channel: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, ytd-channel-name a, ytd-channel-name #text',
     length: '.ytBadgeShapeText, .yt-badge-shape__text, .badge-shape-wiz__text, ytd-thumbnail-overlay-time-status-renderer #text',
+    // The line after the title: channel, views, and age ("3d ago" in late 2026, "3 days ago" before). The age is the
+    // part that matches AGE, so it's English only (checked 2026-10-14).
+    metaPart: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, #metadata-line span',
     watched: 'ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHost',
     ad: 'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer',
   };
+  const AGE = /\bago$/i;
 
   /** @type {any} */
   let state = null;
@@ -51,6 +55,15 @@
     return '';
   }
 
+  /** @param {Element} item */
+  function ageText(item) {
+    for (const el of item.querySelectorAll(SEL.metaPart)) {
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (AGE.test(text)) return text;
+    }
+    return '';
+  }
+
   /**
    * Videos currently in a feed's grid, minus ads, Shorts, mixes, and ones already watched.
    * @param {ParentNode} root The page, or a hidden frame's document.
@@ -59,7 +72,7 @@
   function readPool(root = document, browseSelector = SEL.homeBrowse) {
     const browse = root.querySelector(browseSelector);
     if (!browse) return [];
-    /** @type {{id: string, title: string, channel: string, length: string}[]} */
+    /** @type {{id: string, title: string, channel: string, length: string, age: string}[]} */
     const pool = [];
     const ids = new Set();
     for (const item of browse.querySelectorAll(SEL.item)) {
@@ -72,7 +85,7 @@
       const title = firstText(item, SEL.title) || link.getAttribute('title') || '';
       if (!title) continue;
       ids.add(id);
-      pool.push({ id, title, channel: firstText(item, SEL.channel), length: firstText(item, SEL.length) });
+      pool.push({ id, title, channel: firstText(item, SEL.channel), length: firstText(item, SEL.length), age: ageText(item) });
     }
     return pool;
   }
@@ -715,7 +728,7 @@
   /** @param {any} video */
   function card(video) {
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === video.id);
-    const meta = [video.channel, video.length].filter(Boolean).join(' · ');
+    const meta = [video.channel, video.length, video.age].filter(Boolean).join(' · ');
     // At 0 minutes Watch buys a drop's minutes and plays (Q18). With no drops either, it goes to the lock screen.
     const buys = costsDrop(video.id);
     // The animation shows Reveal next its own way, and draws the card as it'll be once it's done.
