@@ -838,12 +838,13 @@
     if (!state) return;
     if (glassEl && !pouring) DripGlass.set(glassEl, DripGlass.fraction(state), GLASS_PX);
     for (const video of state.backlog) {
-      const link = root.querySelector(`[data-k="play-${CSS.escape(video.id)}"]`);
-      if (!link) continue;
+      const id = CSS.escape(video.id);
+      const link = root.querySelector(`[data-k="play-${id}"]`);
       const href = resumeUrl(video.id);
-      if (link.getAttribute('href') !== href) link.setAttribute('href', href);
-      const bar = /** @type {HTMLElement | null | undefined} */ (link.closest('li')?.querySelector('.drip-stash-bar'));
-      bar?.style.setProperty('--drip-at', DripSwap.fraction(video).toFixed(3));
+      if (link && link.getAttribute('href') !== href) link.setAttribute('href', href);
+      // The stash row's bar, and the same video's bar in the full-stash list when it's open (Codex, 2026-10-14).
+      const bars = [link?.closest('li')?.querySelector('.drip-stash-bar'), root.querySelector(`[data-k="swap-${id}"] .drip-stash-bar`)];
+      for (const bar of bars) /** @type {HTMLElement | null | undefined} */ (bar)?.style.setProperty('--drip-at', DripSwap.fraction(video).toFixed(3));
     }
   }
 
