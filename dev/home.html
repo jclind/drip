@@ -137,6 +137,7 @@
       onMessage: { addListener: (/** @type {Function} */ fn) => { messageListeners.push(fn); } },
       onMessageExternal: { addListener() {} },
       onInstalled: { addListener() {} },
+      onStartup: { addListener() {} },
       sendMessage: (/** @type {any} */ msg) => new Promise((resolve) => {
         // A small delay, like a real round trip to the worker.
         setTimeout(() => {

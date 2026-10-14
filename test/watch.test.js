@@ -331,6 +331,32 @@ test('ad time is not charged, and the video after it is (Q27)', async () => {
   assert.ok(Math.abs(world.state.watchSecondsLeft - 890) < 0.01);
 });
 
+test('during an ad, zero-second ticks keep the toolbar told that playback goes on (Codex, 2026-10-14)', async () => {
+  const { world, tab } = await setup();
+  tab.setAd(true);
+  await play(world, tab, 20);
+  const heartbeats = world.ticks().filter((t) => t.seconds === 0);
+  assert.ok(heartbeats.length >= 3, `${heartbeats.length} heartbeats in 20 seconds of ad`);
+  assert.ok(heartbeats.every((t) => t.playing === true && !t.key));
+  assert.equal(world.state.watchSecondsLeft, 900);
+});
+
+test('a pause with no time banked still tells the toolbar playback stopped (Codex, 2026-10-14)', async () => {
+  const { world, tab } = await setup();
+  await play(world, tab, 5);
+  tab.video.pause();
+  await tab.tick();
+  world.sent.length = 0;
+  await tab.video.play();
+  await tab.tick();
+  assert.equal(world.ticks().at(-1)?.playing, true, 'playing again is told at once');
+  tab.video.pause();
+  await tab.tick();
+  const last = world.ticks().at(-1);
+  assert.equal(last?.playing, false);
+  assert.equal(last?.seconds, 0);
+});
+
 test('a delayed tick spanning video, an ad, and video again charges only the video (Codex, Q27)', async () => {
   const { world, tab } = await setup();
   // No tick runs in between, as when Chrome throttles a background tab's timers.
