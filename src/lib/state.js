@@ -777,6 +777,16 @@
   }
 
   /**
+   * The tick's explicit playing flag says whether playback is ongoing.
+   * The toolbar forgets playback after 12 seconds without a fresh tick, including when a tab closes.
+   * @param {{at: number, playing?: boolean} | null} tick
+   * @param {number} now
+   */
+  function toolbarPlaying(tick, now) {
+    return tick !== null && tick.playing === true && now - tick.at < 12000;
+  }
+
+  /**
    * The toolbar uses the popup's fraction and the mockup's smooth top 5%. The glass API is passed in so this stays
    * pure and state.js can still load on pages that don't draw glasses. Unlocks don't affect minutes left.
    * @param {Pick<State, 'watchSecondsLeft' | 'watchSecondsBought'>} state
@@ -803,6 +813,6 @@
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
-    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass,
+    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
   };
 })();

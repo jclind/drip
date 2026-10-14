@@ -8,6 +8,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const SRC = path.join(__dirname, '..', 'src');
+const DEFAULT_ICON = JSON.parse(fs.readFileSync(path.join(SRC, '..', 'manifest.json'), 'utf8')).action.default_icon;
 const YT = { tab: { id: 1 }, url: 'https://www.youtube.com/watch?v=abc', origin: 'https://www.youtube.com' };
 const PAGE = { url: 'chrome-extension://drip/src/options/options.html', origin: 'chrome-extension://drip' };
 
@@ -35,6 +36,10 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   let failSession = 0;
   let failIcon = 0;
   let failDraw = 0;
+  let elapsed = 0;
+  let timerId = 0;
+  const timers = new Map();
+  class WorkerDate extends Date { static now() { return Date.now() + elapsed; } }
   /** @type {any[]} */
   const icons = [];
   /** @type {Function | null} */
@@ -49,6 +54,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
     runtime: {
       getURL: (/** @type {string} */ p) => p,
       getManifest: () => ({
+        action: { default_icon: DEFAULT_ICON },
         externally_connectable: { matches: ['http://localhost/*'] },
         content_scripts: panel ? [{ js: ['src/devpanel/panel.js'] }] : [],
       }),
@@ -103,7 +109,9 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
     }
   }
   /** @type {any} */
-  const context = { chrome, console, setTimeout, structuredClone, URL, fetch: async () => ({ ok: dev }),
+  const context = { chrome, console, Date: WorkerDate,
+    setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, at: WorkerDate.now() + ms }); return id; },
+    clearTimeout: (id) => timers.delete(id), structuredClone, URL, fetch: async () => ({ ok: dev }),
     OffscreenCanvas: FakeCanvas, Path2D: class { constructor(d) { this.d = d; } } };
   context.globalThis = context;
   context.importScripts = (/** @type {string} */ file) => vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
@@ -116,48 +124,168 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   });
   const install = (/** @type {string} */ reason) => /** @type {Function} */ (onInstalled)({ reason });
   const restart = () => worker(undefined, { dev, panel, stores: { local: store, session } });
+  const advance = async (ms) => {
+    elapsed += ms;
+    for (const [id, timer] of timers) {
+      if (timer.at <= WorkerDate.now()) { timers.delete(id); timer.fn(); }
+    }
+    await vm.runInContext('queue', context);
+  };
   return { send, install, restart, opened, store, session, icons,
+    advance,
     startup: () => /** @type {Function} */ (onStartup)(), idle: () => vm.runInContext('queue', context),
     failIcons: (n) => { failIcon = n; }, failDrawing: (n) => { failDraw = n; },
     writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
 }
 
-test('toolbar draws at load and after saves, skips unchanged levels, and redraws after a worker restart', async () => {
+test('toolbar shows the drop while idle, draws on fresh ticks, and skips unchanged glass levels', async () => {
   const w = worker();
   await w.idle();
   assert.equal(w.icons.length, 1);
   assert.equal(w.writes(), 0);
+  assert.deepEqual(w.icons[0].path, DEFAULT_ICON);
+  await w.send({ type: 'get' });
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'status', videoId: 'abc' });
+  assert.equal(w.icons.length, 1);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true });
+  assert.equal(w.icons.length, 2);
   for (const size of [16, 32]) {
-    const data = w.icons[0].imageData[size];
+    const data = w.icons[1].imageData[size];
     assert.equal(data.width, size);
     assert.equal(data.height, size);
     assert.equal(data.fills[0].color, '#909090');
     assert.equal(data.fills[1].color, '#42A5F6');
   }
-  await w.send({ type: 'get' });
-  assert.equal(w.icons.length, 1);
+  assert.equal(w.icons[1].imageData[32].fills.length, 3);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true });
+  assert.equal(w.icons.length, 2);
   await w.send({ type: 'spendWatch' });
   assert.equal(w.icons.length, 2);
-  assert.equal(w.icons[1].imageData[32].fills.length, 3);
-  await w.send({ type: 'tick', videoId: 'abc', seconds: .001 });
+  await w.advance(5000);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true });
   assert.equal(w.icons.length, 2);
-  await w.send({ type: 'needThis', videoId: 'abc', reason: 'for school' });
-  assert.equal(w.icons.length, 2);
-  await w.send({ type: 'tick', videoId: 'other', seconds: 450, ago: 60000 });
+  w.store.drip.watchSecondsLeft = 900;
+  await w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true });
   assert.equal(w.icons.length, 3);
   assert.equal(w.icons[2].imageData[32].fills.length, 2);
+});
+
+test('a stop tick restores the drop and the next playing tick redraws even at the same level', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'needThis', videoId: 'abc', reason: 'for school' });
+  const writes = w.writes();
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 0, ago: 0, playing: true });
+  assert.equal(w.writes(), writes, 'unlocked playback does not need a state save to show the glass');
+  assert.equal(w.icons.length, 2);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
+  assert.equal(w.store.drip.watchSecondsLeft, 900);
+  assert.equal(w.icons.length, 2);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 0, playing: false });
+  assert.equal(w.icons.length, 3);
+  assert.deepEqual(w.icons[2].path, DEFAULT_ICON);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
+  assert.equal(w.icons.length, 4);
+  assert.ok(w.icons[3].imageData);
+});
+
+test('missing playing clears the tab, and positive ago with playing true still shows the glass', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'needThis', videoId: 'abc', reason: 'for school' });
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 5000, playing: true });
+  assert.ok(w.icons.at(-1).imageData);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 0 });
+  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+});
+
+test('12 seconds without a fresh tick restores the drop, and playing ticks renew the timeout', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
+  await w.advance(5000);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 5000, playing: true });
+  const draws = w.icons.length;
+  const writes = w.writes();
+  await w.advance(7000);
+  assert.equal(w.icons.length, draws, 'the first tick timeout was canceled');
+  await w.advance(4900);
+  assert.equal(w.icons.length, draws);
+  await w.advance(100);
+  assert.equal(w.icons.length, draws + 1);
+  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+  assert.equal(w.writes(), writes, 'timeout only changes the icon');
+  await w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true });
+  assert.ok(w.icons.at(-1).imageData, 'the timeout cleared the glass cache');
+});
+
+test('a stopped tab does not hide another playing tab, which still expires after 12 seconds', async () => {
+  const w = worker();
+  const other = { ...YT, tab: { id: 2 } };
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
+  await w.advance(5000);
+  await w.send({ type: 'tick', videoId: 'other', seconds: 5, ago: 0, playing: true }, other);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 100, playing: false });
+  assert.ok(w.icons.at(-1).imageData);
+  await w.advance(7000);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 200, playing: false });
+  assert.ok(w.icons.at(-1).imageData);
+  await w.advance(5000);
+  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+});
+
+test('a worker restart shows the drop until a fresh tick, even with stored minutes and clock', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
   const restarted = w.restart();
   await restarted.idle();
   assert.equal(restarted.icons.length, 1);
-  assert.equal(restarted.icons[0].imageData[32].fills.length, 2);
+  assert.deepEqual(restarted.icons[0].path, DEFAULT_ICON);
+  await restarted.send({ type: 'get' });
+  assert.equal(restarted.icons.length, 1);
+  await restarted.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
+  assert.ok(restarted.icons.at(-1).imageData);
+});
+
+test('a timeout queued alongside a fresh tick leaves the playing glass visible', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
+  const response = w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true });
+  await w.advance(12000);
+  await response;
+  assert.ok(w.icons.at(-1).imageData);
+  await w.advance(12000);
+  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+});
+
+test('startup and install/update clear an active glass until another playing tick', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  for (const reset of [w.startup, () => w.install('update')]) {
+    await w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true });
+    assert.ok(w.icons.at(-1).imageData);
+    const writes = w.writes();
+    reset();
+    await w.idle();
+    assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+    const count = w.icons.length;
+    await w.advance(12000);
+    assert.equal(w.icons.length, count);
+    assert.equal(w.writes(), writes);
+  }
 });
 
 test('toolbar drawing and setIcon failures leave state writes and responses intact and can retry', async () => {
   const w = worker();
+  await w.send({ type: 'spendWatch' });
   await w.idle();
   w.failDrawing(1);
-  assert.equal((await w.send({ type: 'spendWatch' })).ok, true);
-  assert.equal(w.store.drip.watchSecondsLeft, 900);
+  assert.equal((await w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true })).ok, true);
+  assert.ok(w.store.drip.watchSecondsLeft < 900);
   assert.equal(w.icons.length, 1);
   w.failIcons(1);
   assert.equal((await w.send({ type: 'addBacklog', video: { id: 'abc', title: 'A' } })).ok, true);
@@ -166,9 +294,15 @@ test('toolbar drawing and setIcon failures leave state writes and responses inta
   await w.send({ type: 'removeBacklog', id: 'abc' });
   assert.equal(w.icons.length, 2);
   w.failWrites(1);
-  assert.equal((await w.send({ type: 'tick', videoId: 'abc', seconds: 450, ago: 60000 })).ok, false);
+  const left = w.store.drip.watchSecondsLeft;
+  assert.equal((await w.send({ type: 'tick', videoId: 'abc', seconds: 450, ago: 60000, playing: true })).ok, false);
   assert.equal(w.icons.length, 2);
-  assert.equal(w.store.drip.watchSecondsLeft, 900);
+  assert.equal(w.store.drip.watchSecondsLeft, left);
+  w.failIcons(1);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 100, playing: false });
+  assert.equal(w.icons.length, 2);
+  await w.send({ type: 'addBacklog', video: { id: 'retry', title: 'Retry' } });
+  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
 });
 
 test('toolbar refreshes on startup and install/update, keeping the day reset lazy', async () => {
@@ -179,16 +313,16 @@ test('toolbar refreshes on startup and install/update, keeping the day reset laz
   const writes = w.writes();
   w.startup();
   await w.idle();
-  assert.equal(w.icons.length, 2);
+  assert.equal(w.icons.length, 1);
   assert.equal(w.store.drip.watchSecondsLeft, 900);
   assert.equal(w.writes(), writes);
   w.store.drip.watchSecondsLeft = 450;
   w.install('update');
   await w.idle();
-  assert.equal(w.icons.length, 3);
+  assert.equal(w.icons.length, 1);
   assert.equal(w.opened.length, 0);
   await w.send({ type: 'get' });
-  assert.equal(w.icons.length, 4);
+  assert.equal(w.icons.length, 1);
   assert.equal(w.store.drip.watchSecondsLeft, 0);
   const installed = worker();
   installed.install('install');
@@ -216,10 +350,11 @@ test('ticks only count from youtube.com tabs', async () => {
   const w = worker();
   await w.send({ type: 'spendWatch' }, PAGE);
   for (const sender of [PAGE, { ...YT, tab: undefined }, { ...YT, url: 'https://evil.example/watch' }]) {
-    const res = await w.send({ type: 'tick', seconds: 60, videoId: 'abc' }, sender);
+    const res = await w.send({ type: 'tick', seconds: 60, videoId: 'abc', playing: true }, sender);
     assert.deepEqual({ ...res }, { ok: false, error: 'bad-sender' });
   }
   assert.equal(w.store.drip.watchSecondsLeft, 900);
+  assert.equal(w.icons.length, 1, 'rejected ticks cannot start the glass');
 });
 
 test('messages run one at a time, so two tabs cannot both spend the last token', async () => {

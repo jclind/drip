@@ -23,10 +23,39 @@ let queue = Promise.resolve();
 let lastIconKey = null;
 /** @type {{outline: Path2D, body: Path2D, surface: Path2D, wave: Path2D} | null} */
 let iconPaths = null;
+let toolbarIsDrop = false;
+/** @type {Map<number, {at: number, playing: boolean}>} */
+const toolbarTicks = new Map();
+/** @type {ReturnType<typeof setTimeout> | null} */
+let toolbarTimer = null;
+
+/** @param {number} tabId @param {boolean | undefined} playing @param {number} now */
+function noteToolbarTick(tabId, playing, now) {
+  toolbarTicks.set(tabId, { at: now, playing: playing === true });
+  for (const [id, tick] of toolbarTicks) {
+    if (!Drip.toolbarPlaying(tick, now)) toolbarTicks.delete(id);
+  }
+  if (toolbarTimer !== null) clearTimeout(toolbarTimer);
+  toolbarTimer = null;
+  if (toolbarTicks.size) {
+    const last = Math.max(...Array.from(toolbarTicks.values(), (tick) => tick.at));
+    // Chrome normally keeps the worker alive for 30 seconds after a tick. A forced restart resets to the drop.
+    toolbarTimer = setTimeout(refreshToolbar, Math.max(0, last + 12000 - Date.now()));
+  }
+}
 
 /** @param {any} state */
 async function updateToolbar(state) {
   try {
+    const playing = Array.from(toolbarTicks.values()).some((tick) => Drip.toolbarPlaying(tick, Date.now()));
+    if (!playing) {
+      lastIconKey = null;
+      if (!toolbarIsDrop) {
+        await chrome.action.setIcon({ path: chrome.runtime.getManifest().action.default_icon });
+        toolbarIsDrop = true;
+      }
+      return;
+    }
     const level = Drip.toolbarGlass(state, DripGlass);
     if (level.cacheKey === lastIconKey) return;
     if (!iconPaths) {
@@ -62,17 +91,32 @@ async function updateToolbar(state) {
     };
     await chrome.action.setIcon({ imageData: { 16: draw(16, level.water16), 32: draw(32, level.water32) } });
     lastIconKey = level.cacheKey;
+    toolbarIsDrop = false;
   } catch {
     // Drawing and setIcon failures leave the old icon and never fail a state write. Retry on the next save/start.
   }
 }
 
 function refreshToolbar() {
-  // Share the state queue so a startup read cannot overwrite an icon drawn for a later save. Read only: the day
-  // still resets lazily when a message comes in, even if the worker wakes after 4am.
+  // Share the state queue so an expired timer cannot overwrite an icon drawn for a later tick. Read only: the day
+  // still resets lazily when a message comes in, even if this runs after 4am.
   const run = queue.then(async () => {
+    if (!Array.from(toolbarTicks.values()).some((tick) => Drip.toolbarPlaying(tick, Date.now()))) {
+      await updateToolbar(null);
+      return;
+    }
     const stored = await chrome.storage.local.get(KEY);
     await updateToolbar(Drip.hydrate(stored[KEY], Date.now()));
+  });
+  queue = run.catch(() => {});
+}
+
+function resetToolbar() {
+  const run = queue.then(async () => {
+    toolbarTicks.clear();
+    if (toolbarTimer !== null) clearTimeout(toolbarTimer);
+    toolbarTimer = null;
+    await updateToolbar(null);
   });
   queue = run.catch(() => {});
 }
@@ -97,9 +141,10 @@ function stableJson(value) {
  * time. Every save wakes the storage listeners in every YouTube tab, so a call that changes nothing doesn't save.
  * @template T
  * @param {(state: any, now: number, clock: any) => T} fn
+ * @param {{tabId: number, playing?: boolean}} [toolbarTick]
  * @returns {Promise<T>}
  */
-function withState(fn) {
+function withState(fn, toolbarTick) {
   const run = queue.then(async () => {
     const now = Date.now();
     const [stored, session] = await Promise.all([chrome.storage.local.get(KEY), chrome.storage.session.get(CLOCK_KEY)]);
@@ -117,8 +162,9 @@ function withState(fn) {
     // Once the state is saved, the charge stuck, so a clock that fails to save mustn't fail the message: the tab
     // would resend time already charged (Codex, 2026-10-14). That loses only the clock, as a stopped worker used to.
     if (stableJson(clock) !== clockBefore) await chrome.storage.session.set({ [CLOCK_KEY]: clock }).catch(() => {});
+    if (toolbarTick) noteToolbarTick(toolbarTick.tabId, toolbarTick.playing, now);
     // Persist the clock before waiting on the icon, so drawing doesn't delay recording time already charged.
-    if (stateChanged) await updateToolbar(state);
+    if (stateChanged || toolbarTick) await updateToolbar(state);
     return result;
   });
   queue = run.catch(() => {});
@@ -172,13 +218,13 @@ function handle(msg, state, now, clock) {
 
 // A new install opens the welcome page once. Updates don't.
 chrome.runtime.onInstalled.addListener((details) => {
-  refreshToolbar();
+  resetToolbar();
   if (details.reason !== 'install') return;
   // Saves the state now, so the first day (Q6) starts at install, not at the first visit to YouTube (Codex).
   withState(() => ({ ok: true })).catch(() => {});
   chrome.tabs.create({ url: chrome.runtime.getURL('src/welcome/welcome.html') });
 });
-chrome.runtime.onStartup.addListener(refreshToolbar);
+chrome.runtime.onStartup.addListener(resetToolbar);
 
 // Development only: dev/reload.html on localhost asks for a reload after a code change.
 // Open YouTube tabs pause and ask for a refresh when this happens, so it can't be used to dodge the clock.
@@ -264,11 +310,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ ok: false, error: 'bad-sender' });
     return;
   }
-  withState((state, now, clock) => ({ result: handle(msg, state, now, clock), state }))
+  withState((state, now, clock) => ({ result: handle(msg, state, now, clock), state }),
+    msg.type === 'tick' ? { tabId: /** @type {chrome.tabs.Tab} */ (sender.tab).id, playing: msg.playing } : undefined)
     .then(({ result, state }) => sendResponse({ ...result, state }))
     .catch((err) => sendResponse({ ok: false, error: String(err) }));
   return true;
 });
 
 // A suspended service worker runs this again when Chrome starts it for any event.
-refreshToolbar();
+resetToolbar();

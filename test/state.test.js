@@ -26,13 +26,28 @@ test('API contains every contract name, and defaults are frozen', () => {
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
-    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass',
+    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
     watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10,
     rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home', stashMax: 10,
   });
+});
+
+test('toolbar playing rule needs a fresh ongoing tick and expires at 12 seconds', () => {
+  const tick = { at: time(5), playing: true };
+  const before = structuredClone(tick);
+  assert.equal(D.toolbarPlaying(null, tick.at), false);
+  assert.equal(D.toolbarPlaying(tick, tick.at), true);
+  assert.equal(D.toolbarPlaying(tick, tick.at + 11999), true);
+  assert.equal(D.toolbarPlaying(tick, tick.at + 12000), false);
+  assert.equal(D.toolbarPlaying(tick, tick.at + 20000), false);
+  assert.equal(D.toolbarPlaying({ ...tick, playing: false }, tick.at), false);
+  assert.equal(D.toolbarPlaying({ at: tick.at }, tick.at), false);
+  const delayed = { ...tick, ago: 5000 };
+  assert.equal(D.toolbarPlaying(delayed, tick.at), true);
+  assert.deepEqual(tick, before);
 });
 
 test('toolbar glass shows full, half, a sliver, and exactly empty without changing state', () => {
