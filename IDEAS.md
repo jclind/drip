@@ -75,7 +75,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 - On the lock, clicking the open water sends a small ripple out from the click. A calm fidget, but it rewards lingering on the lock, which may cut against "the satisfying moment is leaving". Worth a try before deciding.
 - Fish that drift away from the pointer on the lock. Cute; maybe too much to watch.
 - A soft water "plip" on "Done for now", off by default. drip has no sound anywhere yet, so it's a bigger decision than it looks.
-- Grace mode: while a video finishes on grace, the pill shows an empty glass with a dotted outline and "Finishing this one".
+- Grace mode: while a video finishes on grace, the pill shows an empty glass with a faded outline at 35% opacity and "Finishing this one". Built on 2026-10-14 with the faded outline instead of a dotted one (DESIGN.md, "Grace on the pill as built").
 
 ## Efficiency
 
