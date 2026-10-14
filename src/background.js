@@ -51,7 +51,10 @@ async function updateToolbar(state) {
     if (!playing) {
       lastIconKey = null;
       if (!toolbarIsDrop) {
-        await chrome.action.setIcon({ path: chrome.runtime.getManifest().action.default_icon });
+        // The manifest's paths are relative to the extension root, but setIcon resolves a relative path against this
+        // worker's folder (src/), so they need a leading slash.
+        const icons = /** @type {Record<string, string>} */ (chrome.runtime.getManifest().action.default_icon);
+        await chrome.action.setIcon({ path: Object.fromEntries(Object.entries(icons).map(([size, file]) => [size, `/${file}`])) });
         toolbarIsDrop = true;
       }
       return;

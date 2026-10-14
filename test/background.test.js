@@ -9,6 +9,8 @@ const vm = require('node:vm');
 
 const SRC = path.join(__dirname, '..', 'src');
 const DEFAULT_ICON = JSON.parse(fs.readFileSync(path.join(SRC, '..', 'manifest.json'), 'utf8')).action.default_icon;
+// setIcon resolves relative paths against the worker's folder, so the worker sends the manifest's paths from the root.
+const DROP_ICON = Object.fromEntries(Object.entries(DEFAULT_ICON).map(([size, file]) => [size, `/${file}`]));
 const YT = { tab: { id: 1 }, url: 'https://www.youtube.com/watch?v=abc', origin: 'https://www.youtube.com' };
 const PAGE = { url: 'chrome-extension://drip/src/options/options.html', origin: 'chrome-extension://drip' };
 
@@ -143,7 +145,7 @@ test('toolbar shows the drop while idle, draws on fresh ticks, and skips unchang
   await w.idle();
   assert.equal(w.icons.length, 1);
   assert.equal(w.writes(), 0);
-  assert.deepEqual(w.icons[0].path, DEFAULT_ICON);
+  assert.deepEqual({ ...w.icons[0].path }, DROP_ICON);
   await w.send({ type: 'get' });
   await w.send({ type: 'spendWatch' });
   await w.send({ type: 'status', videoId: 'abc' });
@@ -184,7 +186,7 @@ test('a stop tick restores the drop and the next playing tick redraws even at th
   assert.equal(w.icons.length, 2);
   await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 0, playing: false });
   assert.equal(w.icons.length, 3);
-  assert.deepEqual(w.icons[2].path, DEFAULT_ICON);
+  assert.deepEqual({ ...w.icons[2].path }, DROP_ICON);
   await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
   assert.equal(w.icons.length, 4);
   assert.ok(w.icons[3].imageData);
@@ -197,7 +199,7 @@ test('missing playing clears the tab, and positive ago with playing true still s
   await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 5000, playing: true });
   assert.ok(w.icons.at(-1).imageData);
   await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 0 });
-  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+  assert.deepEqual({ ...w.icons.at(-1).path }, DROP_ICON);
 });
 
 test('12 seconds without a fresh tick restores the drop, and playing ticks renew the timeout', async () => {
@@ -214,7 +216,7 @@ test('12 seconds without a fresh tick restores the drop, and playing ticks renew
   assert.equal(w.icons.length, draws);
   await w.advance(100);
   assert.equal(w.icons.length, draws + 1);
-  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+  assert.deepEqual({ ...w.icons.at(-1).path }, DROP_ICON);
   assert.equal(w.writes(), writes, 'timeout only changes the icon');
   await w.send({ type: 'tick', videoId: 'abc', seconds: .001, ago: 0, playing: true });
   assert.ok(w.icons.at(-1).imageData, 'the timeout cleared the glass cache');
@@ -233,7 +235,7 @@ test('a stopped tab does not hide another playing tab, which still expires after
   await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 200, playing: false });
   assert.ok(w.icons.at(-1).imageData);
   await w.advance(5000);
-  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+  assert.deepEqual({ ...w.icons.at(-1).path }, DROP_ICON);
 });
 
 test('a worker restart shows the drop until a fresh tick, even with stored minutes and clock', async () => {
@@ -243,7 +245,7 @@ test('a worker restart shows the drop until a fresh tick, even with stored minut
   const restarted = w.restart();
   await restarted.idle();
   assert.equal(restarted.icons.length, 1);
-  assert.deepEqual(restarted.icons[0].path, DEFAULT_ICON);
+  assert.deepEqual({ ...restarted.icons[0].path }, DROP_ICON);
   await restarted.send({ type: 'get' });
   assert.equal(restarted.icons.length, 1);
   await restarted.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true });
@@ -259,7 +261,7 @@ test('a timeout queued alongside a fresh tick leaves the playing glass visible',
   await response;
   assert.ok(w.icons.at(-1).imageData);
   await w.advance(12000);
-  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+  assert.deepEqual({ ...w.icons.at(-1).path }, DROP_ICON);
 });
 
 test('startup and install/update clear an active glass until another playing tick', async () => {
@@ -271,7 +273,7 @@ test('startup and install/update clear an active glass until another playing tic
     const writes = w.writes();
     reset();
     await w.idle();
-    assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+    assert.deepEqual({ ...w.icons.at(-1).path }, DROP_ICON);
     const count = w.icons.length;
     await w.advance(12000);
     assert.equal(w.icons.length, count);
@@ -302,7 +304,7 @@ test('toolbar drawing and setIcon failures leave state writes and responses inta
   await w.send({ type: 'tick', videoId: 'abc', seconds: 1, ago: 100, playing: false });
   assert.equal(w.icons.length, 2);
   await w.send({ type: 'addBacklog', video: { id: 'retry', title: 'Retry' } });
-  assert.deepEqual(w.icons.at(-1).path, DEFAULT_ICON);
+  assert.deepEqual({ ...w.icons.at(-1).path }, DROP_ICON);
 });
 
 test('toolbar refreshes on startup and install/update, keeping the day reset lazy', async () => {
