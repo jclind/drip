@@ -963,7 +963,7 @@
 
   let pillView = '';
   /** Grace presentation waits for the existing 700ms water drain, without changing grace's rules. */
-  let pillGrace = { id: '', ready: false };
+  let pillGrace = { id: '', ready: false, attentionAt: -Infinity };
   /** The pill's Stash as last drawn, so a rebuild after stashing fills the bookmark from where it was (stash.js). */
   let stashDrawn = { id: '', stashed: false };
   /** @type {SVGSVGElement | null} */
@@ -975,6 +975,7 @@
   const PILL_GLASS_PX = 20;
   /** In the last this many seconds, the pill stays up over the video and shimmers. */
   const LOW_SECONDS = 120;
+  const GRACE_ATTENTION_MS = 3000;
 
   /**
    * Keeps clicks and keys on the pill away from the player, which would otherwise read a click as play or pause.
@@ -989,7 +990,8 @@
 
   /**
    * The pill hides along with YouTube's controls a few seconds into playback, except in the last minutes, when it stays
-   * up and shimmers. Checked every tick and whenever the player's class changes.
+   * up and shimmers, and for three seconds after the grace label appears. Checked every tick and whenever the
+   * player's class changes.
    */
   function pillLook() {
     const pill = document.getElementById('drip-pill');
@@ -997,9 +999,15 @@
     const playing = !!video && !video.paused;
     pill.classList.toggle('is-grace', inGrace() && pillGrace.ready);
     pill.classList.toggle('is-low', pillLow && playing);
+    const attention = inGrace() && pillGrace.ready && performance.now() - pillGrace.attentionAt < GRACE_ATTENTION_MS;
+    if (attention && !pill.classList.contains('is-grace-attention')) {
+      // A replacement pill joins the same two rings where they are, rather than starting them again.
+      pill.style.setProperty('--drip-grace-ring-delay', `${-Math.max(0, performance.now() - pillGrace.attentionAt)}ms`);
+    }
+    pill.classList.toggle('is-grace-attention', attention);
     // Never hidden while it has keyboard focus, or Enter would act on a button nobody can see.
     const focused = pill.contains(document.activeElement);
-    pill.classList.toggle('is-idle', playing && !pillLow && !focused && !!document.querySelector(SEL.playerIdle));
+    pill.classList.toggle('is-idle', playing && !pillLow && !attention && !focused && !!document.querySelector(SEL.playerIdle));
   }
 
   // DESIGN.md "Minutes and the watch page pill": the glass, minutes left, and Save. It never offers to buy minutes.
@@ -1010,7 +1018,7 @@
     if (!id || !state) {
       pill?.remove();
       pillView = '';
-      pillGrace = { id: '', ready: false };
+      pillGrace = { id: '', ready: false, attentionAt: -Infinity };
       pillGraceFade?.cancel();
       pillGraceFade = null;
       if (swapOpen || swapped) {
@@ -1027,7 +1035,7 @@
     const graceVideo = grace ? id : '';
     if (pillGrace.id !== graceVideo) {
       const drainMs = pillGlass && Number(pillGlass.dataset.level) > 0 ? 700 : Math.max(0, 700 - (performance.now() - pillDrainAt));
-      const next = { id: graceVideo, ready: !grace || reduced || drainMs === 0 };
+      const next = { id: graceVideo, ready: !grace || reduced || drainMs === 0, attentionAt: -Infinity };
       pillGrace = next;
       if (!next.ready) setTimeout(() => {
         // Ending grace or navigating cancels this presentation, including another grace on the same video.
@@ -1038,6 +1046,13 @@
     }
     if (grace && reduced) pillGrace.ready = true;
     const finishing = grace && pillGrace.ready;
+    if (finishing && pillGrace.attentionAt === -Infinity) {
+      const current = pillGrace;
+      current.attentionAt = performance.now();
+      setTimeout(() => {
+        if (pillGrace === current) pillLook();
+      }, GRACE_ATTENTION_MS);
+    }
     if (!finishing || reduced) {
       pillGraceFade?.cancel();
       pillGraceFade = null;

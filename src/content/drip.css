@@ -398,6 +398,14 @@ html[dark] #drip-lock {
   pointer-events: none;
 }
 
+/* Two rings as the grace label appears, 1.4 seconds apart. The pill's own outline reaches past its overflow clip;
+   only the outline's color fades, leaving the pill and its contents at full opacity. */
+#drip-pill.is-grace-attention {
+  /* 2px, a little heavier than the lock's rings, since this one sits over a moving video. */
+  outline: 2px solid transparent;
+  animation: drip-pill-grace-ring 1400ms cubic-bezier(0.15, 0.6, 0.35, 1) var(--drip-grace-ring-delay, 0ms) 2 forwards;
+}
+
 /* No player to sit in (watch.js renderPill): pinned to the window, below YouTube's 56px top bar and above it. */
 #drip-pill.is-floating {
   position: fixed;
@@ -607,6 +615,7 @@ html[dark] #drip-pill {
   --drip-gray: rgba(255, 255, 255, 0.16);
   --drip-glass-line: #d9d9d9;
   --drip-shimmer: rgba(66, 165, 246, 0.45);
+  --drip-ring: rgba(66, 165, 246, 0.75);
 }
 
 :is(#drip-home, #drip-lock, #drip-pill) *,
@@ -1646,6 +1655,19 @@ html[dark] #drip-pill {
   }
 }
 
+/* Match drip-done-ring's opacity and travel without fading the pill itself. */
+@keyframes drip-pill-grace-ring {
+  from {
+    outline-color: color-mix(in srgb, var(--drip-ring) 85%, transparent);
+    outline-offset: 0;
+  }
+
+  to {
+    outline-color: transparent;
+    outline-offset: 8px;
+  }
+}
+
 @keyframes drip-lift {
   to {
     opacity: 0;
@@ -1661,6 +1683,11 @@ html[dark] #drip-pill {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  #drip-pill.is-grace-attention {
+    animation: none;
+    outline: none;
+  }
+
   #drip-lock,
   #drip-lock.is-draining,
   #drip-lock.is-surfacing {

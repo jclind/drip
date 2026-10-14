@@ -204,6 +204,7 @@ Grace on the pill as built (2026-10-14). Built from `designs/motion/8-grace.html
 
 - While the current video finishes in grace (Q3), the pill's glass is empty, its real outline is at 35% opacity, and the label reads "Finishing this one". Screen readers read "Finishing this one, time is up".
 - The existing water drain finishes over 700ms, then the label changes and the outline fades over 300ms. An already empty glass changes at once. Reduced motion skips the wait and fade. The existing last-drop motion stays as it was.
+- When "Finishing this one" appears, the pill stays up for 3 seconds even with YouTube's controls hidden. Two thin blue rings start at once and 1.4 seconds later, with the Done for now ring's color token, timing, and 8px fade outward. The pill's own outline keeps the rings outside its clip without changing its size. Rebuilds keep the original timing; leaving grace or the video stops the effect. Reduced motion keeps the 3-second hold but skips the rings.
 - The pill listens to `drip-grace`, and grace is part of its view key. Ending or changing the video, or turning grace off, restores the usual pill. A pending label change belongs to that grace and cannot carry over to another one.
 - The pill stays inside the player, capped at 320px and the available width. The label fits on one line; on very narrow players it truncates before Stash does.
 
