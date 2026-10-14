@@ -54,6 +54,12 @@
  * @property {number} watched
  * @property {{videoId: string, title: string, reason: string, at: number}[]} needThis
  */
+/**
+ * The worker's clock for watching in several tabs. It lives outside State, in chrome.storage.session.
+ * @typedef {Object} Clock
+ * @property {number} lastChargeEnd End of the last stretch of watching charged, in ms.
+ * @property {[string, number][]} [ticks] Recent tick keys and the seconds charged under each.
+ */
 
 (() => {
   /** @type {Readonly<Settings>} */
@@ -331,6 +337,9 @@
     if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
     const undo = typeof index === 'number' && Number.isInteger(index);
     if (!undo && state.backlog.length >= state.settings.stashMax) return { ok: false, error: 'stash-full' };
+    // Undo can go over the cap, but not past the highest cap Settings allows, so a made-up index can't grow the
+    // stash forever (Codex, 2026-10-13).
+    if (undo && state.backlog.length >= ranges.stashMax[1]) return { ok: false, error: 'stash-full' };
     // Undo puts back the video as it was, so one stashed before addedAt existed stays undated.
     if (!undo && !video.addedAt && seconds(now)) video.addedAt = seconds(now);
     const at = typeof index === 'number' && Number.isInteger(index) ? Math.min(Math.max(index, 0), state.backlog.length) : state.backlog.length;
@@ -407,20 +416,33 @@
     return watchStatus(state, videoId);
   }
 
+  /** How many recent tick keys the clock remembers, to spot a resent tick. */
+  const TICK_KEYS = 20;
+
   /**
    * Charges only paid playback not already covered by another tab.
    * @param {State} state
-   * @param {{lastChargeEnd: number}} clock
+   * @param {Clock} clock
    * @param {number} now
    * @param {number} seconds
    * @param {string} videoId
    * @param {number} [agoMs] How long before now the playback ended. A tab sends time it held back, for a video it
    *   already left, after newer playback, so the intervals mustn't be assumed to end now.
+   * @param {unknown} [key] The tab's name for this stretch of time, the same on a resend.
    */
-  function chargeTick(state, clock, now, seconds, videoId, agoMs = 0) {
+  function chargeTick(state, clock, now, seconds, videoId, agoMs = 0, key = '') {
     const ago = Math.min(Math.max(Number(agoMs) || 0, 0), 3600000);
     now -= ago;
     seconds = Math.min(Math.max(Number(seconds) || 0, 0), 3600);
+    // A tab resends time the worker didn't confirm. When the worker did charge it and only the reply got lost, the
+    // resend charges just what played since (Codex, 2026-10-13).
+    if (typeof key === 'string' && key) {
+      const ticks = (Array.isArray(clock.ticks) ? clock.ticks : []).filter((t) => Array.isArray(t));
+      const charged = ticks.find((t) => t[0] === key);
+      const before = charged ? Number(charged[1]) || 0 : 0;
+      clock.ticks = [...ticks.filter((t) => t !== charged), /** @type {[string, number]} */ ([key, Math.max(before, seconds)])].slice(-TICK_KEYS);
+      seconds = Math.max(0, seconds - before);
+    }
     if (seconds === 0) return watchStatus(state, videoId);
     if (state.unlocked.includes(videoId)) {
       logDay(state).watchedSec += seconds;
@@ -443,7 +465,9 @@
 
   /** @param {State} state @param {string} videoId @param {string} title @param {string} reason @param {number} now */
   function needThis(state, videoId, title, reason, now) {
-    const trimmed = reason.trim();
+    if (typeof videoId !== 'string' || !/^[\w-]{1,64}$/.test(videoId)) return { ok: false, error: 'bad-video' };
+    const trimmed = String(reason).trim();
+    title = String(title);
     if (trimmed.length < 3) return { ok: false, error: 'reason-required' };
     if (state.unlocked.includes(videoId)) return { ok: true };
     if (state.unlocked.length >= state.settings.needThisPerDay) return { ok: false, error: 'need-this-limit' };

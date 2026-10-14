@@ -43,6 +43,8 @@
   let emptyNote = null;
   /** @type {Element | null} */
   let watched = null;
+  /** @type {MutationObserver | null} */
+  let observer = null;
   let queued = false;
 
   /** @param {Element} root @param {string} selector */
@@ -185,15 +187,18 @@
     const search = document.querySelector('ytd-search');
     if (search && search !== watched) {
       watched = search;
-      // Hide new rows the moment YouTube adds them, not at the next half-second check.
-      new MutationObserver(() => {
+      observer?.disconnect();
+      // Hide new rows before the next frame paints them, not at the next half-second check. YouTube adds rows in
+      // bursts, so one check per frame covers the whole burst and reads the rows' layout once (Codex, 2026-10-13).
+      observer = new MutationObserver(() => {
         if (queued) return;
         queued = true;
-        queueMicrotask(() => {
+        requestAnimationFrame(() => {
           queued = false;
           apply();
         });
-      }).observe(search, { childList: true, subtree: true });
+      });
+      observer.observe(search, { childList: true, subtree: true });
     }
     const primary = document.querySelector(SEL.primary);
     if (more && primary) {

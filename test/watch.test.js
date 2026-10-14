@@ -176,7 +176,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   /** @type {any} */
   const context = {
     navigator: { userAgent: 'test', clipboard: { writeText: async () => {} } },
-    document, location, URLSearchParams, JSON, Math, Number, String, Set, Array, Object, Promise, console,
+    document, location, URLSearchParams, JSON, Math, Number, String, Set, Array, Object, Promise, console, crypto,
     MutationObserver: FakeMutationObserver,
     localStorage: fakeStorage(), sessionStorage: fakeStorage(),
     performance: { now: () => world.now },
@@ -232,13 +232,15 @@ function makeWorld() {
     now: 0,
     state: D.initialState(new Date(2026, 9, 6, 12).getTime()),
     clock: { lastChargeEnd: 0 },
-    /** @type {{type: string, seconds?: number, videoId?: string}[]} */
+    /** @type {{type: string, seconds?: number, videoId?: string, key?: string}[]} */
     sent: [],
     /** @type {Function[]} */
     listeners: [],
     /** @type {any[]} */
     tabs: [],
     failTicks: 0,
+    /** Ticks the worker charges whose reply never reaches the tab. */
+    loseReplies: 0,
     /** @param {any} msg */
     async handle(msg) {
       world.sent.push(msg);
@@ -249,7 +251,11 @@ function makeWorld() {
           world.failTicks--;
           return { ok: false, error: 'Error: write failed' };
         }
-        result = { ok: true, ...D.chargeTick(world.state, world.clock, now, msg.seconds, msg.videoId, msg.ago) };
+        result = { ok: true, ...D.chargeTick(world.state, world.clock, now, msg.seconds, msg.videoId, msg.ago, msg.key) };
+        if (world.loseReplies > 0) {
+          world.loseReplies--;
+          return undefined;
+        }
       } else if (msg.type === 'status') result = { ok: true, ...D.watchStatus(world.state, msg.videoId) };
       else if (msg.type === 'spendWatch') result = D.spendWatch(world.state);
       else result = { ok: true };
@@ -444,6 +450,32 @@ test('a tick the worker refuses is sent again, not lost (finding 17)', async () 
   await tab.tick();
   await tab.tick();
   assert.ok(Math.abs(world.state.watchSecondsLeft - 890) < 0.01, `left ${world.state.watchSecondsLeft}`);
+});
+
+test('a tick charged but whose reply got lost is not charged again after another tab plays (Codex, 2026-10-13)', async () => {
+  const world = makeWorld();
+  world.state.watchSecondsLeft = 900;
+  const a = makeTab(world, 'aaa');
+  const b = makeTab(world, 'bbb');
+  await settle();
+  await a.video.play();
+  await a.tick();
+  world.sent.length = 0;
+  // Tab A plays 5 seconds. The worker charges them, but the reply never comes back.
+  world.loseReplies = 1;
+  await play(world, a, 5);
+  a.video.pause();
+  // Tab A's timers are throttled now. Tab B plays 5 seconds, which moves the clock past A's time.
+  await b.video.play();
+  await b.tick();
+  await play(world, b, 5);
+  b.video.pause();
+  await b.tick();
+  world.advance(1);
+  await a.tick();
+  const resent = world.ticks().filter((t) => t.videoId === 'aaa');
+  assert.ok(resent.length >= 2 && resent[0].key === resent[1].key, `keys ${resent.map((t) => t.key)}`);
+  assert.ok(Math.abs(world.state.watchSecondsLeft - 890) < 0.01, `${900 - world.state.watchSecondsLeft} charged for 10 played`);
 });
 
 test('the pill says paused while the video is paused, and stays up and shimmers in the last two minutes', async () => {

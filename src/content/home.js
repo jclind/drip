@@ -829,17 +829,39 @@
   /** The minutes the stats were last drawn with. */
   let drawnTime = '';
 
+  /**
+   * Brings up to date, without a rebuild, what moves with every tick while another tab plays: the glass's water, and
+   * each started video's bar and resume link (Codex, 2026-10-13).
+   * @param {HTMLElement} root
+   */
+  function freshen(root) {
+    if (!state) return;
+    if (glassEl && !pouring) DripGlass.set(glassEl, DripGlass.fraction(state), GLASS_PX);
+    for (const video of state.backlog) {
+      const link = root.querySelector(`[data-k="play-${CSS.escape(video.id)}"]`);
+      if (!link) continue;
+      const href = resumeUrl(video.id);
+      if (link.getAttribute('href') !== href) link.setAttribute('href', href);
+      const bar = /** @type {HTMLElement | null | undefined} */ (link.closest('li')?.querySelector('.drip-stash-bar'));
+      bar?.style.setProperty('--drip-at', DripSwap.fraction(video).toFixed(3));
+    }
+  }
+
   /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
     const root = document.getElementById('drip-home');
     if (!root || moving || leaving) return;
     takeRefill();
+    // The glass level and a stashed video's progress change on every tick, so they're left out here and freshen()
+    // sets them in place. The minutes and each row's "12m left" change once a minute.
     const key = JSON.stringify([state && [
-      Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0, DripGlass.fraction(state).toFixed(3),
-      state.tokens, state.current, state.backlog, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
+      Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0,
+      state.tokens, state.current, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
       state.settings.resetHour, state.settings.stashMax,
+      state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
+      Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
     ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId]);
-    if (root.firstChild && key === rendered) return;
+    if (root.firstChild && key === rendered) return freshen(root);
     rendered = key;
     // Keep keyboard focus on the same control across the rebuild.
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
