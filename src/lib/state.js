@@ -776,11 +776,33 @@
     return { ok: true };
   }
 
+  /**
+   * The toolbar uses the popup's fraction and the mockup's smooth top 5%. The glass API is passed in so this stays
+   * pure and state.js can still load on pages that don't draw glasses. Unlocks don't affect minutes left.
+   * @param {Pick<State, 'watchSecondsLeft' | 'watchSecondsBought'>} state
+   * @param {{fraction: (state: Pick<State, 'watchSecondsLeft' | 'watchSecondsBought'>) => number,
+   *   waterline: (fraction: number, height: number) => number, viewBox: {height: number}}} glass
+   */
+  function toolbarGlass(state, glass) {
+    const fraction = glass.fraction(state);
+    /** @param {number} size */
+    const waterY = (size) => fraction >= 1 ? 0 : fraction > .95
+      ? glass.waterline(.95, size) * (1 - fraction) / .05 : glass.waterline(fraction, size);
+    const water16 = waterY(16);
+    const water32 = waterY(32);
+    const surfaceOpacity = Math.max(0, Math.min(1, (fraction - .95) / .05));
+    // Cache the visible height at 32px, including the surface fade. Empty has its own key, so even the smallest
+    // positive balance draws the minimum sliver. Below that minimum, different fractions share the same key.
+    const cacheKey = fraction <= 0 ? 'empty'
+      : `${Math.round(water32 * 32 / glass.viewBox.height)}:${Math.round(surfaceOpacity * 32)}`;
+    return { fraction, water16, water32, surfaceOpacity, cacheKey };
+  }
+
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
-    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction,
+    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass,
   };
 })();

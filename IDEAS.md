@@ -71,7 +71,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 - Out for the day on the home page gets the lock's calm sea instead of a gray line: still water, one slow fish, and "The glass refills at 4:00am." This is the redesign DESIGN.md asks for ("a good place to stop").
 - "+2 saved from yesterday" at rollover trickles two drops into the counter.
 - The popup's glass drifts gently while a video is playing in any tab and stays still otherwise, so the popup shows at a glance whether the clock is running.
-- The toolbar icon draws the glass at its current level (`chrome.action.setIcon` from a canvas), so minutes left show without opening anything. Not an animation, but the same idea.
+- The toolbar icon draws the glass at its current level (`chrome.action.setIcon` from a canvas), so minutes left show without opening anything. Built 2026-10-14; see [Toolbar glass as built](DESIGN.md) near "Popup and Settings as built".
 - On the lock, clicking the open water sends a small ripple out from the click. A calm fidget, but it rewards lingering on the lock, which may cut against "the satisfying moment is leaving". Worth a try before deciding.
 - Fish that drift away from the pointer on the lock. Cute; maybe too much to watch.
 - A soft water "plip" on "Done for now", off by default. drip has no sound anywhere yet, so it's a bigger decision than it looks.

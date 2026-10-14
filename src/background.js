@@ -2,10 +2,13 @@
 // The only writer of drip's state. Pages and content scripts send messages here.
 
 importScripts('lib/state.js');
+importScripts('lib/glass.js');
 
 /** @type {any} */
 // var, not const: these page scripts share one type-check program, and only var may be declared twice.
 var Drip = /** @type {any} */ (globalThis).Drip;
+/** @type {any} */
+var DripGlass = /** @type {any} */ (globalThis).DripGlass;
 const KEY = 'drip';
 
 // The clock for watching in several tabs (DESIGN.md, "The clock with several tabs"). Chrome stops an idle worker and
@@ -15,6 +18,64 @@ const CLOCK_KEY = 'dripClock';
 
 /** @type {Promise<unknown>} */
 let queue = Promise.resolve();
+
+/** @type {string | null} */
+let lastIconKey = null;
+/** @type {{outline: Path2D, body: Path2D, surface: Path2D, wave: Path2D} | null} */
+let iconPaths = null;
+
+/** @param {any} state */
+async function updateToolbar(state) {
+  try {
+    const level = Drip.toolbarGlass(state, DripGlass);
+    if (level.cacheKey === lastIconKey) return;
+    if (!iconPaths) {
+      iconPaths = {
+        outline: new Path2D(DripGlass.paths.outline), body: new Path2D(DripGlass.paths.body),
+        surface: new Path2D(DripGlass.paths.surface), wave: new Path2D(DripGlass.paths.wave),
+      };
+    }
+    const paths = iconPaths;
+    const view = DripGlass.viewBox;
+    /** @param {number} size @param {number} y */
+    const draw = (size, y) => {
+      const canvas = new OffscreenCanvas(size, size);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No toolbar canvas context');
+      ctx.translate((size - size * view.width / view.height) / 2, 0);
+      ctx.scale(size / view.height, size / view.height);
+      ctx.fillStyle = '#909090';
+      ctx.fill(paths.outline);
+      ctx.save();
+      ctx.translate(0, y);
+      ctx.clip(paths.wave);
+      ctx.translate(0, -y);
+      ctx.fillStyle = DripGlass.blue;
+      ctx.fill(paths.body);
+      ctx.restore();
+      if (level.surfaceOpacity > 0) {
+        ctx.fillStyle = DripGlass.blue;
+        ctx.globalAlpha = level.surfaceOpacity;
+        ctx.fill(paths.surface);
+      }
+      return ctx.getImageData(0, 0, size, size);
+    };
+    await chrome.action.setIcon({ imageData: { 16: draw(16, level.water16), 32: draw(32, level.water32) } });
+    lastIconKey = level.cacheKey;
+  } catch {
+    // Drawing and setIcon failures leave the old icon and never fail a state write. Retry on the next save/start.
+  }
+}
+
+function refreshToolbar() {
+  // Share the state queue so a startup read cannot overwrite an icon drawn for a later save. Read only: the day
+  // still resets lazily when a message comes in, even if the worker wakes after 4am.
+  const run = queue.then(async () => {
+    const stored = await chrome.storage.local.get(KEY);
+    await updateToolbar(Drip.hydrate(stored[KEY], Date.now()));
+  });
+  queue = run.catch(() => {});
+}
 
 /**
  * JSON with object keys sorted. chrome.storage hands objects back with sorted keys, so plain JSON.stringify would
@@ -51,10 +112,13 @@ function withState(fn) {
     const clockBefore = stableJson(clock);
     const result = fn(state, now, clock);
     // A failed state write throws before the clock is saved, so the tab's resent time is charged again.
-    if (stableJson(state) !== before) await chrome.storage.local.set({ [KEY]: state });
+    const stateChanged = stableJson(state) !== before;
+    if (stateChanged) await chrome.storage.local.set({ [KEY]: state });
     // Once the state is saved, the charge stuck, so a clock that fails to save mustn't fail the message: the tab
     // would resend time already charged (Codex, 2026-10-14). That loses only the clock, as a stopped worker used to.
     if (stableJson(clock) !== clockBefore) await chrome.storage.session.set({ [CLOCK_KEY]: clock }).catch(() => {});
+    // Persist the clock before waiting on the icon, so drawing doesn't delay recording time already charged.
+    if (stateChanged) await updateToolbar(state);
     return result;
   });
   queue = run.catch(() => {});
@@ -108,11 +172,13 @@ function handle(msg, state, now, clock) {
 
 // A new install opens the welcome page once. Updates don't.
 chrome.runtime.onInstalled.addListener((details) => {
+  refreshToolbar();
   if (details.reason !== 'install') return;
   // Saves the state now, so the first day (Q6) starts at install, not at the first visit to YouTube (Codex).
   withState(() => ({ ok: true })).catch(() => {});
   chrome.tabs.create({ url: chrome.runtime.getURL('src/welcome/welcome.html') });
 });
+chrome.runtime.onStartup.addListener(refreshToolbar);
 
 // Development only: dev/reload.html on localhost asks for a reload after a code change.
 // Open YouTube tabs pause and ask for a refresh when this happens, so it can't be used to dodge the clock.
@@ -203,3 +269,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     .catch((err) => sendResponse({ ok: false, error: String(err) }));
   return true;
 });
+
+// A suspended service worker runs this again when Chrome starts it for any event.
+refreshToolbar();

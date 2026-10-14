@@ -33,10 +33,16 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   let writes = 0;
   let failNext = 0;
   let failSession = 0;
+  let failIcon = 0;
+  let failDraw = 0;
+  /** @type {any[]} */
+  const icons = [];
   /** @type {Function | null} */
   let onMessage = null;
   /** @type {Function | null} */
   let onInstalled = null;
+  /** @type {Function | null} */
+  let onStartup = null;
   /** @type {string[]} */
   const opened = [];
   const chrome = {
@@ -49,6 +55,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
       onMessage: { addListener: (/** @type {Function} */ fn) => { onMessage = fn; } },
       onMessageExternal: { addListener() {} },
       onInstalled: { addListener: (/** @type {Function} */ fn) => { onInstalled = fn; } },
+      onStartup: { addListener: (/** @type {Function} */ fn) => { onStartup = fn; } },
       reload() {},
     },
     storage: {
@@ -76,9 +83,28 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
       },
     },
     tabs: { create: (/** @type {{url: string}} */ opts) => { opened.push(opts.url); } },
+    action: { setIcon: async (/** @type {any} */ icon) => {
+      if (failIcon > 0) { failIcon--; throw new Error('setIcon failed'); }
+      icons.push(icon);
+    } },
   };
+  class FakeCanvas {
+    constructor(width, height) { this.width = width; this.height = height; }
+    getContext() {
+      if (failDraw > 0) { failDraw--; throw new Error('drawing failed'); }
+      const fills = [];
+      const ctx = {
+        fillStyle: '', globalAlpha: 1,
+        translate() {}, scale() {}, save() {}, restore() {}, clip() {},
+        fill(p) { fills.push({ path: p.d, color: ctx.fillStyle, alpha: ctx.globalAlpha }); },
+        getImageData: () => ({ width: this.width, height: this.height, fills }),
+      };
+      return ctx;
+    }
+  }
   /** @type {any} */
-  const context = { chrome, console, setTimeout, structuredClone, URL, fetch: async () => ({ ok: dev }) };
+  const context = { chrome, console, setTimeout, structuredClone, URL, fetch: async () => ({ ok: dev }),
+    OffscreenCanvas: FakeCanvas, Path2D: class { constructor(d) { this.d = d; } } };
   context.globalThis = context;
   context.importScripts = (/** @type {string} */ file) => vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
   vm.createContext(context);
@@ -90,8 +116,87 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   });
   const install = (/** @type {string} */ reason) => /** @type {Function} */ (onInstalled)({ reason });
   const restart = () => worker(undefined, { dev, panel, stores: { local: store, session } });
-  return { send, install, restart, opened, store, session, writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
+  return { send, install, restart, opened, store, session, icons,
+    startup: () => /** @type {Function} */ (onStartup)(), idle: () => vm.runInContext('queue', context),
+    failIcons: (n) => { failIcon = n; }, failDrawing: (n) => { failDraw = n; },
+    writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
 }
+
+test('toolbar draws at load and after saves, skips unchanged levels, and redraws after a worker restart', async () => {
+  const w = worker();
+  await w.idle();
+  assert.equal(w.icons.length, 1);
+  assert.equal(w.writes(), 0);
+  for (const size of [16, 32]) {
+    const data = w.icons[0].imageData[size];
+    assert.equal(data.width, size);
+    assert.equal(data.height, size);
+    assert.equal(data.fills[0].color, '#909090');
+    assert.equal(data.fills[1].color, '#42A5F6');
+  }
+  await w.send({ type: 'get' });
+  assert.equal(w.icons.length, 1);
+  await w.send({ type: 'spendWatch' });
+  assert.equal(w.icons.length, 2);
+  assert.equal(w.icons[1].imageData[32].fills.length, 3);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: .001 });
+  assert.equal(w.icons.length, 2);
+  await w.send({ type: 'needThis', videoId: 'abc', reason: 'for school' });
+  assert.equal(w.icons.length, 2);
+  await w.send({ type: 'tick', videoId: 'other', seconds: 450, ago: 60000 });
+  assert.equal(w.icons.length, 3);
+  assert.equal(w.icons[2].imageData[32].fills.length, 2);
+  const restarted = w.restart();
+  await restarted.idle();
+  assert.equal(restarted.icons.length, 1);
+  assert.equal(restarted.icons[0].imageData[32].fills.length, 2);
+});
+
+test('toolbar drawing and setIcon failures leave state writes and responses intact and can retry', async () => {
+  const w = worker();
+  await w.idle();
+  w.failDrawing(1);
+  assert.equal((await w.send({ type: 'spendWatch' })).ok, true);
+  assert.equal(w.store.drip.watchSecondsLeft, 900);
+  assert.equal(w.icons.length, 1);
+  w.failIcons(1);
+  assert.equal((await w.send({ type: 'addBacklog', video: { id: 'abc', title: 'A' } })).ok, true);
+  assert.equal(w.icons.length, 1);
+  assert.equal(w.store.drip.backlog.length, 1);
+  await w.send({ type: 'removeBacklog', id: 'abc' });
+  assert.equal(w.icons.length, 2);
+  w.failWrites(1);
+  assert.equal((await w.send({ type: 'tick', videoId: 'abc', seconds: 450, ago: 60000 })).ok, false);
+  assert.equal(w.icons.length, 2);
+  assert.equal(w.store.drip.watchSecondsLeft, 900);
+});
+
+test('toolbar refreshes on startup and install/update, keeping the day reset lazy', async () => {
+  const w = worker();
+  await w.send({ type: 'get' });
+  w.store.drip.day = w.Drip.addDays(w.store.drip.day, -1);
+  w.store.drip.watchSecondsLeft = w.store.drip.watchSecondsBought = 900;
+  const writes = w.writes();
+  w.startup();
+  await w.idle();
+  assert.equal(w.icons.length, 2);
+  assert.equal(w.store.drip.watchSecondsLeft, 900);
+  assert.equal(w.writes(), writes);
+  w.store.drip.watchSecondsLeft = 450;
+  w.install('update');
+  await w.idle();
+  assert.equal(w.icons.length, 3);
+  assert.equal(w.opened.length, 0);
+  await w.send({ type: 'get' });
+  assert.equal(w.icons.length, 4);
+  assert.equal(w.store.drip.watchSecondsLeft, 0);
+  const installed = worker();
+  installed.install('install');
+  await installed.idle();
+  assert.equal(installed.icons.length, 1);
+  assert.ok(installed.store.drip);
+  assert.equal(installed.opened.length, 1);
+});
 
 test('every reply carries the saved state', async () => {
   const w = worker();
