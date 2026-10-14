@@ -129,6 +129,14 @@ Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. W
 - `dev/home.html` runs the real home page outside YouTube, with the real worker on fake storage and a fake grid, in any of a dozen states, light or dark. `dev/home-sizes.html` shows it at several widths at once. See the comment at the top of each.
 - Not built yet: the "+2 saved from yesterday" note. The reveal animation came in a later pass (2026-10-12, below).
 
+Out for the day as built (2026-10-14). Jesse picked J, "Small sea", over 10 other variants in four rounds.
+
+- With no minutes, drops, or cards left and no card showing, a small rounded sea replaces the disabled +15m and Reveal video buttons and the gray note. It fills drip's 400px column, with plain blue water and no wave line: `rgba(150,195,240,.23)` in light mode and `rgba(10,50,95,.6)` in dark. It's 190px tall, or 170px below 480px wide.
+- Centered copy reads "You're out for today." at 20px, weight 500, then the muted "The glass refills at 4:00am.", using the actual reset hour. Screen readers hear both lines as a status; the water and fish are hidden from them.
+- One faint fish uses the lock's shape and colors, crossing slowly every 22 seconds. No bubbles. Reduced motion hides the fish.
+- Stash starts folded here and still opens from its header. This state keeps its own fold choice, separate from the normal empty page and the card page. Errors still show below the sea. Other states keep their buttons and messages.
+- A day reset restores the normal page and plays the existing refill motion. The code is in `src/content/home.js` and `src/content/drip.css`, with the sea's styles scoped to the home page so the lock can be on screen at the same time.
+
 Reveal animation as built (2026-10-12). Jesse picked it in two rounds of design variants. Round 1 was A (a drop falls into the card's box, rings while it loads, the picture opens from the center), B (his idea from 2026-10-07 in "Ideas"), and C (a face-down card dealt from the counter that flips over). C won "because it really shows a card being used", and he liked B's buttons. Round 2 combined them: D (C's card in B's opening page, with B's goo), E (the gold Reveal button itself becomes the card), and F (D without the goo). D won. The code is `src/content/reveal.js`, shared by the home page and the welcome tour.
 
 - Reveal video: the page opens to make the card's room. The stats lift 16px and the buttons ride down as the space grows. A face-down card leaves the card counter, turns from portrait to landscape, and is dealt into the box, and the count drops by one as it goes. On the way down, +15m shrinks to a bead against Reveal video and Stash grows back out of it, Reveal video turns gray as Reveal next, and × pinches off its end, through an SVG goo filter. Stash folds as the space opens.

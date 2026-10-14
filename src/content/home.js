@@ -608,8 +608,8 @@
     return rows;
   }
 
-  // Whether Saved is open, kept separately for the empty page (open by default) and while a card is up (collapsed).
-  const savedOpen = { empty: true, card: false };
+  // Stash opens on the normal empty page, and starts folded with a card up or when out for the day.
+  const savedOpen = { empty: true, card: false, out: false };
   let savedShowAll = false;
 
   // Kept across renders, so a rebuild doesn't reload the thumbnail or jump the glass's water.
@@ -747,16 +747,31 @@
       h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, countRow('watch'), countRow('rec')));
   }
 
+  /** No minutes or tokens left, and no card still to watch or stash. */
+  function outForDay() {
+    return !state.current && state.tokens.watch < 1 && state.tokens.rec < 1 && state.watchSecondsLeft <= 0;
+  }
+
   /** The gray line under the buttons when something has run out. */
   function outNote() {
     const reset = hourLabel(state.settings.resetHour);
     const noDrops = state.tokens.watch < 1;
     const noCards = state.tokens.rec < 1;
     if (state.current) return noCards ? `No cards left. More at ${reset}.` : '';
-    if (noDrops && noCards && state.watchSecondsLeft <= 0) return `You're out for today. Drops and cards refill at ${reset}.`;
+    if (outForDay()) return `You're out for today. Drops and cards refill at ${reset}.`;
     if (noCards) return `No cards left. More at ${reset}.`;
     if (noDrops) return `No drops left. More at ${reset}.`;
     return '';
+  }
+
+  /** Variant J, "Small sea": still water and one faint fish, with only the copy read aloud. */
+  function outSea() {
+    return h('section', { class: 'drip-out-sea' },
+      h('div', { class: 'drip-sea', 'aria-hidden': 'true' },
+        animates() && h('span', { class: 'drip-fish' }, h('span', {}))),
+      h('div', { class: 'drip-out-copy', role: 'status', 'aria-atomic': 'true' },
+        h('h2', {}, "You're out for today."),
+        h('p', {}, `The glass refills at ${hourLabel(state.settings.resetHour)}.`)));
   }
 
   function actions() {
@@ -856,9 +871,9 @@
       swapped && swapped.newId === video.id && DripSwap.note(swapped.dropped, onSwapUndo));
   }
 
-  /** @param {'empty' | 'card'} [as] Draw it as on that page. The reveal animation opens and folds it ahead of time. */
+  /** @param {'empty' | 'card' | 'out'} [as] Draw it as on that page. The reveal animation opens and folds it ahead of time. */
   function savedList(as) {
-    const mode = as || (state.current || busy === 'reveal' ? 'card' : 'empty');
+    const mode = as || (state.current || busy === 'reveal' ? 'card' : outForDay() ? 'out' : 'empty');
     const open = savedOpen[mode];
     const count = state.backlog.length;
     // What's left to watch, so a half-watched video counts only its unwatched part.
@@ -914,12 +929,13 @@
   function view() {
     if (disconnected) return h('div', { class: 'drip-message' }, 'drip was updated. Refresh this page.');
     if (!state) return h('div', { class: 'drip-loading', 'aria-busy': 'true' });
-    const note = outNote();
     const showCard = state.current || busy === 'reveal';
+    const out = !showCard && outForDay();
+    const note = out ? '' : outNote();
     // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
-    return h('div', { class: `drip-page${showCard ? ' is-open' : ''}` },
+    return h('div', { class: `drip-page${showCard ? ' is-open' : out ? ' is-out' : ''}` },
       stats(),
-      !showCard && actions(),
+      !showCard && (out ? outSea() : actions()),
       state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
       savedList());
