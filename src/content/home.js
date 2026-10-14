@@ -738,14 +738,16 @@
   }
 
   /**
-   * "Channel · 394K views · 3d ago". A long channel name is cut short before the views and age are.
+   * "Channel · 394K views · 3d ago". A long channel name is cut short before the views and age are. The length badge
+   * is on the thumbnail, which screen readers skip, so they get the length here.
    * @param {any} video
    */
   function metaLine(video) {
     const rest = [video.views, video.age].filter(Boolean).join(' · ');
     return h('span', { class: 'drip-meta drip-meta-split' },
       h('span', { class: 'drip-meta-channel' }, video.channel),
-      rest && h('span', { class: 'drip-meta-rest' }, video.channel ? ` · ${rest}` : rest));
+      rest && h('span', { class: 'drip-meta-rest' }, video.channel ? ` · ${rest}` : rest),
+      video.length && h('span', { class: 'drip-sr' }, `, length ${video.length}`));
   }
 
   /** @param {any} video */

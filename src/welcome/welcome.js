@@ -268,7 +268,7 @@
       h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true)),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
       h('div', { class: 'drip-card-meta-row' },
-        h('span', { class: 'drip-meta drip-meta-split' }, h('span', { class: 'drip-meta-channel' }, video.channel), h('span', { class: 'drip-meta-rest' }, ` · ${video.views} · ${video.age}`)),
+        h('span', { class: 'drip-meta drip-meta-split' }, h('span', { class: 'drip-meta-channel' }, video.channel), h('span', { class: 'drip-meta-rest' }, ` · ${video.views} · ${video.age}`), h('span', { class: 'drip-sr' }, `, length ${video.length}`)),
         h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(2); } },
           icon('play'), h('span', {}, 'Watch'), sand.watchSecondsLeft <= 0 && price('drop'))),
       h('div', { class: 'drip-card-actions' },
