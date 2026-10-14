@@ -499,25 +499,80 @@
    * Saved rows removed in the last few seconds, shown as "Removed · Undo" where they were. `before` is the ids that sat
    * before the row, oldest first, counting other rows still waiting on Undo, so several undos in any order restore the
    * original order (Codex).
-   * @type {Map<string, {video: any, before: string[], timer: number}>}
+   * @type {Map<string, {video: any, before: string[], timer: number, height?: number}>}
    */
   const removed = new Map();
   const UNDO_MS = 5000;
+  const EVAPORATE_MS = 260;
+  const ROW_VISIBLE = { opacity: 1, filter: 'blur(0)', transform: 'translateY(0)' };
+  const ROW_VAPOR = { opacity: 0, filter: 'blur(3px)', transform: 'translateY(-9px)' };
+  /** Kept until the worker replies, so another × cannot remove the same row twice. */
+  /** @type {Map<string, {started: number | null, height?: number, animations: Animation[]}>} */
+  const evaporating = new Map();
+  /** Undo starts on the restored node, even if storage draws it before the worker replies. */
+  /** @type {Set<string>} */
+  const condensing = new Set();
+
+  /** @param {HTMLElement} root @param {string} id */
+  function stashRow(root, id) {
+    return root.querySelector(`[data-k="x-${CSS.escape(id)}"]`)?.closest('li');
+  }
+
+  /** Resumes any evaporate on the new row at its original elapsed time. @param {HTMLElement} root */
+  function syncRowMotion(root) {
+    for (const [id, motion] of evaporating) {
+      motion.animations.forEach((a) => a.cancel());
+      motion.animations = [];
+      const row = stashRow(root, id);
+      if (!row || motion.started === null || !animates()) continue;
+      row.setAttribute('aria-busy', 'true');
+      const elapsed = Math.min(EVAPORATE_MS, performance.now() - motion.started);
+      motion.animations = Array.from(row.children, (el) => {
+        const a = el.animate([ROW_VISIBLE, ROW_VAPOR], { duration: EVAPORATE_MS, easing: 'ease-out', fill: 'forwards' });
+        a.currentTime = elapsed;
+        return a;
+      });
+    }
+    for (const id of condensing) {
+      const row = stashRow(root, id);
+      if (!row) continue;
+      condensing.delete(id);
+      if (!animates()) continue;
+      for (const el of row.children) el.animate([ROW_VAPOR, ROW_VISIBLE], {
+        duration: 300, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)',
+      });
+    }
+  }
 
   /** @param {string} id */
   async function onRemove(id) {
-    if (!state) return;
-    const video = state.backlog.find((/** @type {any} */ v) => v.id === id);
-    if (!video) return;
-    const rows = savedRows();
-    const before = rows.slice(0, rows.findIndex((r) => r.video.id === id)).map((r) => r.video.id);
-    const timer = window.setTimeout(() => {
-      removed.delete(id);
+    if (!state || evaporating.has(id) || !state.backlog.some((/** @type {any} */ v) => v.id === id)) return;
+    const root = document.getElementById('drip-home');
+    const row = root && stashRow(root, id);
+    const motion = { started: row && animates() ? performance.now() : null, height: row?.getBoundingClientRect().height, animations: /** @type {Animation[]} */ ([]) };
+    evaporating.set(id, motion);
+    try {
+      if (root && motion.started !== null) {
+        syncRowMotion(root);
+        await sleep(EVAPORATE_MS);
+      }
+      // A tick or another tab may have updated the video while it evaporated.
+      const video = state.backlog.find((/** @type {any} */ v) => v.id === id);
+      if (!video) return;
+      const rows = savedRows();
+      const before = rows.slice(0, rows.findIndex((r) => r.video.id === id)).map((r) => r.video.id);
+      const timer = window.setTimeout(() => {
+        removed.delete(id);
+        render();
+      }, UNDO_MS);
+      removed.set(id, { video, before, timer, height: motion.height });
+      absorb(await send({ type: 'removeBacklog', id }));
+    } finally {
+      evaporating.delete(id);
+      motion.animations.forEach((a) => a.cancel());
+      if (root) stashRow(root, id)?.removeAttribute('aria-busy');
       render();
-    }, UNDO_MS);
-    removed.set(id, { video, before, timer });
-    absorb(await send({ type: 'removeBacklog', id }));
-    render();
+    }
   }
 
   /** @param {string} id */
@@ -527,8 +582,16 @@
     clearTimeout(entry.timer);
     removed.delete(id);
     const index = state ? state.backlog.filter((/** @type {any} */ v) => entry.before.includes(v.id)).length : undefined;
-    absorb(await send({ type: 'addBacklog', video: entry.video, index }));
-    render();
+    condensing.add(id);
+    try {
+      absorb(await send({ type: 'addBacklog', video: entry.video, index }));
+      if (!state?.backlog.some((/** @type {any} */ v) => v.id === id)) condensing.delete(id);
+      render();
+      // If a reveal is holding renders, keep the condense queued until the row is actually drawn.
+    } catch (error) {
+      condensing.delete(id);
+      throw error;
+    }
   }
 
   /**
@@ -817,7 +880,7 @@
       open && (rows.length === 0
         ? h('div', { class: 'drip-saved-empty' }, 'Videos you stash show up here.')
         : h('ul', { class: 'drip-saved-list' }, ...shown.map(({ video, removed: gone }) => gone
-          ? h('li', { class: 'drip-saved-row is-removed' },
+          ? h('li', { class: 'drip-saved-row is-removed', style: removed.get(video.id)?.height ? `min-height: ${removed.get(video.id)?.height}px` : undefined },
             h('span', {}, 'Removed'), h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'),
             h('button', { class: 'drip-undo', 'data-k': `undo-${video.id}`, onclick: () => onUndo(video.id) }, 'Undo'))
           : h('li', {
@@ -913,6 +976,7 @@
     // Moving the kept list out and back in resets its scroll, so it's put back after.
     const listTop = swapEl?.querySelector('.drip-swap-list')?.scrollTop || 0;
     root.replaceChildren(view());
+    syncRowMotion(root);
     syncCounts();
     if (swapEl && swapEl.isConnected) {
       if (!swapPlaced) {

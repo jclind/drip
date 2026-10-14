@@ -180,6 +180,12 @@ The stash fill as built (2026-10-13). Jesse picked it in three rounds of design 
 - The card and the pill are rebuilt when a video is stashed. Each remembers what it last drew for that video, so the new button starts as the old one was, and the water moves from there. A video stashed in another tab fills the same way. A rebuild partway through, like the pill's minutes changing, shows the end state.
 - The water is drawn every frame while it moves, and its clock starts on the first frame drawn. A stash made while the tab is hidden waits, and the whole fill plays when the tab shows. With reduced motion, the water and the word change at once.
 
+Stash rows as built (2026-10-14). Built from the approved "Evaporate" mockup (`designs/motion/1-evaporate.html` in `drip-motion-mockups`). The code is in `src/content/home.js`.
+
+- Remove: each child fades out, blurs from 0 to 3px, and rises 9px over 260ms, ease-out. Then the row becomes "Removed · Undo". It keeps its height, so the rows below stay still. Another × while it plays does nothing. A rebuild partway resumes the evaporate on the new row at the same elapsed time.
+- Undo: the restored row's children condense back from opacity 0, blur 3px, and 9px up over 300ms, with drip's settling ease-out. No drop or ring: drops mean drip's currency. The 5 second Undo expiry stays as before, without motion.
+- With reduced motion, neither plays, and the row changes at once.
+
 Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups and the rules above. Claude's calls, open to Jesse's review:
 
 - The lock and the pill share the home page's color tokens and button styles (`drip.css`, the block on `#drip-home, #drip-lock, #drip-pill`), and `icon()` and `price()` moved to `common.js`.
