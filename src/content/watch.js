@@ -999,7 +999,10 @@
     const playing = !!video && !video.paused;
     pill.classList.toggle('is-grace', inGrace() && pillGrace.ready);
     pill.classList.toggle('is-low', pillLow && playing);
-    const attention = inGrace() && pillGrace.ready && performance.now() - pillGrace.attentionAt < GRACE_ATTENTION_MS;
+    // From grace starting until 3 seconds after its label shows, the pill stays up, so it changes in place instead of
+    // vanishing while the last water drains. The rings play only once the label is there.
+    const holding = inGrace() && (!pillGrace.ready || performance.now() - pillGrace.attentionAt < GRACE_ATTENTION_MS);
+    const attention = holding && pillGrace.ready;
     if (attention && !pill.classList.contains('is-grace-attention')) {
       // A replacement pill joins the same two rings where they are, rather than starting them again.
       pill.style.setProperty('--drip-grace-ring-delay', `${-Math.max(0, performance.now() - pillGrace.attentionAt)}ms`);
@@ -1007,7 +1010,7 @@
     pill.classList.toggle('is-grace-attention', attention);
     // Never hidden while it has keyboard focus, or Enter would act on a button nobody can see.
     const focused = pill.contains(document.activeElement);
-    pill.classList.toggle('is-idle', playing && !pillLow && !attention && !focused && !!document.querySelector(SEL.playerIdle));
+    pill.classList.toggle('is-idle', playing && !pillLow && !holding && !focused && !!document.querySelector(SEL.playerIdle));
   }
 
   // DESIGN.md "Minutes and the watch page pill": the glass, minutes left, and Save. It never offers to buy minutes.
@@ -1067,7 +1070,8 @@
     const time = finishing ? 'Finishing this one' : unlocked ? 'Unlocked' : Drip.formatMinutes(left);
     // Paused, the minutes aren't draining, and the pill says so.
     const paused = !grace && !unlocked && !adShowing && !!video && video.paused && left > 0;
-    pillLow = !grace && !unlocked && !adShowing && left > 0 && left <= LOW_SECONDS;
+    // With grace on, the pill stays up through 0 too, until grace takes over, so it never blinks out at the switch.
+    pillLow = !grace && !unlocked && !adShowing && (left > 0 || state.settings.graceMode) && left <= LOW_SECONDS;
     if (!unlocked) {
       const fraction = grace ? 0 : DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
       if (fraction === 0 && pillGlass && Number(pillGlass.dataset.level) > 0) pillDrainAt = performance.now();
