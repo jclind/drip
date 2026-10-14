@@ -764,12 +764,12 @@
     return '';
   }
 
-  /** Variant J, "Small sea": still water and one faint fish, with only the copy read aloud. */
+  /** Variant J, "Small sea": still water and one faint fish. Screen readers get the copy as plain text, not a status, so a rebuild (opening the Stash) doesn't read it out again. */
   function outSea() {
     return h('section', { class: 'drip-out-sea' },
       h('div', { class: 'drip-sea', 'aria-hidden': 'true' },
         animates() && h('span', { class: 'drip-fish' }, h('span', {}))),
-      h('div', { class: 'drip-out-copy', role: 'status', 'aria-atomic': 'true' },
+      h('div', { class: 'drip-out-copy' },
         h('h2', {}, "You're out for today."),
         h('p', {}, `The glass refills at ${hourLabel(state.settings.resetHour)}.`)));
   }

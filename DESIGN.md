@@ -132,7 +132,7 @@ Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. W
 Out for the day as built (2026-10-14). Jesse picked J, "Small sea", over 10 other variants in four rounds.
 
 - With no minutes, drops, or cards left and no card showing, a small rounded sea replaces the disabled +15m and Reveal video buttons and the gray note. It fills drip's 400px column, with plain blue water and no wave line: `rgba(150,195,240,.23)` in light mode and `rgba(10,50,95,.6)` in dark. It's 190px tall, or 170px below 480px wide.
-- Centered copy reads "You're out for today." at 20px, weight 500, then the muted "The glass refills at 4:00am.", using the actual reset hour. Screen readers hear both lines as a status; the water and fish are hidden from them.
+- Centered copy reads "You're out for today." at 20px, weight 500, then the muted "The glass refills at 4:00am.", using the actual reset hour. Screen readers read both lines as plain text, not a status, because every rebuild (opening the Stash, say) would announce a status again; the water and fish are hidden from them.
 - One faint fish uses the lock's shape and colors, crossing slowly every 22 seconds. No bubbles. Reduced motion hides the fish.
 - Stash starts folded here and still opens from its header. This state keeps its own fold choice, separate from the normal empty page and the card page. Errors still show below the sea. Other states keep their buttons and messages.
 - A day reset restores the normal page and plays the existing refill motion. The code is in `src/content/home.js` and `src/content/drip.css`, with the sea's styles scoped to the home page so the lock can be on screen at the same time.
