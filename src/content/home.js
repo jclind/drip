@@ -374,8 +374,10 @@
         render();
         return;
       }
-      const { focused } = await animate(DripReveal.pass, async () => null);
-      if (focused) focusOn('reveal');
+      const out = outForDay();
+      seaRises = out;
+      const { focused } = await animate(out ? DripReveal.passOut : DripReveal.pass, async () => null);
+      if (focused) focusOn(out ? 'saved-head' : 'reveal');
       return;
     }
     // The worker's save redraws the page through the storage listener, which would show the empty page while the
@@ -758,6 +760,9 @@
       h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, countRow('watch'), countRow('rec')));
   }
 
+  /** Set when Pass on the last card leaves the page out for the day, so the sea rises in where the card dropped. */
+  let seaRises = false;
+
   /** No minutes or tokens left, and no card still to watch or stash. */
   function outForDay() {
     // Cards left don't count: with no minutes or drops, a reveal can't lead to watching anything (Jesse, 2026-10-14).
@@ -785,7 +790,9 @@
 
   /** Variant J, "Small sea": still water and one faint fish. Screen readers get the copy as plain text, not a status, so a rebuild (opening the Stash) doesn't read it out again. */
   function outSea() {
-    return h('section', { class: 'drip-out-sea' },
+    const rises = seaRises && animates();
+    seaRises = false;
+    return h('section', { class: `drip-out-sea${rises ? ' is-new' : ''}` },
       h('div', { class: 'drip-sea', 'aria-hidden': 'true' },
         animates() && h('span', { class: 'drip-fish' }, h('span', {}))),
       h('div', { class: 'drip-out-copy' },
@@ -994,7 +1001,8 @@
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0,
       state.tokens, state.current, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
-      state.settings.resetHour, state.settings.stashMax,
+      // The sea's "N cards carry over" follows the allowance, the rollover cap, and pending settings (Codex, 2026-10-14).
+      state.settings.resetHour, state.settings.stashMax, cardsCarried(),
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
     ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId]);

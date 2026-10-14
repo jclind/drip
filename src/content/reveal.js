@@ -579,11 +579,7 @@
    * @param {Options} o
    */
   async function pass(o) {
-    const shown = /** @type {HTMLElement} */ (o.page.querySelector('.drip-card'));
-    const old = parts(shown);
-    shown.inert = true;
-    textOut([old.title, old.meta]);
-    if (old.deal) await toss(old.deal, 'down');
+    const shown = await drop(o);
     // The empty page's buttons, measured where they'll be, under the card's row.
     const s = split(shown);
     const probe = o.actions();
@@ -594,5 +590,29 @@
     await close(o, shown, s, empty);
   }
 
-  /** @type {any} */ (globalThis).DripReveal = { reveal, next, pass, dealCard, reduced };
+  /**
+   * The card that's up turns face down and drops.
+   * @param {Options} o
+   */
+  async function drop(o) {
+    const shown = /** @type {HTMLElement} */ (o.page.querySelector('.drip-card'));
+    const old = parts(shown);
+    shown.inert = true;
+    textOut([old.title, old.meta]);
+    if (old.deal) await toss(old.deal, 'down');
+    return shown;
+  }
+
+  /**
+   * Pass, when it leaves the page out for the day: the card drops, and home.js redraws onto the sea. close() would end
+   * on +15m and Reveal video with Stash open, which that page doesn't have (Codex, 2026-10-14).
+   * @param {Options} o
+   */
+  async function passOut(o) {
+    // The stats glide down to the closed page's place while the card drops, since the redraw would snap them there.
+    o.page.classList.remove('is-open');
+    await Promise.all([drop(o), wait(OPEN_MS)]);
+  }
+
+  /** @type {any} */ (globalThis).DripReveal = { reveal, next, pass, passOut, dealCard, reduced };
 })();
