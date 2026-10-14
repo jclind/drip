@@ -962,10 +962,16 @@
   }
 
   let pillView = '';
+  /** Grace presentation waits for the existing 700ms water drain, without changing grace's rules. */
+  let pillGrace = { id: '', ready: false };
   /** The pill's Stash as last drawn, so a rebuild after stashing fills the bookmark from where it was (stash.js). */
   let stashDrawn = { id: '', stashed: false };
   /** @type {SVGSVGElement | null} */
   let pillGlass = null;
+  /** When the current water drain began, including a zero reached between worker replies. */
+  let pillDrainAt = -Infinity;
+  /** @type {Animation | null} */
+  let pillGraceFade = null;
   const PILL_GLASS_PX = 20;
   /** In the last this many seconds, the pill stays up over the video and shimmers. */
   const LOW_SECONDS = 120;
@@ -989,6 +995,7 @@
     const pill = document.getElementById('drip-pill');
     if (!pill) return;
     const playing = !!video && !video.paused;
+    pill.classList.toggle('is-grace', inGrace() && pillGrace.ready);
     pill.classList.toggle('is-low', pillLow && playing);
     // Never hidden while it has keyboard focus, or Enter would act on a button nobody can see.
     const focused = pill.contains(document.activeElement);
@@ -1003,6 +1010,9 @@
     if (!id || !state) {
       pill?.remove();
       pillView = '';
+      pillGrace = { id: '', ready: false };
+      pillGraceFade?.cancel();
+      pillGraceFade = null;
       if (swapOpen || swapped) {
         swapOpen = '';
         drawSwap();
@@ -1012,25 +1022,47 @@
     // Moved on to another video: its list and note were for the last one.
     if ((swapOpen && swapOpen !== id) || (swapped && swapped.newId !== id)) drawSwap();
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === id);
-    const unlocked = state.unlocked.includes(id);
+    const grace = inGrace();
+    const reduced = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const graceVideo = grace ? id : '';
+    if (pillGrace.id !== graceVideo) {
+      const drainMs = pillGlass && Number(pillGlass.dataset.level) > 0 ? 700 : Math.max(0, 700 - (performance.now() - pillDrainAt));
+      const next = { id: graceVideo, ready: !grace || reduced || drainMs === 0 };
+      pillGrace = next;
+      if (!next.ready) setTimeout(() => {
+        // Ending grace or navigating cancels this presentation, including another grace on the same video.
+        if (pillGrace !== next) return;
+        next.ready = true;
+        renderPill();
+      }, drainMs);
+    }
+    if (grace && reduced) pillGrace.ready = true;
+    const finishing = grace && pillGrace.ready;
+    if (!finishing || reduced) {
+      pillGraceFade?.cancel();
+      pillGraceFade = null;
+    }
+    const wasFinishing = !!pill?.classList.contains('is-grace');
+    const unlocked = !grace && state.unlocked.includes(id);
     // Count down between ticks, which only go out every few seconds. During an ad, the time not banked yet is all ad
     // (syncAd banked what came before it), and ads aren't charged (Q27).
     const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
     const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
     const left = Math.max(0, state.watchSecondsLeft - pending);
-    const time = unlocked ? 'Unlocked' : Drip.formatMinutes(left);
+    const time = finishing ? 'Finishing this one' : unlocked ? 'Unlocked' : Drip.formatMinutes(left);
     // Paused, the minutes aren't draining, and the pill says so.
-    const paused = !unlocked && !adShowing && !!video && video.paused && left > 0;
-    pillLow = !unlocked && !adShowing && left > 0 && left <= LOW_SECONDS;
+    const paused = !grace && !unlocked && !adShowing && !!video && video.paused && left > 0;
+    pillLow = !grace && !unlocked && !adShowing && left > 0 && left <= LOW_SECONDS;
     if (!unlocked) {
-      const fraction = DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
+      const fraction = grace ? 0 : DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
+      if (fraction === 0 && pillGlass && Number(pillGlass.dataset.level) > 0) pillDrainAt = performance.now();
       if (!pillGlass) pillGlass = DripGlass.make(fraction, PILL_GLASS_PX);
       else DripGlass.set(pillGlass, fraction, PILL_GLASS_PX);
       if (fraction > 0) pillWetAt = performance.now();
     }
     const parent = document.querySelector(SEL.player) || document.body;
     // Rebuild only when the text changes. A button replaced mid-click loses the click.
-    const view = JSON.stringify([id, time, saved, adShowing, paused, swapOpen]);
+    const view = JSON.stringify([id, time, saved, adShowing, paused, swapOpen, grace, finishing]);
     if (pill && pillView === view && pill.parentElement === parent) return pillLook();
     pillView = view;
     // Stashed or taken out since the last draw: the new button starts as the old one was, and the water moves.
@@ -1044,7 +1076,7 @@
         // One inline line, so the smaller note sits on the minutes' baseline instead of being centered as its own box.
         h('span', { class: 'drip-pill-label' },
           h('span', { class: 'drip-pill-minutes' }, time),
-          !unlocked && h('span', { class: 'drip-sr' }, ' left today'),
+          !unlocked && h('span', { class: 'drip-sr' }, finishing ? ', time is up' : ' left today'),
           paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       h('button', {
@@ -1065,7 +1097,15 @@
     pill.classList.toggle('is-floating', parent === document.body);
     if (focused) /** @type {HTMLElement | null} */ (pill.querySelector('[data-k="pill-save"]'))?.focus();
     pillLook();
+    if (finishing && !wasFinishing && !reduced) {
+      // The SVG survives rebuilds. Animate after reattaching it so the fade doesn't depend on a CSS transition
+      // surviving replaceChildren; the class keeps the final opacity after this animation ends.
+      pillGraceFade = pillGlass?.querySelector('.drip-glass-outline')?.animate?.([{ opacity: 1 }, { opacity: 0.35 }], { duration: 300, easing: 'ease' }) || null;
+    }
   }
+
+  // setGrace also runs in the middle of applying a status. Draw once that status has finished applying.
+  document.addEventListener('drip-grace', () => { Promise.resolve().then(renderPill); });
 
   onState((next) => {
     if (disconnected) return;

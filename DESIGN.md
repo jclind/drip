@@ -200,6 +200,13 @@ Lock screen and pill as built (2026-10-10, step 3). Built from the lock mockups 
 - Under the lock's water, faint bubbles drift up at random sizes and speeds, and two small fish cross now and then, one every minute or so, at different depths and directions. The overlay's mask covers them, so they only show where the water has risen. Reduced motion hides them (Jesse asked for something underwater, 2026-10-10).
 - More motion ideas are in IDEAS.md, "Motion and small touches".
 
+Grace on the pill as built (2026-10-14). Built from `designs/motion/8-grace.html` in the motion mockups, with Outline set to "Faded".
+
+- While the current video finishes in grace (Q3), the pill's glass is empty, its real outline is at 35% opacity, and the label reads "Finishing this one". Screen readers read "Finishing this one, time is up".
+- The existing water drain finishes over 700ms, then the label changes and the outline fades over 300ms. An already empty glass changes at once. Reduced motion skips the wait and fade. The existing last-drop motion stays as it was.
+- The pill listens to `drip-grace`, and grace is part of its view key. Ending or changing the video, or turning grace off, restores the usual pill. A pending label change belongs to that grace and cannot carry over to another one.
+- The pill stays inside the player, capped at 320px and the available width. The label fits on one line; on very narrow players it truncates before Stash does.
+
 Popup and Settings as built (2026-10-11, step 4). Built from `popup.png`, `settings.png`, and the rules above. Claude's calls, open to Jesse's review:
 
 - The popup, Settings, and the welcome page share `src/pages.css`, whose color tokens match drip.css's and follow Chrome's light or dark theme. `src/pages.js` has `h()`, `icon()`, and `hourLabel()` for these pages.
