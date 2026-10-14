@@ -65,7 +65,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 - ★ Save fills. The bookmark on the card and the pill fills from the bottom up in blue when saved, like the glass, and drains when unsaved. Built on 2026-10-13 (DESIGN.md, "The stash fill as built").
 - ★ A new day. The first time the home page opens after the reset, the glass fills from empty with the day's minutes. As written it can't happen: the reset sets minutes to 0. The day's new drops landing in the counter fits with "Kept drops land" instead (2026-10-12). Built that way on 2026-10-13, with "4 new" and "10 new" tags (DESIGN.md, "The counter's motion as built").
 - Pass sinks. The × sends the card down and out like it dropped into water, instead of vanishing. Reveal next could do the same before the new card rises. Built another way on 2026-10-12: the card turns face down and drops (DESIGN.md, "Reveal animation as built").
-- Removing a Saved row evaporates it (a short blur and fade upward), and Undo drips it back in.
+- Removing a Saved row evaporates it (a short blur and fade upward). Built on 2026-10-14, with Undo condensing it back instead of dripping it in (DESIGN.md, "Stash rows as built").
 - The pill's water surface gets a tiny ripple each time a minute ticks off, so a glance shows it's draining without reading the number.
 - In the last minute, the pill's water wobbles a little on top of the low-time shimmer. Still no red.
 - Out for the day on the home page gets the lock's calm sea instead of a gray line: still water, one slow fish, and "The glass refills at 4:00am." This is the redesign DESIGN.md asks for ("a good place to stop").
