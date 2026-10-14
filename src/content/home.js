@@ -728,7 +728,7 @@
   /** @param {any} video */
   function card(video) {
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === video.id);
-    const meta = [video.channel, video.length, video.age].filter(Boolean).join(' · ');
+    const meta = [video.channel, video.length].filter(Boolean).join(' · ');
     // At 0 minutes Watch buys a drop's minutes and plays (Q18). With no drops either, it goes to the lock screen.
     const buys = costsDrop(video.id);
     // The animation shows Reveal next its own way, and draws the card as it'll be once it's done.
@@ -746,7 +746,8 @@
       thumbnail(video.id),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
       h('div', { class: 'drip-card-meta-row' },
-        h('span', { class: 'drip-meta' }, meta),
+        // The age gets its own line, the way YouTube's grid puts it under the channel, so a long channel can't cut it off.
+        h('span', { class: 'drip-meta' }, h('span', { class: 'drip-meta-line' }, meta), video.age && h('span', { class: 'drip-meta-line' }, video.age)),
         h('button', { class: 'drip-b drip-b-primary drip-watch', 'data-k': 'watch', disabled: next, onclick: () => onResolve('watch', video.id) },
           icon('play'), h('span', {}, 'Watch'), buys && price('drop'))),
       h('div', { class: 'drip-card-actions' },

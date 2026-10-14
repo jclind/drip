@@ -940,6 +940,13 @@ html[dark] #drip-pill {
   white-space: nowrap;
 }
 
+/* Channel and length, then the age under them. Two lines fit beside Watch, so the card keeps its height. */
+#drip-home .drip-meta-line {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 #drip-home .drip-watch {
   flex: none;
   padding: 0 16px 0 14px;
