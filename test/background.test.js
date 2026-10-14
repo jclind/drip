@@ -32,6 +32,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   const session = stores ? stores.session : {};
   let writes = 0;
   let failNext = 0;
+  let failSession = 0;
   /** @type {Function | null} */
   let onMessage = null;
   /** @type {Function | null} */
@@ -65,7 +66,13 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
       },
       session: {
         get: async (/** @type {string} */ key) => (key in session ? { [key]: structuredClone(session[key]) } : {}),
-        set: async (/** @type {Record<string, any>} */ items) => { Object.assign(session, structuredClone(items)); },
+        set: async (/** @type {Record<string, any>} */ items) => {
+          if (failSession > 0) {
+            failSession--;
+            throw new Error('session write failed');
+          }
+          Object.assign(session, structuredClone(items));
+        },
       },
     },
     tabs: { create: (/** @type {{url: string}} */ opts) => { opened.push(opts.url); } },
@@ -83,7 +90,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   });
   const install = (/** @type {string} */ reason) => /** @type {Function} */ (onInstalled)({ reason });
   const restart = () => worker(undefined, { dev, panel, stores: { local: store, session } });
-  return { send, install, restart, opened, store, session, writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, Drip: context.Drip };
+  return { send, install, restart, opened, store, session, writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
 }
 
 test('every reply carries the saved state', async () => {
@@ -321,6 +328,15 @@ test('a resent tick key is charged only for its new seconds, and a failed write 
   // Two more seconds played under the same key, ending two seconds later.
   await w.send({ type: 'tick', seconds: 7, videoId: 'aaa', key: 'k1', ago: 58000 });
   assert.equal(w.store.drip.watchSecondsLeft, 893);
+});
+
+test('a tick whose state saved but whose clock did not is still ok, so the tab does not resend it (Codex, 2026-10-14)', async () => {
+  const w = worker();
+  await w.send({ type: 'spendWatch' });
+  w.failSessionWrites(1);
+  const res = await w.send({ type: 'tick', seconds: 5, videoId: 'aaa', key: 'k1', ago: 60000 });
+  assert.equal(res.ok, true);
+  assert.equal(w.store.drip.watchSecondsLeft, 895);
 });
 
 // Codex, 2026-10-13: only drip's own scripts can send these, but a bad shape mustn't get around a limit.

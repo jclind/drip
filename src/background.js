@@ -52,7 +52,9 @@ function withState(fn) {
     const result = fn(state, now, clock);
     // A failed state write throws before the clock is saved, so the tab's resent time is charged again.
     if (stableJson(state) !== before) await chrome.storage.local.set({ [KEY]: state });
-    if (stableJson(clock) !== clockBefore) await chrome.storage.session.set({ [CLOCK_KEY]: clock });
+    // Once the state is saved, the charge stuck, so a clock that fails to save mustn't fail the message: the tab
+    // would resend time already charged (Codex, 2026-10-14). That loses only the clock, as a stopped worker used to.
+    if (stableJson(clock) !== clockBefore) await chrome.storage.session.set({ [CLOCK_KEY]: clock }).catch(() => {});
     return result;
   });
   queue = run.catch(() => {});
