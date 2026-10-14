@@ -94,7 +94,7 @@ function handle(msg, state, now) {
     case 'needThis':
       return Drip.needThis(state, msg.videoId, msg.title || '', msg.reason || '', now);
     case 'updateSettings':
-      return Drip.updateSettings(state, msg.changes || {});
+      return Drip.updateSettings(state, msg.changes || {}, now);
     case 'cancelPending':
       return Drip.cancelPending(state, msg.key);
     case 'refillSeen':
@@ -106,7 +106,10 @@ function handle(msg, state, now) {
 
 // A new install opens the welcome page once. Updates don't.
 chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('src/welcome/welcome.html') });
+  if (details.reason !== 'install') return;
+  // Saves the state now, so the first day (Q6) starts at install, not at the first visit to YouTube (Codex).
+  withState(() => ({ ok: true })).catch(() => {});
+  chrome.tabs.create({ url: chrome.runtime.getURL('src/welcome/welcome.html') });
 });
 
 // Development only: dev/reload.html on localhost asks for a reload after a code change.

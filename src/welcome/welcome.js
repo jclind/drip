@@ -70,7 +70,7 @@
       kind('save', '', 'Stash', `Holds ${settings.stashMax} videos for later`));
     /** @param {number} n @param {string} one @param {string} many */
     const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    $('allowance').textContent = `You get ${count(settings.watchTokensPerDay, 'drop', 'drops')} and ${count(settings.recTokensPerDay, 'card', 'cards')} a day. You can change these in Settings.`;
+    $('allowance').textContent = `You get ${count(settings.watchTokensPerDay, 'drop', 'drops')} and ${count(settings.recTokensPerDay, 'card', 'cards')} a day. You can change these in Settings, and for your first 24 hours, changes apply right away.`;
   }
 
   $('brandDrop').replaceWith(icon('drop', 'drip-token-drop'));

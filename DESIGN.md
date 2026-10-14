@@ -13,7 +13,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q3 | Out of time means hard stop: pause and overlay. "Finish the current video" grace mode is a setting, off by default. |
 | Q4 | Daily allowance only. Tasks are in IDEAS.md. The whole extension runs on the honor system. |
 | Q5 | Feed source: YouTube home feed (default) or subscriptions. It keeps the last choice. Explore was dropped because `/feed/explore` now serves the home feed (Jesse, 2026-10-06). It's a Settings field for now, not a toggle on the home page; its design comes later (Jesse, 2026-10-10). |
-| Q6 | A settings change that loosens a limit takes effect at the next day reset. Tightening is immediate. |
+| Q6 | A settings change that loosens a limit takes effect at the next day reset. Tightening is immediate. In the first 24 hours after install, every change is immediate, because a new user is trying settings out (Jesse, 2026-10-13). Settings says so, with the time it ends. |
 | Q7 | The clock runs on every youtube.com watch page while the video plays. Embeds elsewhere are free. |
 | Q8 | Built on air as private `jclind/drip`, tested in air's Chrome, cloned on the MacBook and loaded unpacked. Data in `chrome.storage.local`. |
 | Q9 | Plain JS, Manifest V3, no build step, `// @ts-check` with JSDoc. Move to WXT when settings outgrow one page or publishing gets serious. |
@@ -93,7 +93,7 @@ Settings (2026-10-08, Jesse's mockups):
 
 Welcome page (2026-10-09, Jesse's first mockup and this plan):
 
-- Hero: the drop and "drip", the tagline "Make every drop count." (Jesse's), then three cards: Drops "1 drop = 15m of watching", Cards "1 card = 1 video revealed", Stash "Holds 10 videos for later" (the cap, from the default settings, since 2026-10-13, Q28). Under them: "You get 4 drops and 10 cards a day. You can change these in Settings." The numbers are the defaults, which are the settings on install. They were read from the saved settings until 2026-10-12, when a reopened tab showed Jesse his test numbers; he asked for "whatever a default account starts with".
+- Hero: the drop and "drip", the tagline "Make every drop count." (Jesse's), then three cards: Drops "1 drop = 15m of watching", Cards "1 card = 1 video revealed", Stash "Holds 10 videos for later" (the cap, from the default settings, since 2026-10-13, Q28). Under them: "You get 4 drops and 10 cards a day. You can change these in Settings, and for your first 24 hours, changes apply right away." (Q6) The numbers are the defaults, which are the settings on install. They were read from the saved settings until 2026-10-12, when a reopened tab showed Jesse his test numbers; he asked for "whatever a default account starts with".
 - Then one interactive tour panel in 5 steps, each one sentence over a working miniature of the real screen: the stats block where "+15m" fills the glass, a reveal with the parting animation and Save, a fake player with the pill draining fast, the lock panel where Done for now ripples, and the five "what changes" bullets. Step dots, Back, Next, and Skip. The last step ends on the white Open YouTube button.
 - The tour is a sandbox and never touches real state. It reuses the real components, so it has no screenshots or separate art, and it's built last, after those components exist.
 - Footer: gray "Open YouTube ↗" and "⚙ Settings" for people who skip, and "Everything drip knows stays in this browser."
@@ -278,6 +278,7 @@ Each tab measures how long its video played and sends it as `seconds`, every 5 s
   unlocked: string[],       // video ids unlocked by "I need this" today
   log: { [day]: LogDay },
   refill: null | { day, watch, rec },  // what the last reset added, until a home page shows it
+  installedAt: 0,  // ms, set by initialState; 0 for state from before 2026-10-13, which counts as installed long ago
 }
 Video  = { id, title, channel, length, resumeSec?, durationSec?, addedAt? }
          // length is a display string like "14:02", may be ''. A stashed video keeps how far it got in seconds,
@@ -310,7 +311,8 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, watched, needThis: [
 - `needThis(state, videoId, title, reason, now)` unlocks the video for today and logs the reason. Errors, in order: `'reason-required'` if the trimmed reason is under 3 characters, `'need-this-limit'` if `unlocked.length >= needThisPerDay`. Unlocking a video that's already unlocked is `ok` and doesn't count again.
 - `cleanSettings(changes)` returns only known keys with valid values. Integers get rounded and clamped to their range, `graceMode` becomes a boolean, `feedSource` must be one of the two values or is dropped.
 - `isLoosening(key, from, to)`. The numeric keys loosen when they go up. `graceMode` loosens going from false to true. Any change to `resetHour` counts as loosening. `feedSource` never does.
-- `updateSettings(state, changes)` cleans the changes, then for each key that differs from the current value it either applies it now (tightening or neutral) or puts it in `pending` with `effectiveDay = addDays(state.day, 1)`. Applying a key now removes any pending value for that key. Setting a key back to its current value removes its pending value too. An empty `pending.changes` becomes `null`. Balances above the new cap (`perDay * rolloverDays`) drop to it at once. Returns `{ ok: true, applied: {...}, pending: {...} }` listing just what this call did.
+- `updateSettings(state, changes, now)` cleans the changes, then for each key that differs from the current value it either applies it now (tightening or neutral) or puts it in `pending` with `effectiveDay = addDays(state.day, 1)`. Applying a key now removes any pending value for that key. Setting a key back to its current value removes its pending value too. An empty `pending.changes` becomes `null`. Balances above the new cap (`perDay * rolloverDays`) drop to it at once. Returns `{ ok: true, applied: {...}, pending: {...} }` listing just what this call did. In the first day after install (`firstDayUntil(state, now)` is nonzero) every key applies now (Q6). There a new daily allowance also moves today's balance by the difference, floored at 0, so 4 to 6 drops a day shows 6 today and going back takes them away. A new reset hour on that day moves `state.day` forward when the new hour already passed today, and never back, so changing it can't start a new day and refill (Claude's calls, 2026-10-13). Without `now`, the first day doesn't count.
+- `firstDayUntil(state, now)` is when the first day ends, `installedAt` plus 24 hours, or 0 once it's over or with no `installedAt`. Settings shows it.
 - `cancelPending(state, key)` drops one pending key.
 - `refillSeen(state)` clears `refill` once a home page has shown it, so no other tab shows it again.
 - `caps(settings)` returns `{ watch, rec }`, the most each balance can hold: `perDay * rolloverDays`. `rollDay` and `updateSettings` cap with it, and the home page sizes its counts from it.
