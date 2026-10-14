@@ -79,6 +79,7 @@
     nocards() { s.tokens.rec = 0; },
     nocardsCard() { this.card(); s.tokens.rec = 0; },
     out() { s.tokens = { watch: 0, rec: 0 }; s.watchSecondsLeft = 0; },
+    outCards() { s.tokens = { watch: 0, rec: 6 }; s.watchSecondsLeft = 0; },
     fresh() { Object.assign(s, D.initialState(now)); },
     one() { s.backlog = [VIDEOS[4]]; },
     full() { s.watchSecondsLeft = s.watchSecondsBought; },

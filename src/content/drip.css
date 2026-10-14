@@ -923,6 +923,10 @@ html[dark] #drip-home .drip-out-sea {
   font-size: 14px;
 }
 
+#drip-home .drip-out-copy p + p {
+  margin-top: 4px;
+}
+
 #drip-home .drip-sea {
   position: absolute;
   inset: 0;

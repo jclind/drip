@@ -749,7 +749,15 @@
 
   /** No minutes or tokens left, and no card still to watch or stash. */
   function outForDay() {
-    return !state.current && state.tokens.watch < 1 && state.tokens.rec < 1 && state.watchSecondsLeft <= 0;
+    // Cards left don't count: with no minutes or drops, a reveal can't lead to watching anything (Jesse, 2026-10-14).
+    return !state.current && state.tokens.watch < 1 && state.watchSecondsLeft <= 0;
+  }
+
+  /** How many of today's cards the reset keeps, under the rollover cap, by the settings tomorrow will use. */
+  function cardsCarried() {
+    const settings = { ...state.settings, ...state.pending?.changes };
+    const perDay = settings.recTokensPerDay;
+    return Math.max(0, Math.min(state.tokens.rec + perDay, Drip.caps(settings).rec) - perDay);
   }
 
   /** The gray line under the buttons when something has run out. */
@@ -771,7 +779,8 @@
         animates() && h('span', { class: 'drip-fish' }, h('span', {}))),
       h('div', { class: 'drip-out-copy' },
         h('h2', {}, "You're out for today."),
-        h('p', {}, `The glass refills at ${hourLabel(state.settings.resetHour)}.`)));
+        h('p', {}, `The glass refills at ${hourLabel(state.settings.resetHour)}.`),
+        cardsCarried() > 0 && h('p', {}, `${cardsCarried()} ${cardsCarried() === 1 ? 'card carries' : 'cards carry'} over to tomorrow.`)));
   }
 
   function actions() {
