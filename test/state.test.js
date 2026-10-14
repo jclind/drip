@@ -3,7 +3,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../src/lib/state.js');
+require('../src/lib/glass.js');
 const D = globalThis.Drip;
+const G = globalThis.DripGlass;
 
 /** @param {number} day @param {number} [hour] @param {number} [minute] */
 const time = (day, hour = 12, minute = 0) => new Date(2026, 9, day, hour, minute).getTime();
@@ -24,13 +26,76 @@ test('API contains every contract name, and defaults are frozen', () => {
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
-    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction',
+    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
     watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10,
     rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home', stashMax: 10,
   });
+});
+
+test('toolbar playing rule needs a fresh ongoing tick and expires at 12 seconds', () => {
+  const tick = { at: time(5), playing: true };
+  const before = structuredClone(tick);
+  assert.equal(D.toolbarPlaying(null, tick.at), false);
+  assert.equal(D.toolbarPlaying(tick, tick.at), true);
+  assert.equal(D.toolbarPlaying(tick, tick.at + 11999), true);
+  assert.equal(D.toolbarPlaying(tick, tick.at + 12000), false);
+  assert.equal(D.toolbarPlaying(tick, tick.at + 20000), false);
+  assert.equal(D.toolbarPlaying({ ...tick, playing: false }, tick.at), false);
+  assert.equal(D.toolbarPlaying({ at: tick.at }, tick.at), false);
+  const delayed = { ...tick, ago: 5000 };
+  assert.equal(D.toolbarPlaying(delayed, tick.at), true);
+  assert.deepEqual(tick, before);
+});
+
+test('toolbar glass shows full, half, a sliver, and exactly empty without changing state', () => {
+  for (const [left, fraction] of [[900, 1], [450, .5], [.001, .001 / 900], [0, 0]]) {
+    const state = { ...fresh(), watchSecondsLeft: left, watchSecondsBought: 900, unlocked: ['abc'] };
+    const before = structuredClone(state);
+    const level = D.toolbarGlass(state, G);
+    assert.equal(level.fraction, fraction);
+    assert.equal(level.fraction, G.fraction(state));
+    assert.deepEqual(state, before);
+    if (fraction === 1) {
+      assert.equal(level.water16, 0);
+      assert.equal(level.water32, 0);
+      assert.ok(Math.abs(level.surfaceOpacity - 1) < 1e-12);
+    } else {
+      assert.equal(level.surfaceOpacity, 0);
+      assert.equal(level.water16, G.waterline(fraction, 16));
+      assert.equal(level.water32, G.waterline(fraction, 32));
+    }
+    if (left > 0 && left < 1) {
+      assert.ok((675 - level.water16) * 16 / G.viewBox.height >= 2);
+      assert.ok((675 - level.water32) * 32 / G.viewBox.height >= 2);
+      assert.notEqual(level.cacheKey, D.toolbarGlass({ watchSecondsLeft: 0, watchSecondsBought: 900 }, G).cacheKey);
+    }
+    if (left === 0) {
+      assert.ok(level.water16 > 675);
+      assert.equal(level.cacheKey, 'empty');
+    }
+  }
+});
+
+test('toolbar glass cache skips invisible changes and the minimum sliver, but tracks visible changes', () => {
+  const level = (left) => D.toolbarGlass({ watchSecondsLeft: left, watchSecondsBought: 900 }, G);
+  assert.equal(level(450).cacheKey, level(449.999).cacheKey);
+  assert.notEqual(level(450).cacheKey, level(400).cacheKey);
+  assert.equal(level(.001).cacheKey, level(1).cacheKey);
+  assert.notEqual(level(.001).cacheKey, level(0).cacheKey);
+  assert.equal(D.toolbarGlass({ watchSecondsLeft: 60, watchSecondsBought: 0 }, G).fraction, 1);
+  assert.equal(level(1000).fraction, 1);
+});
+
+test('toolbar glass follows the mockup at nearly full, including the fading surface', () => {
+  const state = { watchSecondsLeft: 975, watchSecondsBought: 1000 };
+  const level = D.toolbarGlass(state, G);
+  assert.ok(Math.abs(level.water32 - G.waterline(.95, 32) / 2) < 1e-10);
+  assert.ok(Math.abs(level.water16 - G.waterline(.95, 16) / 2) < 1e-10);
+  assert.ok(Math.abs(level.surfaceOpacity - .5) < 1e-10);
+  assert.notEqual(level.cacheKey, D.toolbarGlass({ ...state, watchSecondsLeft: 1000 }, G).cacheKey);
 });
 
 test('dayKey turns over at the local reset hour', () => {
