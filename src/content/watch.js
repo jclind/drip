@@ -397,7 +397,7 @@
     const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && playing), startedAt: performance.now() };
     pendingTick = request;
     try {
-      const res = await send({ type: 'tick', seconds, videoId: id, key: entry.key, ago: Math.round(performance.now() - entry.endedAt), ...position(id) });
+      const res = await send({ type: 'tick', seconds, videoId: id, key: entry.key, ago: Math.round(performance.now() - entry.endedAt), playing, ...position(id) });
       if (res && res.ok && !disconnected) {
         entry.seconds -= seconds;
         // Time that played while the tick was out is new, so it goes under a new key.

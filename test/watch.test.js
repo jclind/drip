@@ -232,7 +232,7 @@ function makeWorld() {
     now: 0,
     state: D.initialState(new Date(2026, 9, 6, 12).getTime()),
     clock: { lastChargeEnd: 0 },
-    /** @type {{type: string, seconds?: number, videoId?: string, key?: string}[]} */
+    /** @type {{type: string, seconds?: number, videoId?: string, key?: string, playing?: boolean, ago?: number}[]} */
     sent: [],
     /** @type {Function[]} */
     listeners: [],
@@ -304,6 +304,18 @@ test('playback is charged in full, in a few batched ticks rather than one per se
   const total = ticks.reduce((sum, t) => sum + /** @type {number} */ (t.seconds), 0);
   assert.ok(Math.abs(total - 12) < 0.01, `charged ${total}`);
   assert.ok(Math.abs(world.state.watchSecondsLeft - 888) < 0.01);
+});
+
+test('ticks carry the playing flag, including an immediate stop with zero ago', async () => {
+  const { world, tab } = await setup();
+  await play(world, tab, 5);
+  assert.equal(world.ticks().at(-1).playing, true);
+  world.advance(1);
+  tab.video.pause();
+  await tab.tick();
+  const stopped = world.ticks().at(-1);
+  assert.equal(stopped.playing, false);
+  assert.equal(stopped.ago, 0);
 });
 
 test('ad time is not charged, and the video after it is (Q27)', async () => {

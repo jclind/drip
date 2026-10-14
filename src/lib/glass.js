@@ -98,5 +98,7 @@
     return Math.min(1, state.watchSecondsLeft / state.watchSecondsBought);
   }
 
-  /** @type {any} */ (globalThis).DripGlass = { make, set, fraction, waterline };
+  // Data only, so the worker can draw the same glass without creating any DOM nodes.
+  const paths = Object.freeze({ outline: OUTLINE, body: BODY, surface: SURFACE, wave: WAVE });
+  /** @type {any} */ (globalThis).DripGlass = { make, set, fraction, waterline, paths, viewBox: Object.freeze(VIEW), blue: BLUE };
 })();

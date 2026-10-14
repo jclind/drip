@@ -65,13 +65,13 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 - ★ Save fills. The bookmark on the card and the pill fills from the bottom up in blue when saved, like the glass, and drains when unsaved. Built on 2026-10-13 (DESIGN.md, "The stash fill as built").
 - ★ A new day. The first time the home page opens after the reset, the glass fills from empty with the day's minutes. As written it can't happen: the reset sets minutes to 0. The day's new drops landing in the counter fits with "Kept drops land" instead (2026-10-12). Built that way on 2026-10-13, with "4 new" and "10 new" tags (DESIGN.md, "The counter's motion as built").
 - Pass sinks. The × sends the card down and out like it dropped into water, instead of vanishing. Reveal next could do the same before the new card rises. Built another way on 2026-10-12: the card turns face down and drops (DESIGN.md, "Reveal animation as built").
-- Removing a Saved row evaporates it (a short blur and fade upward), and Undo drips it back in.
+- Removing a Saved row evaporates it (a short blur and fade upward). Built on 2026-10-14, with Undo condensing it back instead of dripping it in (DESIGN.md, "Stash rows as built").
 - The pill's water surface gets a tiny ripple each time a minute ticks off, so a glance shows it's draining without reading the number.
 - In the last minute, the pill's water wobbles a little on top of the low-time shimmer. Still no red.
 - Out for the day on the home page gets the lock's calm sea instead of a gray line: still water, one slow fish, and "The glass refills at 4:00am." This is the redesign DESIGN.md asks for ("a good place to stop").
 - "+2 saved from yesterday" at rollover trickles two drops into the counter.
 - The popup's glass drifts gently while a video is playing in any tab and stays still otherwise, so the popup shows at a glance whether the clock is running.
-- The toolbar icon draws the glass at its current level (`chrome.action.setIcon` from a canvas), so minutes left show without opening anything. Not an animation, but the same idea.
+- The toolbar icon shows the drop when idle and draws the glass at its current level while a YouTube video plays (`chrome.action.setIcon` from a canvas), including unlocked playback. Jesse chose the idle drop because it is more recognizable for now (2026-10-14). Built 2026-10-14; see [Toolbar glass as built](DESIGN.md) near "Popup and Settings as built".
 - On the lock, clicking the open water sends a small ripple out from the click. A calm fidget, but it rewards lingering on the lock, which may cut against "the satisfying moment is leaving". Worth a try before deciding.
 - Fish that drift away from the pointer on the lock. Cute; maybe too much to watch.
 - A soft water "plip" on "Done for now", off by default. drip has no sound anywhere yet, so it's a bigger decision than it looks.
