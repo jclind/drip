@@ -120,7 +120,8 @@
       const picked = row.name === modeBase;
       const el = h('div', {
         class: 'rung', role: 'radio', tabindex: picked ? '0' : '-1', 'aria-checked': String(picked), 'data-mode': row.name,
-        onclick: (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button')) pickMode(row.name); },
+        // A click in Customize's switches or their text isn't a pick, or it would put the preset back over the mix.
+        onclick: (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, .opts')) pickMode(row.name); },
         onkeydown: (/** @type {KeyboardEvent} */ e) => {
           if (e.target !== el) return;
           const i = MODE_ROWS.indexOf(row);
