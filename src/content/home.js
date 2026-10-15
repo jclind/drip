@@ -1019,6 +1019,24 @@
     document.documentElement.toggleAttribute('data-drip-search-moved', true);
   }
 
+  /**
+   * Puts the new view in the page. Quiet's search box never leaves the page on a redraw: YouTube's box rebuilds itself
+   * empty whenever it's moved, even with moveBefore, which loses what was typed and the focus (Chrome 154, 2026-10-15).
+   * So when the old and new pages both have the slot, the old page and its slot stay and the rest is swapped around them.
+   * @param {HTMLElement} root
+   * @param {HTMLElement} next
+   */
+  function swapIn(root, next) {
+    const page = root.childElementCount === 1 ? root.firstElementChild : null;
+    const slot = page?.classList.contains('drip-page') && page.querySelector(':scope > .drip-search-slot');
+    const nextSlot = next.classList.contains('drip-page') && next.querySelector(':scope > .drip-search-slot');
+    if (!page || !slot || !nextSlot) return root.replaceChildren(next);
+    page.className = next.className;
+    for (const node of [...page.childNodes]) if (node !== slot) node.remove();
+    nextSlot.remove();
+    page.append(...next.childNodes);
+  }
+
   /** drip's own search box: a form that goes to YouTube's results page. */
   function makeOwnSearch() {
     const input = /** @type {HTMLInputElement} */ (h('input', { type: 'search', class: 'drip-search-input', placeholder: 'Search', 'aria-label': 'Search YouTube' }));
@@ -1095,7 +1113,7 @@
     const was = glides ? /** @type {SVGSVGElement} */ (glassEl).getBoundingClientRect().left : null;
     // Moving the kept list out and back in resets its scroll, so it's put back after.
     const listTop = swapEl?.querySelector('.drip-swap-list')?.scrollTop || 0;
-    root.replaceChildren(view());
+    swapIn(root, view());
     placeSearch(root);
     syncRowMotion(root);
     syncCounts();
