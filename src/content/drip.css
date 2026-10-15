@@ -900,6 +900,20 @@ html[dark] #drip-pill {
   padding-top: 12vh;
 }
 
+/* With the clock on, the stats come first and +15m ends their line, over the search box (design F, 2026-10-15). */
+#drip-home .drip-page.is-search .drip-stats {
+  margin-bottom: 28px;
+}
+
+#drip-home .drip-stats .drip-add {
+  margin-left: 12px;
+}
+
+/* YouTube's Ask YouTube chip, hidden in the moved box only (design F). If YouTube renames it, it just shows again. */
+#drip-home .drip-search-slot .ytSearchboxComponentInputBox > div:has(.ytSpecButtonShapeNextIconLeading) {
+  display: none !important;
+}
+
 /* Above the stash, so the suggestions open over it. */
 #drip-home .drip-search-slot {
   position: relative;

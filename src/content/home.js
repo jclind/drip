@@ -37,6 +37,8 @@
     ad: 'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer',
     // The top bar's search box and voice search, which Quiet's home page moves into the middle of the page (Q29).
     searchBox: 'ytd-masthead #center',
+    // The box's text field, whose "Search or ask a question" drip shortens to "Search" with Ask YouTube hidden.
+    searchInput: 'textarea[name="search_query"], input[name="search_query"]',
   };
   const AGE = /\bago$/i;
   const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
@@ -804,7 +806,9 @@
       clock && h('div', { class: 'drip-time-block' },
         h('div', { class: 'drip-time' }, left),
         h('div', { class: 'drip-sub' }, 'left today')),
-      h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, clock && countRow('watch'), counted && countRow('rec')));
+      h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, clock && countRow('watch'), counted && countRow('rec')),
+      // With cards off there's no row of buttons, so +15m ends the stats line, over the search box (design F, 2026-10-15).
+      clock && cardsMode() === 'off' && !outForDay() && addButton());
   }
 
   /** Set when Pass on the last card leaves the page out for the day, so the sea rises in where the card dropped. */
@@ -852,19 +856,24 @@
 
   /** +15m with the clock on, and Reveal video with cards on. It costs a card only when cards are counted (Q29). */
   function actions() {
-    const s = state.settings;
     const cards = cardsMode();
-    if (!clockOn() && cards === 'off') return null;
+    // With cards off, +15m sits in the stats line instead (stats()).
+    if (cards === 'off') return null;
     return h('div', { class: 'drip-actions' },
-      clockOn() && h('button', {
-        class: 'drip-b drip-b-gray drip-add', 'data-k': 'add', onclick: onAddTime, disabled: state.tokens.watch < 1,
-        title: `Add ${s.minutesPerToken} minutes for 1 drop`,
-      }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop')),
-      cards !== 'off' && h('button', {
+      clockOn() && addButton(),
+      h('button', {
         // While the animation runs, it draws these buttons as they'll be once it's done.
         class: 'drip-b drip-b-gold drip-reveal', 'data-k': 'reveal', onclick: onReveal,
         disabled: (cards === 'limited' && state.tokens.rec < 1) || (!!busy && !moving),
       }, h('span', {}, 'Reveal video'), cards === 'limited' && price('card')));
+  }
+
+  function addButton() {
+    const s = state.settings;
+    return h('button', {
+      class: 'drip-b drip-b-gray drip-add', 'data-k': 'add', onclick: onAddTime, disabled: state.tokens.watch < 1,
+      title: `Add ${s.minutesPerToken} minutes for 1 drop`,
+    }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop'));
   }
 
   /** What the loading card says, which changes once the read has taken SLOW_MS. */
@@ -1014,11 +1023,12 @@
     const out = !showCard && outForDay();
     const note = out ? '' : outNote();
     // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
-    // With cards off there's nothing to reveal, so the page is YouTube's search box (Quiet, Q29).
+    // With cards off there's nothing to reveal, so the page is YouTube's search box (Quiet, Q29), under the stats when
+    // the clock is on (design F, 2026-10-15).
     const search = cardsMode() === 'off';
-    return h('div', { class: `drip-page${showCard ? ' is-open' : out ? ' is-out' : ''}${search ? ' is-search' : ''}${search && !stashOn() ? ' is-search-only' : ''}` },
-      search && h('div', { class: 'drip-search-slot' }),
+    return h('div', { class: `drip-page${showCard ? ' is-open' : out ? ' is-out' : ''}${search ? ' is-search' : ''}${search && !stashOn() && !clockOn() ? ' is-search-only' : ''}` },
       stats(),
+      search && h('div', { class: 'drip-search-slot' }),
       !showCard && (out ? outSea() : actions()),
       current ? card(current) : busy === 'reveal' && placeholderCard(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
@@ -1027,7 +1037,7 @@
 
   /**
    * Where the top bar's search box came from, to put it back when the page leaves Quiet's layout or YouTube's home.
-   * @type {{el: Element, parent: Node, next: Node | null} | null}
+   * @type {{el: Element, parent: Node, next: Node | null, input: Element | null, placeholder: string | null} | null}
    */
   let movedSearch = null;
   /** drip's own search box, for when YouTube's can't be found. Kept across redraws so typing survives them. */
@@ -1048,7 +1058,12 @@
       if (form.parentElement !== slot) slot.append(form);
       return;
     }
-    if (!movedSearch) movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling };
+    if (!movedSearch) {
+      const input = el.querySelector(SEL.searchInput);
+      movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling, input, placeholder: input?.getAttribute('placeholder') ?? null };
+      // drip.css hides Ask YouTube in the moved box, so the field says what's left (design F, 2026-10-15).
+      input?.setAttribute('placeholder', 'Search');
+    }
     if (el.parentElement !== slot) slot.append(el);
     document.documentElement.toggleAttribute('data-drip-search-moved', true);
     fitSuggestions();
@@ -1079,8 +1094,11 @@
     if (!page || !slot || !nextSlot) return root.replaceChildren(next);
     page.className = next.className;
     for (const node of [...page.childNodes]) if (node !== slot) node.remove();
-    nextSlot.remove();
-    page.append(...next.childNodes);
+    // The new parts go on the same side of the kept slot as in the new view.
+    const kids = [...next.childNodes];
+    const at = kids.indexOf(nextSlot);
+    slot.before(...kids.slice(0, at));
+    page.append(...kids.slice(at + 1));
   }
 
   /** drip's own search box: a form that goes to YouTube's results page. */
@@ -1099,8 +1117,9 @@
   function restoreSearch() {
     document.documentElement.toggleAttribute('data-drip-search-moved', false);
     if (!movedSearch) return;
-    const { el, parent, next } = movedSearch;
+    const { el, parent, next, input, placeholder } = movedSearch;
     movedSearch = null;
+    if (input && placeholder !== null) input.setAttribute('placeholder', placeholder);
     if (parent.isConnected) parent.insertBefore(el, next && next.parentNode === parent ? next : null);
   }
 
