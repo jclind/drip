@@ -1022,6 +1022,18 @@
     if (!movedSearch) movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling };
     if (el.parentElement !== slot) slot.append(el);
     document.documentElement.toggleAttribute('data-drip-search-moved', true);
+    fitSuggestions();
+  }
+
+  /**
+   * YouTube sizes its suggestion list for the top bar, so in the middle of the page the list ran off the bottom of the
+   * screen and only the first few showed (Jesse, 2026-10-15). drip.css caps it at the room left under the box.
+   */
+  function fitSuggestions() {
+    const slot = document.querySelector('#drip-home .drip-search-slot');
+    if (!slot) return;
+    const room = Math.max(160, window.innerHeight - slot.getBoundingClientRect().bottom - 16);
+    document.documentElement.style.setProperty('--drip-suggest-room', `${Math.round(room)}px`);
   }
 
   /**
@@ -1311,6 +1323,8 @@
   watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
   document.addEventListener('yt-navigate-finish', () => mount(true));
   document.addEventListener('yt-navigate-start', restoreSearch);
+  for (const ev of ['resize', 'scroll']) window.addEventListener(ev, fitSuggestions, { passive: true });
+  document.addEventListener('focusin', fitSuggestions);
   // Back from the watch page can bring this page back from Chrome's cache, still waiting on Watch.
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted || !leaving) return;

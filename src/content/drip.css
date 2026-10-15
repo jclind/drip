@@ -918,6 +918,12 @@ html[dark] #drip-pill {
   margin: 0;
 }
 
+/* YouTube's suggestion list under the moved box, capped at the room left on screen (home.js fitSuggestions). Its own
+   max-height assumes the top bar. */
+#drip-home .drip-search-slot .ytSearchboxComponentSuggestionsContainer {
+  max-height: var(--drip-suggest-room, 60vh) !important;
+}
+
 /* drip's own box, when YouTube's isn't there to move. */
 #drip-home .drip-search-form {
   display: flex;
