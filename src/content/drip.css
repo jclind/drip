@@ -915,8 +915,10 @@ html[dark] #drip-pill {
   margin-left: 12px;
 }
 
-/* YouTube's Ask YouTube chip, hidden in the moved box only (design F). If YouTube renames it, it just shows again. */
-#drip-home .drip-search-slot .ytSearchboxComponentInputBox > div:has(.ytSpecButtonShapeNextIconLeading) {
+/* YouTube's Ask YouTube chip, hidden in the moved box only (design F). It sits in the field at rest and moves to the
+   box's actions while typing; both times it's a tracked div around the box's one button with an icon and words. If
+   YouTube renames these, it just shows again. */
+#drip-home .drip-search-slot div[client-ve-type]:has(> button-view-model .ytSpecButtonShapeNextIconLeading) {
   display: none !important;
 }
 
