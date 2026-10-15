@@ -7,8 +7,9 @@
   // Runs a real extension page outside the extension, for checking it in a browser. Serve the repo and open
   // http://localhost:8077/dev/page.html?page=welcome (or options, or popup). Chrome's extension APIs are stubs: messages to the
   // worker are kept in window.__sent and answer with a fresh install's state, run through the real rules in state.js.
-  // ?mode=quiet, curated, or full starts the page as if that mode were saved. &settled=1 starts it a week after install,
-  // so a lighter change waits for the reset (Q6) instead of applying at once.
+  // ?mode=quiet, curated, or full starts the page as if that mode were saved. &cards=off, unlimited, or limited, and
+  // &clock, &stash, and &searchCap set to 1 or 0, set one part on top of that, for a custom mix.
+  // &settled=1 starts it a week after install, so a lighter change waits for the reset (Q6) instead of applying at once.
   const listeners = { addListener() {}, removeListener() {} };
   const params = new URLSearchParams(location.search);
   const mode = params.get('mode');
@@ -30,6 +31,8 @@
           state = D.initialState(settled ? Date.now() - 7 * 86400000 : Date.now());
           if (settled) D.rollDay(state, Date.now());
           if (mode && D.MODES[mode]) Object.assign(state.settings, D.MODES[mode]);
+          if (params.has('cards')) state.settings.cards = params.get('cards');
+          for (const key of ['clock', 'stash', 'searchCap']) if (params.has(key)) state.settings[key] = params.get(key) === '1';
         }
         const res = msg.type === 'updateSettings' ? D.updateSettings(state, msg.changes, Date.now())
           : msg.type === 'cancelPending' ? D.cancelPending(state, msg.key) : { ok: true };
