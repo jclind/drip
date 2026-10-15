@@ -36,9 +36,9 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q26 | Finishing a video that's in the backlog removes it from the backlog. Each new video opens in theater mode. Kept as they are for now (Jesse, 2026-10-06). |
 | Q27 | Ads don't use watch minutes. Time the player spends on an ad isn't charged or logged (Jesse, 2026-10-07). |
 | Q28 | The stash is capped, 10 by default, as the setting "Stash holds" (1 to 50). Raising it waits for the next day (Q6). A free, unlimited stash made Pass pointless and grew into a feed of its own. Lowering it deletes nothing: new videos wait until the stash is under the cap. A full stash asks which video to swap out, oldest first. Stashed videos never expire, so time away from YouTube loses nothing. A started video shows how far it got and opens where it stopped (Jesse, 2026-10-13). |
-| Q29 | drip has three modes, picked on a choice page at the start of the welcome page and changed in Settings: Quiet, Curated, and Full drip. The choice page shows them as three preset cards, with a Customize link to the separate parts. Quiet's home page is the Stash with a search box. Moving to a lighter mode follows Q6: it waits for the next reset, except in the first 24 hours (Jesse, 2026-10-14). The details are under "Modes". |
+| Q29 | drip has three modes, picked on a choice page at the start of the welcome page and changed in Settings: Quiet, Curated, and Full drip. The choice page is a list of the three, lightest first, each with a small picture of its home page, and the picked one has a Customize link to the separate parts (design I). The stash is a part too, off in Quiet. Quiet's home page is YouTube's own search box, moved to the middle of the page. Moving to a lighter mode follows Q6: it waits for the next reset, except in the first 24 hours (Jesse, 2026-10-14). The details are under "Modes". |
 
-## Modes (Q29, planned 2026-10-14, not built)
+## Modes (Q29, planned 2026-10-14, state rules built)
 
 Jesse's idea, 2026-10-14: a new user picks how much of drip they want before the tour, and can change it later in Settings. It grew out of "Lighter modes" in IDEAS.md (2026-10-13).
 
@@ -50,17 +50,21 @@ drip splits into parts that turn on and off. The list and which preset gets whic
 | Search cap | Q15: 10 results, then a free "more" button | off | on | on |
 | Reveal cards | Q13: one recommended video at a time | off | unlimited | 10 a day, as cards |
 | Watch clock | Q3, Q10, Q20: drops, the glass, the pill, and the lock | off | off | on |
-| Stash | Q14, Q28 | on | on | on |
+| Stash | Q14, Q28: Stash buttons and the list | off | on | on |
 
 - Hidden feeds is on in every mode. Without it drip is a timer, and "Customize" doesn't offer it in the first build. A clock with the feeds left visible stays an idea (IDEAS.md).
-- Customize shows the other parts as toggles, with the cards' per-day count beside Reveal cards. Any mix is allowed. The home page draws from what's on: with the clock off there's no glass, no drop counter, and no +15m; with cards off there's no Reveal button and no card counter; with cards unlimited there's no card counter and Reveal costs nothing.
-- Quiet's home page is the Stash open in full with a search box above it that runs YouTube's search (Jesse, 2026-10-14).
+- Customize shows the other parts as switches (design I, below). Any mix is allowed. In state the parts are four settings: `searchCap`, `cards` (`'off'`, `'unlimited'`, or `'limited'`), `clock`, and `stash`. `Drip.MODES` holds the three mixes and `Drip.modeOf(settings)` names one, or returns null for a custom mix. Customize's one cards switch sets `'limited'` while the clock is on and `'unlimited'` while it's off, so it needs no count of its own (Claude's call, open to review). The count stays "Cards per day" in Settings. The home page draws from what's on: with the clock off there's no glass, no drop counter, and no +15m; with cards off there's no Reveal button and no card counter; with cards unlimited there's no card counter and Reveal costs nothing.
+- Quiet's home page is YouTube's own search box, mic and all, moved from the top bar to the middle of the page, with nothing else (design G). With the stash turned on, the stash sits folded under it (design H). Moving the real box keeps YouTube's suggestions and voice search. It moves on the home page only; every other page keeps it in the top bar, and if YouTube's markup changes it stays where YouTube put it (Jesse, 2026-10-14).
+- The stash became a part on 2026-10-14: off in Quiet, which costs nothing, so YouTube's Watch later already does the stash's job there (Jesse agreed). Turning it off keeps what's in it, hidden until it's back on, and refuses new videos (`stash-off`). Undo can still put back a row.
+- With the clock off, watching is still logged for History and costs nothing, like an unlocked video, and nothing locks. With cards unlimited, a reveal spends nothing but still counts in `recSpent`, so History's cards line still adds up.
 - The choice page has no mode preselected, so the user has to pick one. Existing installs, Jesse's included, get Full drip on upgrade, since that's what they have now.
-- Q6 per part: turning the search cap, cards, or the clock off, or moving cards from a count to unlimited, waits for the next reset. Turning any of them on, or giving cards a count, applies at once. A change that does both splits, so the tightening parts apply now and the rest wait. In Settings each waiting part gets the usual gray chip.
+- Q6 per part: turning the search cap, cards, the clock, or the stash off, or moving cards from a count to unlimited, waits for the next reset. Turning any of them on, or giving cards a count, applies at once. For cards, off is the loosest, then unlimited, then a count (`isLoosening`). A change that does both splits, so the tightening parts apply now and the rest wait. In Settings each waiting part gets the usual gray chip.
 - The tour after the choice page skips the steps for parts that are off. Quiet keeps only "What changes", and its table drops the rows for parts that are off.
 - The welcome page's three tiles and its allowance sentence follow the mode too. Their design comes with the choice page.
 
-Build order (agreed 2026-10-14): this docs PR, then `/design-variants` for the choice page and for the Quiet and Curated home pages, then stacked PRs: the rules and tests in state.js, each content script's checks, then the pages.
+The choice page as picked (2026-10-14, design I, after three rounds of design variants). The list of three from round 1's B, lightest first: Quiet, Curated, Full drip. Each row has a radio dot, the name, one sentence, and a 132 by 80 picture of its home page on the right, hidden on phones. Nothing is picked at first, and Next waits for a pick. The picked row gets a blue border and a "Customize" link, which opens one row per part: "Hide YouTube's feeds" (always on, its switch disabled), "Stop search at 10 results", "Reveal one video at a time", "Limit watch time", and "Stash videos for later", each with one gray line on how. The labels name the action and never change, so the switch alone says on or off. Jesse found D's chips "a little hard to understand" for someone new; switches read better. A mix that differs from the row's mode puts a "Changed" tag after its name. Curated's and Full drip's home pages follow round 1's A: the home page as now, without the counters and glass Curated doesn't use.
+
+Build order (agreed 2026-10-14): the docs PR, then `/design-variants` (done), then stacked PRs: the rules and tests in state.js (this one), each content script's checks, then the pages.
 
 ## Visual design (in progress, home page, lock screen, popup, and Settings built)
 
