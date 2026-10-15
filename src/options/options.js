@@ -37,7 +37,7 @@ const noCards = (d) => (d.cards === 'off' ? 'Not used while cards are off.' : ''
 /** @type {{title: string, modes?: boolean, fields: Field[]}[]} */
 const SECTIONS = [
   {
-    // Q29. The mode picker above these sets all four at once; each can also be switched on its own.
+    // Q29. The mode picker above these sets the four parts at once; each can also be switched on its own.
     title: 'What drip does',
     modes: true,
     fields: [
@@ -46,6 +46,8 @@ const SECTIONS = [
         options: [['limited', 'Cards per day'], ['unlimited', 'Unlimited'], ['off', 'Off']] },
       { key: 'searchCap', label: 'Stop search at 10 results', kind: 'toggle' },
       { key: 'stash', label: 'Stash videos for later', kind: 'toggle' },
+      // Not a mode part: the same in every mode, so the picker above leaves it alone (Q16).
+      { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle', hint: 'The same in every mode.' },
     ],
   },
   {

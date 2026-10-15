@@ -53,6 +53,11 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
+      "js": ["src/content/menu.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.youtube.com/*"],
       "css": ["src/content/early.css"],
       "run_at": "document_start"
     },

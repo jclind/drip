@@ -38,6 +38,7 @@ function pages() {
   const comments = selectors('src/content/comments.js');
   const search = selectors('src/content/search.js');
   const home = selectors('src/content/home.js');
+  const menu = selectors('src/content/menu.js');
   /**
    * @param {string} file @param {Record<string, string>} sel @param {string[]} keys @param {string} [row]
    * @returns {([string, string] | [string, string, string])[]}
@@ -66,7 +67,12 @@ function pages() {
     {
       name: 'home',
       url: 'https://www.youtube.com/',
-      need: pick('home.js', home, ['homeBrowse', 'mount']),
+      need: [
+        ...pick('home.js', home, ['homeBrowse', 'mount']),
+        // If the menu button goes, menu.js gives the sidebar back. If the sidebar is renamed, early.css stops hiding it.
+        ...pick('menu.js', menu, ['guideButton', 'searchBox']),
+        ['early.css sidebar', 'ytd-app tp-yt-app-drawer#guide'],
+      ],
     },
   ];
 }
