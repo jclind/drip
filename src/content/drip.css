@@ -884,6 +884,48 @@ html[dark] #drip-pill {
   flex: 1;
 }
 
+/* Quiet's home page (Q29): YouTube's own search box, which home.js moves here from the top bar. The column widens to
+   the box's size, and with no stash under it the box sits lower on the page. */
+#drip-home:has(.drip-page.is-search) {
+  --drip-col: 560px;
+}
+
+#drip-home .drip-page.is-search-only {
+  padding-top: 12vh;
+}
+
+#drip-home .drip-search-slot {
+  display: flex;
+  margin-bottom: 32px;
+}
+
+#drip-home .drip-search-slot > #center {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+/* drip's own box, when YouTube's isn't there to move. */
+#drip-home .drip-search-form {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+}
+
+#drip-home .drip-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--drip-rule);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--drip-text);
+  font: inherit;
+  font-size: 16px;
+}
+
 #drip-home .drip-add .drip-i-clock {
   width: 17px;
   height: 17px;

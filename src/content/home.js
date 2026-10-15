@@ -35,6 +35,8 @@
     metaPart: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, #metadata-line span',
     watched: 'ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHost',
     ad: 'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer',
+    // The top bar's search box and voice search, which Quiet's home page moves into the middle of the page (Q29).
+    searchBox: 'ytd-masthead #center',
   };
   const AGE = /\bago$/i;
   const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
@@ -206,6 +208,13 @@
 
   /** Reveals, Reveal next, and Pass animate unless the browser asks for reduced motion. */
   const animates = () => !DripReveal.reduced();
+  // Mode parts (Q29). Until the worker answers, the page draws as Full drip.
+  const clockOn = () => !state || state.settings.clock !== false;
+  /** @returns {'off' | 'unlimited' | 'limited'} */
+  const cardsMode = () => (state ? state.settings.cards : 'limited');
+  const stashOn = () => !state || state.settings.stash !== false;
+  /** The reveal animations morph Full drip's +15m, card counter, and Stash, so other mixes change without them. */
+  const deals = () => animates() && clockOn() && cardsMode() === 'limited' && stashOn();
 
   /**
    * Reads the feed, then sends `msg` with the videos it found. Resolves with the worker's reply when it worked, or
@@ -247,7 +256,7 @@
     if (busy || moving) return;
     busy = kind;
     message = '';
-    if (animates()) {
+    if (deals()) {
       const run = kind === 'reveal' ? DripReveal.reveal : DripReveal.next;
       const { ok, focused } = await animate(run, async () => (await findWith(msg))?.video || null);
       // The button that had focus is gone. Focus goes to what you'd press next.
@@ -364,7 +373,7 @@
   async function onResolve(action, videoId, keyboard = false) {
     if (moving) return;
     message = '';
-    if (action === 'pass' && animates() && document.querySelector('#drip-home .drip-card .drip-deal')) {
+    if (action === 'pass' && deals() && document.querySelector('#drip-home .drip-card .drip-deal')) {
       // Redraws wait while the worker answers, so the card is still there to animate.
       moving = true;
       const res = absorb(await send({ type: 'resolve', action, videoId }));
@@ -495,7 +504,7 @@
    * @param {string} id
    */
   function costsDrop(id) {
-    return state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !state.unlocked.includes(id);
+    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !state.unlocked.includes(id);
   }
 
   /**
@@ -750,14 +759,18 @@
     return String(Math.max(now.watch, now.rec, next.watch, next.rec, state.tokens.watch, state.tokens.rec)).length;
   }
 
+  /** The glass, minutes, and counts, each only while its part is on. Curated and Quiet have none of them (Q29). */
   function stats() {
+    const clock = clockOn();
+    const counted = cardsMode() === 'limited';
+    if (!clock && !counted) return null;
     const left = Drip.formatMinutes(heldLeft ?? state.watchSecondsLeft);
     return h('div', { class: 'drip-stats' },
-      h('div', { class: 'drip-glass-tile' }, glass()),
-      h('div', { class: 'drip-time-block' },
+      clock && h('div', { class: 'drip-glass-tile' }, glass()),
+      clock && h('div', { class: 'drip-time-block' },
         h('div', { class: 'drip-time' }, left),
         h('div', { class: 'drip-sub' }, 'left today')),
-      h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, countRow('watch'), countRow('rec')));
+      h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, clock && countRow('watch'), counted && countRow('rec')));
   }
 
   /** Set when Pass on the last card leaves the page out for the day, so the sea rises in where the card dropped. */
@@ -766,7 +779,7 @@
   /** No minutes or tokens left, and no card still to watch or stash. */
   function outForDay() {
     // Cards left don't count: with no minutes or drops, a reveal can't lead to watching anything (Jesse, 2026-10-14).
-    return !state.current && state.tokens.watch < 1 && state.watchSecondsLeft <= 0;
+    return clockOn() && !state.current && state.tokens.watch < 1 && state.watchSecondsLeft <= 0;
   }
 
   /** How many of today's cards the reset keeps, under the rollover cap, by the settings tomorrow will use. */
@@ -779,8 +792,8 @@
   /** The gray line under the buttons when something has run out. */
   function outNote() {
     const reset = hourLabel(state.settings.resetHour);
-    const noDrops = state.tokens.watch < 1;
-    const noCards = state.tokens.rec < 1;
+    const noDrops = clockOn() && state.tokens.watch < 1;
+    const noCards = cardsMode() === 'limited' && state.tokens.rec < 1;
     if (state.current) return noCards ? `No cards left. More at ${reset}.` : '';
     if (outForDay()) return `You're out for today. Drops and cards refill at ${reset}.`;
     if (noCards) return `No cards left. More at ${reset}.`;
@@ -801,17 +814,21 @@
         cardsCarried() > 0 && h('p', {}, `${cardsCarried()} ${cardsCarried() === 1 ? 'card carries' : 'cards carry'} over to tomorrow.`)));
   }
 
+  /** +15m with the clock on, and Reveal video with cards on. It costs a card only when cards are counted (Q29). */
   function actions() {
     const s = state.settings;
+    const cards = cardsMode();
+    if (!clockOn() && cards === 'off') return null;
     return h('div', { class: 'drip-actions' },
-      h('button', {
+      clockOn() && h('button', {
         class: 'drip-b drip-b-gray drip-add', 'data-k': 'add', onclick: onAddTime, disabled: state.tokens.watch < 1,
         title: `Add ${s.minutesPerToken} minutes for 1 drop`,
       }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop')),
-      h('button', {
+      cards !== 'off' && h('button', {
         // While the animation runs, it draws these buttons as they'll be once it's done.
-        class: 'drip-b drip-b-gold drip-reveal', 'data-k': 'reveal', onclick: onReveal, disabled: state.tokens.rec < 1 || (!!busy && !moving),
-      }, h('span', {}, 'Reveal video'), price('card')));
+        class: 'drip-b drip-b-gold drip-reveal', 'data-k': 'reveal', onclick: onReveal,
+        disabled: (cards === 'limited' && state.tokens.rec < 1) || (!!busy && !moving),
+      }, h('span', {}, 'Reveal video'), cards === 'limited' && price('card')));
   }
 
   /** What the loading card says, which changes once the read has taken SLOW_MS. */
@@ -879,17 +896,17 @@
         h('button', { class: 'drip-b drip-b-primary drip-watch', 'data-k': 'watch', disabled: next, onclick: () => onResolve('watch', video.id) },
           icon('play'), h('span', {}, 'Watch'), buys && price('drop'))),
       h('div', { class: 'drip-card-actions' },
-        h('button', {
+        stashOn() && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
           'data-swap-anchor': true, 'aria-expanded': swapping ? 'true' : undefined,
           // detail is 0 for a click from the keyboard (Enter or Space).
           onclick: (/** @type {MouseEvent} */ e) => (swapping ? closeSwap() : onResolve(saved ? 'unsave' : 'save', video.id, e.detail === 0)),
           title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
         }, ...stash.nodes),
-        h('button', {
-          class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || state.tokens.rec < 1,
+        cardsMode() !== 'off' && h('button', {
+          class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || (cardsMode() === 'limited' && state.tokens.rec < 1),
           onclick: () => onRevealNext(video.id),
-        }, icon('arrow'), h('span', { class: 'drip-next-label' }, next ? 'Revealing…' : 'Reveal next'), !next && price('card')),
+        }, icon('arrow'), h('span', { class: 'drip-next-label' }, next ? 'Revealing…' : 'Reveal next'), !next && cardsMode() === 'limited' && price('card')),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'data-k': 'pass', disabled: next, onclick: () => onResolve('pass', video.id),
           title: "Pass. It's free, and this video won't come back.", 'aria-label': 'Pass',
@@ -960,12 +977,61 @@
     const out = !showCard && outForDay();
     const note = out ? '' : outNote();
     // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
-    return h('div', { class: `drip-page${showCard ? ' is-open' : out ? ' is-out' : ''}` },
+    // With cards off there's nothing to reveal, so the page is YouTube's search box (Quiet, Q29).
+    const search = cardsMode() === 'off';
+    return h('div', { class: `drip-page${showCard ? ' is-open' : out ? ' is-out' : ''}${search ? ' is-search' : ''}${search && !stashOn() ? ' is-search-only' : ''}` },
+      search && h('div', { class: 'drip-search-slot' }),
       stats(),
       !showCard && (out ? outSea() : actions()),
       state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
-      savedList());
+      stashOn() && savedList());
+  }
+
+  /**
+   * Where the top bar's search box came from, to put it back when the page leaves Quiet's layout or YouTube's home.
+   * @type {{el: Element, parent: Node, next: Node | null} | null}
+   */
+  let movedSearch = null;
+  /** drip's own search box, for when YouTube's can't be found. Kept across redraws so typing survives them. */
+  /** @type {HTMLElement | null} */
+  let ownSearch = null;
+
+  /**
+   * Quiet's home page (Q29): YouTube's own search box, mic and all, moves from the top bar into the page, so its
+   * suggestions and voice search still work. Without it, drip's own box searches the same way.
+   * @param {HTMLElement} root
+   */
+  function placeSearch(root) {
+    const slot = root.querySelector('.drip-search-slot');
+    if (!slot || location.pathname !== '/') return restoreSearch();
+    const el = movedSearch?.el || document.querySelector(SEL.searchBox);
+    if (!el) {
+      if (!ownSearch) {
+        const input = /** @type {HTMLInputElement} */ (h('input', { type: 'search', class: 'drip-search-input', placeholder: 'Search', 'aria-label': 'Search YouTube' }));
+        ownSearch = h('form', {
+          class: 'drip-search-form', role: 'search',
+          onsubmit: (/** @type {SubmitEvent} */ e) => {
+            e.preventDefault();
+            const q = input.value.trim();
+            if (q) location.href = `/results?search_query=${encodeURIComponent(q)}`;
+          },
+        }, input, h('button', { class: 'drip-b drip-b-gray', type: 'submit', 'aria-label': 'Search' }, icon('search')));
+      }
+      if (ownSearch.parentElement !== slot) slot.append(ownSearch);
+      return;
+    }
+    if (!movedSearch) movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling };
+    if (el.parentElement !== slot) slot.append(el);
+    document.documentElement.toggleAttribute('data-drip-search-moved', true);
+  }
+
+  function restoreSearch() {
+    document.documentElement.toggleAttribute('data-drip-search-moved', false);
+    if (!movedSearch) return;
+    const { el, parent, next } = movedSearch;
+    movedSearch = null;
+    if (parent.isConnected) parent.insertBefore(el, next && next.parentNode === parent ? next : null);
   }
 
   let rendered = '';
@@ -1003,10 +1069,14 @@
       state.tokens, state.current, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
       // The sea's "N cards carry over" follows the allowance, the rollover cap, and pending settings (Codex, 2026-10-14).
       state.settings.resetHour, state.settings.stashMax, cardsCarried(),
+      state.settings.clock, state.settings.cards, state.settings.stash,
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
     ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId]);
-    if (root.firstChild && key === rendered) return freshen(root);
+    if (root.firstChild && key === rendered) {
+      placeSearch(root);
+      return freshen(root);
+    }
     rendered = key;
     // Keep keyboard focus on the same control across the rebuild.
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
@@ -1020,6 +1090,7 @@
     // Moving the kept list out and back in resets its scroll, so it's put back after.
     const listTop = swapEl?.querySelector('.drip-swap-list')?.scrollTop || 0;
     root.replaceChildren(view());
+    placeSearch(root);
     syncRowMotion(root);
     syncCounts();
     if (swapEl && swapEl.isConnected) {
@@ -1090,6 +1161,11 @@
     const r = state && state.refill;
     if (!r || r.day !== state.day || r.day === refillTaken || arriving || !homeInView()) return;
     refillTaken = r.day;
+    // Without both counters on the page there's nowhere for the refill to land, so it's only marked seen (Q29).
+    if (!clockOn() || cardsMode() !== 'limited') {
+      send({ type: 'refillSeen' }).then(absorb);
+      return;
+    }
     arriving = { kind: 'new', watch: r.watch, rec: r.rec };
     rendered = '';
     landWhenShown();
@@ -1205,6 +1281,7 @@
   });
   watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
   document.addEventListener('yt-navigate-finish', () => mount(true));
+  document.addEventListener('yt-navigate-start', restoreSearch);
   // Back from the watch page can bring this page back from Chrome's cache, still waiting on Watch.
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted || !leaving) return;
