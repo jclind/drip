@@ -161,9 +161,14 @@
     if (pool.some(isNew)) return pool;
     // This page's grid is hidden, so YouTube never loads past its first screenful. With all of that revealed, a hidden
     // frame of the home page scrolls for more, the way YouTube loads them when you scroll (Jesse, 2026-10-15).
-    const more = await readFeedInFrame('/', SEL.homeBrowse);
-    return more.length ? more : pool;
+    // What it read is kept for the next reveals, so each one doesn't load the page again.
+    if (!morePool.some(isNew)) morePool = await readFeedInFrame('/', SEL.homeBrowse);
+    return morePool.length ? morePool : pool;
   }
+
+  /** Videos the hidden home frame read past this page's grid. */
+  /** @type {{id: string, title: string, channel: string, length: string, views: string, age: string}[]} */
+  let morePool = [];
 
   /** @param {any} res */
   function absorb(res) {
