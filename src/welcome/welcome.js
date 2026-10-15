@@ -1,6 +1,6 @@
 // @ts-check
-// The page drip opens once, when it's installed (DESIGN.md, "Welcome page"). The top states the default allowance.
-// The tour under it runs working copies of drip's screens on a throwaway state, through the real rules in
+// The page drip opens once, when it's installed (DESIGN.md, "Welcome page"). It's two screens: the mode choice, then a
+// tour of the mix picked. The tour runs working copies of drip's screens on a throwaway state, through the real rules in
 // state.js and drip.css's styles. It never sends a change to the worker. The markup copies home.js's stats, actions,
 // and card, and watch.js's lock and pill, so a change to those screens needs the same change here.
 
@@ -60,31 +60,6 @@
     Object.assign(state.settings, settings, parts);
     state.tokens = { watch: settings.watchTokensPerDay, rec: settings.recTokensPerDay };
     return state;
-  }
-
-  // The top of the page.
-
-  function fillHero() {
-    const minutes = Drip.formatMinutes(settings.minutesPerToken * 60);
-    /** @param {string} name @param {string} cls @param {string} label @param {string} what */
-    const kind = (name, cls, label, what) => h('li', { class: 'kind' },
-      h('div', { class: 'kind-name' }, icon(name, cls), h('span', {}, label)),
-      h('div', { class: 'kind-what' }, what));
-    // One tile per part that's on (Q29). Quiet has none.
-    const kinds = [
-      parts.clock && kind('drop', 'drip-token-drop', 'Drops', `1 drop = ${minutes} of watching`),
-      parts.cards === 'limited' && kind('card', 'drip-token-card', 'Cards', '1 card = 1 video revealed'),
-      parts.cards === 'unlimited' && kind('card', 'drip-token-card', 'Reveal', 'One new video at a time'),
-      parts.stash && kind('save', '', 'Stash', `Holds ${settings.stashMax} videos for later`),
-    ].filter(Boolean);
-    $('kinds').replaceChildren(...kinds);
-    $('kinds').hidden = !kinds.length;
-    $('kinds').style.setProperty('--kinds', String(Math.max(1, kinds.length)));
-    /** @param {number} n @param {string} one @param {string} many */
-    const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    const daily = [parts.clock && count(settings.watchTokensPerDay, 'drop', 'drops'), parts.cards === 'limited' && count(settings.recTokensPerDay, 'card', 'cards')].filter(Boolean);
-    $('allowance').hidden = !daily.length;
-    $('allowance').textContent = daily.length ? `You get ${daily.join(' and ')} a day. You can change these in Settings.` : '';
   }
 
   // The mode (Q29, DESIGN.md "Modes"), design J: a list lightest first, each row with a small picture of its home page.
@@ -197,20 +172,61 @@
     retour();
   }
 
-  /** The hero and the tour for the current mix. The tour starts over on its own fresh state. */
-  function retour() {
+  /** The tour for the current mix, from step n. It starts over on its own fresh state. @param {number} [n] */
+  function retour(n = 0) {
     Object.assign(sand, freshState());
     lastCardId = '';
-    fillHero();
+    const mode = Drip.modeOf(parts);
+    $('tourTitle').textContent = `How ${mode ? MODE_ROWS.find((r) => r.name === mode)?.label : 'your mix'} works`;
     STEPS = ALL_STEPS.filter((s) => s.needs());
-    go(0);
+    go(n);
+  }
+
+  // The two screens. The hash keeps the screen and the step across a reload: none on the choice, #tour-2 on the tour's
+  // second step. Next pushes the tour onto the history, so the browser's Back goes to the choice too.
+
+  /** The tour step in the hash, counted from 0, or -1 on the choice. */
+  function hashStep() {
+    const m = /^#tour(?:-(\d+))?$/.exec(location.hash);
+    return m ? Math.max(0, Number(m[1] || 1) - 1) : -1;
+  }
+
+  /** Set once Next has pushed the tour, so going back can pop it instead of adding another entry. */
+  let pushed = false;
+
+  /** Shows the screen the hash names. */
+  function showScreen() {
+    const n = hashStep();
+    const touring = n >= 0;
+    const switched = touring === $('tour').hidden;
+    $('choose').hidden = touring;
+    $('tour').hidden = !touring;
+    if (touring && n !== step) go(n);
+    if (!switched) return;
+    window.scrollTo(0, 0);
+    // Focus goes to the new screen, so a screen reader starts there.
+    const to = touring ? $('tourTitle') : /** @type {HTMLElement | null} */ ($('ladder').querySelector('[aria-checked="true"]'));
+    to?.focus({ preventScroll: true });
+  }
+
+  function toChoice() {
+    if (pushed) {
+      pushed = false;
+      history.back();
+    } else {
+      history.replaceState(null, '', location.pathname + location.search);
+      showScreen();
+    }
   }
 
   $('modesNext').append('Next', icon('arrow-right'));
   $('modesNext').addEventListener('click', () => {
-    const target = $('kinds').hidden ? $('tour') : $('kindsBlock');
-    target.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+    retour(0);
+    pushed = true;
+    location.hash = 'tour-1';
   });
+  $('changeMode').addEventListener('click', toChoice);
+  window.addEventListener('hashchange', showScreen);
 
   $('brandDrop').replaceWith(icon('drop', 'drip-token-drop'));
   $('footYouTube').append('Open YouTube', icon('arrow-up-right'));
@@ -223,10 +239,14 @@
   /** @typedef {{id: string, say: () => string, show: () => (() => void) | undefined, needs: () => boolean}} Step */
   /** @type {Step[]} Every step. The tour skips the ones whose part is off (Q29). */
   const ALL_STEPS = [
-    { id: 'home', say: () => 'This is your YouTube home now. Try +15m.', show: showHome, needs: () => parts.clock },
+    // The first steps say the day's drops and cards, which had tiles of their own above the tour until 2026-10-15.
+    {
+      id: 'home', show: showHome, needs: () => parts.clock,
+      say: () => `You get ${plural(settings.watchTokensPerDay, 'drop')} a day, and each one is ${dropTime} of watching. Try +${dropTime}.`,
+    },
     {
       id: 'reveal', show: showReveal, needs: () => parts.cards !== 'off',
-      say: () => `${parts.cards === 'limited' ? 'Reveal video spends a card on one video.' : 'Reveal video shows one video at a time.'} ${parts.stash ? 'Watch it, stash it, or pass.' : 'Watch it or pass.'}`,
+      say: () => `${parts.cards === 'limited' ? `You get ${plural(settings.recTokensPerDay, 'card')} a day, and each one reveals a video.` : 'Reveal video shows one video at a time.'} ${parts.stash ? 'Watch it, stash it, or pass.' : 'Watch it or pass.'}`,
     },
     { id: 'player', say: () => 'Minutes only drain while a video plays. Press play.', show: showPlayer, needs: () => parts.clock },
     { id: 'lock', say: () => 'When the glass runs dry, the lock comes up. Done for now takes you home.', show: showLock, needs: () => parts.clock },
@@ -234,6 +254,9 @@
   ];
   /** @type {Step[]} */
   let STEPS = ALL_STEPS.filter((s) => s.needs());
+  const dropTime = Drip.formatMinutes(settings.minutesPerToken * 60);
+  /** @param {number} n @param {string} word */
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   /** Where a step is in this tour, or the last step if the mode skips it. @param {string} id */
   const at = (id) => {
     const i = STEPS.findIndex((s) => s.id === id);
@@ -290,6 +313,7 @@
     for (const t of timers) clearTimeout(t);
     timers.clear();
     step = Math.max(0, Math.min(STEPS.length - 1, n));
+    if (!$('tour').hidden) history.replaceState(null, '', `#tour-${step + 1}`);
     $('say').textContent = STEPS[step].say();
     morph(() => {
       stage.style.minHeight = '';
@@ -305,13 +329,13 @@
       type: 'button', 'aria-label': `Step ${i + 1} of ${STEPS.length}`, 'aria-current': i === step ? 'step' : undefined,
       onclick: () => go(i),
     })));
-    $('back').hidden = step === 0;
+    // Back on the first step goes to the choice.
     $('skip').hidden = last;
     const next = $('next');
     next.replaceChildren(...(last ? ['Open YouTube', icon('arrow-up-right')] : ['Next', icon('arrow-right')]));
   }
 
-  $('back').addEventListener('click', () => go(step - 1));
+  $('back').addEventListener('click', () => (step === 0 ? toChoice() : go(step - 1)));
   $('skip').addEventListener('click', () => go(STEPS.length - 1));
   $('next').addEventListener('click', () => {
     if (step === STEPS.length - 1) location.href = 'https://www.youtube.com/';
@@ -1029,9 +1053,9 @@
     return undefined;
   }
 
-  fillHero();
   drawLadder();
-  go(0);
+  retour(Math.max(0, hashStep()));
+  showScreen();
   // A reopened page shows the mode that's saved. A new install has the defaults, which are Full drip.
   chrome.runtime.sendMessage({ type: 'get' }).then((/** @type {any} */ res) => {
     const saved = res && res.state && res.state.settings;
@@ -1041,6 +1065,6 @@
     parts = next;
     modeBase = Drip.modeOf(next) || 'full';
     drawLadder();
-    retour();
+    retour(Math.max(0, hashStep()));
   }, () => {});
 })();

@@ -392,63 +392,50 @@ main {
   }
 }
 
-/* Drops, Cards, and Stash, one tile each. */
-.kinds {
-  display: grid;
-  /* One column per tile the mode has (welcome.js fillHero). */
-  grid-template-columns: repeat(var(--kinds, 3), 1fr);
-  gap: 12px;
-  margin: 36px 0 0;
-  padding: 0;
-  list-style: none;
+/* The two screens fade in when Next or Back swaps them. */
+.screen {
+  animation: screen-in 240ms ease;
 }
 
-/* Each caption fits one line, so the three tiles line up. */
-.kind {
-  padding: 14px 10px 16px;
-  border-radius: 12px;
-  background: var(--gray);
-  text-align: center;
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
-.kind-name {
+@media (prefers-reduced-motion: reduce) {
+  .screen {
+    animation: none;
+  }
+}
+
+/* The tour: its title, one sentence, a stage with a working copy of one of drip's screens, then the step controls. */
+.tour {
+  margin-top: 48px;
+}
+
+.tour-head {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 18px;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tour-title {
+  margin: 0;
+  font-size: 22px;
   font-weight: 500;
 }
 
-.kind-name .drip-i {
-  width: 18px;
-  height: 22px;
+/* It only takes focus from welcome.js, so a screen reader starts on the tour. */
+.tour-title:focus {
+  outline: none;
 }
 
-.kind-name .drip-i-save {
-  color: var(--text);
-}
-
-.kind-what {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.35;
-  text-wrap: balance;
-}
-
-.allowance {
-  margin: 16px 0 0;
-  color: var(--muted);
-}
-
-/* The tour: one sentence, a stage with a working copy of one of drip's screens, then the step controls. */
-.tour {
-  margin-top: 56px;
-}
-
+/* Two lines for every step, since the first steps' sentences wrap, so the stage never moves. */
 .tour-say {
-  min-height: 21px;
+  min-height: 42px;
   margin: 0 0 12px;
   font-size: 15px;
   font-weight: 500;
@@ -817,30 +804,9 @@ button.foot-link:hover {
   font-size: 12px;
 }
 
-/* Below the full column width the tiles stack, so a caption never wraps in a narrowed tile. */
 @media (max-width: 600px) {
   main {
     padding-top: 40px;
-  }
-
-  .kinds {
-    grid-template-columns: 1fr;
-  }
-
-  .kind {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    text-align: left;
-  }
-
-  .kind-name {
-    justify-content: flex-start;
-    min-width: 92px;
-  }
-
-  .kind-what {
-    margin-top: 0;
   }
 
   .tour-changes-head {

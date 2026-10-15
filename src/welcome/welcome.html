@@ -16,20 +16,20 @@
         <p class="tagline">Make every drop count.</p>
       </header>
 
+      <!-- Two screens (DESIGN.md "Welcome page"): the mode choice, then the tour for the mix picked. One shows at a time. -->
       <!-- The mode (Q29, DESIGN.md "Modes"), design J: Full drip picked to start and recommended. -->
-      <section class="modes" aria-labelledby="modesAsk">
+      <section class="modes screen" id="choose" aria-labelledby="modesAsk">
         <h2 class="modes-ask" id="modesAsk">How much should drip do?</h2>
         <p class="modes-sub">You can change this in Settings. For your first 24 hours, changes apply right away.</p>
         <div class="ladder" id="ladder" role="radiogroup" aria-labelledby="modesAsk"></div>
         <div class="modes-after"><button class="tour-btn is-primary" id="modesNext" type="button"></button></div>
       </section>
 
-      <div class="hero-kinds" id="kindsBlock">
-        <ul class="kinds" id="kinds"></ul>
-        <p class="allowance" id="allowance">You get 4 drops and 10 cards a day. You can change these in Settings.</p>
-      </div>
-
-      <section class="tour" id="tour" aria-label="How drip works">
+      <section class="tour screen" id="tour" aria-labelledby="tourTitle" hidden>
+        <div class="tour-head">
+          <h2 class="tour-title" id="tourTitle" tabindex="-1">How Full drip works</h2>
+          <button class="linkish" id="changeMode" type="button">Change</button>
+        </div>
         <p class="tour-say" id="say" aria-live="polite"></p>
         <div class="tour-stage" id="stage"></div>
         <div class="tour-controls">
