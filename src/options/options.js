@@ -1,5 +1,6 @@
 // @ts-check
-// Settings (DESIGN.md, "Settings"): the allowance with the next-day rule, then History and the unlock reasons.
+// Settings (DESIGN.md, "Settings"): the mode and its parts (Q29), the allowance with the next-day rule, then History
+// and the unlock reasons.
 
 /** @type {any} */
 // var, not const: these page scripts share one type-check program, and only var may be declared twice.
@@ -26,8 +27,20 @@ var DripPage = /** @type {any} */ (globalThis).DripPage;
 /** @param {number} n @param {string} one @param {string} many */
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-/** @type {{title: string, fields: Field[]}[]} */
+/** @type {{title: string, modes?: boolean, fields: Field[]}[]} */
 const SECTIONS = [
+  {
+    // Q29. The mode picker above these sets all four at once; each can also be switched on its own.
+    title: 'What drip does',
+    modes: true,
+    fields: [
+      { key: 'clock', label: 'Limit watch time', kind: 'toggle', hint: 'Drops, the glass, and the lock.' },
+      { key: 'cards', label: 'Reveal one video at a time', kind: 'choice',
+        options: [['limited', 'Cards per day'], ['unlimited', 'Unlimited'], ['off', 'Off']] },
+      { key: 'searchCap', label: 'Stop search at 10 results', kind: 'toggle' },
+      { key: 'stash', label: 'Stash videos for later', kind: 'toggle' },
+    ],
+  },
   {
     title: 'Your allowance',
     fields: [
@@ -169,7 +182,7 @@ function control(f, labelId) {
   if (f.kind === 'stepper') return stepper(f, labelId);
   if (f.kind === 'toggle') {
     const box = /** @type {HTMLInputElement} */ (h('input', { type: 'checkbox', role: 'switch', class: 'toggle', id: f.key, checked: draft[f.key] }));
-    box.addEventListener('change', () => { draft[f.key] = box.checked; draftChanged(); });
+    box.addEventListener('change', () => { draft[f.key] = box.checked; draftChanged(); syncModeRow(); });
     return box;
   }
   const options = f.kind === 'hour'
@@ -180,6 +193,7 @@ function control(f, labelId) {
   select.addEventListener('change', () => {
     draft[f.key] = f.kind === 'hour' ? Number(select.value) : select.value;
     draftChanged();
+    syncModeRow();
   });
   return h('div', { class: 'picker-wrap' }, select, icon('chevron-down'));
 }
@@ -213,11 +227,38 @@ function renderFirstDay() {
 }
 setInterval(renderFirstDay, 60000);
 
+/** The three modes (Q29), named in Settings as on the welcome page. */
+const MODE_NAMES = /** @type {const} */ ([['quiet', 'Quiet'], ['curated', 'Curated'], ['full', 'Full drip']]);
+
+/**
+ * Quiet, Curated, and Full drip, as one row of three. Picking one sets the four parts in the form, still waiting for
+ * Save like any other edit. A mix that matches none of them picks none.
+ */
+function modeRow() {
+  const { h } = DripPage;
+  const now = Drip.modeOf(draft);
+  return h('div', { class: 'setting' },
+    h('div', { class: 'setting-text' },
+      h('div', { class: 'setting-line' }, h('span', { class: 'setting-label', id: 'label-mode' }, 'Mode')),
+      h('div', { class: 'hint' }, now ? 'Switch a part below to make your own mix.' : 'Your own mix.')),
+    h('div', { class: 'segmented', role: 'radiogroup', 'aria-labelledby': 'label-mode' },
+      ...MODE_NAMES.map(([name, label]) => h('button', {
+        type: 'button', role: 'radio', 'aria-checked': String(now === name), 'data-mode': name,
+        onclick: () => {
+          Object.assign(draft, Drip.MODES[name]);
+          renderForm();
+          draftChanged();
+          /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
+        },
+      }, label))));
+}
+
 function renderForm() {
   const { h } = DripPage;
   renderFirstDay();
   $('settings').replaceChildren(...SECTIONS.map((section) => h('section', { class: 'group' },
     h('h2', { class: 'caps' }, section.title),
+    section.modes && modeRow(),
     ...section.fields.map((f) => {
       const labelId = `label-${f.key}`;
       const label = f.kind === 'stepper'
@@ -230,6 +271,12 @@ function renderForm() {
         control(f, labelId));
     }))));
   renderStatus();
+}
+
+/** A part switched by hand may make the mix match a mode, or stop matching one. */
+function syncModeRow() {
+  const row = document.querySelector('.segmented')?.closest('.setting');
+  if (row) row.replaceWith(modeRow());
 }
 
 function dirty() {
