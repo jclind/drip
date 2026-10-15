@@ -439,10 +439,16 @@ html[dark] #drip-lock {
   white-space: nowrap;
 }
 
-/* The divider is for Stash beside it. With the stash off there's nothing to divide (Q29). */
+/* The divider is for Stash beside it. With the stash off there's nothing to divide (Q29), and the minutes make up
+   the right side's padding that Stash's own padding gives (the pill has 12px on the left, 4px on the right). */
 #drip-pill .drip-pill-time:last-child {
-  padding-right: 0;
+  padding-right: 8px;
   border-right: 0;
+}
+
+/* Stash alone, with the clock off: its own padding is the left side's, so the pill's 12px would make it lopsided. */
+#drip-pill:has(> .drip-pill-save:first-child) {
+  padding-left: 4px;
 }
 
 #drip-pill .drip-glass {
@@ -930,6 +936,12 @@ html[dark] #drip-pill {
   width: 100%;
   max-width: none;
   margin: 0;
+}
+
+/* YouTube's home page clips what overflows it, and with Quiet's short page that cut the suggestion list off a few rows
+   under the moved box (Jesse, 2026-10-15). */
+html[data-drip-search-moved] ytd-browse[page-subtype="home"] {
+  overflow: visible !important;
 }
 
 /* YouTube's suggestion list under the moved box, capped at the room left on screen (home.js fitSuggestions). Its own
