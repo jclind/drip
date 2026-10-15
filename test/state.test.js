@@ -22,7 +22,7 @@ function refusesUnchanged(state, call, error) {
 
 test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
-    'DEFAULT_SETTINGS', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
+    'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
     'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
@@ -32,7 +32,10 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(D.DEFAULT_SETTINGS, {
     watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10,
     rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home', stashMax: 10,
+    searchCap: true, cards: 'limited', clock: true, stash: true,
   });
+  assert.ok(Object.isFrozen(D.MODES));
+  assert.equal(D.modeOf(D.DEFAULT_SETTINGS), 'full');
 });
 
 test('toolbar playing rule needs a fresh ongoing tick and expires at 12 seconds', () => {

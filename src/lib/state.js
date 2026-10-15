@@ -35,6 +35,10 @@
  * @property {number} needThisPerDay
  * @property {'home' | 'subscriptions'} feedSource
  * @property {number} stashMax The most videos the stash holds (Q28).
+ * @property {boolean} searchCap Search stops at 10 results (Q15). A mode part (Q29).
+ * @property {'off' | 'unlimited' | 'limited'} cards Reveal cards (Q13): none, free, or spending rec tokens. A mode part (Q29).
+ * @property {boolean} clock The watch clock: drops, minutes, the pill, and the lock (Q3, Q10). A mode part (Q29).
+ * @property {boolean} stash The stash and its buttons (Q14, Q28). A mode part (Q29).
  */
 /**
  * @typedef {Object} Video
@@ -77,7 +81,23 @@
     needThisPerDay: 2,
     feedSource: 'home',
     stashMax: 10,
+    searchCap: true,
+    cards: 'limited',
+    clock: true,
+    stash: true,
   });
+  /**
+   * The three modes (Q29). Each is a set of parts, and a mix that matches none of them is a custom mode. The defaults
+   * are Full drip, so installs from before modes keep what they had.
+   * @type {Readonly<Record<'quiet' | 'curated' | 'full', Readonly<Pick<Settings, 'searchCap' | 'cards' | 'clock' | 'stash'>>>>}
+   */
+  const MODES = Object.freeze({
+    quiet: Object.freeze({ searchCap: false, cards: /** @type {const} */ ('off'), clock: false, stash: false }),
+    curated: Object.freeze({ searchCap: true, cards: /** @type {const} */ ('unlimited'), clock: false, stash: true }),
+    full: Object.freeze({ searchCap: true, cards: /** @type {const} */ ('limited'), clock: true, stash: true }),
+  });
+  /** How much drip each cards setting is, for Q6: lower is looser. */
+  const CARDS_RANK = { off: 0, unlimited: 1, limited: 2 };
   /** @type {Object<string, [number, number]>} */
   const ranges = {
     watchTokensPerDay: [0, 48], minutesPerToken: [1, 120],
@@ -227,6 +247,7 @@
 
   /** @param {State} state */
   function spendWatch(state) {
+    if (!state.settings.clock) return { ok: false, error: 'clock-off' };
     if (state.tokens.watch <= 0) return { ok: false, error: 'no-watch-tokens' };
     state.tokens.watch--;
     state.watchSecondsLeft += state.settings.minutesPerToken * 60;
@@ -235,18 +256,24 @@
     return { ok: true };
   }
 
-  /** @param {State} state @param {unknown[]} candidates */
+  /**
+   * Reveals one video (Q13). It costs a card only with `cards: 'limited'`, and with cards off there are no reveals (Q29).
+   * @param {State} state @param {unknown[]} candidates
+   */
   function reveal(state, candidates) {
     if (state.current) return { ok: false, error: 'resolve-current' };
-    if (state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
+    if (state.settings.cards === 'off') return { ok: false, error: 'cards-off' };
+    const paid = state.settings.cards === 'limited';
+    if (paid && state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
     const seen = new Set(state.seen);
     const saved = new Set(state.backlog.map(video => video.id));
     const video = candidates.map(cleanVideo).find(candidate => !!candidate && !seen.has(candidate.id) && !saved.has(candidate.id));
     if (!video) return { ok: false, error: 'pool-empty' };
-    state.tokens.rec--;
+    if (paid) state.tokens.rec--;
     state.current = video;
     state.seen.push(video.id);
     if (state.seen.length > 2000) state.seen.splice(0, state.seen.length - 2000);
+    // With unlimited cards nothing is spent, but the reveal still counts, so History's cards line adds up.
     logDay(state).recSpent++;
     return { ok: true, video };
   }
@@ -258,7 +285,7 @@
    * @param {string} videoId
    */
   function buyIfOut(state, videoId) {
-    const bought = state.watchSecondsLeft <= 0 && !state.unlocked.includes(videoId) && spendWatch(state).ok;
+    const bought = state.settings.clock && state.watchSecondsLeft <= 0 && !state.unlocked.includes(videoId) && spendWatch(state).ok;
     return { ok: true, bought };
   }
 
@@ -322,7 +349,8 @@
   function revealNext(state, videoId, candidates) {
     if (!state.current) return { ok: false, error: 'no-current' };
     if (videoId !== state.current.id) return { ok: false, error: 'stale-card' };
-    if (state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
+    if (state.settings.cards === 'off') return { ok: false, error: 'cards-off' };
+    if (state.settings.cards === 'limited' && state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
     const seen = new Set(state.seen);
     const saved = new Set(state.backlog.map(video => video.id));
     if (!candidates.map(cleanVideo).some(c => !!c && !seen.has(c.id) && !saved.has(c.id))) return { ok: false, error: 'pool-empty' };
@@ -343,6 +371,7 @@
     if (!video) return { ok: false, error: 'bad-video' };
     if (state.backlog.some(saved => saved.id === video.id)) return { ok: true };
     const undo = typeof index === 'number' && Number.isInteger(index);
+    if (!undo && !state.settings.stash) return { ok: false, error: 'stash-off' };
     if (!undo && state.backlog.length >= state.settings.stashMax) return { ok: false, error: 'stash-full' };
     // Undo can go over the cap, but not past the highest cap Settings allows, so a made-up index can't grow the
     // stash forever (Codex, 2026-10-13).
@@ -385,6 +414,7 @@
     const video = cleanVideo(raw);
     if (!video) return { ok: false, error: 'bad-video' };
     const undo = typeof index === 'number' && Number.isInteger(index);
+    if (!undo && !state.settings.stash) return { ok: false, error: 'stash-off' };
     const drop = state.backlog.findIndex(saved => saved.id === dropId);
     const dropped = drop >= 0 ? { ...state.backlog[drop] } : null;
     if (state.backlog.some(saved => saved.id === video.id)) {
@@ -451,7 +481,8 @@
       seconds = Math.max(0, seconds - before);
     }
     if (seconds === 0) return watchStatus(state, videoId);
-    if (state.unlocked.includes(videoId)) {
+    // With the clock off, watching is logged for History and costs nothing, the same as an unlocked video (Q29).
+    if (!state.settings.clock || state.unlocked.includes(videoId)) {
       logDay(state).watchedSec += seconds;
       return watchStatus(state, videoId);
     }
@@ -467,7 +498,8 @@
   /** @param {State} state @param {string} videoId */
   function watchStatus(state, videoId) {
     const unlocked = state.unlocked.includes(videoId);
-    return { secondsLeft: state.watchSecondsLeft, unlocked, locked: state.watchSecondsLeft === 0 && !unlocked };
+    // With the clock off nothing locks (Q29).
+    return { secondsLeft: state.watchSecondsLeft, unlocked, locked: state.settings.clock && state.watchSecondsLeft === 0 && !unlocked };
   }
 
   /** @param {State} state @param {string} videoId @param {string} title @param {string} reason @param {number} now */
@@ -497,6 +529,10 @@
         cleaned.graceMode = Boolean(value);
       } else if (key === 'feedSource' && (value === 'home' || value === 'subscriptions')) {
         cleaned.feedSource = value;
+      } else if ((key === 'searchCap' || key === 'clock' || key === 'stash') && typeof value === 'boolean') {
+        cleaned[key] = value;
+      } else if (key === 'cards' && (value === 'off' || value === 'unlimited' || value === 'limited')) {
+        cleaned.cards = value;
       }
     }
     return cleaned;
@@ -507,6 +543,9 @@
     if (key === 'resetHour') return from !== to;
     if (key === 'feedSource') return false;
     if (key === 'graceMode') return from === false && to === true;
+    // Turning a mode part off, or cards from a count to unlimited, gives less drip, so it waits (Q29).
+    if (key === 'searchCap' || key === 'clock' || key === 'stash') return from === true && to === false;
+    if (key === 'cards') return CARDS_RANK[/** @type {Settings['cards']} */ (to)] < CARDS_RANK[/** @type {Settings['cards']} */ (from)];
     return typeof from === 'number' && typeof to === 'number' && to > from;
   }
 
@@ -726,8 +765,14 @@
   function earlyLocked(raw, now, videoId) {
     const stored = /** @type {Partial<State> | undefined} */ (raw && typeof raw === 'object' ? raw : undefined);
     if (!stored) return true;
-    const resetHour = cleanSettings(stored.settings).resetHour ?? DEFAULT_SETTINGS.resetHour;
-    if (typeof stored.day !== 'string' || stored.day < dayKey(now, resetHour)) return true;
+    const settings = cleanSettings(stored.settings);
+    const resetHour = settings.resetHour ?? DEFAULT_SETTINGS.resetHour;
+    const today = dayKey(now, resetHour);
+    // A clock turned off waits in pending until its day, which may have come without the worker rolling over yet.
+    const pending = stored.pending && typeof stored.pending.effectiveDay === 'string' && stored.pending.effectiveDay <= today
+      ? cleanSettings(stored.pending.changes) : {};
+    if ((pending.clock ?? settings.clock) === false) return false;
+    if (typeof stored.day !== 'string' || stored.day < today) return true;
     if (Array.isArray(stored.unlocked) && stored.unlocked.includes(videoId)) return false;
     return count(stored.watchSecondsLeft, 0) <= 0;
   }
@@ -808,8 +853,18 @@
     return { fraction, water16, water32, surfaceOpacity, cacheKey };
   }
 
+  /**
+   * Which mode a set of settings is, or null for a custom mix (Q29).
+   * @param {Pick<Settings, 'searchCap' | 'cards' | 'clock' | 'stash'>} settings
+   * @returns {'quiet' | 'curated' | 'full' | null}
+   */
+  function modeOf(settings) {
+    const names = /** @type {('quiet' | 'curated' | 'full')[]} */ (Object.keys(MODES));
+    return names.find(name => Object.entries(MODES[name]).every(([key, value]) => settings[/** @type {keyof typeof settings} */ (key)] === value)) ?? null;
+  }
+
   /** @type {any} */ (globalThis).Drip = {
-    DEFAULT_SETTINGS, dayKey, addDays, daysBetween, initialState, hydrate,
+    DEFAULT_SETTINGS, MODES, modeOf, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
