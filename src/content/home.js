@@ -1007,23 +1007,26 @@
     if (!slot || location.pathname !== '/') return restoreSearch();
     const el = movedSearch?.el || document.querySelector(SEL.searchBox);
     if (!el) {
-      if (!ownSearch) {
-        const input = /** @type {HTMLInputElement} */ (h('input', { type: 'search', class: 'drip-search-input', placeholder: 'Search', 'aria-label': 'Search YouTube' }));
-        ownSearch = h('form', {
-          class: 'drip-search-form', role: 'search',
-          onsubmit: (/** @type {SubmitEvent} */ e) => {
-            e.preventDefault();
-            const q = input.value.trim();
-            if (q) location.href = `/results?search_query=${encodeURIComponent(q)}`;
-          },
-        }, input, h('button', { class: 'drip-b drip-b-gray', type: 'submit', 'aria-label': 'Search' }, icon('search')));
-      }
-      if (ownSearch.parentElement !== slot) slot.append(ownSearch);
+      const form = ownSearch || (ownSearch = makeOwnSearch());
+      if (form.parentElement !== slot) slot.append(form);
       return;
     }
     if (!movedSearch) movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling };
     if (el.parentElement !== slot) slot.append(el);
     document.documentElement.toggleAttribute('data-drip-search-moved', true);
+  }
+
+  /** drip's own search box: a form that goes to YouTube's results page. */
+  function makeOwnSearch() {
+    const input = /** @type {HTMLInputElement} */ (h('input', { type: 'search', class: 'drip-search-input', placeholder: 'Search', 'aria-label': 'Search YouTube' }));
+    return /** @type {HTMLElement} */ (h('form', {
+      class: 'drip-search-form', role: 'search',
+      onsubmit: (/** @type {SubmitEvent} */ e) => {
+        e.preventDefault();
+        const q = input.value.trim();
+        if (q) location.href = `/results?search_query=${encodeURIComponent(q)}`;
+      },
+    }, input, h('button', { class: 'drip-b drip-b-gray', type: 'submit', 'aria-label': 'Search' }, icon('search'))));
   }
 
   function restoreSearch() {
