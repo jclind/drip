@@ -38,10 +38,362 @@ main {
   font-size: 17px;
 }
 
+/* The mode (Q29, DESIGN.md "Modes"), design J. A list lightest first; the picked row gets a blue border and Customize. */
+.modes {
+  margin-top: 48px;
+}
+
+.modes-ask {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.modes-sub {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The name and its sentence sit together, centered against the picture (rows 2 and 3 of 4). */
+.rung {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  grid-template-rows: 1fr auto auto 1fr;
+  gap: 2px 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: var(--gray);
+  cursor: pointer;
+}
+
+.rung:hover {
+  background: var(--gray-hover);
+}
+
+.rung[aria-checked="true"] {
+  border-color: var(--blue);
+  cursor: default;
+}
+
+.rung[aria-checked="true"]:hover {
+  background: var(--gray);
+}
+
+.rung .dot {
+  grid-row: 2;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+}
+
+.rung[aria-checked="true"] .dot {
+  border: 5px solid var(--blue);
+}
+
+.rung-name {
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.rung-what {
+  grid-row: 3;
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* "Recommended" is drip's gray chip with the drop, like "3 kept". */
+.rec-tag,
+.custom-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.rec-tag {
+  padding-left: 6px;
+  background: var(--chip);
+}
+
+.rec-tag .drip-i {
+  width: 10px;
+  height: 13px;
+}
+
+/* Darker blue in light mode: the lighter one was about 2:1 on its tint. */
+.custom-tag {
+  background: rgba(6, 95, 212, 0.1);
+  color: #065fd4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .custom-tag {
+    background: rgba(66, 165, 246, 0.22);
+    color: var(--blue);
+  }
+}
+
+/* A small drawing of each mode's home page. Only Full drip's is in color until another row is picked. */
+.mini {
+  grid-row: 1 / 5;
+  grid-column: 3;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 132px;
+  height: 80px;
+  padding: 10px 16px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--bg);
+  transition: filter 200ms, opacity 200ms;
+}
+
+.rung:not([data-mode="full"]):not([aria-checked="true"]) .mini {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.mini > * {
+  flex: none;
+}
+
+.mini::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.m-stats {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.m-glass {
+  position: relative;
+  width: 12px;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--chip);
+}
+
+.m-glass::after {
+  content: "";
+  position: absolute;
+  inset: 40% 2px 2px;
+  border-radius: 1px;
+  background: var(--blue);
+}
+
+.m-num {
+  width: 16px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--muted);
+  opacity: 0.6;
+}
+
+.m-pip {
+  width: 5px;
+  height: 6px;
+  border-radius: 1px;
+}
+
+.m-pip.is-drop {
+  background: var(--blue);
+}
+
+.m-pip.is-card {
+  background: var(--gold);
+}
+
+.m-btns {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+
+.m-btn {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--chip);
+}
+
+.m-btn.gold {
+  flex: 2;
+  background: var(--gold);
+}
+
+.m-search {
+  display: flex;
+  width: 80%;
+  height: 11px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.m-search::after {
+  content: "";
+  width: 16px;
+  margin-left: auto;
+  background: var(--chip);
+}
+
+.m-line {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--chip);
+}
+
+.linkish {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.linkish:hover {
+  background: none;
+}
+
+.cz {
+  grid-column: 2 / 4;
+  justify-self: start;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.opts {
+  grid-column: 2 / 4;
+  margin-top: 6px;
+}
+
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.opt-text {
+  flex: 1;
+}
+
+.opt-sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--gray-hover);
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.switch:hover {
+  background: var(--gray-hover);
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 150ms;
+}
+
+.switch[aria-checked="true"] {
+  background: var(--toggle);
+}
+
+.switch[aria-checked="true"]::after {
+  transform: translateX(16px);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.modes-after {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+@media (max-width: 560px) {
+  .rung {
+    grid-template-columns: 22px 1fr;
+  }
+
+  .mini {
+    display: none;
+  }
+
+  .cz,
+  .opts {
+    grid-column: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini,
+  .switch,
+  .switch::after {
+    transition: none;
+  }
+}
+
 /* Drops, Cards, and Stash, one tile each. */
 .kinds {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* One column per tile the mode has (welcome.js fillHero). */
+  grid-template-columns: repeat(var(--kinds, 3), 1fr);
   gap: 12px;
   margin: 36px 0 0;
   padding: 0;

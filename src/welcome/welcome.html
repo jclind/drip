@@ -14,9 +14,20 @@
       <header class="hero">
         <h1 class="brand"><span class="brand-drop" id="brandDrop"></span>drip</h1>
         <p class="tagline">Make every drop count.</p>
+      </header>
+
+      <!-- The mode (Q29, DESIGN.md "Modes"), design J: Full drip picked to start and recommended. -->
+      <section class="modes" aria-labelledby="modesAsk">
+        <h2 class="modes-ask" id="modesAsk">How much should drip do?</h2>
+        <p class="modes-sub">You can change this in Settings. For your first 24 hours, changes apply right away.</p>
+        <div class="ladder" id="ladder" role="radiogroup" aria-labelledby="modesAsk"></div>
+        <div class="modes-after"><button class="tour-btn is-primary" id="modesNext" type="button"></button></div>
+      </section>
+
+      <div class="hero-kinds" id="kindsBlock">
         <ul class="kinds" id="kinds"></ul>
         <p class="allowance" id="allowance">You get 4 drops and 10 cards a day. You can change these in Settings.</p>
-      </header>
+      </div>
 
       <section class="tour" id="tour" aria-label="How drip works">
         <p class="tour-say" id="say" aria-live="polite"></p>
