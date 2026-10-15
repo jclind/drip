@@ -1037,7 +1037,7 @@
 
   /**
    * Where the top bar's search box came from, to put it back when the page leaves Quiet's layout or YouTube's home.
-   * @type {{el: Element, parent: Node, next: Node | null, input: Element | null, placeholder: string | null} | null}
+   * @type {{el: Element, parent: Node, next: Node | null, placeholder: string | null} | null}
    */
   let movedSearch = null;
   /** drip's own search box, for when YouTube's can't be found. Kept across redraws so typing survives them. */
@@ -1059,12 +1059,12 @@
       return;
     }
     if (!movedSearch) {
-      const input = el.querySelector(SEL.searchInput);
-      movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling, input, placeholder: input?.getAttribute('placeholder') ?? null };
-      // drip.css hides Ask YouTube in the moved box, so the field says what's left (design F, 2026-10-15).
-      input?.setAttribute('placeholder', 'Search');
+      const placeholder = el.querySelector(SEL.searchInput)?.getAttribute('placeholder') ?? null;
+      movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling, placeholder };
+      placeholderWatch.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['placeholder'] });
     }
     if (el.parentElement !== slot) slot.append(el);
+    shortenPlaceholder();
     document.documentElement.toggleAttribute('data-drip-search-moved', true);
     fitSuggestions();
   }
@@ -1114,13 +1114,24 @@
     }, input, h('button', { class: 'drip-b drip-b-gray', type: 'submit', 'aria-label': 'Search' }, icon('search'))));
   }
 
+  /**
+   * drip.css hides Ask YouTube in the moved box, so the field says what's left (design F, 2026-10-15). YouTube builds a
+   * new field a moment after the box moves, so a watch sets it on whichever field is there.
+   */
+  function shortenPlaceholder() {
+    const input = movedSearch?.el.querySelector(SEL.searchInput);
+    if (input && input.getAttribute('placeholder') !== 'Search') input.setAttribute('placeholder', 'Search');
+  }
+  const placeholderWatch = new MutationObserver(shortenPlaceholder);
+
   function restoreSearch() {
     document.documentElement.toggleAttribute('data-drip-search-moved', false);
+    placeholderWatch.disconnect();
     if (!movedSearch) return;
-    const { el, parent, next, input, placeholder } = movedSearch;
+    const { el, parent, next, placeholder } = movedSearch;
     movedSearch = null;
-    if (input && placeholder !== null) input.setAttribute('placeholder', placeholder);
     if (parent.isConnected) parent.insertBefore(el, next && next.parentNode === parent ? next : null);
+    if (placeholder !== null) el.querySelector(SEL.searchInput)?.setAttribute('placeholder', placeholder);
   }
 
   let rendered = '';
