@@ -723,9 +723,11 @@ main {
   background: var(--text);
 }
 
+/* On the right even when a one-step tour hides the dots. */
 .tour-buttons {
   display: flex;
   gap: 8px;
+  margin-left: auto;
 }
 
 button.tour-btn,

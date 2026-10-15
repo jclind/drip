@@ -191,9 +191,6 @@
     return m ? Math.max(0, Number(m[1] || 1) - 1) : -1;
   }
 
-  /** Set once Next has pushed the tour, so going back can pop it instead of adding another entry. */
-  let pushed = false;
-
   /** Shows the screen the hash names. */
   function showScreen() {
     const n = hashStep();
@@ -209,9 +206,11 @@
     to?.focus({ preventScroll: true });
   }
 
+  /** The tour's own history entry, which Next pushed, so going back pops it instead of leaving it as a Forward. */
+  const PUSHED = 'drip-tour';
+
   function toChoice() {
-    if (pushed) {
-      pushed = false;
+    if (history.state === PUSHED) {
       history.back();
     } else {
       history.replaceState(null, '', location.pathname + location.search);
@@ -222,11 +221,13 @@
   $('modesNext').append('Next', icon('arrow-right'));
   $('modesNext').addEventListener('click', () => {
     retour(0);
-    pushed = true;
-    location.hash = 'tour-1';
+    // The whole path, since a bare hash resolves against a <base>, which dev/page.html sets.
+    history.pushState(PUSHED, '', `${location.pathname}${location.search}#tour-1`);
+    showScreen();
   });
   $('changeMode').addEventListener('click', toChoice);
   window.addEventListener('hashchange', showScreen);
+  window.addEventListener('popstate', showScreen);
 
   $('brandDrop').replaceWith(icon('drop', 'drip-token-drop'));
   $('footYouTube').append('Open YouTube', icon('arrow-up-right'));
@@ -313,7 +314,7 @@
     for (const t of timers) clearTimeout(t);
     timers.clear();
     step = Math.max(0, Math.min(STEPS.length - 1, n));
-    if (!$('tour').hidden) history.replaceState(null, '', `#tour-${step + 1}`);
+    if (!$('tour').hidden) history.replaceState(history.state, '', `${location.pathname}${location.search}#tour-${step + 1}`);
     $('say').textContent = STEPS[step].say();
     morph(() => {
       stage.style.minHeight = '';
@@ -325,6 +326,7 @@
 
   function renderControls() {
     const last = step === STEPS.length - 1;
+    $('dots').hidden = STEPS.length < 2;
     $('dots').replaceChildren(...STEPS.map((_, i) => h('button', {
       type: 'button', 'aria-label': `Step ${i + 1} of ${STEPS.length}`, 'aria-current': i === step ? 'step' : undefined,
       onclick: () => go(i),
