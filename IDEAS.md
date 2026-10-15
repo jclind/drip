@@ -30,10 +30,9 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 
 ## Lighter modes
 
-Jesse, 2026-10-13: two settings below full drip, for later. Neither has limits: no minutes, no tokens, no lock. Moving to a lighter mode loosens every limit at once, so it should probably wait for the next day like any other loosening change (Q6). That's Claude's note, not decided.
+Decided 2026-10-14 as Quiet and Curated, beside Full drip. See "Modes" in DESIGN.md (Q29).
 
-- Feeds only. drip hides YouTube's "recommended for you" feeds and does nothing else. Open question: what the home page shows instead, whether that's an empty page, Subscriptions, or the stash.
-- In between. The feeds stay hidden, and the only way to find something new is the reveal page, one card at a time, as many as you want. A controlled "for you" page instead of a grid.
+- A clock with YouTube's feeds left visible, for people who only want a time limit. Customize leaves it out of the first build, because the grid is what pulls you in.
 
 ## Friction
 
