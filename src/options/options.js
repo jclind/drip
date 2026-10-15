@@ -243,17 +243,31 @@ function modeRow() {
     h('div', { class: 'setting-text' },
       h('div', { class: 'setting-line' }, h('span', { class: 'setting-label', id: 'label-mode' }, 'Mode')),
       h('div', { class: 'hint' }, now ? 'Switch a part below to make your own mix.' : 'Your own mix.')),
-    h('div', { class: 'segmented', role: 'radiogroup', 'aria-labelledby': 'label-mode' },
+    // One Tab stop, with the arrow keys moving the pick, like the welcome page's list (Codex, 2026-10-15).
+    h('div', {
+      class: 'segmented', role: 'radiogroup', 'aria-labelledby': 'label-mode',
+      onkeydown: (/** @type {KeyboardEvent} */ e) => {
+        const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        const at = MODE_NAMES.findIndex(([name]) => name === (now || 'full'));
+        pickMode(MODE_NAMES[(at + step + MODE_NAMES.length) % MODE_NAMES.length][0]);
+      },
+    },
       ...MODE_NAMES.map(([name, label]) => h('button', {
         type: 'button', role: 'radio', 'aria-checked': String(now === name), 'data-mode': name,
-        onclick: () => {
-          Object.assign(draft, Drip.MODES[name]);
-          for (const key of Object.keys(Drip.MODES[name])) picked.add(key);
-          renderForm();
-          draftChanged();
-          /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
-        },
+        tabindex: now === name || (!now && name === 'full') ? '0' : '-1',
+        onclick: () => pickMode(name),
       }, label))));
+}
+
+/** @param {string} name */
+function pickMode(name) {
+  Object.assign(draft, Drip.MODES[name]);
+  for (const key of Object.keys(Drip.MODES[name])) picked.add(key);
+  renderForm();
+  draftChanged();
+  /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
 }
 
 function renderForm() {
