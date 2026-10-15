@@ -797,6 +797,8 @@
   /** How many of today's cards the reset keeps, under the rollover cap, by the settings tomorrow will use. */
   function cardsCarried() {
     const settings = { ...state.settings, ...state.pending?.changes };
+    // Cards that aren't counted tomorrow don't carry over to anything (Q29).
+    if (settings.cards !== 'limited') return 0;
     const perDay = settings.recTokensPerDay;
     return Math.max(0, Math.min(state.tokens.rec + perDay, Drip.caps(settings).rec) - perDay);
   }
