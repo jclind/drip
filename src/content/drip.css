@@ -902,13 +902,13 @@ html[dark] #drip-pill {
   margin-bottom: 32px;
 }
 
-/* The box keeps its top-bar height while its suggestions are open, so they hang over the page and the mic stays put. */
+/* The mic stays beside the box while the suggestions open under it. Neither the box nor the slot can have a set height:
+   with one, YouTube stops showing suggestions (checked in Chrome on 2026-10-15). */
 #drip-home .drip-search-slot > #center {
   flex: 1 1 auto;
   align-items: flex-start;
   width: 100%;
   max-width: none;
-  height: 40px;
   margin: 0;
 }
 
