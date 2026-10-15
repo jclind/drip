@@ -1063,6 +1063,8 @@
       movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling, placeholder };
       placeholderWatch.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['placeholder'] });
     }
+    // drip's own box stood in while YouTube's hadn't loaded. The kept slot would show both (Codex, 2026-10-15).
+    ownSearch?.remove();
     if (el.parentElement !== slot) slot.append(el);
     shortenPlaceholder();
     document.documentElement.toggleAttribute('data-drip-search-moved', true);
