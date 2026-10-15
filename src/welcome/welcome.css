@@ -289,7 +289,9 @@ main {
   background: none;
 }
 
+/* Rows 5 and 6, under the picture. Without a row, the phone layout (no picture) puts Customize in the empty row 1. */
 .cz {
+  grid-row: 5;
   grid-column: 2 / 4;
   justify-self: start;
   margin-top: 10px;
@@ -297,6 +299,7 @@ main {
 }
 
 .opts {
+  grid-row: 6;
   grid-column: 2 / 4;
   margin-top: 6px;
 }
