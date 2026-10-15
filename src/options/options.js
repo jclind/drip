@@ -81,6 +81,8 @@ let state = null;
 /** Settings as the form shows them, saved or not. */
 /** @type {Record<string, any>} */
 let draft = {};
+/** The mode parts a mode pick set since the last save. Save sends them even at today's values (Drip.settingsToSave). */
+const picked = new Set();
 let justSaved = false;
 /** How many weeks back History shows, and the day its block under the chart is about. */
 let weeksBack = 0;
@@ -246,6 +248,7 @@ function modeRow() {
         type: 'button', role: 'radio', 'aria-checked': String(now === name), 'data-mode': name,
         onclick: () => {
           Object.assign(draft, Drip.MODES[name]);
+          for (const key of Object.keys(Drip.MODES[name])) picked.add(key);
           renderForm();
           draftChanged();
           /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
@@ -279,8 +282,11 @@ function syncModeRow() {
   if (row) row.replaceWith(modeRow());
 }
 
+/** What Save would send. */
+const toSave = () => Drip.settingsToSave(state, draft, FIELDS.map((f) => f.key), picked);
+
 function dirty() {
-  return FIELDS.some((f) => draft[f.key] !== state.settings[f.key]);
+  return Object.keys(toSave()).length > 0;
 }
 
 /**
@@ -310,14 +316,13 @@ function absorb(res) {
 }
 
 async function save() {
-  /** @type {Record<string, any>} */
-  const changes = {};
-  for (const f of FIELDS) if (draft[f.key] !== state.settings[f.key]) changes[f.key] = draft[f.key];
+  const changes = toSave();
   if (!Object.keys(changes).length) {
     $('result').textContent = 'Nothing changed.';
     return;
   }
   absorb(await send({ type: 'updateSettings', changes }));
+  picked.clear();
   draft = { ...state.settings };
   justSaved = true;
   renderForm();
@@ -537,6 +542,7 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
   }
   renderSamples(dev);
   if (!state) return;
+  picked.clear();
   draft = { ...state.settings };
   renderForm();
   renderHistory();

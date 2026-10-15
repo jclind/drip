@@ -863,8 +863,32 @@
     return names.find(name => Object.entries(MODES[name]).every(([key, value]) => settings[/** @type {keyof typeof settings} */ (key)] === value)) ?? null;
   }
 
+  /**
+   * What Settings' Save sends: each setting the form changed from today's, plus each mode part a mode pick set whose
+   * waiting change it overrides. updateSettings cancels a waiting change when it's sent today's value, so without the
+   * second kind, Quiet saved and then Curated left Quiet's waiting search cap and stash, and the reset applied a mix
+   * (Codex, 2026-10-15).
+   * @param {State} state
+   * @param {Record<string, any>} draft The form's values.
+   * @param {string[]} keys The settings the form has.
+   * @param {Iterable<string>} picked The parts a mode pick set since the last save.
+   * @returns {Partial<Settings>}
+   */
+  function settingsToSave(state, draft, keys, picked) {
+    const waiting = /** @type {Record<string, any>} */ (state.pending ? state.pending.changes : {});
+    const sticky = new Set(picked);
+    /** @type {Record<string, any>} */
+    const changes = {};
+    for (const key of keys) {
+      const value = draft[key];
+      const current = /** @type {Record<string, any>} */ (state.settings)[key];
+      if (value !== current || (sticky.has(key) && key in waiting && waiting[key] !== value)) changes[key] = value;
+    }
+    return changes;
+  }
+
   /** @type {any} */ (globalThis).Drip = {
-    DEFAULT_SETTINGS, MODES, modeOf, dayKey, addDays, daysBetween, initialState, hydrate,
+    DEFAULT_SETTINGS, MODES, modeOf, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
