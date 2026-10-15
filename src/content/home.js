@@ -155,9 +155,14 @@
   }
 
   /** The videos the next reveal can pick from, newest first for subscriptions. */
-  function readCandidates() {
+  async function readCandidates() {
     if (state && state.settings.feedSource === 'subscriptions') return readFeedInFrame('/feed/subscriptions', SEL.subsBrowse);
-    return waitForPool();
+    const pool = await waitForPool();
+    if (pool.some(isNew)) return pool;
+    // This page's grid is hidden, so YouTube never loads past its first screenful. With all of that revealed, a hidden
+    // frame of the home page scrolls for more, the way YouTube loads them when you scroll (Jesse, 2026-10-15).
+    const more = await readFeedInFrame('/', SEL.homeBrowse);
+    return more.length ? more : pool;
   }
 
   /** @param {any} res */
