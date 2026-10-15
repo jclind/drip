@@ -115,3 +115,20 @@ button.plain .drip-i-arrow-up-right {
   height: 13px;
   margin-left: -2px;
 }
+
+/* Counted cards without the clock, as a line under the mix's name (popup.js). */
+.sub-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sub-count .drip-i {
+  width: 12px;
+  height: 15px;
+}
+
+.sub-count.is-zero .drip-i {
+  opacity: 0.4;
+}
+

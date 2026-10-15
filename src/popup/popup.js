@@ -1,6 +1,6 @@
 // @ts-check
 // Minutes left and the two balances. Spending happens on YouTube, not here (Q22). Each shows only when its mode part
-// is on (Q29); with neither the clock nor counted cards, the popup names the mode instead.
+// is on (Q29); without the clock, the popup names the mode instead, with counted cards on a line under it.
 
 /** @type {any} */
 // var, not const: these page scripts share one type-check program, and only var may be declared twice.
@@ -27,11 +27,14 @@ function show(state) {
   const clock = state.settings.clock !== false;
   const cards = state.settings.cards === 'limited';
   const stats = /** @type {HTMLElement} */ (document.getElementById('stats'));
-  if (!clock && !cards) {
+  // Without the clock the popup names the mix. Counted cards are a line under it, not a lone number (Jesse, 2026-10-15).
+  if (!clock) {
     const name = { quiet: 'Quiet', curated: 'Curated', full: 'Full drip' }[/** @type {string} */ (Drip.modeOf(state.settings))] || 'Custom';
     stats.replaceChildren(h('div', { class: 'top' }, h('div', { class: 'time-block' },
       h('div', { class: 'time' }, name),
-      h('div', { class: 'sub' }, "YouTube's feeds are hidden."))));
+      cards
+        ? h('div', { class: `sub sub-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), `${rec} ${rec === 1 ? 'card' : 'cards'} left today`)
+        : h('div', { class: 'sub' }, "YouTube's feeds are hidden."))));
     return;
   }
   stats.replaceChildren(...[
