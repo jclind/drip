@@ -215,6 +215,8 @@
   const stashOn = () => !state || state.settings.stash !== false;
   /** The reveal animations morph Full drip's +15m, card counter, and Stash, so other mixes change without them. */
   const deals = () => animates() && clockOn() && cardsMode() === 'limited' && stashOn();
+  /** The card up now. With cards off it stays stored for when they're back on, but the page doesn't show it (Codex, 2026-10-15). */
+  const shownCard = () => (cardsMode() === 'off' ? null : state.current);
 
   /**
    * Reads the feed, then sends `msg` with the videos it found. Resolves with the worker's reply when it worked, or
@@ -779,7 +781,7 @@
   /** No minutes or tokens left, and no card still to watch or stash. */
   function outForDay() {
     // Cards left don't count: with no minutes or drops, a reveal can't lead to watching anything (Jesse, 2026-10-14).
-    return clockOn() && !state.current && state.tokens.watch < 1 && state.watchSecondsLeft <= 0;
+    return clockOn() && !shownCard() && state.tokens.watch < 1 && state.watchSecondsLeft <= 0;
   }
 
   /** How many of today's cards the reset keeps, under the rollover cap, by the settings tomorrow will use. */
@@ -794,7 +796,7 @@
     const reset = hourLabel(state.settings.resetHour);
     const noDrops = clockOn() && state.tokens.watch < 1;
     const noCards = cardsMode() === 'limited' && state.tokens.rec < 1;
-    if (state.current) return noCards ? `No cards left. More at ${reset}.` : '';
+    if (shownCard()) return noCards ? `No cards left. More at ${reset}.` : '';
     if (outForDay()) return `You're out for today. Drops and cards refill at ${reset}.`;
     if (noCards) return `No cards left. More at ${reset}.`;
     if (noDrops) return `No drops left. More at ${reset}.`;
@@ -917,7 +919,7 @@
 
   /** @param {'empty' | 'card' | 'out'} [as] Draw it as on that page. The reveal animation opens and folds it ahead of time. */
   function savedList(as) {
-    const mode = as || (state.current || busy === 'reveal' ? 'card' : outForDay() ? 'out' : 'empty');
+    const mode = as || (shownCard() || busy === 'reveal' ? 'card' : outForDay() ? 'out' : 'empty');
     const open = savedOpen[mode];
     const count = state.backlog.length;
     // What's left to watch, so a half-watched video counts only its unwatched part.
@@ -973,7 +975,8 @@
   function view() {
     if (disconnected) return h('div', { class: 'drip-message' }, 'drip was updated. Refresh this page.');
     if (!state) return h('div', { class: 'drip-loading', 'aria-busy': 'true' });
-    const showCard = state.current || busy === 'reveal';
+    const current = shownCard();
+    const showCard = current || busy === 'reveal';
     const out = !showCard && outForDay();
     const note = out ? '' : outNote();
     // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
@@ -983,7 +986,7 @@
       search && h('div', { class: 'drip-search-slot' }),
       stats(),
       !showCard && (out ? outSea() : actions()),
-      state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
+      current ? card(current) : busy === 'reveal' && placeholderCard(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
       stashOn() && savedList());
   }
