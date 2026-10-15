@@ -439,6 +439,12 @@ html[dark] #drip-lock {
   white-space: nowrap;
 }
 
+/* The divider is for Stash beside it. With the stash off there's nothing to divide (Q29). */
+#drip-pill .drip-pill-time:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
 #drip-pill .drip-glass {
   flex: none;
   color: var(--drip-glass-line);
