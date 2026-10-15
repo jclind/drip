@@ -2,6 +2,8 @@
 <meta charset="utf-8">
 <title>drip page harness</title>
 <script>
+  // In its own scope: the pages' scripts declare top-level names like `state` that these mustn't take first.
+  (() => {
   // Runs a real extension page outside the extension, for checking it in a browser. Serve the repo and open
   // http://localhost:8077/dev/page.html?page=welcome (or options). Chrome's extension APIs are stubs: messages to the
   // worker are kept in window.__sent and answer with a fresh install's state, run through the real rules in state.js.
@@ -41,4 +43,5 @@
     document.write(html.replace('<head>', `<head><base href="/src/${page}/">`));
     document.close();
   });
+  })();
 </script>
