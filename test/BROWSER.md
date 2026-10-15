@@ -54,3 +54,9 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 ## After a day boundary
 
 33. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.
+
+## Top bar and menu
+
+34. On any YouTube page, at any window width, there's no sidebar and no icon strip down the left, and the page uses the full width. The top bar has no Create, no Ask YouTube, and no bell, and the search box says "Search". Logged out, Sign in still shows.
+35. Click the menu button at the top left. drip's menu drops under it: Home; You, History, Playlists, Watch later, Liked videos, Your videos, Downloads; Channels. Each link opens its page, and Channels opens the list of your subscriptions. A click outside, Escape, or a page change closes the menu. Tab to the button and press Enter: the menu opens with Home focused, and Escape puts focus back on the button.
+36. In Settings, turn off Hide the notification bell and save. It waits for the reset with a gray chip; after Run reset now, the bell is back. Turning it on again hides the bell at once.
