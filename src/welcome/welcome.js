@@ -81,10 +81,20 @@
   const OPTS = [
     { key: 'feeds', label: "Hide YouTube's feeds", how: () => 'Home, Subscriptions, the sidebar, end screens, autoplay, and Shorts. Always on.' },
     { key: 'searchCap', label: 'Stop search at 10 results', how: () => 'A button loads 10 more.' },
-    { key: 'cards', label: 'Reveal one video at a time', how: () => (parts.clock ? `${settings.recTokensPerDay} a day, while watch time is limited.` : 'As many as you want.') },
+    { key: 'cards', label: 'Reveal one video at a time', how: cardsHow },
     { key: 'clock', label: 'Limit watch time', how: () => `${hourDaily} a day, in ${Drip.formatMinutes(settings.minutesPerToken * 60)} drops. The video stops when it runs out.` },
     { key: 'stash', label: 'Stash videos for later', how: () => `Up to ${settings.stashMax}, from search and watch pages.` },
   ];
+  /**
+   * What the cards switch gives: the cards as saved, or with it off, what turning it on would give. A mix saved in
+   * Settings can count cards without the clock, or not count them with it (Codex, 2026-10-15).
+   */
+  function cardsHow() {
+    const counted = parts.cards === 'off' ? parts.clock : parts.cards === 'limited';
+    if (!counted) return 'As many as you want.';
+    return parts.clock ? `${settings.recTokensPerDay} a day, while watch time is limited.` : `${settings.recTokensPerDay} a day.`;
+  }
+
   /** The row picked, which a switched part leaves picked with a "Changed" tag. */
   let modeBase = /** @type {'quiet' | 'curated' | 'full'} */ ('full');
   let customizing = false;
@@ -601,7 +611,8 @@
     const save = h('button', { class: 'drip-pill-save drip-stash' });
     /** @type {any} */
     let stash = null;
-    const el = h('div', { id: 'drip-pill', class: 'drip-ui' }, time, save);
+    // Stash only with the stash on, as on the real pill (Q29, Codex 2026-10-15).
+    const el = h('div', { id: 'drip-pill', class: 'drip-ui' }, time, parts.stash && save);
     let lastPlaying = false;
     let savedShown = '';
 
