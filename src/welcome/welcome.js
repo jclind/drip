@@ -428,16 +428,42 @@
         h('div', { class: 'drip-sub' }, 'left today')),
       h('div', { class: 'drip-counts', style: `--drip-room: ${room}` },
         parts.clock && h('div', { class: `drip-count${watch ? '' : ' is-zero'}` }, icon('drop', 'drip-token-drop'), DripCounter.num(watch), h('span', { class: 'drip-sr' }, watch === 1 ? ' drop' : ' drops')),
-        counted && h('div', { class: `drip-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), DripCounter.num(rec), h('span', { class: 'drip-sr' }, rec === 1 ? ' card' : ' cards'))));
+        counted && h('div', { class: `drip-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), DripCounter.num(rec), h('span', { class: 'drip-sr' }, rec === 1 ? ' card' : ' cards'))),
+      // With cards off, +15m ends the stats line, as on YouTube (design F).
+      parts.clock && parts.cards === 'off' && addButton());
+  }
+
+  function addButton() {
+    return h('button', {
+      class: 'drip-b drip-b-gray drip-add', disabled: sand.tokens.watch < 1, onclick: addTime,
+    }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(sand.settings.minutesPerToken * 60)}`), price('drop'));
+  }
+
+  /**
+   * The home page's body as home.js lays it out. With cards off, YouTube's search box sits under the stats instead of
+   * the buttons, drawn here as a picture of it (design F, Codex 2026-10-15).
+   * @param {HTMLElement | null} top @param {HTMLElement | null} rest
+   */
+  function homePage(top, rest) {
+    const search = parts.cards === 'off';
+    return h('div', { class: `drip-page${sand.current ? ' is-open' : ''}${search ? ' is-search' : ''}` }, top, search ? searchPicture() : rest);
+  }
+
+  function searchPicture() {
+    const mic = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    for (const [k, v] of Object.entries({ width: '20', height: '20', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round' })) mic.setAttribute(k, v);
+    mic.innerHTML = '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>';
+    return h('div', { class: 'drip-search-slot tour-search', 'aria-hidden': 'true' },
+      h('span', { class: 'tour-search-field' }, h('span', {}, 'Search'), h('span', { class: 'tour-search-go' }, icon('search'))),
+      h('span', { class: 'tour-search-mic' }, mic));
   }
 
   function actions() {
     const counted = parts.cards === 'limited';
+    if (parts.cards === 'off') return null;
     return h('div', { class: 'drip-actions' },
-      parts.clock && h('button', {
-        class: 'drip-b drip-b-gray drip-add', disabled: sand.tokens.watch < 1, onclick: addTime,
-      }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(sand.settings.minutesPerToken * 60)}`), price('drop')),
-      parts.cards !== 'off' && h('button', {
+      parts.clock && addButton(),
+      h('button', {
         class: 'drip-b drip-b-gold drip-reveal', disabled: counted && sand.tokens.rec < 1, onclick: () => (stepId() === 'reveal' ? reveal() : go(at('reveal'))),
       }, h('span', {}, 'Reveal video'), counted && price('card')));
   }
@@ -568,7 +594,7 @@
     const focused = document.activeElement && stage.contains(document.activeElement) ? [...stage.querySelectorAll('button')].indexOf(/** @type {any} */ (document.activeElement)) : -1;
     // With a card up, the page is open: the stats sit a little higher, as the reveal animation leaves them.
     morph(() => stage.replaceChildren(h('div', { id: 'drip-home', class: 'drip-ui' },
-      h('div', { class: `drip-page${sand.current ? ' is-open' : ''}` }, stats(), sand.current ? card(sand.current) : actions()))));
+      homePage(stats(), sand.current ? card(sand.current) : actions()))));
     if (focused >= 0) /** @type {HTMLElement | undefined} */ (stage.querySelectorAll('button')[focused])?.focus();
   }
 
@@ -891,7 +917,7 @@
       const kept = sand.tokens.watch;
       /** The kept drops land in the counter as on YouTube (counter.js), 250ms after the water starts falling. */
       const home = () => {
-        const page = h('div', { class: 'drip-page' }, stats(kept), actions());
+        const page = homePage(stats(kept), actions());
         setUnder(h('div', { id: 'drip-home', class: 'drip-ui' }, page));
         stage.append(again());
         const row = /** @type {HTMLElement} */ (page.querySelector('.drip-count'));

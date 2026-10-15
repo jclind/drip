@@ -846,3 +846,51 @@ button.foot-link:hover {
     min-height: 44px;
   }
 }
+
+/* The tour's picture of YouTube's search box, which home.js moves under the stats with cards off (design F). */
+.tour-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tour-search-field {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  height: 40px;
+  padding: 0 4px 0 16px;
+  border: 1px solid var(--yt-spec-10-percent-layer, rgba(0, 0, 0, 0.1));
+  border-radius: 20px;
+  color: var(--yt-spec-text-secondary, #606060);
+  font-size: 16px;
+}
+
+.tour-search-field > span:first-child {
+  flex: 1;
+}
+
+.tour-search-go,
+.tour-search-mic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: var(--yt-spec-badge-chip-background, rgba(0, 0, 0, 0.05));
+  color: var(--yt-spec-text-primary, #0f0f0f);
+}
+
+.tour-search-go {
+  width: 32px;
+  height: 32px;
+}
+
+.tour-search-go .drip-i {
+  width: 18px;
+  height: 18px;
+}
+
+.tour-search-mic {
+  width: 40px;
+  height: 40px;
+}
