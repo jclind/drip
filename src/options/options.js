@@ -22,10 +22,17 @@ var DripPage = /** @type {any} */ (globalThis).DripPage;
  * @property {(n: number) => string} [say] The value in words, for the pending chip and screen readers.
  * @property {(n: number) => string} [spoken] The value for screen readers, when `say` is too short to read aloud.
  * @property {[string, string][]} [options]
+ * @property {(d: Record<string, any>) => string} [idle] Why the setting does nothing in the form's mix, or ''.
  */
 
 /** @param {number} n @param {string} one @param {string} many */
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+// A setting for a part that's off stays editable but dims, with a line saying why (Jesse, 2026-10-15; Codex audit).
+/** @param {Record<string, any>} d */
+const noClock = (d) => (d.clock ? '' : 'Not used while watch time is off.');
+/** @param {Record<string, any>} d */
+const noCards = (d) => (d.cards === 'off' ? 'Not used while cards are off.' : '');
 
 /** @type {{title: string, modes?: boolean, fields: Field[]}[]} */
 const SECTIONS = [
@@ -44,19 +51,22 @@ const SECTIONS = [
   {
     title: 'Your allowance',
     fields: [
-      { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48,
+      { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48, idle: noClock,
         unit: () => [DripPage.icon('drop', 'drip-token-drop')], say: (n) => plural(n, 'drop', 'drops') },
-      { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
+      { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5, idle: noClock,
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
       { key: 'recTokensPerDay', label: 'Cards per day', kind: 'stepper', min: 0, max: 100,
+        idle: (d) => noCards(d) || (d.cards === 'unlimited' ? 'Not used while cards are unlimited.' : ''),
         unit: () => [DripPage.icon('card', 'drip-token-card')], say: (n) => plural(n, 'card', 'cards') },
       // Not in the mockups. Settings is where the feed source lives for now (Q5).
-      { key: 'feedSource', label: 'Reveal from', kind: 'choice', options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
+      { key: 'feedSource', label: 'Reveal from', kind: 'choice', idle: noCards, options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
       { key: 'rolloverDays', label: 'Save unspent for', kind: 'stepper', min: 1, max: 7,
+        idle: (d) => (!d.clock && d.cards !== 'limited' ? 'Not used without watch time or counted cards.' : ''),
         unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days'),
         hint: 'Unspent drops and cards carry over up to this many days.' },
       // Q28. Lowering it keeps every stashed video; a full stash asks which one to swap out.
       { key: 'stashMax', label: 'Stash holds', kind: 'stepper', min: 1, max: 50,
+        idle: (d) => (d.stash ? '' : 'Not used while the stash is off.'),
         unit: (n) => [n === 1 ? 'video' : 'videos'], say: (n) => plural(n, 'video', 'videos'),
         hint: 'A full stash asks which video to swap out.' },
     ],
@@ -68,8 +78,8 @@ const SECTIONS = [
   {
     title: 'When time runs out',
     fields: [
-      { key: 'graceMode', label: 'Finish the current video', kind: 'toggle' },
-      { key: 'needThisPerDay', label: '"I need this one" per day', kind: 'stepper', min: 0, max: 10,
+      { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', idle: noClock },
+      { key: 'needThisPerDay', label: '"I need this one" per day', kind: 'stepper', min: 0, max: 10, idle: noClock,
         say: (n) => String(n), hint: 'Each one needs a typed reason.' },
     ],
   },
@@ -281,13 +291,27 @@ function renderForm() {
       const label = f.kind === 'stepper'
         ? h('span', { class: 'setting-label', id: labelId }, f.label)
         : h('label', { class: 'setting-label', id: labelId, for: f.key }, f.label);
-      return h('div', { class: 'setting' },
+      return h('div', { class: 'setting', 'data-field': f.key },
         h('div', { class: 'setting-text' },
           h('div', { class: 'setting-line' }, label, chip(f)),
-          f.hint && h('div', { class: 'hint' }, f.hint)),
+          f.hint && h('div', { class: 'hint' }, f.hint),
+          f.idle && h('div', { class: 'hint idle-note' })),
         control(f, labelId));
     }))));
+  syncIdle();
   renderStatus();
+}
+
+/** Dims the settings for parts that are off in the form's mix, and says why. Runs on every edit. */
+function syncIdle() {
+  for (const f of FIELDS) {
+    if (!f.idle) continue;
+    const row = document.querySelector(`.setting[data-field="${f.key}"]`);
+    const why = f.idle(draft);
+    row?.classList.toggle('is-idle', !!why);
+    const note = row?.querySelector('.idle-note');
+    if (note) note.textContent = why;
+  }
 }
 
 /** A part switched by hand may make the mix match a mode, or stop matching one. */
@@ -320,6 +344,7 @@ function renderStatus() {
 
 function draftChanged() {
   justSaved = false;
+  syncIdle();
   renderStatus();
 }
 

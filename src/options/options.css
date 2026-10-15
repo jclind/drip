@@ -667,3 +667,15 @@ button.col.is-selected .letter {
   background: var(--primary-bg);
   color: var(--primary-fg);
 }
+
+/* A setting for a part that's off: still editable, dimmed, with a line saying why (options.js syncIdle). */
+.setting.is-idle .setting-line,
+.setting.is-idle .setting-text > .hint:not(.idle-note),
+.setting.is-idle > :last-child {
+  opacity: 0.45;
+}
+
+.idle-note:empty {
+  display: none;
+}
+
