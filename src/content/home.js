@@ -219,10 +219,17 @@
   /** Reveals, Reveal next, and Pass animate unless the browser asks for reduced motion. */
   const animates = () => !DripReveal.reduced();
   // Mode parts (Q29). Until the worker answers, the page draws as Full drip.
-  const clockOn = () => !state || state.settings.clock !== false;
+  /**
+   * The parts as a running animation started. A mode change partway can't take away a button it's moving, and the
+   * redraw after it draws the new mix (Codex, 2026-10-15).
+   * @type {{clock: boolean, cards: 'off' | 'unlimited' | 'limited', stash: boolean} | null}
+   */
+  let animParts = null;
+  const partsNow = () => animParts || (state ? state.settings : null);
+  const clockOn = () => partsNow()?.clock !== false;
   /** @returns {'off' | 'unlimited' | 'limited'} */
-  const cardsMode = () => (state ? state.settings.cards : 'limited');
-  const stashOn = () => !state || state.settings.stash !== false;
+  const cardsMode = () => partsNow()?.cards ?? 'limited';
+  const stashOn = () => partsNow()?.stash !== false;
   /** The reveal animations morph Full drip's +15m, card counter, and Stash, so other mixes change without them. */
   const deals = () => animates() && clockOn() && cardsMode() === 'limited' && stashOn();
   /** The card up now. With cards off it stays stored for when they're back on, but the page doesn't show it (Codex, 2026-10-15). */
@@ -275,13 +282,18 @@
       if (focused) focusOn(ok ? (kind === 'reveal' ? 'watch' : 'next') : kind === 'reveal' ? 'reveal' : 'next');
       return;
     }
+    // Without the animation the pressed button can go too (Reveal video once a card is up), so focus goes to what
+    // you'd press next here as well (Codex, 2026-10-15).
+    const had = !!document.getElementById('drip-home')?.contains(document.activeElement);
     render();
+    let ok = false;
     try {
-      await findWith(msg);
+      ok = !!(await findWith(msg));
     } finally {
       busy = '';
       render();
     }
+    if (had) focusOn(ok ? (kind === 'reveal' ? 'watch' : 'next') : kind === 'reveal' ? 'reveal' : 'next');
   }
 
   /**
@@ -296,6 +308,8 @@
     const page = root.querySelector('.drip-page');
     const focused = root.contains(document.activeElement);
     moving = true;
+    // Pass sets it before asking the worker, from the page the card was dealt on.
+    animParts ||= { clock: clockOn(), cards: cardsMode(), stash: stashOn() };
     let ok = false;
     try {
       ok = !!(await run({
@@ -311,6 +325,7 @@
       }));
     } finally {
       moving = false;
+      animParts = null;
       busy = '';
       rendered = '';
       render();
@@ -388,9 +403,11 @@
     if (action === 'pass' && deals() && document.querySelector('#drip-home .drip-card .drip-deal')) {
       // Redraws wait while the worker answers, so the card is still there to animate.
       moving = true;
+      animParts = { clock: clockOn(), cards: cardsMode(), stash: stashOn() };
       const res = absorb(await send({ type: 'resolve', action, videoId }));
       moving = false;
       if (!res || !res.ok) {
+        animParts = null;
         message = errorText(res ? res.error : '');
         render();
         return;
@@ -404,6 +421,8 @@
     // The worker's save redraws the page through the storage listener, which would show the empty page while the
     // watch page loads.
     if (action === 'watch') leaving = true;
+    // Taken before asking: the worker's save redraws the page, and with it the pressed button can go.
+    const had = !!document.getElementById('drip-home')?.contains(document.activeElement);
     const res = absorb(await send({ type: 'resolve', action, videoId }));
     // A full stash asks which video to swap out instead (Q28).
     if (res && !res.ok && res.error === 'stash-full') {
@@ -421,6 +440,8 @@
     }
     leaving = false;
     render();
+    // Pass without the animation takes its button away too. Focus goes where the animated Pass sends it.
+    if (had && action === 'pass' && res && res.ok) focusOn(outForDay() ? 'saved-head' : 'reveal');
   }
 
   /**
@@ -642,8 +663,9 @@
     return rows;
   }
 
-  // Stash opens on the normal empty page, and starts folded with a card up or when out for the day.
-  const savedOpen = { empty: true, card: false, out: false };
+  // Stash opens on the normal empty page, and starts folded with a card up, when out for the day, and under the search
+  // box with cards off (design H, Q29).
+  const savedOpen = { empty: true, card: false, out: false, search: false };
   let savedShowAll = false;
 
   // Kept across renders, so a rebuild doesn't reload the thumbnail or jump the glass's water.
@@ -931,7 +953,7 @@
 
   /** @param {'empty' | 'card' | 'out'} [as] Draw it as on that page. The reveal animation opens and folds it ahead of time. */
   function savedList(as) {
-    const mode = as || (shownCard() || busy === 'reveal' ? 'card' : outForDay() ? 'out' : 'empty');
+    const mode = as || (shownCard() || busy === 'reveal' ? 'card' : outForDay() ? 'out' : cardsMode() === 'off' ? 'search' : 'empty');
     const open = savedOpen[mode];
     const count = state.backlog.length;
     // What's left to watch, so a half-watched video counts only its unwatched part.
@@ -1325,6 +1347,8 @@
 
   onState((next) => {
     state = next;
+    // The stash turned off with its full-stash list open: the list goes with its button (Codex, 2026-10-15).
+    if (state && state.settings.stash === false) swapFor = '';
     render();
   });
   watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');

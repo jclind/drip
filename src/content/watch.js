@@ -1042,6 +1042,11 @@
     // Mode parts (Q29): with the clock off the pill has no glass or minutes, and with the stash off too it has nothing.
     const clockOn = !!state && state.settings.clock !== false;
     const stashOn = !!state && state.settings.stash !== false;
+    // The stash turned off with its full-stash list open: the list goes with its button (Codex, 2026-10-15).
+    if (swapOpen && state && !stashOn) {
+      swapOpen = '';
+      drawSwap();
+    }
     if (!id || !state || (!clockOn && !stashOn)) {
       pill?.remove();
       pillView = '';
@@ -1154,7 +1159,14 @@
     if (disconnected) return;
     const id = videoId();
     const wasFunded = !!state && !!id && !Drip.watchStatus(state, id).locked;
+    const clockWasOff = !!state && state.settings.clock === false;
     state = next;
+    // Time played while the clock was off was free, so turning it on mid-video drops what hadn't gone to the worker
+    // yet instead of charging it. History loses those few seconds (Codex, 2026-10-15).
+    if (clockWasOff && state.settings.clock !== false) {
+      bank();
+      unsent.length = 0;
+    }
     const status = Drip.watchStatus(state, id);
     // Another tab may have used up the minutes. A video playing here when that happened gets grace too (Q3).
     if (wasFunded && status.locked && state.settings.graceMode && clockActive() && video && !video.paused) setGrace(id);
