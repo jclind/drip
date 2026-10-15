@@ -5,13 +5,13 @@
   // In its own scope: the pages' scripts declare top-level names like `state` that these mustn't take first.
   (() => {
   // Runs a real extension page outside the extension, for checking it in a browser. Serve the repo and open
-  // http://localhost:8077/dev/page.html?page=welcome (or options). Chrome's extension APIs are stubs: messages to the
+  // http://localhost:8077/dev/page.html?page=welcome (or options, or popup). Chrome's extension APIs are stubs: messages to the
   // worker are kept in window.__sent and answer with a fresh install's state, run through the real rules in state.js.
   // ?mode=quiet, curated, or full starts the page as if that mode were saved.
   const listeners = { addListener() {}, removeListener() {} };
   const params = new URLSearchParams(location.search);
   const mode = params.get('mode');
-  const page = params.get('page') === 'options' ? 'options' : 'welcome';
+  const page = ['options', 'popup'].includes(params.get('page') || '') ? params.get('page') : 'welcome';
   /** @type {any} */
   let state = null;
   /** @type {any} */ (window).chrome = {
