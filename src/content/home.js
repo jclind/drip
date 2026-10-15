@@ -59,14 +59,15 @@
   /**
    * The views and age from a grid item's line under the title, as YouTube writes them, or '' for a part it lacks.
    * @param {Element} item
-   * @param {string} channel Left out, in case a channel's name is a number.
+   * @param {string} channel Left out, in case a channel's name is a number or ends in "ago" (Codex, 2026-10-14).
    */
   function viewsAndAge(item, channel) {
     let views = '';
     let age = '';
     for (const el of item.querySelectorAll(SEL.metaPart)) {
       const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      if (!views && text !== channel && VIEWS.test(text)) views = /views?$/i.test(text) ? text : `${text} views`;
+      if (text === channel) continue;
+      if (!views && VIEWS.test(text)) views = /views?$/i.test(text) ? text : `${text} views`;
       else if (!age && AGE.test(text)) age = text;
     }
     return { views, age };
@@ -373,8 +374,10 @@
         render();
         return;
       }
-      const { focused } = await animate(DripReveal.pass, async () => null);
-      if (focused) focusOn('reveal');
+      const out = outForDay();
+      seaRises = out;
+      const { focused } = await animate(out ? DripReveal.passOut : DripReveal.pass, async () => null);
+      if (focused) focusOn(out ? 'saved-head' : 'reveal');
       return;
     }
     // The worker's save redraws the page through the storage listener, which would show the empty page while the
@@ -509,16 +512,20 @@
   /** Kept until the worker replies, so another × cannot remove the same row twice. */
   /** @type {Map<string, {started: number | null, height?: number, animations: Animation[]}>} */
   const evaporating = new Map();
-  /** Undo starts on the restored node, even if storage draws it before the worker replies. */
-  /** @type {Set<string>} */
-  const condensing = new Set();
+  /**
+   * Undo starts on the restored node, even if storage draws it before the worker replies. Each id maps to when its
+   * condense began, or null until its row is drawn, so a rebuild mid-condense resumes it (Codex, 2026-10-14).
+   * @type {Map<string, number | null>}
+   */
+  const condensing = new Map();
+  const CONDENSE_MS = 300;
 
   /** @param {HTMLElement} root @param {string} id */
   function stashRow(root, id) {
     return root.querySelector(`[data-k="x-${CSS.escape(id)}"]`)?.closest('li');
   }
 
-  /** Resumes any evaporate on the new row at its original elapsed time. @param {HTMLElement} root */
+  /** Resumes any evaporate or condense on the new row at its original elapsed time. @param {HTMLElement} root */
   function syncRowMotion(root) {
     for (const [id, motion] of evaporating) {
       motion.animations.forEach((a) => a.cancel());
@@ -533,14 +540,20 @@
         return a;
       });
     }
-    for (const id of condensing) {
+    for (const [id, started] of condensing) {
       const row = stashRow(root, id);
       if (!row) continue;
-      condensing.delete(id);
-      if (!animates()) continue;
-      for (const el of row.children) el.animate([ROW_VAPOR, ROW_VISIBLE], {
-        duration: 300, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)',
-      });
+      const now = performance.now();
+      const elapsed = started === null ? 0 : now - started;
+      if (!animates() || elapsed >= CONDENSE_MS) {
+        condensing.delete(id);
+        continue;
+      }
+      if (started === null) condensing.set(id, now);
+      for (const el of row.children) {
+        const a = el.animate([ROW_VAPOR, ROW_VISIBLE], { duration: CONDENSE_MS, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
+        a.currentTime = elapsed;
+      }
     }
   }
 
@@ -582,7 +595,7 @@
     clearTimeout(entry.timer);
     removed.delete(id);
     const index = state ? state.backlog.filter((/** @type {any} */ v) => entry.before.includes(v.id)).length : undefined;
-    condensing.add(id);
+    condensing.set(id, null);
     try {
       absorb(await send({ type: 'addBacklog', video: entry.video, index }));
       if (!state?.backlog.some((/** @type {any} */ v) => v.id === id)) condensing.delete(id);
@@ -747,6 +760,9 @@
       h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, countRow('watch'), countRow('rec')));
   }
 
+  /** Set when Pass on the last card leaves the page out for the day, so the sea rises in where the card dropped. */
+  let seaRises = false;
+
   /** No minutes or tokens left, and no card still to watch or stash. */
   function outForDay() {
     // Cards left don't count: with no minutes or drops, a reveal can't lead to watching anything (Jesse, 2026-10-14).
@@ -774,7 +790,9 @@
 
   /** Variant J, "Small sea": still water and one faint fish. Screen readers get the copy as plain text, not a status, so a rebuild (opening the Stash) doesn't read it out again. */
   function outSea() {
-    return h('section', { class: 'drip-out-sea' },
+    const rises = seaRises && animates();
+    seaRises = false;
+    return h('section', { class: `drip-out-sea${rises ? ' is-new' : ''}` },
       h('div', { class: 'drip-sea', 'aria-hidden': 'true' },
         animates() && h('span', { class: 'drip-fish' }, h('span', {}))),
       h('div', { class: 'drip-out-copy' },
@@ -983,7 +1001,8 @@
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0,
       state.tokens, state.current, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
-      state.settings.resetHour, state.settings.stashMax,
+      // The sea's "N cards carry over" follows the allowance, the rollover cap, and pending settings (Codex, 2026-10-14).
+      state.settings.resetHour, state.settings.stashMax, cardsCarried(),
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
     ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId]);

@@ -992,7 +992,8 @@ html[dark] #drip-home .drip-out-sea {
 }
 
 /* The reveal card. The 16:9 box and two title lines are reserved before anything loads, so nothing shifts. */
-#drip-home .drip-card.is-new {
+#drip-home .drip-card.is-new,
+#drip-home .drip-out-sea.is-new {
   animation: drip-rise 260ms cubic-bezier(0.3, 0.7, 0.2, 1);
 }
 

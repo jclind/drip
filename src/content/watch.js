@@ -367,6 +367,7 @@
     else takePlayed();
     if (state && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) await refreshStatus();
     if (sendDue()) await sendTick();
+    else toolbarHeartbeat();
     if (!clockActive() || !videoId()) {
       hideLock();
       renderPill();
@@ -387,6 +388,22 @@
     return { position: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : undefined };
   }
 
+  // What the toolbar last heard from this tab, and when. Ticks only go out with time to charge, so during an ad, or
+  // on a pause with nothing banked, a zero-second tick tells it instead (Codex, 2026-10-14).
+  let toolbarSaid = false;
+  let toolbarSaidAt = -Infinity;
+
+  /** Keeps the toolbar's 12 second playing window fresh, and tells it at once when playback starts or stops. */
+  function toolbarHeartbeat() {
+    const id = videoId();
+    const playing = clockActive() && !!id && !!video && !video.paused;
+    if (playing === toolbarSaid && (!playing || performance.now() - toolbarSaidAt < SEND_EVERY * 1000)) return;
+    toolbarSaid = playing;
+    toolbarSaidAt = performance.now();
+    // No key and no seconds, so the worker charges nothing and saves nothing.
+    send({ type: 'tick', seconds: 0, videoId: id, ago: 0, playing });
+  }
+
   /** Sends the oldest unsent time. If the worker doesn't confirm it, it stays unsent and goes again next tick. */
   async function sendTick() {
     const entry = unsent[0];
@@ -394,6 +411,8 @@
     const id = entry.id;
     const before = state && Drip.watchStatus(state, id);
     const playing = id === videoId() && !!video && !video.paused;
+    toolbarSaid = playing;
+    toolbarSaidAt = performance.now();
     const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && playing), startedAt: performance.now() };
     pendingTick = request;
     try {
