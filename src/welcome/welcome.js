@@ -1,6 +1,6 @@
 // @ts-check
-// The page drip opens once, when it's installed (DESIGN.md, "Welcome page"). The top states the default allowance.
-// The tour under it runs working copies of drip's screens on a throwaway state, through the real rules in
+// The page drip opens once, when it's installed (DESIGN.md, "Welcome page"). It's two screens: the mode choice, then a
+// tour of the mix picked. The tour runs working copies of drip's screens on a throwaway state, through the real rules in
 // state.js and drip.css's styles. It never sends a change to the worker. The markup copies home.js's stats, actions,
 // and card, and watch.js's lock and pill, so a change to those screens needs the same change here.
 
@@ -47,31 +47,197 @@
    */
   const settings = Drip.DEFAULT_SETTINGS;
   /** The tour's own state. Every button in the tour changes this and nothing else. */
+  /**
+   * The mode parts picked on this page (Q29). Full drip to start, as design J picked it; a saved mix replaces it once the
+   * worker answers. The hero, the tour, and the tour's own state all follow it.
+   * @type {{searchCap: boolean, cards: 'off' | 'unlimited' | 'limited', clock: boolean, stash: boolean}}
+   */
+  let parts = { ...Drip.MODES.full };
   const sand = freshState();
 
   function freshState() {
     const state = Drip.initialState(Date.now());
-    Object.assign(state.settings, settings);
+    Object.assign(state.settings, settings, parts);
     state.tokens = { watch: settings.watchTokensPerDay, rec: settings.recTokensPerDay };
     return state;
   }
 
-  // The top of the page.
+  // The mode (Q29, DESIGN.md "Modes"), design J: a list lightest first, each row with a small picture of its home page.
+  // Full drip is picked to start, with a "Recommended" tag, and its picture is the only one in color until another row is
+  // picked. Customize on the picked row opens a switch per part, each named for what it does. A pick saves at once, and
+  // the hero and the tour below follow it.
 
-  function fillHero() {
-    const minutes = Drip.formatMinutes(settings.minutesPerToken * 60);
-    /** @param {string} name @param {string} cls @param {string} label @param {string} what */
-    const kind = (name, cls, label, what) => h('li', { class: 'kind' },
-      h('div', { class: 'kind-name' }, icon(name, cls), h('span', {}, label)),
-      h('div', { class: 'kind-what' }, what));
-    $('kinds').replaceChildren(
-      kind('drop', 'drip-token-drop', 'Drops', `1 drop = ${minutes} of watching`),
-      kind('card', 'drip-token-card', 'Cards', '1 card = 1 video revealed'),
-      kind('save', '', 'Stash', `Holds ${settings.stashMax} videos for later`));
-    /** @param {number} n @param {string} one @param {string} many */
-    const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    $('allowance').textContent = `You get ${count(settings.watchTokensPerDay, 'drop', 'drops')} and ${count(settings.recTokensPerDay, 'card', 'cards')} a day. You can change these in Settings, and for your first 24 hours, changes apply right away.`;
+  const hourDaily = Drip.formatMinutes(settings.watchTokensPerDay * settings.minutesPerToken * 60);
+  /** @type {{name: 'quiet' | 'curated' | 'full', label: string, what: string, mini: string}[]} */
+  const MODE_ROWS = [
+    { name: 'quiet', label: 'Quiet', what: "Hides YouTube's feeds. Search is all that's left.",
+      mini: '<span class="m-search"></span>' },
+    { name: 'curated', label: 'Curated', what: 'New videos come one at a time, as many as you want.',
+      mini: '<span class="m-btns"><span class="m-btn gold"></span></span><span class="m-line"></span><span class="m-line"></span><span class="m-line"></span>' },
+    { name: 'full', label: 'Full drip', what: `${hourDaily} of watching and ${settings.recTokensPerDay} new videos a day. The video stops when the time runs out.`,
+      mini: '<span class="m-stats"><span class="m-glass"></span><span class="m-num"></span><span class="m-pip is-drop"></span><span class="m-pip is-card"></span></span><span class="m-btns"><span class="m-btn"></span><span class="m-btn gold"></span></span><span class="m-line"></span><span class="m-line"></span>' },
+  ];
+  /** @type {{key: 'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash', label: string, how: () => string}[]} */
+  const OPTS = [
+    { key: 'feeds', label: "Hide YouTube's feeds", how: () => 'Home, Subscriptions, the sidebar, end screens, autoplay, and Shorts. Always on.' },
+    { key: 'searchCap', label: 'Stop search at 10 results', how: () => 'A button loads 10 more.' },
+    { key: 'cards', label: 'Reveal one video at a time', how: cardsHow },
+    { key: 'clock', label: 'Limit watch time', how: () => `${hourDaily} a day, in ${Drip.formatMinutes(settings.minutesPerToken * 60)} drops. The video stops when it runs out.` },
+    { key: 'stash', label: 'Stash videos for later', how: () => `Up to ${settings.stashMax}, from search and watch pages.` },
+  ];
+  /**
+   * What the cards switch gives: the cards as saved, or with it off, what turning it on would give. A mix saved in
+   * Settings can count cards without the clock, or not count them with it (Codex, 2026-10-15).
+   */
+  function cardsHow() {
+    const counted = parts.cards === 'off' ? parts.clock : parts.cards === 'limited';
+    if (!counted) return 'As many as you want.';
+    return parts.clock ? `${settings.recTokensPerDay} a day, while watch time is limited.` : `${settings.recTokensPerDay} a day.`;
   }
+
+  /** The row picked, which a switched part leaves picked with a "Changed" tag. */
+  let modeBase = /** @type {'quiet' | 'curated' | 'full'} */ ('full');
+  let customizing = false;
+
+  /** @param {string} [focus] What keyboard focus goes back to after the redraw: a row's mode, a part, or 'customize'. */
+  function drawLadder(focus) {
+    const rows = MODE_ROWS.map((row) => {
+      const picked = row.name === modeBase;
+      const el = h('div', {
+        class: 'rung', role: 'radio', tabindex: picked ? '0' : '-1', 'aria-checked': String(picked), 'data-mode': row.name,
+        // A click in Customize's switches or their text isn't a pick, or it would put the preset back over the mix.
+        onclick: (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, .opts')) pickMode(row.name); },
+        onkeydown: (/** @type {KeyboardEvent} */ e) => {
+          if (e.target !== el) return;
+          const i = MODE_ROWS.indexOf(row);
+          const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+          if (step) {
+            e.preventDefault();
+            pickMode(MODE_ROWS[(i + step + MODE_ROWS.length) % MODE_ROWS.length].name, true);
+          } else if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            pickMode(row.name, true);
+          }
+        },
+      },
+      h('span', { class: 'dot', 'aria-hidden': 'true' }),
+      h('span', { class: 'rung-name' }, row.label,
+        row.name === 'full' && h('span', { class: 'rec-tag' }, icon('drop', 'drip-token-drop'), 'Recommended'),
+        picked && Drip.modeOf(parts) !== row.name && h('span', { class: 'custom-tag' }, 'Changed')),
+      h('span', { class: 'rung-what' }, row.what));
+      const mini = h('div', { class: 'mini', 'aria-hidden': 'true' });
+      mini.innerHTML = row.mini;
+      el.insertBefore(mini, el.children[2]);
+      if (picked) {
+        el.append(h('button', {
+          type: 'button', class: 'linkish cz', 'data-k': 'customize', 'aria-expanded': String(customizing),
+          onclick: () => { customizing = !customizing; drawLadder('customize'); },
+        }, customizing ? 'Hide' : 'Customize'));
+        if (customizing) {
+          el.append(h('div', { class: 'opts' }, ...OPTS.map((o) => {
+            const on = o.key === 'feeds' || (o.key === 'cards' ? parts.cards !== 'off' : parts[o.key]);
+            return h('div', { class: 'opt' },
+              h('div', { class: 'opt-text' }, o.label, h('div', { class: 'opt-sub' }, o.how())),
+              h('button', {
+                type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(on), 'aria-label': o.label, 'data-k': o.key,
+                disabled: o.key === 'feeds', onclick: () => switchPart(o.key),
+              }));
+          })));
+        }
+      }
+      return el;
+    });
+    $('ladder').replaceChildren(...rows);
+    if (focus) /** @type {HTMLElement | null} */ ($('ladder').querySelector(`[data-k="${focus}"], [data-mode="${focus}"]`))?.focus();
+  }
+
+  /** @param {'quiet' | 'curated' | 'full'} name @param {boolean} [keyboard] */
+  function pickMode(name, keyboard = false) {
+    if (name === modeBase && Drip.modeOf(parts) === name) return;
+    modeBase = name;
+    parts = { ...Drip.MODES[name] };
+    customizing = false;
+    applyParts(keyboard ? name : undefined);
+  }
+
+  /**
+   * Customize's switches. The one cards switch counts cards while watch time is limited and leaves them unlimited
+   * otherwise, so it needs no count of its own (DESIGN.md "Modes").
+   * @param {'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash'} key
+   */
+  function switchPart(key) {
+    if (key === 'feeds') return;
+    if (key === 'cards') parts.cards = parts.cards === 'off' ? (parts.clock ? 'limited' : 'unlimited') : 'off';
+    else {
+      parts[key] = !parts[key];
+      if (key === 'clock' && parts.cards !== 'off') parts.cards = parts.clock ? 'limited' : 'unlimited';
+    }
+    applyParts(key);
+  }
+
+  /** Saves the mix, then redraws the list, the hero, and the tour from its first step. @param {string} [focus] */
+  function applyParts(focus) {
+    chrome.runtime.sendMessage({ type: 'updateSettings', changes: { ...parts } }).catch(() => {});
+    drawLadder(focus);
+    retour();
+  }
+
+  /** The tour for the current mix, from step n. It starts over on its own fresh state. @param {number} [n] */
+  function retour(n = 0) {
+    Object.assign(sand, freshState());
+    lastCardId = '';
+    const mode = Drip.modeOf(parts);
+    $('tourTitle').textContent = `How ${mode ? MODE_ROWS.find((r) => r.name === mode)?.label : 'your mix'} works`;
+    STEPS = ALL_STEPS.filter((s) => s.needs());
+    go(n);
+  }
+
+  // The two screens. The hash keeps the screen and the step across a reload: none on the choice, #tour-2 on the tour's
+  // second step. Next pushes the tour onto the history, so the browser's Back goes to the choice too.
+
+  /** The tour step in the hash, counted from 0, or -1 on the choice. */
+  function hashStep() {
+    const m = /^#tour(?:-(\d+))?$/.exec(location.hash);
+    return m ? Math.max(0, Number(m[1] || 1) - 1) : -1;
+  }
+
+  /** Shows the screen the hash names. */
+  function showScreen() {
+    const n = hashStep();
+    const touring = n >= 0;
+    const switched = touring === $('tour').hidden;
+    $('choose').hidden = touring;
+    $('tour').hidden = !touring;
+    if (touring && n !== step) go(n);
+    if (!switched) return;
+    window.scrollTo(0, 0);
+    // Focus goes to the new screen, so a screen reader starts there.
+    const to = touring ? $('tourTitle') : /** @type {HTMLElement | null} */ ($('ladder').querySelector('[aria-checked="true"]'));
+    to?.focus({ preventScroll: true });
+  }
+
+  /** The tour's own history entry, which Next pushed, so going back pops it instead of leaving it as a Forward. */
+  const PUSHED = 'drip-tour';
+
+  function toChoice() {
+    if (history.state === PUSHED) {
+      history.back();
+    } else {
+      history.replaceState(null, '', location.pathname + location.search);
+      showScreen();
+    }
+  }
+
+  $('modesNext').append('Next', icon('arrow-right'));
+  $('modesNext').addEventListener('click', () => {
+    retour(0);
+    // The whole path, since a bare hash resolves against a <base>, which dev/page.html sets.
+    history.pushState(PUSHED, '', `${location.pathname}${location.search}#tour-1`);
+    showScreen();
+  });
+  $('changeMode').addEventListener('click', toChoice);
+  window.addEventListener('hashchange', showScreen);
+  window.addEventListener('popstate', showScreen);
 
   $('brandDrop').replaceWith(icon('drop', 'drip-token-drop'));
   $('footYouTube').append('Open YouTube', icon('arrow-up-right'));
@@ -81,15 +247,33 @@
   // The tour. Each step is one sentence over one screen. A step's show() draws into the stage and returns a function
   // that stops its timers when the step changes.
 
-  /** @typedef {{say: string, show: () => (() => void) | undefined}} Step */
-  /** @type {Step[]} */
-  const STEPS = [
-    { say: 'This is your YouTube home now. Try +15m.', show: showHome },
-    { say: 'Reveal video spends a card on one video. Watch it, stash it, or pass.', show: showReveal },
-    { say: 'Minutes only drain while a video plays. Press play.', show: showPlayer },
-    { say: 'When the glass runs dry, the lock comes up. Done for now takes you home.', show: showLock },
-    { say: 'What else changes on YouTube.', show: showChanges },
+  /** @typedef {{id: string, say: () => string, show: () => (() => void) | undefined, needs: () => boolean}} Step */
+  /** @type {Step[]} Every step. The tour skips the ones whose part is off (Q29). */
+  const ALL_STEPS = [
+    // The first steps say the day's drops and cards, which had tiles of their own above the tour until 2026-10-15.
+    {
+      id: 'home', show: showHome, needs: () => parts.clock,
+      say: () => `You get ${plural(settings.watchTokensPerDay, 'drop')} a day, and each one is ${dropTime} of watching. Try +${dropTime}.`,
+    },
+    {
+      id: 'reveal', show: showReveal, needs: () => parts.cards !== 'off',
+      say: () => `${parts.cards === 'limited' ? `You get ${plural(settings.recTokensPerDay, 'card')} a day, and each one reveals a video.` : 'Reveal video shows one video at a time.'} ${parts.stash ? 'Watch it, stash it, or pass.' : 'Watch it or pass.'}`,
+    },
+    { id: 'player', say: () => 'Minutes only drain while a video plays. Press play.', show: showPlayer, needs: () => parts.clock },
+    { id: 'lock', say: () => 'When the glass runs dry, the lock comes up. Done for now takes you home.', show: showLock, needs: () => parts.clock },
+    { id: 'changes', say: () => (STEPS.length > 1 ? 'What else changes on YouTube.' : 'What changes on YouTube.'), show: showChanges, needs: () => true },
   ];
+  /** @type {Step[]} */
+  let STEPS = ALL_STEPS.filter((s) => s.needs());
+  const dropTime = Drip.formatMinutes(settings.minutesPerToken * 60);
+  /** @param {number} n @param {string} word */
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  /** Where a step is in this tour, or the last step if the mode skips it. @param {string} id */
+  const at = (id) => {
+    const i = STEPS.findIndex((s) => s.id === id);
+    return i < 0 ? STEPS.length - 1 : i;
+  };
+  const stepId = () => STEPS[step].id;
 
   let step = 0;
   /** @type {(() => void) | undefined} */
@@ -140,7 +324,8 @@
     for (const t of timers) clearTimeout(t);
     timers.clear();
     step = Math.max(0, Math.min(STEPS.length - 1, n));
-    $('say').textContent = STEPS[step].say;
+    if (!$('tour').hidden) history.replaceState(history.state, '', `${location.pathname}${location.search}#tour-${step + 1}`);
+    $('say').textContent = STEPS[step].say();
     morph(() => {
       stage.style.minHeight = '';
       stage.replaceChildren();
@@ -151,17 +336,18 @@
 
   function renderControls() {
     const last = step === STEPS.length - 1;
+    $('dots').hidden = STEPS.length < 2;
     $('dots').replaceChildren(...STEPS.map((_, i) => h('button', {
       type: 'button', 'aria-label': `Step ${i + 1} of ${STEPS.length}`, 'aria-current': i === step ? 'step' : undefined,
       onclick: () => go(i),
     })));
-    $('back').hidden = step === 0;
+    // Back on the first step goes to the choice.
     $('skip').hidden = last;
     const next = $('next');
     next.replaceChildren(...(last ? ['Open YouTube', icon('arrow-up-right')] : ['Next', icon('arrow-right')]));
   }
 
-  $('back').addEventListener('click', () => go(step - 1));
+  $('back').addEventListener('click', () => (step === 0 ? toChoice() : go(step - 1)));
   $('skip').addEventListener('click', () => go(STEPS.length - 1));
   $('next').addEventListener('click', () => {
     if (step === STEPS.length - 1) location.href = 'https://www.youtube.com/';
@@ -209,7 +395,7 @@
       heldLeft = left;
       // The tour may have moved on and come back by now. Steps 1 and 2 show the stats, so they redraw.
       const redraw = () => {
-        if (step <= 1) drawHome();
+        if (stepId() === 'home' || stepId() === 'reveal') drawHome();
       };
       DripPour.pour({
         counter: /** @type {Element} */ (counter).getBoundingClientRect(), glass: glassEl, px: GLASS_PX, from, to: DripGlass.fraction(sand),
@@ -228,28 +414,58 @@
 
   /** The home page's stats. `heldDrops` are drops still on their way into the counter, which it doesn't show yet. */
   function stats(heldDrops = 0) {
+    // As home.js draws them: each only while its part is on (Q29).
+    const counted = parts.cards === 'limited';
+    if (!parts.clock && !counted) return null;
     const watch = Math.max(0, sand.tokens.watch - heldDrops);
     const { rec } = sand.tokens;
     const cap = Drip.caps(sand.settings);
     const room = String(Math.max(cap.watch, cap.rec, sand.tokens.watch, rec)).length;
     return h('div', { class: 'drip-stats' },
-      h('div', { class: 'drip-glass-tile' }, glass()),
-      h('div', { class: 'drip-time-block' },
+      parts.clock && h('div', { class: 'drip-glass-tile' }, glass()),
+      parts.clock && h('div', { class: 'drip-time-block' },
         h('div', { class: 'drip-time' }, Drip.formatMinutes(heldLeft ?? sand.watchSecondsLeft)),
         h('div', { class: 'drip-sub' }, 'left today')),
       h('div', { class: 'drip-counts', style: `--drip-room: ${room}` },
-        h('div', { class: `drip-count${watch ? '' : ' is-zero'}` }, icon('drop', 'drip-token-drop'), DripCounter.num(watch), h('span', { class: 'drip-sr' }, watch === 1 ? ' drop' : ' drops')),
-        h('div', { class: `drip-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), DripCounter.num(rec), h('span', { class: 'drip-sr' }, rec === 1 ? ' card' : ' cards'))));
+        parts.clock && h('div', { class: `drip-count${watch ? '' : ' is-zero'}` }, icon('drop', 'drip-token-drop'), DripCounter.num(watch), h('span', { class: 'drip-sr' }, watch === 1 ? ' drop' : ' drops')),
+        counted && h('div', { class: `drip-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), DripCounter.num(rec), h('span', { class: 'drip-sr' }, rec === 1 ? ' card' : ' cards'))),
+      // With cards off, +15m ends the stats line, as on YouTube (design F).
+      parts.clock && parts.cards === 'off' && addButton());
+  }
+
+  function addButton() {
+    return h('button', {
+      class: 'drip-b drip-b-gray drip-add', disabled: sand.tokens.watch < 1, onclick: addTime,
+    }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(sand.settings.minutesPerToken * 60)}`), price('drop'));
+  }
+
+  /**
+   * The home page's body as home.js lays it out. With cards off, YouTube's search box sits under the stats instead of
+   * the buttons, drawn here as a picture of it (design F, Codex 2026-10-15).
+   * @param {HTMLElement | null} top @param {HTMLElement | null} rest
+   */
+  function homePage(top, rest) {
+    const search = parts.cards === 'off';
+    return h('div', { class: `drip-page${sand.current ? ' is-open' : ''}${search ? ' is-search' : ''}` }, top, search ? searchPicture() : rest);
+  }
+
+  function searchPicture() {
+    const mic = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    for (const [k, v] of Object.entries({ width: '20', height: '20', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round' })) mic.setAttribute(k, v);
+    mic.innerHTML = '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>';
+    return h('div', { class: 'drip-search-slot tour-search', 'aria-hidden': 'true' },
+      h('span', { class: 'tour-search-field' }, h('span', {}, 'Search'), h('span', { class: 'tour-search-go' }, icon('search'))),
+      h('span', { class: 'tour-search-mic' }, mic));
   }
 
   function actions() {
+    const counted = parts.cards === 'limited';
+    if (parts.cards === 'off') return null;
     return h('div', { class: 'drip-actions' },
+      parts.clock && addButton(),
       h('button', {
-        class: 'drip-b drip-b-gray drip-add', disabled: sand.tokens.watch < 1, onclick: addTime,
-      }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(sand.settings.minutesPerToken * 60)}`), price('drop')),
-      h('button', {
-        class: 'drip-b drip-b-gold drip-reveal', disabled: sand.tokens.rec < 1, onclick: () => (step === 1 ? reveal() : go(1)),
-      }, h('span', {}, 'Reveal video'), price('card')));
+        class: 'drip-b drip-b-gold drip-reveal', disabled: counted && sand.tokens.rec < 1, onclick: () => (stepId() === 'reveal' ? reveal() : go(at('reveal'))),
+      }, h('span', {}, 'Reveal video'), counted && price('card')));
   }
 
   /** @param {any} video */
@@ -264,37 +480,37 @@
     const thumb = h('div', { class: 'tour-thumb' }, icon('play-line'), h('span', { class: 'drip-length' }, video.length));
     thumb.style.setProperty('--thumb', sample(video.id).thumb);
     // The reveal animation deals the card itself, so the card doesn't also rise in.
-    return h('div', { class: `drip-card${isNew && !animates() ? ' is-new' : ''}` },
+    return h('div', { class: `drip-card${isNew && !deals() ? ' is-new' : ''}` },
       h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true)),
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
       h('div', { class: 'drip-card-meta-row' },
         h('span', { class: 'drip-meta drip-meta-split' }, h('span', { class: 'drip-meta-channel' }, video.channel), h('span', { class: 'drip-meta-rest' }, ` · ${video.views} · ${video.age}`), h('span', { class: 'drip-sr' }, `, length ${video.length}`)),
-        h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(2); } },
-          icon('play'), h('span', {}, 'Watch'), sand.watchSecondsLeft <= 0 && price('drop'))),
+        h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(at('player')); } },
+          icon('play'), h('span', {}, 'Watch'), parts.clock && sand.watchSecondsLeft <= 0 && price('drop'))),
       h('div', { class: 'drip-card-actions' },
-        h('button', {
+        parts.stash && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
           onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); },
         }, ...stash.nodes),
         h('button', {
-          class: 'drip-b drip-b-gray drip-next', disabled: sand.tokens.rec < 1,
+          class: 'drip-b drip-b-gray drip-next', disabled: parts.cards === 'limited' && sand.tokens.rec < 1,
           onclick: () => {
             const find = () => {
               if (!Drip.revealNext(sand, video.id, pool()).ok) refill();
               return sand.current && sand.current.id !== video.id ? sand.current : null;
             };
-            if (animates()) animate(DripReveal.next, find, 'next');
+            if (deals()) animate(DripReveal.next, find, 'next');
             else {
               find();
               drawHome();
             }
           },
-        }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
+        }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), parts.cards === 'limited' && price('card')),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'aria-label': 'Pass', title: "Pass. It's free, and this video won't come back.",
           onclick: () => {
             Drip.resolveCurrent(sand, 'pass', video.id);
-            if (animates()) animate(DripReveal.pass, () => null, 'reveal');
+            if (deals()) animate(DripReveal.pass, () => null, 'reveal');
             else drawHome();
           },
         }, icon('x'))));
@@ -313,6 +529,8 @@
   }
 
   const animates = () => !DripReveal.reduced();
+  /** The reveal animations morph Full drip's +15m, card counter, and Stash, so other mixes change without them (Q29). */
+  const deals = () => animates() && parts.clock && parts.cards === 'limited' && parts.stash;
   /** A reveal animation is running on the tour's home screen, which it draws until it's done. */
   let moving = false;
   /** Counts animations, so one left over from a step that's gone doesn't draw over the new one. */
@@ -364,7 +582,7 @@
 
   function reveal() {
     const find = () => (!sand.current && Drip.reveal(sand, pool()).ok ? sand.current : null);
-    if (animates() && !sand.current) animate(DripReveal.reveal, find, 'watch');
+    if (deals() && !sand.current) animate(DripReveal.reveal, find, 'watch');
     else {
       find();
       drawHome();
@@ -376,7 +594,7 @@
     const focused = document.activeElement && stage.contains(document.activeElement) ? [...stage.querySelectorAll('button')].indexOf(/** @type {any} */ (document.activeElement)) : -1;
     // With a card up, the page is open: the stats sit a little higher, as the reveal animation leaves them.
     morph(() => stage.replaceChildren(h('div', { id: 'drip-home', class: 'drip-ui' },
-      h('div', { class: `drip-page${sand.current ? ' is-open' : ''}` }, stats(), sand.current ? card(sand.current) : actions()))));
+      homePage(stats(), sand.current ? card(sand.current) : actions()))));
     if (focused >= 0) /** @type {HTMLElement | undefined} */ (stage.querySelectorAll('button')[focused])?.focus();
   }
 
@@ -386,11 +604,11 @@
   }
 
   function showReveal() {
-    const deals = !sand.current && sand.tokens.rec > 0;
-    if (deals && !animates()) Drip.reveal(sand, pool());
+    const dealsOne = !sand.current && (parts.cards !== 'limited' || sand.tokens.rec > 0);
+    if (dealsOne && !deals()) Drip.reveal(sand, pool());
     drawHome();
     // Arriving with no card up, the step deals one, so the first thing it shows is a reveal.
-    if (deals && animates()) later(reveal, 250);
+    if (dealsOne && deals()) later(reveal, 250);
     return undefined;
   }
 
@@ -419,7 +637,8 @@
     const save = h('button', { class: 'drip-pill-save drip-stash' });
     /** @type {any} */
     let stash = null;
-    const el = h('div', { id: 'drip-pill', class: 'drip-ui' }, time, save);
+    // Stash only with the stash on, as on the real pill (Q29, Codex 2026-10-15).
+    const el = h('div', { id: 'drip-pill', class: 'drip-ui' }, time, parts.stash && save);
     let lastPlaying = false;
     let savedShown = '';
 
@@ -536,7 +755,7 @@
     // Play pressed again in the pause before the lock buys more minutes, and then the lock doesn't come (Codex, 2026-10-11).
     const p = player({ onEmpty: () => lastDrop((x) => {
       dropX = x;
-      go(3);
+      go(at('lock'));
     }) });
     stage.append(p.el);
     return p.stop;
@@ -698,7 +917,7 @@
       const kept = sand.tokens.watch;
       /** The kept drops land in the counter as on YouTube (counter.js), 250ms after the water starts falling. */
       const home = () => {
-        const page = h('div', { class: 'drip-page' }, stats(kept), actions());
+        const page = homePage(stats(kept), actions());
         setUnder(h('div', { id: 'drip-home', class: 'drip-ui' }, page));
         stage.append(again());
         const row = /** @type {HTMLElement} */ (page.querySelector('.drip-count'));
@@ -845,29 +1064,46 @@
   // 2026-10-12, over five sentences with an icon each. Each cell is one line at full width; the YouTube column truncates
   // rather than wraps, so keep its text short.
 
-  const CHANGES = [
-    { icon: 'house', place: 'Home', youtube: 'A feed', drip: 'Your drip page', note: 'Subscriptions too. Reveal from either.' },
-    { icon: 'play-line', place: 'Watch pages', youtube: 'Suggestions, autoplay', drip: 'Just the video', note: 'No end screen. Comments wait behind a button.' },
-    { icon: 'smartphone', place: 'Shorts', youtube: 'The Shorts player', drip: 'Regular videos', note: 'They use minutes like any other.' },
-    { icon: 'search', place: 'Search', youtube: 'One long list', drip: '10 results at a time', note: 'With a button for more.' },
-  ];
+  /** The rows for the parts that are on (Q29). */
+  function changes() {
+    return [
+      parts.cards === 'off'
+        ? { icon: 'house', place: 'Home', youtube: 'A feed', drip: 'A search box', note: 'Subscriptions too.' }
+        : { icon: 'house', place: 'Home', youtube: 'A feed', drip: 'Your drip page', note: 'Subscriptions too. Reveal from either.' },
+      { icon: 'play-line', place: 'Watch pages', youtube: 'Suggestions, autoplay', drip: 'Just the video', note: 'No end screen. Comments wait behind a button.' },
+      { icon: 'smartphone', place: 'Shorts', youtube: 'The Shorts player', drip: 'Regular videos', note: parts.clock ? 'They use minutes like any other.' : 'No endless scroll.' },
+      parts.searchCap && { icon: 'search', place: 'Search', youtube: 'One long list', drip: '10 results at a time', note: 'With a button for more.' },
+    ].filter((c) => !!c);
+  }
 
   function showChanges() {
     /** @param {string} name @param {string} text */
     const place = (name, text) => h('div', { class: 'tour-change-place' }, icon(name), h('span', {}, text));
     stage.append(h('div', { class: 'tour-changes' },
       h('div', { class: 'tour-change tour-changes-head', 'aria-hidden': 'true' }, h('span', {}), h('span', {}, 'YouTube'), h('span', {}, 'With drip')),
-      h('ul', { class: 'tour-changes-list' }, ...CHANGES.map((c) => h('li', { class: 'tour-change' },
+      h('ul', { class: 'tour-changes-list' }, ...changes().map((c) => h('li', { class: 'tour-change' },
         place(c.icon, c.place),
         // The column headings are hidden from screen readers, so each cell says which side it is.
         h('div', { class: 'tour-change-before', title: c.youtube }, h('span', { class: 'sr' }, 'On YouTube: '), c.youtube),
         h('div', { class: 'tour-change-after' }, h('span', { class: 'sr' }, 'With drip: '), c.drip, h('small', {}, c.note))))),
       h('div', { class: 'tour-change tour-changes-same' },
         place('check', 'The same'),
-        h('p', {}, "Your channels and playlists work as before. Ads and videos embedded on other sites don't use your minutes."))));
+        h('p', {}, parts.clock ? "Your channels and playlists work as before. Ads and videos embedded on other sites don't use your minutes." : 'Your channels and playlists work as before.'))));
     return undefined;
   }
 
-  fillHero();
-  go(0);
+  drawLadder();
+  retour(Math.max(0, hashStep()));
+  showScreen();
+  // A reopened page shows the mode that's saved. A new install has the defaults, which are Full drip.
+  chrome.runtime.sendMessage({ type: 'get' }).then((/** @type {any} */ res) => {
+    const saved = res && res.state && res.state.settings;
+    if (!saved) return;
+    const next = { searchCap: saved.searchCap, cards: saved.cards, clock: saved.clock, stash: saved.stash };
+    if (Drip.modeOf(next) === Drip.modeOf(parts) && Drip.modeOf(parts)) return;
+    parts = next;
+    modeBase = Drip.modeOf(next) || 'full';
+    drawLadder();
+    retour(Math.max(0, hashStep()));
+  }, () => {});
 })();

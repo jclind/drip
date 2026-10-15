@@ -47,7 +47,8 @@ function noteToolbarTick(tabId, playing, now) {
 /** @param {any} state */
 async function updateToolbar(state) {
   try {
-    const playing = Array.from(toolbarTicks.values()).some((tick) => Drip.toolbarPlaying(tick, Date.now()));
+    // With the clock off there are no minutes to show, so the toolbar keeps the drop (Q29).
+    const playing = (!state || state.settings.clock !== false) && Array.from(toolbarTicks.values()).some((tick) => Drip.toolbarPlaying(tick, Date.now()));
     if (!playing) {
       lastIconKey = null;
       if (!toolbarIsDrop) {

@@ -35,6 +35,10 @@
     metaPart: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, #metadata-line span',
     watched: 'ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHost',
     ad: 'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer',
+    // The top bar's search box and voice search, which Quiet's home page moves into the middle of the page (Q29).
+    searchBox: 'ytd-masthead #center',
+    // The box's text field, whose "Search or ask a question" drip shortens to "Search" with Ask YouTube hidden.
+    searchInput: 'textarea[name="search_query"], input[name="search_query"]',
   };
   const AGE = /\bago$/i;
   const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
@@ -153,10 +157,20 @@
   }
 
   /** The videos the next reveal can pick from, newest first for subscriptions. */
-  function readCandidates() {
+  async function readCandidates() {
     if (state && state.settings.feedSource === 'subscriptions') return readFeedInFrame('/feed/subscriptions', SEL.subsBrowse);
-    return waitForPool();
+    const pool = await waitForPool();
+    if (pool.some(isNew)) return pool;
+    // This page's grid is hidden, so YouTube never loads past its first screenful. With all of that revealed, a hidden
+    // frame of the home page scrolls for more, the way YouTube loads them when you scroll (Jesse, 2026-10-15).
+    // What it read is kept for the next reveals, so each one doesn't load the page again.
+    if (!morePool.some(isNew)) morePool = await readFeedInFrame('/', SEL.homeBrowse);
+    return morePool.length ? morePool : pool;
   }
+
+  /** Videos the hidden home frame read past this page's grid. */
+  /** @type {{id: string, title: string, channel: string, length: string, views: string, age: string}[]} */
+  let morePool = [];
 
   /** @param {any} res */
   function absorb(res) {
@@ -206,6 +220,22 @@
 
   /** Reveals, Reveal next, and Pass animate unless the browser asks for reduced motion. */
   const animates = () => !DripReveal.reduced();
+  // Mode parts (Q29). Until the worker answers, the page draws as Full drip.
+  /**
+   * The parts as a running animation started. A mode change partway can't take away a button it's moving, and the
+   * redraw after it draws the new mix (Codex, 2026-10-15).
+   * @type {{clock: boolean, cards: 'off' | 'unlimited' | 'limited', stash: boolean} | null}
+   */
+  let animParts = null;
+  const partsNow = () => animParts || (state ? state.settings : null);
+  const clockOn = () => partsNow()?.clock !== false;
+  /** @returns {'off' | 'unlimited' | 'limited'} */
+  const cardsMode = () => partsNow()?.cards ?? 'limited';
+  const stashOn = () => partsNow()?.stash !== false;
+  /** The reveal animations morph Full drip's +15m, card counter, and Stash, so other mixes change without them. */
+  const deals = () => animates() && clockOn() && cardsMode() === 'limited' && stashOn();
+  /** The card up now. With cards off it stays stored for when they're back on, but the page doesn't show it (Codex, 2026-10-15). */
+  const shownCard = () => (cardsMode() === 'off' ? null : state.current);
 
   /**
    * Reads the feed, then sends `msg` with the videos it found. Resolves with the worker's reply when it worked, or
@@ -247,20 +277,25 @@
     if (busy || moving) return;
     busy = kind;
     message = '';
-    if (animates()) {
+    if (deals()) {
       const run = kind === 'reveal' ? DripReveal.reveal : DripReveal.next;
       const { ok, focused } = await animate(run, async () => (await findWith(msg))?.video || null);
       // The button that had focus is gone. Focus goes to what you'd press next.
       if (focused) focusOn(ok ? (kind === 'reveal' ? 'watch' : 'next') : kind === 'reveal' ? 'reveal' : 'next');
       return;
     }
+    // Without the animation the pressed button can go too (Reveal video once a card is up), so focus goes to what
+    // you'd press next here as well (Codex, 2026-10-15).
+    const had = !!document.getElementById('drip-home')?.contains(document.activeElement);
     render();
+    let ok = false;
     try {
-      await findWith(msg);
+      ok = !!(await findWith(msg));
     } finally {
       busy = '';
       render();
     }
+    if (had) focusOn(ok ? (kind === 'reveal' ? 'watch' : 'next') : kind === 'reveal' ? 'reveal' : 'next');
   }
 
   /**
@@ -275,6 +310,8 @@
     const page = root.querySelector('.drip-page');
     const focused = root.contains(document.activeElement);
     moving = true;
+    // Pass sets it before asking the worker, from the page the card was dealt on.
+    animParts ||= { clock: clockOn(), cards: cardsMode(), stash: stashOn() };
     let ok = false;
     try {
       ok = !!(await run({
@@ -290,6 +327,7 @@
       }));
     } finally {
       moving = false;
+      animParts = null;
       busy = '';
       rendered = '';
       render();
@@ -364,12 +402,14 @@
   async function onResolve(action, videoId, keyboard = false) {
     if (moving) return;
     message = '';
-    if (action === 'pass' && animates() && document.querySelector('#drip-home .drip-card .drip-deal')) {
+    if (action === 'pass' && deals() && document.querySelector('#drip-home .drip-card .drip-deal')) {
       // Redraws wait while the worker answers, so the card is still there to animate.
       moving = true;
+      animParts = { clock: clockOn(), cards: cardsMode(), stash: stashOn() };
       const res = absorb(await send({ type: 'resolve', action, videoId }));
       moving = false;
       if (!res || !res.ok) {
+        animParts = null;
         message = errorText(res ? res.error : '');
         render();
         return;
@@ -383,6 +423,8 @@
     // The worker's save redraws the page through the storage listener, which would show the empty page while the
     // watch page loads.
     if (action === 'watch') leaving = true;
+    // Taken before asking: the worker's save redraws the page, and with it the pressed button can go.
+    const had = !!document.getElementById('drip-home')?.contains(document.activeElement);
     const res = absorb(await send({ type: 'resolve', action, videoId }));
     // A full stash asks which video to swap out instead (Q28).
     if (res && !res.ok && res.error === 'stash-full') {
@@ -400,6 +442,8 @@
     }
     leaving = false;
     render();
+    // Pass without the animation takes its button away too. Focus goes where the animated Pass sends it.
+    if (had && action === 'pass' && res && res.ok) focusOn(outForDay() ? 'saved-head' : 'reveal');
   }
 
   /**
@@ -495,7 +539,7 @@
    * @param {string} id
    */
   function costsDrop(id) {
-    return state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !state.unlocked.includes(id);
+    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !state.unlocked.includes(id);
   }
 
   /**
@@ -621,8 +665,9 @@
     return rows;
   }
 
-  // Stash opens on the normal empty page, and starts folded with a card up or when out for the day.
-  const savedOpen = { empty: true, card: false, out: false };
+  // Stash opens on the normal empty page, and starts folded with a card up, when out for the day, and under the search
+  // box with cards off (design H, Q29).
+  const savedOpen = { empty: true, card: false, out: false, search: false };
   let savedShowAll = false;
 
   // Kept across renders, so a rebuild doesn't reload the thumbnail or jump the glass's water.
@@ -750,14 +795,20 @@
     return String(Math.max(now.watch, now.rec, next.watch, next.rec, state.tokens.watch, state.tokens.rec)).length;
   }
 
+  /** The glass, minutes, and counts, each only while its part is on. Curated and Quiet have none of them (Q29). */
   function stats() {
+    const clock = clockOn();
+    const counted = cardsMode() === 'limited';
+    if (!clock && !counted) return null;
     const left = Drip.formatMinutes(heldLeft ?? state.watchSecondsLeft);
     return h('div', { class: 'drip-stats' },
-      h('div', { class: 'drip-glass-tile' }, glass()),
-      h('div', { class: 'drip-time-block' },
+      clock && h('div', { class: 'drip-glass-tile' }, glass()),
+      clock && h('div', { class: 'drip-time-block' },
         h('div', { class: 'drip-time' }, left),
         h('div', { class: 'drip-sub' }, 'left today')),
-      h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, countRow('watch'), countRow('rec')));
+      h('div', { class: 'drip-counts', style: `--drip-room: ${countRoom()}` }, clock && countRow('watch'), counted && countRow('rec')),
+      // With cards off there's no row of buttons, so +15m ends the stats line, over the search box (design F, 2026-10-15).
+      clock && cardsMode() === 'off' && !outForDay() && addButton());
   }
 
   /** Set when Pass on the last card leaves the page out for the day, so the sea rises in where the card dropped. */
@@ -766,12 +817,14 @@
   /** No minutes or tokens left, and no card still to watch or stash. */
   function outForDay() {
     // Cards left don't count: with no minutes or drops, a reveal can't lead to watching anything (Jesse, 2026-10-14).
-    return !state.current && state.tokens.watch < 1 && state.watchSecondsLeft <= 0;
+    return clockOn() && !shownCard() && state.tokens.watch < 1 && state.watchSecondsLeft <= 0;
   }
 
   /** How many of today's cards the reset keeps, under the rollover cap, by the settings tomorrow will use. */
   function cardsCarried() {
     const settings = { ...state.settings, ...state.pending?.changes };
+    // Cards that aren't counted tomorrow don't carry over to anything (Q29).
+    if (settings.cards !== 'limited') return 0;
     const perDay = settings.recTokensPerDay;
     return Math.max(0, Math.min(state.tokens.rec + perDay, Drip.caps(settings).rec) - perDay);
   }
@@ -779,9 +832,9 @@
   /** The gray line under the buttons when something has run out. */
   function outNote() {
     const reset = hourLabel(state.settings.resetHour);
-    const noDrops = state.tokens.watch < 1;
-    const noCards = state.tokens.rec < 1;
-    if (state.current) return noCards ? `No cards left. More at ${reset}.` : '';
+    const noDrops = clockOn() && state.tokens.watch < 1;
+    const noCards = cardsMode() === 'limited' && state.tokens.rec < 1;
+    if (shownCard()) return noCards ? `No cards left. More at ${reset}.` : '';
     if (outForDay()) return `You're out for today. Drops and cards refill at ${reset}.`;
     if (noCards) return `No cards left. More at ${reset}.`;
     if (noDrops) return `No drops left. More at ${reset}.`;
@@ -801,17 +854,26 @@
         cardsCarried() > 0 && h('p', {}, `${cardsCarried()} ${cardsCarried() === 1 ? 'card carries' : 'cards carry'} over to tomorrow.`)));
   }
 
+  /** +15m with the clock on, and Reveal video with cards on. It costs a card only when cards are counted (Q29). */
   function actions() {
-    const s = state.settings;
+    const cards = cardsMode();
+    // With cards off, +15m sits in the stats line instead (stats()).
+    if (cards === 'off') return null;
     return h('div', { class: 'drip-actions' },
-      h('button', {
-        class: 'drip-b drip-b-gray drip-add', 'data-k': 'add', onclick: onAddTime, disabled: state.tokens.watch < 1,
-        title: `Add ${s.minutesPerToken} minutes for 1 drop`,
-      }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop')),
+      clockOn() && addButton(),
       h('button', {
         // While the animation runs, it draws these buttons as they'll be once it's done.
-        class: 'drip-b drip-b-gold drip-reveal', 'data-k': 'reveal', onclick: onReveal, disabled: state.tokens.rec < 1 || (!!busy && !moving),
-      }, h('span', {}, 'Reveal video'), price('card')));
+        class: 'drip-b drip-b-gold drip-reveal', 'data-k': 'reveal', onclick: onReveal,
+        disabled: (cards === 'limited' && state.tokens.rec < 1) || (!!busy && !moving),
+      }, h('span', {}, 'Reveal video'), cards === 'limited' && price('card')));
+  }
+
+  function addButton() {
+    const s = state.settings;
+    return h('button', {
+      class: 'drip-b drip-b-gray drip-add', 'data-k': 'add', onclick: onAddTime, disabled: state.tokens.watch < 1,
+      title: `Add ${s.minutesPerToken} minutes for 1 drop`,
+    }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop'));
   }
 
   /** What the loading card says, which changes once the read has taken SLOW_MS. */
@@ -879,17 +941,17 @@
         h('button', { class: 'drip-b drip-b-primary drip-watch', 'data-k': 'watch', disabled: next, onclick: () => onResolve('watch', video.id) },
           icon('play'), h('span', {}, 'Watch'), buys && price('drop'))),
       h('div', { class: 'drip-card-actions' },
-        h('button', {
+        stashOn() && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
           'data-swap-anchor': true, 'aria-expanded': swapping ? 'true' : undefined,
           // detail is 0 for a click from the keyboard (Enter or Space).
           onclick: (/** @type {MouseEvent} */ e) => (swapping ? closeSwap() : onResolve(saved ? 'unsave' : 'save', video.id, e.detail === 0)),
           title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
         }, ...stash.nodes),
-        h('button', {
-          class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || state.tokens.rec < 1,
+        cardsMode() !== 'off' && h('button', {
+          class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || (cardsMode() === 'limited' && state.tokens.rec < 1),
           onclick: () => onRevealNext(video.id),
-        }, icon('arrow'), h('span', { class: 'drip-next-label' }, next ? 'Revealing…' : 'Reveal next'), !next && price('card')),
+        }, icon('arrow'), h('span', { class: 'drip-next-label' }, next ? 'Revealing…' : 'Reveal next'), !next && cardsMode() === 'limited' && price('card')),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'data-k': 'pass', disabled: next, onclick: () => onResolve('pass', video.id),
           title: "Pass. It's free, and this video won't come back.", 'aria-label': 'Pass',
@@ -900,7 +962,7 @@
 
   /** @param {'empty' | 'card' | 'out'} [as] Draw it as on that page. The reveal animation opens and folds it ahead of time. */
   function savedList(as) {
-    const mode = as || (state.current || busy === 'reveal' ? 'card' : outForDay() ? 'out' : 'empty');
+    const mode = as || (shownCard() || busy === 'reveal' ? 'card' : outForDay() ? 'out' : cardsMode() === 'off' ? 'search' : 'empty');
     const open = savedOpen[mode];
     const count = state.backlog.length;
     // What's left to watch, so a half-watched video counts only its unwatched part.
@@ -956,16 +1018,122 @@
   function view() {
     if (disconnected) return h('div', { class: 'drip-message' }, 'drip was updated. Refresh this page.');
     if (!state) return h('div', { class: 'drip-loading', 'aria-busy': 'true' });
-    const showCard = state.current || busy === 'reveal';
+    const current = shownCard();
+    const showCard = current || busy === 'reveal';
     const out = !showCard && outForDay();
     const note = out ? '' : outNote();
     // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
-    return h('div', { class: `drip-page${showCard ? ' is-open' : out ? ' is-out' : ''}` },
+    // With cards off there's nothing to reveal, so the page is YouTube's search box (Quiet, Q29), under the stats when
+    // the clock is on (design F, 2026-10-15).
+    const search = cardsMode() === 'off';
+    return h('div', { class: `drip-page${showCard ? ' is-open' : out ? ' is-out' : ''}${search ? ' is-search' : ''}${search && !stashOn() && !clockOn() ? ' is-search-only' : ''}` },
       stats(),
+      search && h('div', { class: 'drip-search-slot' }),
       !showCard && (out ? outSea() : actions()),
-      state.current ? card(state.current) : busy === 'reveal' && placeholderCard(),
+      current ? card(current) : busy === 'reveal' && placeholderCard(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
-      savedList());
+      stashOn() && savedList());
+  }
+
+  /**
+   * Where the top bar's search box came from, to put it back when the page leaves Quiet's layout or YouTube's home.
+   * @type {{el: Element, parent: Node, next: Node | null, placeholder: string | null} | null}
+   */
+  let movedSearch = null;
+  /** drip's own search box, for when YouTube's can't be found. Kept across redraws so typing survives them. */
+  /** @type {HTMLElement | null} */
+  let ownSearch = null;
+
+  /**
+   * Quiet's home page (Q29): YouTube's own search box, mic and all, moves from the top bar into the page, so its
+   * suggestions and voice search still work. Without it, drip's own box searches the same way.
+   * @param {HTMLElement} root
+   */
+  function placeSearch(root) {
+    const slot = root.querySelector('.drip-search-slot');
+    if (!slot || location.pathname !== '/') return restoreSearch();
+    const el = movedSearch?.el || document.querySelector(SEL.searchBox);
+    if (!el) {
+      const form = ownSearch || (ownSearch = makeOwnSearch());
+      if (form.parentElement !== slot) slot.append(form);
+      return;
+    }
+    if (!movedSearch) {
+      const placeholder = el.querySelector(SEL.searchInput)?.getAttribute('placeholder') ?? null;
+      movedSearch = { el, parent: /** @type {Node} */ (el.parentNode), next: el.nextSibling, placeholder };
+      placeholderWatch.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['placeholder'] });
+    }
+    // drip's own box stood in while YouTube's hadn't loaded. The kept slot would show both (Codex, 2026-10-15).
+    ownSearch?.remove();
+    if (el.parentElement !== slot) slot.append(el);
+    shortenPlaceholder();
+    document.documentElement.toggleAttribute('data-drip-search-moved', true);
+    fitSuggestions();
+  }
+
+  /**
+   * YouTube sizes its suggestion list for the top bar, so in the middle of the page the list ran off the bottom of the
+   * screen and only the first few showed (Jesse, 2026-10-15). drip.css caps it at the room left under the box.
+   */
+  function fitSuggestions() {
+    const slot = document.querySelector('#drip-home .drip-search-slot');
+    if (!slot) return;
+    const room = Math.max(160, window.innerHeight - slot.getBoundingClientRect().bottom - 16);
+    document.documentElement.style.setProperty('--drip-suggest-room', `${Math.round(room)}px`);
+  }
+
+  /**
+   * Puts the new view in the page. Quiet's search box never leaves the page on a redraw: YouTube's box rebuilds itself
+   * empty whenever it's moved, even with moveBefore, which loses what was typed and the focus (Chrome 154, 2026-10-15).
+   * So when the old and new pages both have the slot, the old page and its slot stay and the rest is swapped around them.
+   * @param {HTMLElement} root
+   * @param {HTMLElement} next
+   */
+  function swapIn(root, next) {
+    const page = root.childElementCount === 1 ? root.firstElementChild : null;
+    const slot = page?.classList.contains('drip-page') && page.querySelector(':scope > .drip-search-slot');
+    const nextSlot = next.classList.contains('drip-page') && next.querySelector(':scope > .drip-search-slot');
+    if (!page || !slot || !nextSlot) return root.replaceChildren(next);
+    page.className = next.className;
+    for (const node of [...page.childNodes]) if (node !== slot) node.remove();
+    // The new parts go on the same side of the kept slot as in the new view.
+    const kids = [...next.childNodes];
+    const at = kids.indexOf(nextSlot);
+    slot.before(...kids.slice(0, at));
+    page.append(...kids.slice(at + 1));
+  }
+
+  /** drip's own search box: a form that goes to YouTube's results page. */
+  function makeOwnSearch() {
+    const input = /** @type {HTMLInputElement} */ (h('input', { type: 'search', class: 'drip-search-input', placeholder: 'Search', 'aria-label': 'Search YouTube' }));
+    return /** @type {HTMLElement} */ (h('form', {
+      class: 'drip-search-form', role: 'search',
+      onsubmit: (/** @type {SubmitEvent} */ e) => {
+        e.preventDefault();
+        const q = input.value.trim();
+        if (q) location.href = `/results?search_query=${encodeURIComponent(q)}`;
+      },
+    }, input, h('button', { class: 'drip-b drip-b-gray', type: 'submit', 'aria-label': 'Search' }, icon('search'))));
+  }
+
+  /**
+   * drip.css hides Ask YouTube in the moved box, so the field says what's left (design F, 2026-10-15). YouTube builds a
+   * new field a moment after the box moves, so a watch sets it on whichever field is there.
+   */
+  function shortenPlaceholder() {
+    const input = movedSearch?.el.querySelector(SEL.searchInput);
+    if (input && input.getAttribute('placeholder') !== 'Search') input.setAttribute('placeholder', 'Search');
+  }
+  const placeholderWatch = new MutationObserver(shortenPlaceholder);
+
+  function restoreSearch() {
+    document.documentElement.toggleAttribute('data-drip-search-moved', false);
+    placeholderWatch.disconnect();
+    if (!movedSearch) return;
+    const { el, parent, next, placeholder } = movedSearch;
+    movedSearch = null;
+    if (parent.isConnected) parent.insertBefore(el, next && next.parentNode === parent ? next : null);
+    if (placeholder !== null) el.querySelector(SEL.searchInput)?.setAttribute('placeholder', placeholder);
   }
 
   let rendered = '';
@@ -1003,10 +1171,14 @@
       state.tokens, state.current, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
       // The sea's "N cards carry over" follows the allowance, the rollover cap, and pending settings (Codex, 2026-10-14).
       state.settings.resetHour, state.settings.stashMax, cardsCarried(),
+      state.settings.clock, state.settings.cards, state.settings.stash,
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
     ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId]);
-    if (root.firstChild && key === rendered) return freshen(root);
+    if (root.firstChild && key === rendered) {
+      placeSearch(root);
+      return freshen(root);
+    }
     rendered = key;
     // Keep keyboard focus on the same control across the rebuild.
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
@@ -1019,7 +1191,8 @@
     const was = glides ? /** @type {SVGSVGElement} */ (glassEl).getBoundingClientRect().left : null;
     // Moving the kept list out and back in resets its scroll, so it's put back after.
     const listTop = swapEl?.querySelector('.drip-swap-list')?.scrollTop || 0;
-    root.replaceChildren(view());
+    swapIn(root, view());
+    placeSearch(root);
     syncRowMotion(root);
     syncCounts();
     if (swapEl && swapEl.isConnected) {
@@ -1090,6 +1263,11 @@
     const r = state && state.refill;
     if (!r || r.day !== state.day || r.day === refillTaken || arriving || !homeInView()) return;
     refillTaken = r.day;
+    // Without both counters on the page there's nowhere for the refill to land, so it's only marked seen (Q29).
+    if (!clockOn() || cardsMode() !== 'limited') {
+      send({ type: 'refillSeen' }).then(absorb);
+      return;
+    }
     arriving = { kind: 'new', watch: r.watch, rec: r.rec };
     rendered = '';
     landWhenShown();
@@ -1201,10 +1379,15 @@
 
   onState((next) => {
     state = next;
+    // The stash turned off with its full-stash list open: the list goes with its button (Codex, 2026-10-15).
+    if (state && state.settings.stash === false) swapFor = '';
     render();
   });
   watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
   document.addEventListener('yt-navigate-finish', () => mount(true));
+  document.addEventListener('yt-navigate-start', restoreSearch);
+  for (const ev of ['resize', 'scroll']) window.addEventListener(ev, fitSuggestions, { passive: true });
+  document.addEventListener('focusin', fitSuggestions);
   // Back from the watch page can bring this page back from Chrome's cache, still waiting on Watch.
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted || !leaving) return;

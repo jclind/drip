@@ -73,6 +73,37 @@ test('Full drip to Quiet waits for the reset, then applies', () => {
   assert.equal(state.pending, null);
 });
 
+test('saving Curated after a waiting Quiet replaces all of Quiet at the reset (Codex, 2026-10-15)', () => {
+  const state = settled();
+  const now = time(5);
+  D.rollDay(state, now);
+  D.updateSettings(state, D.MODES.quiet, now);
+  const keys = Object.keys(D.DEFAULT_SETTINGS);
+  const draft = { ...state.settings, ...D.MODES.curated };
+  // Only what differs from today's settings would leave Quiet's waiting search cap and stash in place.
+  assert.deepEqual(Object.keys(D.settingsToSave(state, draft, keys, [])).sort(), ['cards', 'clock']);
+  const changes = D.settingsToSave(state, draft, keys, Object.keys(D.MODES.curated));
+  assert.deepEqual(changes, D.MODES.curated);
+  D.updateSettings(state, changes, now);
+  D.rollDay(state, time(6, 5));
+  assert.equal(D.modeOf(state.settings), 'curated');
+  assert.equal(state.pending, null);
+});
+
+test('settingsToSave sends a picked part only when it changes something', () => {
+  const state = settled();
+  const now = time(5);
+  D.rollDay(state, now);
+  D.updateSettings(state, { stash: false, watchTokensPerDay: 6 }, now);
+  const keys = Object.keys(D.DEFAULT_SETTINGS);
+  // Nothing edited: nothing to send, and the waiting stash stays.
+  assert.deepEqual(D.settingsToSave(state, { ...state.settings }, keys, []), {});
+  // Full drip picked again: its stash, at today's value, cancels the waiting one. Its other parts match and stay out.
+  assert.deepEqual(D.settingsToSave(state, { ...state.settings }, keys, Object.keys(D.MODES.full)), { stash: true });
+  // A setting no pick touched keeps its waiting change.
+  assert.equal('watchTokensPerDay' in D.settingsToSave(state, { ...state.settings }, keys, Object.keys(D.MODES.full)), false);
+});
+
 test('Quiet to Full drip applies at once', () => {
   const state = withParts(settled(), D.MODES.quiet);
   const res = D.updateSettings(state, D.MODES.full, time(5));

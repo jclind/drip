@@ -1,5 +1,6 @@
 // @ts-check
-// Settings (DESIGN.md, "Settings"): the allowance with the next-day rule, then History and the unlock reasons.
+// Settings (DESIGN.md, "Settings"): the mode and its parts (Q29), the allowance with the next-day rule, then History
+// and the unlock reasons.
 
 /** @type {any} */
 // var, not const: these page scripts share one type-check program, and only var may be declared twice.
@@ -21,29 +22,51 @@ var DripPage = /** @type {any} */ (globalThis).DripPage;
  * @property {(n: number) => string} [say] The value in words, for the pending chip and screen readers.
  * @property {(n: number) => string} [spoken] The value for screen readers, when `say` is too short to read aloud.
  * @property {[string, string][]} [options]
+ * @property {(d: Record<string, any>) => string} [idle] Why the setting does nothing in the form's mix, or ''.
  */
 
 /** @param {number} n @param {string} one @param {string} many */
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-/** @type {{title: string, fields: Field[]}[]} */
+// A setting for a part that's off stays editable but dims, with a line saying why (Jesse, 2026-10-15; Codex audit).
+/** @param {Record<string, any>} d */
+const noClock = (d) => (d.clock ? '' : 'Not used while watch time is off.');
+/** @param {Record<string, any>} d */
+const noCards = (d) => (d.cards === 'off' ? 'Not used while cards are off.' : '');
+
+/** @type {{title: string, modes?: boolean, fields: Field[]}[]} */
 const SECTIONS = [
+  {
+    // Q29. The mode picker above these sets all four at once; each can also be switched on its own.
+    title: 'What drip does',
+    modes: true,
+    fields: [
+      { key: 'clock', label: 'Limit watch time', kind: 'toggle', hint: 'Drops, the glass, and the lock.' },
+      { key: 'cards', label: 'Reveal one video at a time', kind: 'choice',
+        options: [['limited', 'Cards per day'], ['unlimited', 'Unlimited'], ['off', 'Off']] },
+      { key: 'searchCap', label: 'Stop search at 10 results', kind: 'toggle' },
+      { key: 'stash', label: 'Stash videos for later', kind: 'toggle' },
+    ],
+  },
   {
     title: 'Your allowance',
     fields: [
-      { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48,
+      { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48, idle: noClock,
         unit: () => [DripPage.icon('drop', 'drip-token-drop')], say: (n) => plural(n, 'drop', 'drops') },
-      { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
+      { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5, idle: noClock,
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
       { key: 'recTokensPerDay', label: 'Cards per day', kind: 'stepper', min: 0, max: 100,
+        idle: (d) => noCards(d) || (d.cards === 'unlimited' ? 'Not used while cards are unlimited.' : ''),
         unit: () => [DripPage.icon('card', 'drip-token-card')], say: (n) => plural(n, 'card', 'cards') },
       // Not in the mockups. Settings is where the feed source lives for now (Q5).
-      { key: 'feedSource', label: 'Reveal from', kind: 'choice', options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
+      { key: 'feedSource', label: 'Reveal from', kind: 'choice', idle: noCards, options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
       { key: 'rolloverDays', label: 'Save unspent for', kind: 'stepper', min: 1, max: 7,
+        idle: (d) => (!d.clock && d.cards !== 'limited' ? 'Not used without watch time or counted cards.' : ''),
         unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days'),
         hint: 'Unspent drops and cards carry over up to this many days.' },
       // Q28. Lowering it keeps every stashed video; a full stash asks which one to swap out.
       { key: 'stashMax', label: 'Stash holds', kind: 'stepper', min: 1, max: 50,
+        idle: (d) => (d.stash ? '' : 'Not used while the stash is off.'),
         unit: (n) => [n === 1 ? 'video' : 'videos'], say: (n) => plural(n, 'video', 'videos'),
         hint: 'A full stash asks which video to swap out.' },
     ],
@@ -55,8 +78,8 @@ const SECTIONS = [
   {
     title: 'When time runs out',
     fields: [
-      { key: 'graceMode', label: 'Finish the current video', kind: 'toggle' },
-      { key: 'needThisPerDay', label: '"I need this one" per day', kind: 'stepper', min: 0, max: 10,
+      { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', idle: noClock },
+      { key: 'needThisPerDay', label: '"I need this one" per day', kind: 'stepper', min: 0, max: 10, idle: noClock,
         say: (n) => String(n), hint: 'Each one needs a typed reason.' },
     ],
   },
@@ -68,6 +91,8 @@ let state = null;
 /** Settings as the form shows them, saved or not. */
 /** @type {Record<string, any>} */
 let draft = {};
+/** The mode parts a mode pick set since the last save. Save sends them even at today's values (Drip.settingsToSave). */
+const picked = new Set();
 let justSaved = false;
 /** How many weeks back History shows, and the day its block under the chart is about. */
 let weeksBack = 0;
@@ -169,7 +194,7 @@ function control(f, labelId) {
   if (f.kind === 'stepper') return stepper(f, labelId);
   if (f.kind === 'toggle') {
     const box = /** @type {HTMLInputElement} */ (h('input', { type: 'checkbox', role: 'switch', class: 'toggle', id: f.key, checked: draft[f.key] }));
-    box.addEventListener('change', () => { draft[f.key] = box.checked; draftChanged(); });
+    box.addEventListener('change', () => { draft[f.key] = box.checked; draftChanged(); syncModeRow(); });
     return box;
   }
   const options = f.kind === 'hour'
@@ -180,6 +205,7 @@ function control(f, labelId) {
   select.addEventListener('change', () => {
     draft[f.key] = f.kind === 'hour' ? Number(select.value) : select.value;
     draftChanged();
+    syncModeRow();
   });
   return h('div', { class: 'picker-wrap' }, select, icon('chevron-down'));
 }
@@ -213,27 +239,92 @@ function renderFirstDay() {
 }
 setInterval(renderFirstDay, 60000);
 
+/** The three modes (Q29), named in Settings as on the welcome page. */
+const MODE_NAMES = /** @type {const} */ ([['quiet', 'Quiet'], ['curated', 'Curated'], ['full', 'Full drip']]);
+
+/**
+ * Quiet, Curated, and Full drip, as one row of three. Picking one sets the four parts in the form, still waiting for
+ * Save like any other edit. A mix that matches none of them picks none.
+ */
+function modeRow() {
+  const { h } = DripPage;
+  const now = Drip.modeOf(draft);
+  return h('div', { class: 'setting' },
+    h('div', { class: 'setting-text' },
+      h('div', { class: 'setting-line' }, h('span', { class: 'setting-label', id: 'label-mode' }, 'Mode')),
+      h('div', { class: 'hint' }, now ? 'Switch a part below to make your own mix.' : 'Your own mix.')),
+    // One Tab stop, with the arrow keys moving the pick, like the welcome page's list (Codex, 2026-10-15).
+    h('div', {
+      class: 'segmented', role: 'radiogroup', 'aria-labelledby': 'label-mode',
+      onkeydown: (/** @type {KeyboardEvent} */ e) => {
+        const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        const at = MODE_NAMES.findIndex(([name]) => name === (now || 'full'));
+        pickMode(MODE_NAMES[(at + step + MODE_NAMES.length) % MODE_NAMES.length][0]);
+      },
+    },
+      ...MODE_NAMES.map(([name, label]) => h('button', {
+        type: 'button', role: 'radio', 'aria-checked': String(now === name), 'data-mode': name,
+        tabindex: now === name || (!now && name === 'full') ? '0' : '-1',
+        onclick: () => pickMode(name),
+      }, label))));
+}
+
+/** @param {string} name */
+function pickMode(name) {
+  Object.assign(draft, Drip.MODES[name]);
+  for (const key of Object.keys(Drip.MODES[name])) picked.add(key);
+  renderForm();
+  draftChanged();
+  /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
+}
+
 function renderForm() {
   const { h } = DripPage;
   renderFirstDay();
   $('settings').replaceChildren(...SECTIONS.map((section) => h('section', { class: 'group' },
     h('h2', { class: 'caps' }, section.title),
+    section.modes && modeRow(),
     ...section.fields.map((f) => {
       const labelId = `label-${f.key}`;
       const label = f.kind === 'stepper'
         ? h('span', { class: 'setting-label', id: labelId }, f.label)
         : h('label', { class: 'setting-label', id: labelId, for: f.key }, f.label);
-      return h('div', { class: 'setting' },
+      return h('div', { class: 'setting', 'data-field': f.key },
         h('div', { class: 'setting-text' },
           h('div', { class: 'setting-line' }, label, chip(f)),
-          f.hint && h('div', { class: 'hint' }, f.hint)),
+          f.hint && h('div', { class: 'hint' }, f.hint),
+          f.idle && h('div', { class: 'hint idle-note' })),
         control(f, labelId));
     }))));
+  syncIdle();
   renderStatus();
 }
 
+/** Dims the settings for parts that are off in the form's mix, and says why. Runs on every edit. */
+function syncIdle() {
+  for (const f of FIELDS) {
+    if (!f.idle) continue;
+    const row = document.querySelector(`.setting[data-field="${f.key}"]`);
+    const why = f.idle(draft);
+    row?.classList.toggle('is-idle', !!why);
+    const note = row?.querySelector('.idle-note');
+    if (note) note.textContent = why;
+  }
+}
+
+/** A part switched by hand may make the mix match a mode, or stop matching one. */
+function syncModeRow() {
+  const row = document.querySelector('.segmented')?.closest('.setting');
+  if (row) row.replaceWith(modeRow());
+}
+
+/** What Save would send. */
+const toSave = () => Drip.settingsToSave(state, draft, FIELDS.map((f) => f.key), picked);
+
 function dirty() {
-  return FIELDS.some((f) => draft[f.key] !== state.settings[f.key]);
+  return Object.keys(toSave()).length > 0;
 }
 
 /**
@@ -253,6 +344,7 @@ function renderStatus() {
 
 function draftChanged() {
   justSaved = false;
+  syncIdle();
   renderStatus();
 }
 
@@ -263,14 +355,13 @@ function absorb(res) {
 }
 
 async function save() {
-  /** @type {Record<string, any>} */
-  const changes = {};
-  for (const f of FIELDS) if (draft[f.key] !== state.settings[f.key]) changes[f.key] = draft[f.key];
+  const changes = toSave();
   if (!Object.keys(changes).length) {
     $('result').textContent = 'Nothing changed.';
     return;
   }
   absorb(await send({ type: 'updateSettings', changes }));
+  picked.clear();
   draft = { ...state.settings };
   justSaved = true;
   renderForm();
@@ -490,6 +581,7 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
   }
   renderSamples(dev);
   if (!state) return;
+  picked.clear();
   draft = { ...state.settings };
   renderForm();
   renderHistory();

@@ -1,5 +1,6 @@
 // @ts-check
-// Minutes left and the two balances. Spending happens on YouTube, not here (Q22).
+// Minutes left and the two balances. Spending happens on YouTube, not here (Q22). Each shows only when its mode part
+// is on (Q29); without the clock, the popup names the mode instead, with counted cards on a line under it.
 
 /** @type {any} */
 // var, not const: these page scripts share one type-check program, and only var may be declared twice.
@@ -23,13 +24,27 @@ function show(state) {
   /** @param {number} n @param {'drop' | 'card'} token */
   const count = (n, token) => h('div', { class: `count${n ? '' : ' is-zero'}` },
     icon(token, `drip-token-${token}`), h('span', {}, String(n)), h('span', { class: 'sr' }, n === 1 ? ` ${token}` : ` ${token}s`));
-  /** @type {HTMLElement} */ (document.getElementById('stats')).replaceChildren(
-    h('div', { class: 'top' },
+  const clock = state.settings.clock !== false;
+  const cards = state.settings.cards === 'limited';
+  const stats = /** @type {HTMLElement} */ (document.getElementById('stats'));
+  // Without the clock the popup names the mix. Counted cards are a line under it, not a lone number (Jesse, 2026-10-15).
+  if (!clock) {
+    const name = { quiet: 'Quiet', curated: 'Curated', full: 'Full drip' }[/** @type {string} */ (Drip.modeOf(state.settings))] || 'Custom';
+    stats.replaceChildren(h('div', { class: 'top' }, h('div', { class: 'time-block' },
+      h('div', { class: 'time' }, name),
+      cards
+        ? h('div', { class: `sub sub-count${rec ? '' : ' is-zero'}` }, icon('card', 'drip-token-card'), `${rec} ${rec === 1 ? 'card' : 'cards'} left today`)
+        : h('div', { class: 'sub' }, "YouTube's feeds are hidden."))));
+    return;
+  }
+  stats.replaceChildren(...[
+    clock && h('div', { class: 'top' },
       h('div', { class: 'tile' }, glassEl),
       h('div', { class: 'time-block' },
         h('div', { class: 'time' }, Drip.formatMinutes(state.watchSecondsLeft)),
         h('div', { class: 'sub' }, 'left today'))),
-    h('div', { class: 'counts' }, count(watch, 'drop'), count(rec, 'card')));
+    h('div', { class: 'counts' }, clock && count(watch, 'drop'), cards && count(rec, 'card')),
+  ].filter(Boolean));
 }
 
 /**

@@ -104,12 +104,13 @@
       h('span', { class: 'drip-sr' }, `, costs 1 ${token}`));
   }
 
-  // When YouTube changes its markup, drip fails open (Q25): nothing locks, and a banner says what broke.
+  // When YouTube changes its markup, drip fails open (Q25): nothing locks, and a banner says what broke. Each line has
+  // to hold in every mode, so it names what drip can't reach, not a part that may be off (Codex, 2026-10-15).
   const BROKEN = {
-    player: "drip can't find YouTube's video player, so it isn't counting minutes on this page.",
-    home: "drip can't find YouTube's home page, so your tokens aren't showing.",
-    grid: "drip can't read YouTube's recommendations, so Reveal can't pick a video. No token was spent.",
-    search: "drip can't find the search results, so it isn't limiting them.",
+    player: "drip can't find YouTube's video player, so it isn't working on this page.",
+    home: "drip can't find YouTube's home page, so it can't show its own here.",
+    grid: "drip can't read YouTube's recommendations, so Reveal can't pick a video. No card spent.",
+    search: "drip can't find the search results, so it isn't changing them.",
   };
   /** @type {Set<string>} */
   const brokenSeen = new Set();

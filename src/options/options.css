@@ -641,3 +641,41 @@ button.col.is-selected .letter {
     transition: none;
   }
 }
+
+/* The mode picker (Q29): Quiet, Curated, and Full drip as one row of three, filled gray like the steppers. */
+.segmented {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  border-radius: 18px;
+  background: var(--gray);
+}
+
+.segmented button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
+  background: none;
+  font-size: 13px;
+}
+
+.segmented button:hover {
+  background: var(--gray-hover);
+}
+
+.segmented button[aria-checked="true"] {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+}
+
+/* A setting for a part that's off: still editable, dimmed, with a line saying why (options.js syncIdle). */
+.setting.is-idle .setting-line,
+.setting.is-idle .setting-text > .hint:not(.idle-note),
+.setting.is-idle > :last-child {
+  opacity: 0.45;
+}
+
+.idle-note:empty {
+  display: none;
+}
+

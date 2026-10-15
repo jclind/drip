@@ -1,6 +1,7 @@
 // @ts-check
 // Search results: shows 10 at a time with a free "More results" button, and adds a Save button to each video.
-// A search with nothing left to show gets a "No results found" note.
+// A search with nothing left to show gets a "No results found" note. The cap and the Save buttons are mode parts
+// (Q29), so Quiet shows every result with no buttons.
 // The injected shelves and ads are hidden in early.css.
 
 (function () {
@@ -174,16 +175,22 @@
       closeSwap();
       clearSwapped();
     }
+    // Until the worker answers, the cap and the buttons are on, as in Full drip.
+    const cap = !state || state.settings.searchCap !== false;
+    const stash = !state || state.settings.stash !== false;
+    const limit = cap ? shown : Infinity;
     const rows = [...document.querySelectorAll(SEL.results)].flatMap((c) => [...c.children]);
     const items = rows.filter(isResult);
     items.forEach((el, i) => {
-      el.toggleAttribute('data-drip-over', i >= shown);
-      if (i < shown && el.matches(SEL.video)) addSave(el);
+      el.toggleAttribute('data-drip-over', i >= limit);
+      if (i < limit && el.matches(SEL.video) && stash) addSave(el);
+      else if (!stash) el.querySelector('.drip-save-row')?.remove();
     });
+    if (!stash) closeSwap();
     // YouTube loads the next page only while its loader is on screen. Hold it back until the last button press
     // asks for more than the page has, so nothing loads (or flashes) before you click.
-    for (const el of document.querySelectorAll(SEL.continuation)) el.toggleAttribute('data-drip-hold', items.length >= shown);
-    const more = items.length > shown || (document.querySelector(SEL.continuation) !== null && items.length > 0);
+    for (const el of document.querySelectorAll(SEL.continuation)) el.toggleAttribute('data-drip-hold', items.length >= limit);
+    const more = cap && (items.length > shown || (document.querySelector(SEL.continuation) !== null && items.length > 0));
     const search = document.querySelector('ytd-search');
     if (search && search !== watched) {
       watched = search;

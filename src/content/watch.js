@@ -344,6 +344,8 @@
     if (!first || first.seconds <= 0) return false;
     if (unsent.length > 1 || first.id !== videoId() || !video || video.paused) return true;
     if (first.seconds >= SEND_EVERY || !state) return true;
+    // With the clock off nothing runs out, so time waits for the usual send (Q29).
+    if (state.settings.clock === false) return false;
     const status = Drip.watchStatus(state, first.id);
     return !status.unlocked && status.secondsLeft - first.seconds <= 1;
   }
@@ -1037,7 +1039,15 @@
   function renderPill() {
     const id = videoId();
     let pill = document.getElementById('drip-pill');
-    if (!id || !state) {
+    // Mode parts (Q29): with the clock off the pill has no glass or minutes, and with the stash off too it has nothing.
+    const clockOn = !!state && state.settings.clock !== false;
+    const stashOn = !!state && state.settings.stash !== false;
+    // The stash turned off with its full-stash list open: the list goes with its button (Codex, 2026-10-15).
+    if (swapOpen && state && !stashOn) {
+      swapOpen = '';
+      drawSwap();
+    }
+    if (!id || !state || (!clockOn && !stashOn)) {
       pill?.remove();
       pillView = '';
       pillGrace = { id: '', ready: false, attentionAt: -Infinity };
@@ -1090,8 +1100,8 @@
     // Paused, the minutes aren't draining, and the pill says so.
     const paused = !grace && !unlocked && !adShowing && !!video && video.paused && left > 0;
     // With grace on, the pill stays up through 0 too, until grace takes over, so it never blinks out at the switch.
-    pillLow = !grace && !unlocked && !adShowing && (left > 0 || state.settings.graceMode) && left <= LOW_SECONDS;
-    if (!unlocked) {
+    pillLow = clockOn && !grace && !unlocked && !adShowing && (left > 0 || state.settings.graceMode) && left <= LOW_SECONDS;
+    if (clockOn && !unlocked) {
       const fraction = grace ? 0 : DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
       if (fraction === 0 && pillGlass && Number(pillGlass.dataset.level) > 0) pillDrainAt = performance.now();
       if (!pillGlass) pillGlass = DripGlass.make(fraction, PILL_GLASS_PX);
@@ -1100,7 +1110,7 @@
     }
     const parent = document.querySelector(SEL.player) || document.body;
     // Rebuild only when the text changes. A button replaced mid-click loses the click.
-    const view = JSON.stringify([id, time, saved, adShowing, paused, swapOpen, grace, finishing]);
+    const view = JSON.stringify([id, time, saved, adShowing, paused, swapOpen, grace, finishing, clockOn, stashOn]);
     if (pill && pillView === view && pill.parentElement === parent) return pillLook();
     pillView = view;
     // Stashed or taken out since the last draw: the new button starts as the old one was, and the water moves.
@@ -1109,7 +1119,7 @@
     const stash = DripStash.parts(fills ? !saved : saved, { outline: true });
     if (fills) stash.to(saved);
     const content = [
-      h('span', { class: `drip-pill-time${unlocked ? ' is-unlocked' : ''}${paused ? ' is-paused' : ''}` },
+      clockOn && h('span', { class: `drip-pill-time${unlocked ? ' is-unlocked' : ''}${paused ? ' is-paused' : ''}` },
         !unlocked && pillGlass,
         // One inline line, so the smaller note sits on the minutes' baseline instead of being centered as its own box.
         h('span', { class: 'drip-pill-label' },
@@ -1117,7 +1127,7 @@
           !unlocked && h('span', { class: 'drip-sr' }, finishing ? ', time is up' : ' left today'),
           paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
-      h('button', {
+      stashOn && h('button', {
         class: `drip-pill-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'pill-save', 'aria-pressed': String(saved), onclick: onSave,
         'data-swap-anchor': true, 'aria-expanded': swapOpen ? 'true' : undefined,
         title: saved ? 'In your stash. Click to take it out.' : 'Stash it for later',
@@ -1129,7 +1139,7 @@
       for (const ev of ['focusin', 'focusout']) pill.addEventListener(ev, () => setTimeout(pillLook));
     }
     const focused = pill.contains(document.activeElement);
-    pill.replaceChildren(...content);
+    pill.replaceChildren(...content.filter(Boolean));
     if (pill.parentElement !== parent) parent.append(pill);
     // No player found: pinned to the window instead, below YouTube's top bar, where it can still be seen and clicked.
     pill.classList.toggle('is-floating', parent === document.body);
@@ -1149,7 +1159,14 @@
     if (disconnected) return;
     const id = videoId();
     const wasFunded = !!state && !!id && !Drip.watchStatus(state, id).locked;
+    const clockWasOff = !!state && state.settings.clock === false;
     state = next;
+    // Time played while the clock was off was free, so turning it on mid-video drops what hadn't gone to the worker
+    // yet instead of charging it. History loses those few seconds (Codex, 2026-10-15).
+    if (clockWasOff && state.settings.clock !== false) {
+      bank();
+      unsent.length = 0;
+    }
     const status = Drip.watchStatus(state, id);
     // Another tab may have used up the minutes. A video playing here when that happened gets grace too (Q3).
     if (wasFunded && status.locked && state.settings.graceMode && clockActive() && video && !video.paused) setGrace(id);
