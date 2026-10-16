@@ -112,10 +112,15 @@ const FIELDS = PARTS.flatMap((p) => [...(p.toggle ? [p.toggle] : []), ...p.field
 const partOn = (key, d) => (key === 'cards' ? d.cards !== 'off' : !!d[key]);
 
 /**
- * Counted or Unlimited, as the picker beside Cards per day shows it. While cards are off it keeps the last pick, so the
- * switch turns them back on the same way. Off to start with, it follows Customize: counted while the clock is on.
+ * Counted or Unlimited, as last shown or picked beside Cards per day, so the switch turns cards back on the same way.
+ * Null while cards have been off since the form was drawn: then the switch follows Customize, counted while the clock is
+ * on in the form.
+ * @type {string | null}
  */
-let cardsKind = 'limited';
+let cardsKind = null;
+
+/** What the cards switch turns cards on as. @param {Record<string, any>} d */
+const cardsOnAs = (d) => cardsKind || (d.clock ? 'limited' : 'unlimited');
 
 /** @type {any} */
 let state = null;
@@ -222,10 +227,14 @@ function stepper(f, labelId) {
 /** @param {string} key */
 const fieldId = (key) => `field-${key}`;
 
-/** A gray picker. @param {string} id @param {[string, string][]} options @param {string} value @param {(v: string) => void} onPick */
-function picker(id, options, value, onPick) {
+/**
+ * A gray picker.
+ * @param {string} id @param {[string, string][]} options @param {string} value @param {(v: string) => void} onPick
+ * @param {string} [labelId] For a picker with no <label> of its own.
+ */
+function picker(id, options, value, onPick, labelId) {
   const { h, icon } = DripPage;
-  const select = /** @type {HTMLSelectElement} */ (h('select', { class: 'picker', id },
+  const select = /** @type {HTMLSelectElement} */ (h('select', { class: 'picker', id, 'aria-labelledby': labelId },
     ...options.map(([v, label]) => h('option', { value: v, selected: v === value }, label))));
   select.addEventListener('change', () => onPick(select.value));
   return h('div', { class: 'picker-wrap' }, select, icon('chevron-down'));
@@ -254,31 +263,41 @@ function control(f, labelId) {
 function cardsSwitch() {
   const { h } = DripPage;
   const box = /** @type {HTMLInputElement} */ (h('input', { type: 'checkbox', role: 'switch', class: 'toggle', id: fieldId('cards'), checked: draft.cards !== 'off' }));
-  box.addEventListener('change', () => { draft.cards = box.checked ? cardsKind : 'off'; draftChanged(); syncModeRow(); });
+  box.addEventListener('change', () => {
+    draft.cards = box.checked ? cardsOnAs(draft) : 'off';
+    const kind = /** @type {HTMLSelectElement | null} */ (document.getElementById('field-cardsKind'));
+    if (kind && draft.cards !== 'off') kind.value = draft.cards;
+    draftChanged();
+    syncModeRow();
+  });
   return box;
 }
 
-/** Counted or Unlimited, beside the Cards per day stepper. */
+/** Counted or Unlimited, beside the Cards per day stepper. Its name is the row's, "Cards per day". */
 function cardsKindPicker() {
-  return picker('field-cardsKind', [['limited', 'Counted'], ['unlimited', 'Unlimited']], cardsKind, (v) => {
+  return picker('field-cardsKind', [['limited', 'Counted'], ['unlimited', 'Unlimited']], cardsOnAs(draft), (v) => {
     cardsKind = v;
     draft.cards = v;
     draftChanged();
     syncModeRow();
-  });
+  }, 'label-recTokensPerDay');
 }
 
 /** After the form's values are replaced: the picker follows them, or Customize's rule while cards are off. */
 function resetCardsKind() {
-  cardsKind = draft.cards !== 'off' ? draft.cards : draft.clock ? 'limited' : 'unlimited';
+  cardsKind = draft.cards !== 'off' ? draft.cards : null;
 }
 
-/** The gray chip for a loosening change that waits for the reset: "→ 3 days from 4:00am · Undo". */
-function chip(/** @type {Field} */ f) {
+/**
+ * The gray chip for a loosening change that waits for the reset: "→ 3 days from 4:00am · Undo". A folded section shows
+ * its rows' chips in its header, named: "Stash holds → 12 videos from 4:00am · Undo".
+ * @param {Field} f @param {boolean} [named]
+ */
+function chip(f, named) {
   if (!state.pending || !(f.key in state.pending.changes)) return null;
   const { h } = DripPage;
   return h('span', { class: 'chip', title: `Starts ${effectiveLabel()}` },
-    h('span', {}, `→ ${valueWords(f, state.pending.changes[f.key])} from ${DripPage.hourLabel(state.settings.resetHour)}`),
+    h('span', {}, `${named ? `${f.label} ` : ''}→ ${valueWords(f, state.pending.changes[f.key])} from ${DripPage.hourLabel(state.settings.resetHour)}`),
     h('span', { 'aria-hidden': 'true' }, '·'),
     h('button', { type: 'button', class: 'chip-undo', 'aria-label': `Undo the waiting change to ${f.label}`, onclick: () => cancel(f.key) }, 'Undo'));
 }
@@ -370,9 +389,12 @@ function partSection(p) {
       h('div', { class: 'part-text' },
         h('div', { class: 'setting-line' },
           h('h2', { class: 'part-name' }, t ? h('label', { for: fieldId(t.key) }, p.title) : p.title), t && chip(t)),
-        h('div', { class: 'part-sum' })),
+        h('div', { class: 'part-sum' }),
+        // Shown only while the section is folded, so a waiting change inside it stays in view with its Undo.
+        h('div', { class: 'setting-line folded-chips' }, ...p.fields.map((f) => chip(f, true)))),
       t && (t.key === 'cards' ? cardsSwitch() : control(t, ''))),
-    p.fields.length > 0 && h('div', { class: 'rows' }, h('div', { class: 'rows-inner' }, ...p.fields.map(fieldRow))));
+    p.fields.length > 0 && h('div', { class: 'rows' },
+      h('div', { class: 'rows-inner' }, h('div', { class: 'rows-pad' }, ...p.fields.map(fieldRow)))));
 }
 
 function renderForm() {
@@ -468,16 +490,34 @@ function absorb(res) {
   return res;
 }
 
+/** Save and Undo all hide the button pressed, so focus goes to the mode picker, the top of the form, not the page's. */
+const focusForm = () => /** @type {HTMLElement | null} */ (document.querySelector('.segmented [tabindex="0"]'))?.focus();
+
 async function save() {
   const changes = toSave();
   if (!Object.keys(changes).length) return;
-  absorb(await send({ type: 'updateSettings', changes }));
+  /** @type {any} */
+  let res = null;
+  try {
+    res = await send({ type: 'updateSettings', changes });
+  } catch {
+    // The worker didn't answer. Handled below like a refusal.
+  }
+  // A failed save keeps every edit, and the bar says so until the next edit.
+  if (!res || !res.ok || !res.state) {
+    $('result').textContent = "Couldn't save. Try again.";
+    $('status').textContent = "Couldn't save. Try again.";
+    return;
+  }
+  absorb(res);
+  const hadFocus = $('savebar').contains(document.activeElement);
   picked.clear();
   draft = { ...state.settings };
   resetCardsKind();
   justSaved = true;
   renderForm();
   renderHistory();
+  if (hadFocus) focusForm();
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => {
     justSaved = false;
@@ -487,11 +527,13 @@ async function save() {
 
 /** Undo all: the form goes back to the saved settings. */
 function undoAll() {
+  const hadFocus = $('savebar').contains(document.activeElement);
   picked.clear();
   draft = { ...state.settings };
   resetCardsKind();
   justSaved = false;
   renderForm();
+  if (hadFocus) focusForm();
 }
 
 /** @param {string} key */
@@ -637,7 +679,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (JSON.stringify([state.settings, state.pending]) !== before) {
     // Fields being edited keep their values. Every other field follows the new settings (Codex, 2026-10-11).
     draft = { ...state.settings, ...kept };
-    resetCardsKind();
+    if (draft.cards !== 'off') cardsKind = draft.cards;
     renderForm();
   }
   renderHistory();
@@ -721,4 +763,6 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
   renderForm();
   renderHistory();
   renderReasons();
+  // The sections didn't exist when Chrome looked for the #fragment, so options.html#cards goes there now.
+  if (location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
 });

@@ -27,7 +27,7 @@
 }
 
 /* The mode picker (Q29), above the parts. */
-.mode-row {
+.setting.mode-row {
   margin: 0;
   padding: 4px 0 20px;
   border-bottom: 1px solid var(--line);
@@ -42,7 +42,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 0;
+  padding: 14px 0;
 }
 
 .part-icon {
@@ -96,12 +96,25 @@
   opacity: 0;
 }
 
-/* Lined up under the part's name. The extra 4px on top and right keeps focus rings from being cut off. */
+/* The padding is on an inner box, since the folding box's own padding would stay as a gap when folded. Lined up under
+   the part's name, with 4px spare on top and right so focus rings aren't cut off. */
 .rows-inner {
   min-height: 0;
   overflow: hidden;
-  margin: -4px -4px 0 0;
-  padding: 4px 4px 6px 54px;
+  margin-right: -4px;
+}
+
+.rows-pad {
+  padding: 4px 4px 8px 54px;
+}
+
+.folded-chips {
+  margin-top: 4px;
+}
+
+.part:not(.is-off) .folded-chips,
+.folded-chips:empty {
+  display: none;
 }
 
 .controls {
@@ -735,8 +748,11 @@ button.col.is-selected .letter {
 
 @media (max-width: 480px) {
   .rows-inner {
-    padding-left: 4px;
     margin-left: -4px;
+  }
+
+  .rows-pad {
+    padding-left: 4px;
   }
 
   /* Cards per day has two controls, too wide beside its label on a phone, so they go on a line of their own. */
