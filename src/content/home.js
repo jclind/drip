@@ -35,11 +35,21 @@
     metaPart: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, #metadata-line span',
     watched: 'ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHost',
     ad: 'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer',
+    // What kind of video an item is, for what a reveal may deal (Q30). Read on air on 2026-10-16 from channel pages,
+    // which use the home grid's markup. Upcoming videos have a "Notify me" button under the card. The older markup
+    // marked upcoming and live on the length overlay.
+    upcoming: 'lockup-attachments-view-model, ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"]',
+    live: '.ytBadgeShapeThumbnailLive, ytd-thumbnail-overlay-time-status-renderer[overlay-style="LIVE"]',
+    members: '.ytBadgeShapeCommerce',
     // The top bar's search box and voice search, which Quiet's home page moves into the middle of the page (Q29).
     searchBox: 'ytd-masthead #center',
   };
   const AGE = /\bago$/i;
   const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
+  // A past stream's markup is a normal video's, except its age reads "Streamed 23h ago". English only, like AGE.
+  const STREAMED = /^streamed\b/i;
+
+  /** @typedef {{id: string, title: string, channel: string, length: string, views: string, age: string, kind: string}} Candidate */
 
   /** @type {any} */
   let state = null;
@@ -76,6 +86,19 @@
   }
 
   /**
+   * What kind of video a grid item is. The worker decides which kinds a reveal may deal (Drip.mayReveal, Q30).
+   * @param {Element} item
+   * @returns {'video' | 'upcoming' | 'live' | 'streamed' | 'members'}
+   */
+  function kindOf(item) {
+    if (item.querySelector(SEL.upcoming)) return 'upcoming';
+    if (item.querySelector(SEL.members)) return 'members';
+    if (item.querySelector(SEL.live)) return 'live';
+    for (const el of item.querySelectorAll(SEL.metaPart)) if (STREAMED.test((el.textContent || '').trim())) return 'streamed';
+    return 'video';
+  }
+
+  /**
    * Videos currently in a feed's grid, minus ads, Shorts, mixes, and ones already watched.
    * @param {ParentNode} root The page, or a hidden frame's document.
    * @param {string} browseSelector
@@ -83,7 +106,7 @@
   function readPool(root = document, browseSelector = SEL.homeBrowse) {
     const browse = root.querySelector(browseSelector);
     if (!browse) return [];
-    /** @type {{id: string, title: string, channel: string, length: string, views: string, age: string}[]} */
+    /** @type {Candidate[]} */
     const pool = [];
     const ids = new Set();
     for (const item of browse.querySelectorAll(SEL.item)) {
@@ -97,7 +120,7 @@
       if (!title) continue;
       ids.add(id);
       const channel = firstText(item, SEL.channel);
-      pool.push({ id, title, channel, length: firstText(item, SEL.length), ...viewsAndAge(item, channel) });
+      pool.push({ id, title, channel, length: firstText(item, SEL.length), ...viewsAndAge(item, channel), kind: kindOf(item) });
     }
     return pool;
   }
@@ -113,9 +136,13 @@
     return pool;
   }
 
-  /** @param {{id: string}} video Not revealed before and not in the backlog, the same test reveal() applies. */
+  /**
+   * Not revealed before, not in the backlog, and a kind a reveal may deal: the same test reveal() applies.
+   * @param {Candidate} video
+   */
   function isNew(video) {
-    return !!state && !state.seen.includes(video.id) && !state.backlog.some((/** @type {any} */ v) => v.id === video.id);
+    return !!state && Drip.mayReveal(video, state.settings) && !state.seen.includes(video.id)
+      && !state.backlog.some((/** @type {any} */ v) => v.id === video.id);
   }
 
   /**
@@ -167,7 +194,7 @@
   }
 
   /** Videos the hidden home frame read past this page's grid. */
-  /** @type {{id: string, title: string, channel: string, length: string, views: string, age: string}[]} */
+  /** @type {Candidate[]} */
   let morePool = [];
 
   /** @param {any} res */

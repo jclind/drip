@@ -37,6 +37,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q27 | Ads don't use watch minutes. Time the player spends on an ad isn't charged or logged (Jesse, 2026-10-07). |
 | Q28 | The stash is capped, 10 by default, as the setting "Stash holds" (1 to 50). Raising it waits for the next day (Q6). A free, unlimited stash made Pass pointless and grew into a feed of its own. Lowering it deletes nothing: new videos wait until the stash is under the cap. A full stash asks which video to swap out, oldest first. Stashed videos never expire, so time away from YouTube loses nothing. A started video shows how far it got and opens where it stopped (Jesse, 2026-10-13). |
 | Q29 | drip has three modes, picked on a choice page at the start of the welcome page and changed in Settings: Quiet, Curated, and Full drip. The choice page is a list of the three, lightest first, each with a small picture of its home page, and the picked one has a Customize link to the separate parts. Full drip is picked to start and marked "Recommended" (design J, 2026-10-15). The stash is a part too, off in Quiet. Quiet's home page is YouTube's own search box, moved to the middle of the page. Moving to a lighter mode follows Q6: it waits for the next reset, except in the first 24 hours (Jesse, 2026-10-14). The details are under "Modes". |
+| Q30 | What a reveal may deal. Upcoming videos and premieres are never dealt, since they can't be watched yet. Neither are members-only videos. Live streams and past streams are skipped by default, for both feeds, and "Reveal live streams" in Settings allows them. Turning it on waits for the reset (Q6). Jesse, 2026-10-16, after a reveal dealt an upcoming video. The markup is under "What a reveal may deal". |
 
 ## Modes (Q29, built 2026-10-15)
 
@@ -341,6 +342,15 @@ Step 2 adds the sidebar, end screens, autoplay, Shorts, search shelves with the 
 ### Feed source
 
 The "Reveal from" field in Settings writes `settings.feedSource` through `updateSettings`, which applies it at once because a feed change never loosens a limit. The home page has no control for it (Jesse, 2026-10-10). With the feed source set to subscriptions, a reveal loads `/feed/subscriptions` in a hidden same-origin frame on the token page and reads its grid with the same selectors as the home grid. YouTube only fills a feed that's in view, so the frame sits on screen at opacity 0. Nothing new from the feed gives `pool-empty` and spends no token. The first version was tested on air only against the home feed, because air's account has no subscriptions.
+
+### What a reveal may deal (Q30)
+
+`readPool` in `home.js` tags each grid item with a `kind`, and the worker's `reveal` and `revealNext` drop the kinds `Drip.mayReveal` rules out before they pick. The page's `isNew` applies the same rule, so a grid of only skipped kinds sends the hidden frame looking for more instead of ending in `pool-empty` at once. Skipped videos aren't marked seen, so turning streams on later can still deal them. The markup, read on air on 2026-10-16 from channel pages, which share the home grid's markup:
+
+- Upcoming: a "Notify me" button under the card (`lockup-attachments-view-model`), the length badge reads "Upcoming", and the metadata "Scheduled for 10/23/26, 2:00 PM". Ads have the same button holder, but they're skipped first. No premiere was on hand, so premieres are assumed to look the same.
+- Live now: the badge has `ytBadgeShapeThumbnailLive`, and the metadata reads "168 watching".
+- Past stream: no markup of its own. Its age reads "Streamed 23h ago", so this one is English only.
+- Members-only: a second badge, `ytBadgeShapeCommerce`, reading "Members only".
 
 ### The clock with several tabs
 

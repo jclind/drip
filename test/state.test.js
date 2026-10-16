@@ -25,14 +25,14 @@ test('API contains every contract name, and defaults are frozen', () => {
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
-    'isLoosening', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
+    'isLoosening', 'mayReveal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
     watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10,
     rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home', stashMax: 10,
-    searchCap: true, cards: 'limited', clock: true, stash: true, hideBell: true,
+    searchCap: true, cards: 'limited', clock: true, stash: true, hideBell: true, streams: false,
   });
   assert.ok(Object.isFrozen(D.MODES));
   assert.equal(D.modeOf(D.DEFAULT_SETTINGS), 'full');
@@ -250,6 +250,35 @@ test('reveal skips seen and backlog ids and selects the first qualifying video',
   assert.deepEqual(state.seen, ['seen', 'new']);
   D.resolveCurrent(state, 'pass');
   refusesUnchanged(state, () => D.reveal(state, [video('seen'), video('saved'), chosen]), 'pool-empty');
+});
+
+test('a reveal never deals an upcoming or members-only video, and deals streams only when Settings allows them', () => {
+  /** @param {string} id @param {string} kind */
+  const as = (id, kind) => ({ ...video(id), kind });
+  assert.equal(D.mayReveal(as('a', 'video'), D.DEFAULT_SETTINGS), true);
+  assert.equal(D.mayReveal(video('a'), D.DEFAULT_SETTINGS), true, 'no kind is a normal video');
+  for (const kind of ['upcoming', 'members']) {
+    assert.equal(D.mayReveal(as('a', kind), D.DEFAULT_SETTINGS), false, kind);
+    assert.equal(D.mayReveal(as('a', kind), { ...D.DEFAULT_SETTINGS, streams: true }), false, `${kind} with streams on`);
+  }
+  for (const kind of ['live', 'streamed']) {
+    assert.equal(D.mayReveal(as('a', kind), D.DEFAULT_SETTINGS), false, kind);
+    assert.equal(D.mayReveal(as('a', kind), { ...D.DEFAULT_SETTINGS, streams: true }), true, `${kind} with streams on`);
+  }
+
+  const state = fresh();
+  const pool = [as('soon', 'upcoming'), as('paid', 'members'), as('now', 'live'), as('vod', 'streamed'), as('plain', 'video')];
+  assert.deepEqual(D.reveal(state, pool), { ok: true, video: video('plain') }, 'the kind is not kept on the card');
+  assert.deepEqual(state.seen, ['plain'], 'skipped videos are not marked seen, so a later setting can still deal them');
+  D.resolveCurrent(state, 'pass');
+  refusesUnchanged(state, () => D.reveal(state, pool.slice(0, 4)), 'pool-empty');
+  state.settings.streams = true;
+  assert.equal(D.reveal(state, pool).video.id, 'now');
+
+  const next = fresh();
+  D.reveal(next, [video('a')]);
+  refusesUnchanged(next, () => D.revealNext(next, 'a', [as('soon', 'upcoming'), as('now', 'live')]), 'pool-empty');
+  assert.equal(D.revealNext(next, 'a', [as('soon', 'upcoming'), video('b')]).video.id, 'b');
 });
 
 test('seen retains the newest 2000 ids', () => {
@@ -637,6 +666,8 @@ test('cleanSettings rounds and clamps every numeric range, drops unknown and inv
     rolloverDays: 7, resetHour: 0, needThisPerDay: 10, stashMax: 50, feedSource: 'subscriptions', graceMode: false,
   });
   assert.deepEqual(D.cleanSettings({ recTokensPerDay: NaN, minutesPerToken: Infinity, resetHour: '5', watchTokensPerDay: null }), {});
+  assert.deepEqual(D.cleanSettings({ streams: true }), { streams: true });
+  assert.deepEqual(D.cleanSettings({ streams: 'yes' }), {});
   assert.deepEqual(D.cleanSettings(undefined), {});
 });
 
@@ -651,6 +682,8 @@ test('isLoosening classifies numeric limits, reset hour, grace mode, and feed', 
   assert.equal(D.isLoosening('resetHour', 4, 4), false);
   assert.equal(D.isLoosening('graceMode', false, true), true);
   assert.equal(D.isLoosening('graceMode', true, false), false);
+  assert.equal(D.isLoosening('streams', false, true), true);
+  assert.equal(D.isLoosening('streams', true, false), false);
   assert.equal(D.isLoosening('feedSource', 'home', 'subscriptions'), false);
 });
 
