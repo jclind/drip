@@ -105,3 +105,34 @@ Two rows above need a correction:
 | An animation in a tab hidden mid-reveal | Unknown whether Web Animations' `finished` waits until the tab shows again. If it does, the reveal finishes on return | Not tested: air's driven tab wouldn't go hidden |
 
 `test/home.test.js` now runs home.js against a fake page, fake timers, and a fake worker with the real rules, in both the animated and the reduced-motion paths. It covers every row above that can be reached without a real browser.
+
+## Measured on the MacBook, 2026-10-16
+
+Jesse ran `test/PERF.md` on the MacBook (Chrome 154, plugged in, window visible). Claude summarized the captures with throwaway scripts, and Codex reviewed the scripts and conclusions from the numbers alone, without the raw captures, which come from Jesse's signed-in YouTube. The captures stay in `~/drip-perf/` on air, out of git.
+
+| What | drip on | drip off | So |
+|---|---|---|---|
+| Playing tab's renderer CPU, 3 tabs | 22.4, 20.7, 21.9% | 17.3, 6.0, 18.4% | About 8 points more with drip on, in both pairs. Three readings each, so a lead rather than a figure |
+| The same, 20 tabs | 20.6, 19.3, 24.5% | 17.1, 8.7, 9.1% | |
+| Memory, 3 tabs (video, search, home) | 287, 260, 162 MB | 263, 306, 202 MB | Less with drip on overall. The playing tab is about 24 MB more |
+| Memory, all 20 tabs | 4.56 GB | 4.78 GB | Background tabs never painted their grids, so this undercounts what a hidden grid saves |
+| Heap growth over 50 in-page navigations | 472 to 657 MB, 95k to 153k detached nodes | 468 to 696 MB, 95k to 170k detached | No sign of a drip leak. drip's own detached elements went from 89 to 98. Without retainers this isn't proof |
+
+Background search tabs spiked to 21 to 69% CPU now and then with drip on and off alike, so that's YouTube's search page. Task Manager's Tabs & extensions view never showed drip's worker, so its memory wasn't measured. The drip-off heap run still had drip's elements in it, likely from a tab that ran drip before it was turned off and wasn't reloaded. drip's scripts can't reach the worker once it's off, so they had little to do.
+
+The Performance trace (lock screen, Done for now, a Subscriptions reveal):
+
+- drip's own scripts: about 54 ms of main-thread CPU in 67 seconds. That isn't all drip causes: style, paint, and the hidden frame's work show up under other names.
+- The lock screen: the main thread was busy 4% of the time, and the GPU process's main thread 7.6% against 1.0% afterwards. That's elapsed task time on shared threads, not an isolated cost.
+- A Subscriptions reveal: about 1.4 seconds of main-thread work in 2.2 seconds, mostly YouTube's own app starting up in the hidden frame, with long tasks of 353 and 457 ms while the reveal animation runs.
+
+### The pill's blur, measured on air
+
+air's Chrome plays video once its window is in front. With drip on, a video playing, and the pill toggled by hand from the console, eight samples of 3 seconds each per setting:
+
+| Pill | GPU process CPU | Tab renderer CPU |
+|---|---|---|
+| `backdrop-filter: blur(8px)`, as built | 25.8, 21.9, 22.1, 17.5% | 14.3, 14.6, 14.3, 14.8% |
+| No blur, or no pill | 15.8, 16.3, 15.9, 16.3, 15.7% | 13.6, 12.7, 12.6, 13.3, 14.5% |
+
+The blur (`drip.css`, `#drip-pill`) costs the GPU process about 6 points for as long as a video plays, even while the pill is faded to opacity 0 with YouTube's controls. It adds about 1 point to the tab's renderer, so it doesn't explain the 8 points above. That gap needs a Performance recording of a playing video, drip on and off. Leads from Codex's review: the 1-second tick sets the pill glass's style every time (`watch.js`, `DripGlass.set` before the unchanged-view check), and player class changes call `pillLook()`.
