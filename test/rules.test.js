@@ -13,6 +13,9 @@ const HOME = 'https://www.youtube.com/';
 test('Shorts open as ordinary watch pages (Q2)', () => {
   assert.equal(D.redirectTarget('https://www.youtube.com/shorts/abc123'), 'https://www.youtube.com/watch?v=abc123');
   assert.equal(D.redirectTarget('https://www.youtube.com/shorts/abc123/'), 'https://www.youtube.com/watch?v=abc123');
+  // The Shorts feed itself, with no video, goes to the token page.
+  assert.equal(D.redirectTarget('https://www.youtube.com/shorts'), HOME);
+  assert.equal(D.redirectTarget('https://www.youtube.com/shorts/'), HOME);
 });
 
 test('subscriptions, Explore, and the topic pages go to the token page (Q16)', () => {
