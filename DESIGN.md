@@ -345,12 +345,12 @@ The "Reveal from" field in Settings writes `settings.feedSource` through `update
 
 ### What a reveal may deal (Q30)
 
-`readPool` in `home.js` tags each grid item with a `kind`, and the worker's `reveal` and `revealNext` drop the kinds `Drip.mayReveal` rules out before they pick. The page's `isNew` applies the same rule, so a grid of only skipped kinds sends the hidden frame looking for more instead of ending in `pool-empty` at once. Skipped videos aren't marked seen, so turning streams on later can still deal them. The markup, read on air on 2026-10-16 from channel pages, which share the home grid's markup:
+`readPool` in `home.js` tags each grid item with a `kind`, and the worker's `reveal` and `revealNext` drop the kinds `Drip.mayReveal` rules out before they pick. The page's `isNew` asks the worker's own `Drip.canDeal`, so a grid of only skipped kinds sends the hidden frame looking for more instead of ending in `pool-empty` at once. Skipped videos aren't marked seen, so turning streams on later can still deal them. The markup, read on air on 2026-10-16 from channel pages, which share the home grid's markup:
 
-- Upcoming: a "Notify me" button under the card (`lockup-attachments-view-model`), the length badge reads "Upcoming", and the metadata "Scheduled for 10/23/26, 2:00 PM". Ads have the same button holder, but they're skipped first. No premiere was on hand, so premieres are assumed to look the same.
+- Upcoming: a "Notify me" button under the card (`lockup-attachments-view-model`), the length badge reads "Upcoming", and the metadata "Scheduled for 10/23/26, 2:00 PM". The button's holder has no name of its own, and ads have it too, so it only counts on a card with no length. A "Scheduled for" or "Premieres" line counts on its own, in case the button renders late (English only). No premiere was on hand, so premieres are assumed to look the same.
 - Live now: the badge has `ytBadgeShapeThumbnailLive`, and the metadata reads "168 watching".
 - Past stream: no markup of its own. Its age reads "Streamed 23h ago", so this one is English only.
-- Members-only: a second badge, `ytBadgeShapeCommerce`, reading "Members only".
+- Members-only: a second badge, `ytBadgeShapeCommerce`, reading "Members only". The older markup's `badge-style-type-members-only` counts too.
 
 ### The clock with several tabs
 
