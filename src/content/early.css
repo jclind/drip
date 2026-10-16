@@ -79,6 +79,19 @@ html[data-drip-menu] ytd-app ytd-page-manager {
   margin-left: 0 !important;
 }
 
+/* Pages still make room for the sidebar YouTube thinks is there. Some use its width variables, and playlist pages
+   (Watch later, Liked videos) and the search page's footer pin themselves 72px or 240px from the left, so the list
+   slid under the playlist's panel (Jesse, 2026-10-15). */
+html[data-drip-menu] ytd-app {
+  --ytd-mini-guide-width: 0px !important;
+  --ytd-persistent-guide-width: 0px !important;
+}
+
+html[data-drip-menu] ytd-app ytd-browse :is(.page-header-sidebar, ytd-playlist-header-renderer, ytd-playlist-sidebar-renderer),
+html[data-drip-menu] ytd-app ytd-search #floating-footer {
+  left: 0 !important;
+}
+
 /* The top bar's Create button and the search box's Ask YouTube chip, also in Quiet's moved box. Logged out, Sign in is
    the same kind of button, so it's left alone. The chip sits in the field at rest and moves to the box's actions while
    typing; both times it's a tracked div around the box's one button with an icon and words (checked 2026-10-15). If
