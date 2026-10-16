@@ -84,3 +84,24 @@ The worker spends and sets the card in one write (`Drip.reveal`), and the page c
 | Double-click on Reveal video or Reveal next | Already safe: `busy` holds the second click. |
 
 Not covered: the lock's +15m guard wasn't tried on real YouTube with reduced motion. No Node tests, because home.js has no fake-page harness like `test/watch.test.js`. The checks are browser checklist item 5.
+
+### Second pass, 2026-10-16
+
+Claude traced the same paths again, and Codex audited them separately from a brief, without Claude's notes. Every Codex finding was checked against the code. The review file stays out of git (`.second-opinion/`).
+
+Two rows above need a correction:
+
+- The thumbnail row: hqdefault is tried only after hq720 loads or errors. A request that hangs waits out the 8 seconds instead.
+- The navigation row: an in-page navigation (drip's menu, YouTube's own links) doesn't stop a read that's under way. If it finds a video, the card is spent and waits on the home page. That's the reveal the user asked for, so it stays.
+
+| New finding | What happens | Now |
+|---|---|---|
+| The feed read throws (a grid link that can't be parsed, or `reportBroken` in a tab whose drip was reloaded) | Nothing spent, but no message, an unhandled rejection, and in Reveal next the half-dealt card could stay on the old thumbnail | Fixed: `findWith` catches it and says "Something went wrong" |
+| The card's picture during Reveal next with reduced motion | Its buttons are disabled, but the picture still linked to Watch, which could buy a drop and end the old card | Fixed: `onResolve` ignores clicks while a reveal is in flight |
+| Enter held on a button | Chrome repeats the click, and keyboard clicks get past the double-click guard. +15m bought a drop per repeat when the drop didn't fall, and a held Enter could carry from Reveal into Watch | Fixed: drip's home page ignores repeated Enter keydowns. Browser checklist item 5 |
+| Watch whose navigation the user cancels (Esc) | Redraws stay held, so the page shows the old card | Left: the next click on it gets `no-current`, which lets redraws back |
+| Play from Stash at 0 minutes when the purchase fails | It goes to the watch page anyway | Left: the lock there offers +15m (Q18) |
+| The loading text says Subscriptions "can take 15 seconds" | The worst case is about 30 (15 to load, 15 to poll) | Left for Jesse to decide |
+| An animation in a tab hidden mid-reveal | Unknown whether Web Animations' `finished` waits until the tab shows again. If it does, the reveal finishes on return | Not tested: air's driven tab wouldn't go hidden |
+
+`test/home.test.js` now runs home.js against a fake page, fake timers, and a fake worker with the real rules, in both the animated and the reduced-motion paths. It covers every row above that can be reached without a real browser.

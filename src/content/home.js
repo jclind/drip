@@ -260,6 +260,11 @@
       const res = absorb(await send({ ...msg, candidates: pool }));
       if (res && !res.ok) message = errorText(res.error);
       return res && res.ok ? res : null;
+    } catch {
+      // A read that throws never got as far as asking the worker, so nothing was spent. Without this the reveal ended
+      // with no message, and Reveal next's half-dealt card stayed on the old thumbnail (Codex, 2026-10-16).
+      message = errorText('');
+      return null;
     } finally {
       clearTimeout(timer);
       slow = false;
@@ -398,7 +403,8 @@
    * @param {boolean} [keyboard] Pressed from the keyboard, so a full stash's list takes focus.
    */
   async function onResolve(action, videoId, keyboard = false) {
-    if (moving) return;
+    // While a reveal is in flight the card's buttons are disabled, but its picture still links to Watch (Codex, 2026-10-16).
+    if (moving || busy) return;
     message = '';
     if (action === 'pass' && deals() && document.querySelector('#drip-home .drip-card .drip-deal')) {
       // Redraws wait while the worker answers, so the card is still there to animate.
@@ -1347,6 +1353,11 @@
     // drops and × said "Something went wrong" (2026-10-13). Nothing on the page needs a double-click.
     root.addEventListener('click', (e) => {
       if (e.detail > 1) e.stopPropagation();
+    }, true);
+    // Holding Enter repeats a button's click, and keyboard clicks get past the guard above. Each repeat could spend:
+    // +15m when the drop doesn't fall, or the Watch a finished reveal moves focus to (Codex, 2026-10-16).
+    root.addEventListener('keydown', (e) => {
+      if (e.repeat && e.key === 'Enter') e.preventDefault();
     }, true);
     target.prepend(root);
     takeKept();
