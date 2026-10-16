@@ -743,6 +743,21 @@ test('a reveal reads what kind each grid item is, and deals only what it may (Q3
   assert.equal(world.state.tokens.rec, 9);
 });
 
+test('a channel named "Streamed ..." does not make its uploads past streams (Q30, Codex 2026-10-16)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { grid: ['v1'] });
+  const item = tab.browse.querySelector('ytd-rich-item-renderer');
+  const channel = new FakeElement(tab.document, 'span');
+  channel.className = 'ytContentMetadataViewModelMetadataText';
+  channel.textContent = 'Streamed Highlights';
+  item.insertBefore(channel, item.firstChild);
+  await tab.click('reveal');
+  await tab.advance(100);
+  const sent = world.sent.find((msg) => msg.type === 'reveal');
+  assert.equal(sent.candidates[0].kind, 'video');
+  assert.equal(world.state.current.id, 'v1');
+});
+
 test('with streams allowed, a live stream can be dealt (Q30)', async () => {
   const world = makeWorld();
   world.state.settings.streams = true;

@@ -88,14 +88,15 @@
   /**
    * What kind of video a grid item is. The worker decides which kinds a reveal may deal (Drip.mayReveal, Q30).
    * @param {Element} item
+   * @param {string} age From viewsAndAge, which leaves out the channel, so a channel named "Streamed Highlights" doesn't
+   *   make every upload a past stream (Codex, 2026-10-16).
    * @returns {'video' | 'upcoming' | 'live' | 'streamed' | 'members'}
    */
-  function kindOf(item) {
+  function kindOf(item, age) {
     if (item.querySelector(SEL.upcoming)) return 'upcoming';
     if (item.querySelector(SEL.members)) return 'members';
     if (item.querySelector(SEL.live)) return 'live';
-    for (const el of item.querySelectorAll(SEL.metaPart)) if (STREAMED.test((el.textContent || '').trim())) return 'streamed';
-    return 'video';
+    return STREAMED.test(age) ? 'streamed' : 'video';
   }
 
   /**
@@ -120,7 +121,8 @@
       if (!title) continue;
       ids.add(id);
       const channel = firstText(item, SEL.channel);
-      pool.push({ id, title, channel, length: firstText(item, SEL.length), ...viewsAndAge(item, channel), kind: kindOf(item) });
+      const { views, age } = viewsAndAge(item, channel);
+      pool.push({ id, title, channel, length: firstText(item, SEL.length), views, age, kind: kindOf(item, age) });
     }
     return pool;
   }
