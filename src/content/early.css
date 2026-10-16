@@ -87,6 +87,16 @@ html[data-drip-menu] ytd-app {
   --ytd-persistent-guide-width: 0px !important;
 }
 
+html[data-drip-menu] ytd-app ytd-shorts {
+  --ytd-current-guide-width: 0px !important;
+}
+
+/* On a fresh load, YouTube caps the Playlists heading at the page width minus the sidebar, so at 1500px it sat 112px
+   right of its cards. In-page navigation gets it right. Channel pages don't have disable-grid-state-aware. */
+html[data-drip-menu] ytd-app ytd-tabbed-page-header[disable-grid-state-aware]:not([is-constrained-list]) {
+  --ytd-rich-grid-max-width: none !important;
+}
+
 html[data-drip-menu] ytd-app ytd-browse :is(.page-header-sidebar, ytd-playlist-header-renderer, ytd-playlist-sidebar-renderer),
 html[data-drip-menu] ytd-app ytd-search #floating-footer {
   left: 0 !important;
