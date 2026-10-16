@@ -77,7 +77,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 
 ## Settings page
 
-- Unsaved changes get a banner that stays in view while you scroll, instead of only the "Not saved yet." line by Save. Leaving the page with changes unsaved asks first (Jesse, 2026-10-16). Planned for 1.0 with the Settings regroup (RELEASE-PLAN.md).
+- Unsaved changes get a banner that stays in view while you scroll, instead of only the "Not saved yet." line by Save. Leaving the page with changes unsaved asks first (Jesse, 2026-10-16). Built with the Settings regroup on 2026-10-16: a save bar at the bottom of the window.
 
 ## After 1.0
 

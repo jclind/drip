@@ -3,7 +3,7 @@
 .settings main {
   max-width: 532px;
   margin: 0 auto;
-  padding: 56px 16px 96px;
+  padding: 56px 16px 120px;
 }
 
 .settings h1 {
@@ -13,7 +13,7 @@
   margin: 0 0 32px;
 }
 
-.settings h1.watch-title {
+.settings h1.history-title {
   margin: 56px 0 28px;
 }
 
@@ -26,10 +26,89 @@
   text-transform: uppercase;
 }
 
-.group {
-  padding-bottom: 24px;
-  margin-bottom: 32px;
+/* The mode picker (Q29), above the parts. */
+.mode-row {
+  margin: 0;
+  padding: 4px 0 20px;
   border-bottom: 1px solid var(--line);
+}
+
+/* One section per part, its switch in the header (design A, Jesse, 2026-10-16). */
+.part {
+  border-bottom: 1px solid var(--line);
+}
+
+.part-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+}
+
+.part-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--gray);
+}
+
+.part-icon .drip-i {
+  width: 18px;
+  height: 20px;
+}
+
+.part-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings h2.part-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.part-sum {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.part.is-off .part-name {
+  color: var(--muted);
+}
+
+.part.is-off .part-icon .drip-i {
+  opacity: 0.5;
+}
+
+/* A part that's off folds its rows away (options.js syncParts). */
+.rows {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 220ms ease, opacity 220ms ease;
+}
+
+.part.is-off .rows {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+/* Lined up under the part's name. The extra 4px on top and right keeps focus rings from being cut off. */
+.rows-inner {
+  min-height: 0;
+  overflow: hidden;
+  margin: -4px -4px 0 0;
+  padding: 4px 4px 6px 54px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .setting {
@@ -217,17 +296,51 @@ input.toggle:checked::after {
   transform: translateX(28px);
 }
 
-.save-row {
+/* The save bar: floats at the bottom of the window while there are edits not saved. */
+.savebar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-top: -8px;
+  box-sizing: border-box;
+  width: min(500px, calc(100% - 32px));
+  min-height: 52px;
+  padding: 6px 6px 6px 20px;
+  border-radius: 26px;
+  background: var(--gray-raised);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  font-size: 15px;
+  font-weight: 500;
+  transform: translateX(-50%);
+  animation: savebar-in 180ms ease-out;
 }
 
-.save-row button.primary {
+@keyframes savebar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
+.savebar-text {
+  flex: 1;
+}
+
+.savebar button.primary {
   min-width: 80px;
   padding: 10px 24px;
-  border-radius: 21px;
+  border-radius: 20px;
+}
+
+.savebar.is-saved .savebar-text {
+  color: var(--muted);
+}
+
+.savebar.is-saved button {
+  display: none;
 }
 
 /* History. */
@@ -621,6 +734,21 @@ button.col.is-selected .letter {
 }
 
 @media (max-width: 480px) {
+  .rows-inner {
+    padding-left: 4px;
+    margin-left: -4px;
+  }
+
+  /* Cards per day has two controls, too wide beside its label on a phone, so they go on a line of their own. */
+  .setting:has(> .controls):not(.is-unlimited) {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .setting:not(.is-unlimited) > .controls {
+    flex: 1 0 100%;
+  }
+
   .card {
     padding: 20px 18px 24px;
   }
@@ -636,9 +764,14 @@ button.col.is-selected .letter {
 
 @media (prefers-reduced-motion: reduce) {
   .bar,
+  .rows,
   input.toggle,
   input.toggle::after {
     transition: none;
+  }
+
+  .savebar {
+    animation: none;
   }
 }
 
@@ -668,7 +801,7 @@ button.col.is-selected .letter {
   color: var(--primary-fg);
 }
 
-/* A setting for a part that's off: still editable, dimmed, with a line saying why (options.js syncIdle). */
+/* A setting that does nothing in the form's mix: still editable, dimmed, with a line saying why (options.js syncIdle). */
 .setting.is-idle .setting-line,
 .setting.is-idle .setting-text > .hint:not(.idle-note),
 .setting.is-idle > :last-child {
@@ -679,3 +812,14 @@ button.col.is-selected .letter {
   display: none;
 }
 
+
+.savebar button.link {
+  padding: 8px 4px;
+  color: var(--text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.savebar button.link:hover {
+  text-decoration: underline;
+}

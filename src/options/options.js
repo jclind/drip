@@ -1,6 +1,6 @@
 // @ts-check
-// Settings (DESIGN.md, "Settings"): the mode and its parts (Q29), the allowance with the next-day rule, then History
-// and the unlock reasons.
+// Settings (DESIGN.md, "Settings"): the mode, then one section per part (Q29) with the next-day rule, then History and
+// the unlock reasons.
 
 /** @type {any} */
 // var, not const: these page scripts share one type-check program, and only var may be declared twice.
@@ -28,68 +28,94 @@ var DripPage = /** @type {any} */ (globalThis).DripPage;
 /** @param {number} n @param {string} one @param {string} many */
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-// A setting for a part that's off stays editable but dims, with a line saying why (Jesse, 2026-10-15; Codex audit).
-/** @param {Record<string, any>} d */
-const noClock = (d) => (d.clock ? '' : 'Not used while watch time is off.');
-/** @param {Record<string, any>} d */
-const noCards = (d) => (d.cards === 'off' ? 'Not used while cards are off.' : '');
+/**
+ * @typedef {Object} Part
+ * @property {string} id The section's anchor, like options.html#cards.
+ * @property {string} title
+ * @property {string} icon
+ * @property {string} [iconClass]
+ * @property {Field} [toggle] The mode part (Q29) its header switch turns on and off. Off folds the section.
+ * @property {(d: Record<string, any>) => string} summary One line under the title, from the form's values.
+ * @property {Field[]} fields
+ */
 
-/** @type {{title: string, modes?: boolean, fields: Field[]}[]} */
-const SECTIONS = [
+// One section per part, its switch in the header (design A, Jesse, 2026-10-16). The mode picker above them sets the
+// four switches at once. A part that's off folds its rows away, which replaced dimming them (2026-10-15).
+/** @type {Part[]} */
+const PARTS = [
   {
-    // Q29. The mode picker above these sets the four parts at once; each can also be switched on its own.
-    title: 'What drip does',
-    modes: true,
+    id: 'watch', title: 'Watch time', icon: 'drop', iconClass: 'drip-token-drop',
+    toggle: { key: 'clock', label: 'Watch time', kind: 'toggle' },
+    summary: (d) => (d.clock ? `${plural(d.watchTokensPerDay, 'drop', 'drops')} a day, ${d.minutesPerToken}m each` : 'Off. Videos play with no clock.'),
     fields: [
-      { key: 'clock', label: 'Limit watch time', kind: 'toggle', hint: 'Drops, the glass, and the lock.' },
-      { key: 'cards', label: 'Reveal one video at a time', kind: 'choice',
-        options: [['limited', 'Cards per day'], ['unlimited', 'Unlimited'], ['off', 'Off']] },
-      { key: 'searchCap', label: 'Stop search at 10 results', kind: 'toggle' },
-      { key: 'stash', label: 'Stash videos for later', kind: 'toggle' },
-      // Not a mode part: the same in every mode, so the picker above leaves it alone (Q16).
-      { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle', hint: 'The same in every mode.' },
+      { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48,
+        unit: () => [DripPage.icon('drop', 'drip-token-drop')], say: (n) => plural(n, 'drop', 'drops') },
+      { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
+        format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
+      { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', hint: 'When time runs out partway through.' },
+      { key: 'needThisPerDay', label: '"I need this one" per day', kind: 'stepper', min: 0, max: 10,
+        say: (n) => String(n), hint: 'Each one needs a typed reason.' },
     ],
   },
   {
-    title: 'Your allowance',
+    id: 'cards', title: 'Cards', icon: 'card', iconClass: 'drip-token-card',
+    // The switch turns cards off, or back on as counted or unlimited, whichever the row below shows.
+    toggle: { key: 'cards', label: 'Cards', kind: 'choice', options: [['limited', 'Counted'], ['unlimited', 'Unlimited'], ['off', 'Off']] },
+    summary: (d) => (d.cards === 'off' ? 'Off. Home shows a search box.'
+      : `${d.cards === 'unlimited' ? 'Unlimited cards' : `${plural(d.recTokensPerDay, 'card', 'cards')} a day`} from ${d.feedSource === 'home' ? 'your Home feed' : 'Subscriptions'}`),
     fields: [
-      { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48, idle: noClock,
-        unit: () => [DripPage.icon('drop', 'drip-token-drop')], say: (n) => plural(n, 'drop', 'drops') },
-      { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5, idle: noClock,
-        format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
+      // The stepper hides while cards are unlimited, leaving the Counted or Unlimited picker beside it (cardsKind).
       { key: 'recTokensPerDay', label: 'Cards per day', kind: 'stepper', min: 0, max: 100,
-        idle: (d) => noCards(d) || (d.cards === 'unlimited' ? 'Not used while cards are unlimited.' : ''),
         unit: () => [DripPage.icon('card', 'drip-token-card')], say: (n) => plural(n, 'card', 'cards') },
-      // Not in the mockups. Settings is where the feed source lives for now (Q5).
-      { key: 'feedSource', label: 'Reveal from', kind: 'choice', idle: noCards, options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
+      // Settings is where the feed source lives for now (Q5).
+      { key: 'feedSource', label: 'Reveal from', kind: 'choice', options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
       // Q30. Upcoming and members-only videos are never dealt, so they have no switch.
-      { key: 'streams', label: 'Reveal live streams', kind: 'toggle', idle: noCards,
+      { key: 'streams', label: 'Reveal live streams', kind: 'toggle',
         hint: 'Live now and past streams. Upcoming and members-only videos never come up.' },
-      { key: 'rolloverDays', label: 'Save unspent for', kind: 'stepper', min: 1, max: 7,
-        idle: (d) => (!d.clock && d.cards !== 'limited' ? 'Not used without watch time or counted cards.' : ''),
-        unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days'),
-        hint: 'Unspent drops and cards carry over up to this many days.' },
+    ],
+  },
+  {
+    id: 'stash', title: 'Stash', icon: 'save',
+    toggle: { key: 'stash', label: 'Stash', kind: 'toggle' },
+    summary: (d) => (d.stash ? `Holds ${plural(d.stashMax, 'video', 'videos')}` : 'Off. No Stash buttons.'),
+    fields: [
       // Q28. Lowering it keeps every stashed video; a full stash asks which one to swap out.
       { key: 'stashMax', label: 'Stash holds', kind: 'stepper', min: 1, max: 50,
-        idle: (d) => (d.stash ? '' : 'Not used while the stash is off.'),
         unit: (n) => [n === 1 ? 'video' : 'videos'], say: (n) => plural(n, 'video', 'videos'),
         hint: 'A full stash asks which video to swap out.' },
     ],
   },
   {
-    title: 'Your day',
-    fields: [{ key: 'resetHour', label: 'New day starts at', kind: 'hour' }],
+    id: 'search', title: 'Search', icon: 'search',
+    toggle: { key: 'searchCap', label: 'Search', kind: 'toggle' },
+    summary: (d) => (d.searchCap ? 'Stops at 10 results' : 'Off. Search shows every result.'),
+    fields: [],
   },
   {
-    title: 'When time runs out',
+    // Not mode parts: the same in every mode, so the picker leaves them alone.
+    id: 'day', title: 'Every day', icon: 'clock',
+    summary: (d) => `New day at ${DripPage.hourLabel(d.resetHour)}, unspent saved for ${plural(d.rolloverDays, 'day', 'days')}`,
     fields: [
-      { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', idle: noClock },
-      { key: 'needThisPerDay', label: '"I need this one" per day', kind: 'stepper', min: 0, max: 10, idle: noClock,
-        say: (n) => String(n), hint: 'Each one needs a typed reason.' },
+      { key: 'resetHour', label: 'New day starts at', kind: 'hour' },
+      { key: 'rolloverDays', label: 'Save unspent for', kind: 'stepper', min: 1, max: 7,
+        idle: (d) => (!d.clock && d.cards !== 'limited' ? 'Not used without watch time or counted cards.' : ''),
+        unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days'),
+        hint: 'Unspent drops and cards carry over up to this many days.' },
+      // Q16.
+      { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle' },
     ],
   },
 ];
-const FIELDS = SECTIONS.flatMap((s) => s.fields);
+const FIELDS = PARTS.flatMap((p) => [...(p.toggle ? [p.toggle] : []), ...p.fields]);
+
+/** @param {string} key @param {Record<string, any>} d */
+const partOn = (key, d) => (key === 'cards' ? d.cards !== 'off' : !!d[key]);
+
+/**
+ * Counted or Unlimited, as the picker beside Cards per day shows it. While cards are off it keeps the last pick, so the
+ * switch turns them back on the same way. Off to start with, it follows Customize: counted while the clock is on.
+ */
+let cardsKind = 'limited';
 
 /** @type {any} */
 let state = null;
@@ -193,26 +219,58 @@ function stepper(f, labelId) {
   return h('div', { class: 'stepper' }, minus, value, plus);
 }
 
+/** @param {string} key */
+const fieldId = (key) => `field-${key}`;
+
+/** A gray picker. @param {string} id @param {[string, string][]} options @param {string} value @param {(v: string) => void} onPick */
+function picker(id, options, value, onPick) {
+  const { h, icon } = DripPage;
+  const select = /** @type {HTMLSelectElement} */ (h('select', { class: 'picker', id },
+    ...options.map(([v, label]) => h('option', { value: v, selected: v === value }, label))));
+  select.addEventListener('change', () => onPick(select.value));
+  return h('div', { class: 'picker-wrap' }, select, icon('chevron-down'));
+}
+
 /** @param {Field} f @param {string} labelId */
 function control(f, labelId) {
-  const { h, icon } = DripPage;
+  const { h } = DripPage;
   if (f.kind === 'stepper') return stepper(f, labelId);
   if (f.kind === 'toggle') {
-    const box = /** @type {HTMLInputElement} */ (h('input', { type: 'checkbox', role: 'switch', class: 'toggle', id: f.key, checked: draft[f.key] }));
+    const box = /** @type {HTMLInputElement} */ (h('input', { type: 'checkbox', role: 'switch', class: 'toggle', id: fieldId(f.key), checked: draft[f.key] }));
     box.addEventListener('change', () => { draft[f.key] = box.checked; draftChanged(); syncModeRow(); });
     return box;
   }
   const options = f.kind === 'hour'
-    ? Array.from({ length: 24 }, (_, hour) => [String(hour), DripPage.hourLabel(hour)])
+    ? Array.from({ length: 24 }, (_, hour) => /** @type {[string, string]} */ ([String(hour), DripPage.hourLabel(hour)]))
     : f.options || [];
-  const select = /** @type {HTMLSelectElement} */ (h('select', { class: 'picker', id: f.key },
-    ...options.map(([v, label]) => h('option', { value: v, selected: v === String(draft[f.key]) }, label))));
-  select.addEventListener('change', () => {
-    draft[f.key] = f.kind === 'hour' ? Number(select.value) : select.value;
+  return picker(fieldId(f.key), options, String(draft[f.key]), (v) => {
+    draft[f.key] = f.kind === 'hour' ? Number(v) : v;
     draftChanged();
     syncModeRow();
   });
-  return h('div', { class: 'picker-wrap' }, select, icon('chevron-down'));
+}
+
+/** The header switch for cards, which sets `cards` to off or back to Counted or Unlimited. */
+function cardsSwitch() {
+  const { h } = DripPage;
+  const box = /** @type {HTMLInputElement} */ (h('input', { type: 'checkbox', role: 'switch', class: 'toggle', id: fieldId('cards'), checked: draft.cards !== 'off' }));
+  box.addEventListener('change', () => { draft.cards = box.checked ? cardsKind : 'off'; draftChanged(); syncModeRow(); });
+  return box;
+}
+
+/** Counted or Unlimited, beside the Cards per day stepper. */
+function cardsKindPicker() {
+  return picker('field-cardsKind', [['limited', 'Counted'], ['unlimited', 'Unlimited']], cardsKind, (v) => {
+    cardsKind = v;
+    draft.cards = v;
+    draftChanged();
+    syncModeRow();
+  });
+}
+
+/** After the form's values are replaced: the picker follows them, or Customize's rule while cards are off. */
+function resetCardsKind() {
+  cardsKind = draft.cards !== 'off' ? draft.cards : draft.clock ? 'limited' : 'unlimited';
 }
 
 /** The gray chip for a loosening change that waits for the reset: "→ 3 days from 4:00am · Undo". */
@@ -254,7 +312,7 @@ const MODE_NAMES = /** @type {const} */ ([['quiet', 'Quiet'], ['curated', 'Curat
 function modeRow() {
   const { h } = DripPage;
   const now = Drip.modeOf(draft);
-  return h('div', { class: 'setting' },
+  return h('div', { class: 'setting mode-row' },
     h('div', { class: 'setting-text' },
       h('div', { class: 'setting-line' }, h('span', { class: 'setting-label', id: 'label-mode' }, 'Mode')),
       h('div', { class: 'hint' }, now ? 'Switch a part below to make your own mix.' : 'Your own mix.')),
@@ -280,34 +338,72 @@ function modeRow() {
 function pickMode(name) {
   Object.assign(draft, Drip.MODES[name]);
   for (const key of Object.keys(Drip.MODES[name])) picked.add(key);
+  if (draft.cards !== 'off') cardsKind = draft.cards;
   renderForm();
   draftChanged();
   /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
 }
 
-function renderForm() {
+/** One setting's row: label, waiting chip, hint, and control. @param {Field} f */
+function fieldRow(f) {
   const { h } = DripPage;
-  renderFirstDay();
-  $('settings').replaceChildren(...SECTIONS.map((section) => h('section', { class: 'group' },
-    h('h2', { class: 'caps' }, section.title),
-    section.modes && modeRow(),
-    ...section.fields.map((f) => {
-      const labelId = `label-${f.key}`;
-      const label = f.kind === 'stepper'
-        ? h('span', { class: 'setting-label', id: labelId }, f.label)
-        : h('label', { class: 'setting-label', id: labelId, for: f.key }, f.label);
-      return h('div', { class: 'setting', 'data-field': f.key },
-        h('div', { class: 'setting-text' },
-          h('div', { class: 'setting-line' }, label, chip(f)),
-          f.hint && h('div', { class: 'hint' }, f.hint),
-          f.idle && h('div', { class: 'hint idle-note' })),
-        control(f, labelId));
-    }))));
-  syncIdle();
-  renderStatus();
+  const labelId = `label-${f.key}`;
+  const label = f.kind === 'stepper'
+    ? h('span', { class: 'setting-label', id: labelId }, f.label)
+    : h('label', { class: 'setting-label', id: labelId, for: fieldId(f.key) }, f.label);
+  const input = control(f, labelId);
+  return h('div', { class: 'setting', 'data-field': f.key },
+    h('div', { class: 'setting-text' },
+      h('div', { class: 'setting-line' }, label, chip(f)),
+      f.hint && h('div', { class: 'hint' }, f.hint),
+      f.idle && h('div', { class: 'hint idle-note' })),
+    f.key === 'recTokensPerDay' ? h('div', { class: 'controls' }, input, cardsKindPicker()) : input);
 }
 
-/** Dims the settings for parts that are off in the form's mix, and says why. Runs on every edit. */
+/** A part's section: a header with its icon, name, summary, and switch, then its rows. @param {Part} p */
+function partSection(p) {
+  const { h, icon } = DripPage;
+  const t = p.toggle;
+  return h('section', { class: 'part', id: p.id, 'data-part': t && t.key },
+    h('div', { class: 'part-head' },
+      h('span', { class: 'part-icon' }, icon(p.icon, p.iconClass)),
+      h('div', { class: 'part-text' },
+        h('div', { class: 'setting-line' },
+          h('h2', { class: 'part-name' }, t ? h('label', { for: fieldId(t.key) }, p.title) : p.title), t && chip(t)),
+        h('div', { class: 'part-sum' })),
+      t && (t.key === 'cards' ? cardsSwitch() : control(t, ''))),
+    p.fields.length > 0 && h('div', { class: 'rows' }, h('div', { class: 'rows-inner' }, ...p.fields.map(fieldRow))));
+}
+
+function renderForm() {
+  renderFirstDay();
+  $('settings').replaceChildren(modeRow(), ...PARTS.map(partSection));
+  syncParts();
+  syncIdle();
+  renderBar();
+}
+
+/**
+ * Folds the sections of parts that are off, keeps each summary current, and hides the cards stepper while cards are
+ * unlimited. Runs on every edit. A folded section's rows are inert, so Tab skips them.
+ */
+function syncParts() {
+  for (const p of PARTS) {
+    const section = $(p.id);
+    if (!section) continue;
+    const off = !!p.toggle && !partOn(p.toggle.key, draft);
+    section.classList.toggle('is-off', off);
+    section.querySelector('.rows')?.toggleAttribute('inert', off);
+    const sum = section.querySelector('.part-sum');
+    if (sum) sum.textContent = p.summary(draft);
+  }
+  const counted = document.querySelector('[data-field="recTokensPerDay"]');
+  counted?.classList.toggle('is-unlimited', draft.cards === 'unlimited');
+  const stepper = counted?.querySelector('.stepper');
+  if (stepper) /** @type {HTMLElement} */ (stepper).hidden = draft.cards === 'unlimited';
+}
+
+/** Dims a setting that does nothing in the form's mix, and says why. Runs on every edit. */
 function syncIdle() {
   for (const f of FIELDS) {
     if (!f.idle) continue;
@@ -341,16 +437,29 @@ function edits(base) {
   return Object.fromEntries(FIELDS.filter((f) => draft[f.key] !== base[f.key]).map((f) => [f.key, draft[f.key]]));
 }
 
-function renderStatus() {
+/**
+ * The save bar at the bottom of the window: "2 changes not saved" with Undo all and Save while there are edits, then
+ * "Saved." and the waiting count for a moment after Save (IDEAS.md, "Settings page").
+ */
+function renderBar() {
+  const n = Object.keys(toSave()).length;
   const waiting = state.pending ? Object.keys(state.pending.changes).length : 0;
-  const waitingText = waiting ? `${waiting} waiting for the reset.` : '';
-  $('result').textContent = dirty() ? 'Not saved yet.' : [justSaved && 'Saved.', waitingText].filter(Boolean).join(' ');
+  const text = n ? `${plural(n, 'change', 'changes')} not saved`
+    : justSaved ? ['Saved.', waiting && `${waiting} waiting for the reset.`].filter(Boolean).join(' ') : '';
+  $('savebar').hidden = !text;
+  $('savebar').classList.toggle('is-saved', !n);
+  $('result').textContent = text;
+  $('status').textContent = text;
 }
+
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let savedTimer;
 
 function draftChanged() {
   justSaved = false;
+  syncParts();
   syncIdle();
-  renderStatus();
+  renderBar();
 }
 
 /** @param {any} res */
@@ -361,16 +470,28 @@ function absorb(res) {
 
 async function save() {
   const changes = toSave();
-  if (!Object.keys(changes).length) {
-    $('result').textContent = 'Nothing changed.';
-    return;
-  }
+  if (!Object.keys(changes).length) return;
   absorb(await send({ type: 'updateSettings', changes }));
   picked.clear();
   draft = { ...state.settings };
+  resetCardsKind();
   justSaved = true;
   renderForm();
   renderHistory();
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => {
+    justSaved = false;
+    renderBar();
+  }, 2500);
+}
+
+/** Undo all: the form goes back to the saved settings. */
+function undoAll() {
+  picked.clear();
+  draft = { ...state.settings };
+  resetCardsKind();
+  justSaved = false;
+  renderForm();
 }
 
 /** @param {string} key */
@@ -381,6 +502,7 @@ async function cancel(key) {
   absorb(await send({ type: 'cancelPending', key }));
   justSaved = false;
   draft = { ...state.settings, ...kept };
+  resetCardsKind();
   renderForm();
 }
 
@@ -497,6 +619,12 @@ function renderReasons() {
 }
 
 $('save').addEventListener('click', save);
+$('undoAll').addEventListener('click', undoAll);
+
+// Leaving with edits not saved asks first (IDEAS.md, "Settings page").
+window.addEventListener('beforeunload', (e) => {
+  if (state && dirty()) e.preventDefault();
+});
 
 // Another tab or the day reset changed the state. Keep everything current without wiping an edit in progress.
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -509,6 +637,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (JSON.stringify([state.settings, state.pending]) !== before) {
     // Fields being edited keep their values. Every other field follows the new settings (Codex, 2026-10-11).
     draft = { ...state.settings, ...kept };
+    resetCardsKind();
     renderForm();
   }
   renderHistory();
@@ -588,6 +717,7 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
   if (!state) return;
   picked.clear();
   draft = { ...state.settings };
+  resetCardsKind();
   renderForm();
   renderHistory();
   renderReasons();
