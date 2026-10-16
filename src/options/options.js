@@ -62,6 +62,9 @@ const SECTIONS = [
         unit: () => [DripPage.icon('card', 'drip-token-card')], say: (n) => plural(n, 'card', 'cards') },
       // Not in the mockups. Settings is where the feed source lives for now (Q5).
       { key: 'feedSource', label: 'Reveal from', kind: 'choice', idle: noCards, options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
+      // Q30. Upcoming and members-only videos are never dealt, so they have no switch.
+      { key: 'streams', label: 'Reveal live streams', kind: 'toggle', idle: noCards,
+        hint: 'Live now and past streams. Upcoming and members-only videos never come up.' },
       { key: 'rolloverDays', label: 'Save unspent for', kind: 'stepper', min: 1, max: 7,
         idle: (d) => (!d.clock && d.cards !== 'limited' ? 'Not used without watch time or counted cards.' : ''),
         unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days'),

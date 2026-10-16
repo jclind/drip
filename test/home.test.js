@@ -349,10 +349,73 @@ function makeWorld() {
 }
 
 /**
+ * The markup YouTube gives each kind of grid item, as read on air on 2026-10-16: NASA's streams tab for upcoming, live,
+ * and past streams, and Linus Tech Tips' videos tab for members-only.
+ * @param {any} document @param {any} item @param {string} kind
+ */
+function gridMarks(document, item, kind) {
+  /** @param {string} cls @param {string} text */
+  const badge = (cls, text) => {
+    const host = new FakeElement(document, 'div');
+    host.className = `ytBadgeShapeHost ${cls}`;
+    const label = new FakeElement(document, 'div');
+    label.className = 'ytBadgeShapeText';
+    label.textContent = text;
+    host.append(label);
+    item.append(host);
+  };
+  /** @param {string} text */
+  const meta = (text) => {
+    const el = new FakeElement(document, 'span');
+    el.className = 'ytContentMetadataViewModelMetadataText';
+    el.textContent = text;
+    item.append(el);
+  };
+  if (kind === 'video') {
+    badge('ytBadgeShapeThumbnailDefault', '14:02');
+    meta('184K');
+    meta('3d ago');
+  } else if (kind === 'upcoming') {
+    badge('ytBadgeShapeThumbnailDefault', 'Upcoming');
+    meta('5 waiting');
+    meta('Scheduled for 10/23/26, 2:00 PM');
+    // The "Notify me" button.
+    item.append(new FakeElement(document, 'lockup-attachments-view-model'));
+  } else if (kind === 'live') {
+    badge('ytBadgeShapeThumbnailLive', 'LIVE');
+    meta('168 watching');
+  } else if (kind === 'streamed') {
+    badge('ytBadgeShapeThumbnailDefault', '1:42:26');
+    meta('60K');
+    meta('Streamed 23h ago');
+  } else if (kind === 'members') {
+    badge('ytBadgeShapeThumbnailDefault', '14:02');
+    badge('ytBadgeShapeCommerce', 'Members only');
+    meta('3d ago');
+  } else if (kind === 'attached') {
+    // Not seen yet: a normal video with something under the card, like a Join button. It still has a length.
+    gridMarks(document, item, 'video');
+    item.append(new FakeElement(document, 'lockup-attachments-view-model'));
+  } else if (kind === 'premiere') {
+    // An upcoming premiere whose "Notify me" button hasn't rendered, with the channel line Home and Subscriptions have.
+    badge('ytBadgeShapeThumbnailDefault', 'Upcoming');
+    meta('Some Channel');
+    meta('Premieres 10/23/26, 2:00 PM');
+  } else if (kind === 'members-old') {
+    // The older markup's members-only badge.
+    const old = new FakeElement(document, 'div');
+    old.className = 'badge badge-style-type-members-only';
+    old.textContent = 'Members only';
+    item.append(old);
+    meta('3d ago');
+  } else throw new Error(`no markup for ${kind}`);
+}
+
+/**
  * One YouTube tab on the home page, running home.js.
  * @param {ReturnType<typeof makeWorld>} world
  * @param {{reduced?: boolean, grid?: string[]}} [opts] reduced: the browser asks for reduced motion, so nothing
- *   animates. grid: the ids in YouTube's hidden home grid.
+ *   animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that kind's markup (gridMarks).
  */
 async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}) {
   let now = 0;
@@ -398,7 +461,8 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
   results.append(primary);
   browse.append(results);
   document.body.append(browse);
-  for (const id of grid) {
+  for (const entry of grid) {
+    const [kind, id] = entry.includes(':') ? entry.split(':') : ['video', entry];
     const item = new FakeElement(document, 'ytd-rich-item-renderer');
     const link = new FakeElement(document, 'a');
     link.setAttribute('href', `/watch?v=${id}`);
@@ -407,6 +471,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     title.textContent = `Video ${id}`;
     link.append(title);
     item.append(link);
+    gridMarks(document, item, kind);
     primary.append(item);
   }
 
@@ -681,6 +746,66 @@ for (const reduced of [true, false]) {
     assert.match(tab.message(), /hasn't loaded anything new/);
   });
 }
+
+test('a reveal reads what kind each grid item is, and deals only what it may (Q30)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { grid: ['upcoming:s1', 'live:l1', 'members:m1', 'streamed:p1', 'video:v1'] });
+  await tab.click('reveal');
+  await tab.advance(100);
+  const sent = world.sent.find((msg) => msg.type === 'reveal');
+  assert.deepEqual(Array.from(sent.candidates, (/** @type {any} */ v) => `${v.kind}:${v.id}`), ['upcoming:s1', 'live:l1', 'members:m1', 'streamed:p1', 'video:v1']);
+  assert.equal(sent.candidates[4].length, '14:02');
+  assert.equal(world.state.current.id, 'v1');
+  assert.equal(world.state.tokens.rec, 9);
+});
+
+test('a channel named "Streamed ..." does not make its uploads past streams (Q30, Codex 2026-10-16)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { grid: ['v1'] });
+  const item = tab.browse.querySelector('ytd-rich-item-renderer');
+  const channel = new FakeElement(tab.document, 'span');
+  channel.className = 'ytContentMetadataViewModelMetadataText';
+  channel.textContent = 'Streamed Highlights';
+  item.insertBefore(channel, item.firstChild);
+  await tab.click('reveal');
+  await tab.advance(100);
+  const sent = world.sent.find((msg) => msg.type === 'reveal');
+  assert.equal(sent.candidates[0].kind, 'video');
+  assert.equal(world.state.current.id, 'v1');
+});
+
+test('a card with a length is not upcoming, a premiere is upcoming by its text, and the older members badge counts (Q30)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { grid: ['premiere:s1', 'members-old:m1', 'attached:v1'] });
+  await tab.click('reveal');
+  await tab.advance(100);
+  const sent = world.sent.find((msg) => msg.type === 'reveal');
+  assert.deepEqual(Array.from(sent.candidates, (/** @type {any} */ v) => `${v.kind}:${v.id}`), ['upcoming:s1', 'members:m1', 'video:v1']);
+  assert.equal(world.state.current.id, 'v1');
+});
+
+test('with streams allowed, a live stream can be dealt (Q30)', async () => {
+  const world = makeWorld();
+  world.state.settings.streams = true;
+  const tab = await makeTab(world, { grid: ['upcoming:s1', 'live:l1', 'video:v1'] });
+  await tab.click('reveal');
+  await tab.advance(100);
+  assert.equal(world.state.current.id, 'l1');
+});
+
+test('a grid of only videos a reveal may not deal looks further and spends nothing (Q30)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { grid: ['upcoming:s1', 'members:m1', 'live:l1', 'streamed:p1'] });
+  await tab.click('reveal');
+  // None of these count as new, so it doesn't stop at this grid. It asks the hidden home frame for more, which never
+  // loads in the fake page, so the worker hears nothing until that times out.
+  await tab.advance(1000);
+  assert.equal(world.sent.filter((msg) => msg.type === 'reveal').length, 0, 'it looked further first');
+  await tab.advance(35000);
+  assert.equal(world.state.current, null);
+  assert.equal(world.state.tokens.rec, 10);
+  assert.match(tab.message(), /hasn't loaded anything new/);
+});
 
 test('a picture that never loads holds the animated reveal for 8 seconds, not forever', async () => {
   const world = makeWorld();

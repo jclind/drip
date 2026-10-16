@@ -40,6 +40,7 @@
  * @property {boolean} clock The watch clock: drops, minutes, the pill, and the lock (Q3, Q10). A mode part (Q29).
  * @property {boolean} stash The stash and its buttons (Q14, Q28). A mode part (Q29).
  * @property {boolean} hideBell YouTube's notification bell is hidden. The same in every mode, so not a part (Q16).
+ * @property {boolean} streams A reveal may deal live streams and past streams (Q30). Not a mode part.
  */
 /**
  * @typedef {Object} Video
@@ -87,6 +88,7 @@
     clock: true,
     stash: true,
     hideBell: true,
+    streams: false,
   });
   /**
    * The three modes (Q29). Each is a set of parts, and a mix that matches none of them is a custom mode. The defaults
@@ -260,6 +262,7 @@
 
   /**
    * Reveals one video (Q13). It costs a card only with `cards: 'limited'`, and with cards off there are no reveals (Q29).
+   * It skips what mayReveal rules out (Q30).
    * @param {State} state @param {unknown[]} candidates
    */
   function reveal(state, candidates) {
@@ -267,9 +270,8 @@
     if (state.settings.cards === 'off') return { ok: false, error: 'cards-off' };
     const paid = state.settings.cards === 'limited';
     if (paid && state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
-    const seen = new Set(state.seen);
-    const saved = new Set(state.backlog.map(video => video.id));
-    const video = candidates.map(cleanVideo).find(candidate => !!candidate && !seen.has(candidate.id) && !saved.has(candidate.id));
+    const pick = candidates.find(candidate => canDeal(state, candidate));
+    const video = pick ? cleanVideo(pick) : null;
     if (!video) return { ok: false, error: 'pool-empty' };
     if (paid) state.tokens.rec--;
     state.current = video;
@@ -278,6 +280,31 @@
     // With unlimited cards nothing is spent, but the reveal still counts, so History's cards line adds up.
     logDay(state).recSpent++;
     return { ok: true, video };
+  }
+
+  /**
+   * Whether a reveal may deal a video of this kind (Q30). An upcoming video can't be watched yet and a members-only one
+   * needs a paid membership, so neither ever is. Live and past streams are dealt only with the "streams" setting on. A
+   * video with no kind is a normal one.
+   * @param {unknown} candidate As home.js read it from the grid, with `kind`.
+   * @param {Settings} settings
+   */
+  function mayReveal(candidate, settings) {
+    const kind = candidate && typeof candidate === 'object' ? /** @type {{kind?: unknown}} */ (candidate).kind : undefined;
+    if (kind === 'upcoming' || kind === 'members') return false;
+    if (kind === 'live' || kind === 'streamed') return settings.streams === true;
+    return true;
+  }
+
+  /**
+   * Whether a reveal could deal this candidate now. It has to be a video, a kind mayReveal allows, not revealed before,
+   * and not in the stash. The home page asks the same thing to know when to stop looking.
+   * @param {State} state @param {unknown} candidate
+   */
+  function canDeal(state, candidate) {
+    const video = cleanVideo(candidate);
+    return !!video && mayReveal(candidate, state.settings) && !state.seen.includes(video.id)
+      && !state.backlog.some(saved => saved.id === video.id);
   }
 
   /**
@@ -353,9 +380,7 @@
     if (videoId !== state.current.id) return { ok: false, error: 'stale-card' };
     if (state.settings.cards === 'off') return { ok: false, error: 'cards-off' };
     if (state.settings.cards === 'limited' && state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
-    const seen = new Set(state.seen);
-    const saved = new Set(state.backlog.map(video => video.id));
-    if (!candidates.map(cleanVideo).some(c => !!c && !seen.has(c.id) && !saved.has(c.id))) return { ok: false, error: 'pool-empty' };
+    if (!candidates.some(candidate => canDeal(state, candidate))) return { ok: false, error: 'pool-empty' };
     endCard(state, 'pass');
     return reveal(state, candidates);
   }
@@ -531,7 +556,7 @@
         cleaned.graceMode = Boolean(value);
       } else if (key === 'feedSource' && (value === 'home' || value === 'subscriptions')) {
         cleaned.feedSource = value;
-      } else if ((key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell') && typeof value === 'boolean') {
+      } else if ((key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell' || key === 'streams') && typeof value === 'boolean') {
         cleaned[key] = value;
       } else if (key === 'cards' && (value === 'off' || value === 'unlimited' || value === 'limited')) {
         cleaned.cards = value;
@@ -544,7 +569,7 @@
   function isLoosening(key, from, to) {
     if (key === 'resetHour') return from !== to;
     if (key === 'feedSource') return false;
-    if (key === 'graceMode') return from === false && to === true;
+    if (key === 'graceMode' || key === 'streams') return from === false && to === true;
     // Turning a mode part off, or cards from a count to unlimited, gives less drip, so it waits (Q29).
     // Showing the bell again waits too.
     if (key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell') return from === true && to === false;
@@ -896,7 +921,7 @@
     DEFAULT_SETTINGS, MODES, modeOf, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
-    isLoosening, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
+    isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
   };
 })();
