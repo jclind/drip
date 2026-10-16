@@ -393,9 +393,15 @@ html[dark] #drip-lock {
   transition: opacity 200ms ease;
 }
 
+/* The blur over a playing video costs the GPU process about 6 points of CPU even at opacity 0 (AUDIT.md, 2026-10-16),
+   so a hidden pill drops it once the fade is done. Coming back, the base rule's transition applies, and the blur is
+   there at once. */
 #drip-pill.is-idle {
   opacity: 0;
   pointer-events: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition: opacity 200ms ease, backdrop-filter 0s linear 200ms;
 }
 
 /* Two rings as the grace label appears, 1.4 seconds apart. The pill's own outline reaches past its overflow clip;

@@ -576,11 +576,13 @@
    * @type {Promise<void> | null}
    */
   let landing = null;
+  /** +15m's purchase is on its way to the worker. Without the drop's fall, this holds a held Enter's repeats. */
+  let buying = false;
 
   /** @param {Event} e */
   async function onAddTime(e) {
     // A double-click buys one drop, as home's +15m does. Without the drop's fall, nothing else holds the second click.
-    if (landing || /** @type {MouseEvent} */ (e).detail > 1) return;
+    if (landing || buying || /** @type {MouseEvent} */ (e).detail > 1) return;
     // The worker's storage change can lift the lock before this reply arrives, so the drain is asked for up front.
     drainNext = true;
     const button = /** @type {HTMLElement} */ (e.currentTarget);
@@ -592,7 +594,13 @@
         .catch(() => {})
         .then(() => { landing = null; });
     }
-    const res = await send({ type: 'spendWatch' });
+    buying = true;
+    let res;
+    try {
+      res = await send({ type: 'spendWatch' });
+    } finally {
+      buying = false;
+    }
     if (landing) await landing;
     if (disconnected) return;
     if (res && res.ok) {
