@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C, Sentences</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="base.css">
+<style>
+  main { max-width: 600px; margin: 0 auto; padding: 56px 16px 140px; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 38px; margin: 0 0 8px; }
+  .first-day { margin: 0 0 24px; }
+
+  .mode { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 28px; }
+  .mode .muted { flex: 1; min-width: 160px; }
+
+  /* Each part is one card that reads as what drip does, with the controls set into the sentence. */
+  .part { padding: 20px 24px 22px; border-radius: 16px; background: var(--gray); margin-bottom: 12px; }
+  .part-head { display: flex; align-items: center; gap: 12px; }
+  .part-head .i { width: 18px; height: 20px; }
+  .part-head .i:not(.i-drop):not(.i-card) { color: var(--muted); }
+  .part-name { flex: 1; font-size: 15px; font-weight: 500; color: var(--muted); }
+  .say { margin: 14px 0 0; font-size: 18px; line-height: 2.3; }
+  .say + .say { margin-top: 4px; }
+  .say .stepper, .say .picker-wrap { display: inline-flex; vertical-align: middle; margin: 0 2px; }
+  .say .stepper { height: 30px; background: var(--bg); }
+  .say .stepper button { background: var(--bg); }
+  .say .stepper output { min-width: 56px; }
+  .say select.picker { background: var(--bg); height: 30px; }
+  .say .toggle { vertical-align: middle; margin-left: 4px; }
+  .say .why { display: block; color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: -2px; }
+  .part.is-off { background: none; outline: 1px solid var(--line); outline-offset: -1px; }
+  .part.is-off .say { display: none; }
+  .off-say { display: none; margin: 8px 0 0; color: var(--muted); font-size: 15px; }
+  .part.is-off .off-say { display: block; }
+  [data-cards-kind].is-unlimited .stepper, [data-cards-kind].is-unlimited .counted { display: none; }
+  [data-cards-kind]:not(.is-unlimited) .unl { display: none; }
+  .is-dim { opacity: 0.45; }
+  .group-title { margin: 32px 0 12px; font-size: 15px; font-weight: 500; color: var(--muted); }
+  .data-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .data-row button { background: var(--bg); }
+
+  .savebar { position: fixed; left: 0; right: 0; bottom: 0; border-radius: 0; padding: 12px max(16px, calc(50% - 284px)); box-shadow: 0 -1px 0 var(--line); background: var(--bg); z-index: 5; }
+  .savebar.is-saved .count { color: var(--muted); }
+  .savebar.is-saved button { display: none; }
+
+  .history { margin-top: 40px; }
+  .card { padding: 24px 28px; border-radius: 16px; background: var(--gray); }
+  .card .label { color: var(--muted); font-size: 15px; font-weight: 500; }
+  .card .big { font-size: 30px; font-weight: 600; }
+  .bars { display: grid; grid-template-columns: repeat(7, 1fr); height: 120px; align-items: end; gap: 10px; margin-top: 16px; border-bottom: 1px solid var(--line); }
+  .bars span { height: 2px; background: var(--blue); border-radius: 2px; }
+
+  @media (max-width: 480px) {
+    .part { padding: 18px 16px; }
+    .say { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>drip settings</h1>
+  <p class="muted first-day">Changes apply right away until 4:47pm tomorrow, while you try drip out. After that, raising a limit waits for the reset.</p>
+
+  <div class="mode" id="mode">
+    <div class="segmented" role="radiogroup" aria-label="Mode">
+      <button type="button" role="radio" data-mode="quiet">Quiet</button>
+      <button type="button" role="radio" data-mode="curated">Curated</button>
+      <button type="button" role="radio" data-mode="full">Full drip</button>
+    </div>
+    <span class="muted" data-mode-hint></span>
+  </div>
+
+  <section class="part" id="watch" data-part="clock" data-flash>
+    <div class="part-head"><span class="i i-drop"></span><span class="part-name">Watch time</span><span data-ctl="clock"></span></div>
+    <p class="say">You get <span data-ctl="watchTokensPerDay"></span> drops a day, and each one is <span data-ctl="minutesPerToken"></span> of watching.</p>
+    <p class="say">Finish the video when time runs out <span data-ctl="graceMode"></span></p>
+    <p class="say"><span data-ctl="needThisPerDay"></span> times a day, unlock a video with a typed reason.</p>
+    <p class="say">Quiet hours <span data-ctl="quietOn"></span> <span class="planned">Planned</span><br>
+      <span class="is-dim" data-dep="quietOn">No drops from <span data-ctl="quietFrom"></span> to <span data-ctl="quietTo"></span></span></p>
+    <p class="off-say">Off. Videos play with no clock.</p>
+  </section>
+
+  <section class="part" id="cards" data-part="cards" data-flash>
+    <div class="part-head"><span class="i i-card"></span><span class="part-name">Cards</span><span data-ctl="cards"></span></div>
+    <p class="say" data-cards-kind><span class="counted">Reveal <span data-ctl="recTokensPerDay"></span> cards a day</span><span class="unl">Reveal as many cards as you like</span> from <span data-ctl="feedSource"></span></p>
+    <p class="say">Cards per day are <span data-ctl="cardsKind"></span></p>
+    <p class="say">Include live streams <span data-ctl="streams"></span>
+      <span class="why">Live now and past streams. Upcoming and members-only videos never come up.</span></p>
+    <p class="off-say">Off. Home shows a search box.</p>
+  </section>
+
+  <section class="part" id="stash" data-part="stash" data-flash>
+    <div class="part-head"><span class="i i-save"></span><span class="part-name">Stash</span><span data-ctl="stash"></span></div>
+    <p class="say">Keep up to <span data-ctl="stashMax"></span> for later.
+      <span class="why">A full stash asks which video to swap out.</span></p>
+    <p class="off-say">Off. No Stash buttons.</p>
+  </section>
+
+  <section class="part" id="search" data-part="searchCap" data-flash>
+    <div class="part-head"><span class="i i-search"></span><span class="part-name">Search</span><span data-ctl="searchCap"></span></div>
+    <p class="say">Search stops after 10 results.</p>
+    <p class="off-say">Off. Search shows every result.</p>
+  </section>
+
+  <div class="group-title">Also</div>
+
+  <section class="part" id="general" data-flash>
+    <div class="part-head"><span class="i i-clock"></span><span class="part-name">Every day</span></div>
+    <p class="say">A new day starts at <span data-ctl="resetHour"></span>, and unspent drops and cards carry over for <span data-ctl="rolloverDays"></span></p>
+    <p class="say">Hide the notification bell <span data-ctl="hideBell"></span></p>
+  </section>
+
+  <section class="part" id="channels" data-flash>
+    <div class="part-head"><span class="i i-users"></span><span class="part-name">Channels</span><span class="planned">Planned</span></div>
+    <p class="say">Always allowed: <span class="empty">none yet.</span><br>Never revealed: <span class="empty">none yet.</span>
+      <span class="why">Add a channel from a reveal card.</span></p>
+  </section>
+
+  <section class="part" id="data" data-flash>
+    <div class="part-head"><span class="i i-download"></span><span class="part-name">Your data</span><span class="planned">Planned</span></div>
+    <p class="say" style="font-size:15px;line-height:1.5">Everything drip knows stays in this browser. A reset goes back to the defaults and keeps today's drops and cards.</p>
+    <div class="data-row"><button type="button">Export a file</button><button type="button">Import a file</button><button type="button">Reset settings</button></div>
+  </section>
+
+  <section class="history" id="history">
+    <div class="group-title">History</div>
+    <div class="card">
+      <div class="label">Daily average</div>
+      <div class="big">0m</div>
+      <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    </div>
+  </section>
+</main>
+
+<div class="savebar" data-savebar hidden role="status">
+  <span class="count"></span>
+  <button type="button" class="link" data-undo>Undo all</button>
+  <button type="button" class="primary" data-save>Save</button>
+</div>
+<script src="base.js"></script>
+</body>
+</html>

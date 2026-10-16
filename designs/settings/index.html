@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>drip settings, round 1</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap">
+<style>
+  :root { --bg: #0f0f0f; --bar: #1c1c1c; --text: #f1f1f1; --muted: #aaa; --chip: rgba(255,255,255,.1); --on: #fff; --on-fg: #0f0f0f; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font: 13px/1.4 Roboto, Arial, sans-serif; color: var(--text); background: var(--bg); }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; background: var(--bar); }
+  .round { color: var(--muted); }
+  .group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .group-name { margin-right: 4px; color: var(--muted); }
+  .bar button, .bar .open { height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: var(--chip); color: var(--text); font: inherit; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  .bar button[aria-pressed="true"] { background: var(--on); color: var(--on-fg); }
+  .idea { flex-basis: 100%; color: var(--muted); }
+  iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
+  :focus-visible { outline: 2px solid #3ea6ff; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="round">Round 1</span>
+  <div class="group"><span class="group-name">Settings</span>
+    <button type="button" data-v="a">A, Folds</button>
+    <button type="button" data-v="b">B, Two panes</button>
+    <button type="button" data-v="c">C, Sentences</button>
+  </div>
+  <div class="group"><span class="group-name">Elsewhere</span>
+    <button type="button" data-v="links">Links into Settings</button>
+  </div>
+  <div class="group">
+    <button type="button" data-t="dark">Dark</button>
+    <button type="button" data-t="light">Light</button>
+  </div>
+  <a class="open" id="open" target="_blank" rel="noopener">Open alone</a>
+  <div class="idea" id="idea"></div>
+</div>
+<iframe id="frame" title="Mockup"></iframe>
+<script>
+  const V = {
+    a: ['a.html', "Today's single column, regrouped. Each part is a header with its icon, name, a live summary, and its switch. Switch a part off and its rows fold away, leaving one line."],
+    b: ['b.html', 'A list of every part on the left, each showing what it is set to now ("4 a day", "Off"), and one part at a time on the right. On a phone the list is the first screen.'],
+    c: ['c.html', 'Each part is a card that reads as a sentence, with the controls set into it: "You get [4] drops a day, and each one is [15m] of watching." Off parts shrink to an outline and one line.'],
+    links: ['links.html', 'The lock, a reveal card, and the popup with links into Settings. Click a link to land on its section in A, B, or C.'],
+  };
+  const st = { v: 'a', t: 'dark', hash: '' };
+  try { Object.assign(st, JSON.parse(sessionStorage.getItem('settings1') || '{}'), { hash: '' }); } catch {}
+  function go() {
+    const [file, idea] = V[st.v];
+    const url = file + (st.t === 'light' && st.v !== 'links' ? '?theme=light' : '') + st.hash;
+    const f = document.getElementById('frame');
+    if (f.getAttribute('src') !== url) f.src = url;
+    document.getElementById('open').href = url;
+    document.getElementById('idea').textContent = idea;
+    for (const b of document.querySelectorAll('[data-v]')) b.setAttribute('aria-pressed', String(b.dataset.v === st.v));
+    for (const b of document.querySelectorAll('[data-t]')) b.setAttribute('aria-pressed', String(b.dataset.t === st.t));
+    try { sessionStorage.setItem('settings1', JSON.stringify(st)); } catch {}
+  }
+  for (const b of document.querySelectorAll('[data-v],[data-t]')) b.addEventListener('click', () => { if (b.dataset.v) st.v = b.dataset.v; if (b.dataset.t) st.t = b.dataset.t; st.hash = ''; go(); });
+  // A link clicked on the links page opens that variant at the linked section.
+  addEventListener('message', (e) => {
+    if (!e.data || !e.data.open) return;
+    st.v = e.data.open;
+    st.hash = e.data.url.includes('#') ? e.data.url.slice(e.data.url.indexOf('#')) : '';
+    go();
+  });
+  go();
+</script>
+</body>
+</html>

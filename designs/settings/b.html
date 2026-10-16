@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B, Two panes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="base.css">
+<style>
+  .shell { display: grid; grid-template-columns: 268px minmax(0, 560px); gap: 56px; justify-content: center; padding: 48px 24px 96px; }
+
+  /* Left: every part with what it's set to now, so the page reads at a glance without opening anything. */
+  nav { position: sticky; top: 48px; align-self: start; }
+  .brand { font-size: 22px; font-weight: 500; margin: 0 0 20px 12px; }
+  .nav-mode { margin: 0 0 18px 4px; }
+  .nav-mode .segmented { display: flex; }
+  .nav-mode .segmented button { flex: 1; padding: 6px 0; }
+  .nav-mode .muted { margin: 6px 0 0 8px; }
+  .navlist { list-style: none; margin: 0; padding: 0; }
+  .navlist + .navlist { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .navlist button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px; border-radius: 10px;
+    background: none; text-align: left; }
+  .navlist button:hover { background: var(--gray); }
+  .navlist button[aria-current="true"] { background: var(--gray-raised); }
+  .navlist .i:not(.i-drop):not(.i-card) { color: var(--muted); }
+  .nav-name { flex: 1; font-size: 15px; }
+  .nav-state { color: var(--muted); font-size: 13px; font-weight: 400; }
+  [data-part].is-off .nav-state { color: var(--muted); }
+  [data-part].is-off .nav-name { color: var(--muted); }
+
+  /* Right: one part at a time. */
+  .pane[hidden] { display: none; }
+  .pane-head { display: flex; align-items: center; gap: 16px; padding: 4px 8px 14px; margin: 0 -8px 20px; border-bottom: 1px solid var(--line); }
+  .pane-head h2 { flex: 1; margin: 0; font-size: 26px; font-weight: 500; }
+  .pane-head .back { display: none; }
+  .lede { color: var(--muted); font-size: 15px; margin: -8px 0 24px; }
+  .setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; margin-bottom: 14px; }
+  .setting-label { font-size: 15px; font-weight: 500; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .controls { display: flex; gap: 8px; align-items: center; }
+  [data-cards-kind].is-unlimited .stepper { display: none; }
+  .is-dim { opacity: 0.45; }
+  .times { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .off-note { display: none; padding: 20px; border-radius: 12px; background: var(--gray); color: var(--muted); }
+  .pane.is-off .off-note { display: block; }
+  .pane.is-off .body, .pane.is-off .lede { display: none; }
+  .list { margin-bottom: 20px; }
+  .list-title { font-size: 15px; font-weight: 500; }
+
+  .savebar { position: sticky; top: 16px; margin-bottom: 24px; z-index: 5; }
+  .savebar.is-saved .count { color: var(--muted); }
+  .savebar.is-saved button { display: none; }
+
+  .card { padding: 24px 28px; border-radius: 16px; background: var(--gray); }
+  .card .label { color: var(--muted); font-size: 15px; font-weight: 500; }
+  .card .big { font-size: 30px; font-weight: 600; }
+  .bars { display: grid; grid-template-columns: repeat(7, 1fr); height: 160px; align-items: end; gap: 10px; margin-top: 16px; border-bottom: 1px solid var(--line); }
+  .bars span { height: 2px; background: var(--blue); border-radius: 2px; }
+
+  /* Phone: the list is the first screen, and a part opens on its own screen with a back button. */
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: minmax(0, 1fr); padding: 32px 16px 96px; gap: 0; }
+    nav { position: static; }
+    body.in-pane nav { display: none; }
+    body:not(.in-pane) main { display: none; }
+    .pane-head .back { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; background: none; }
+    .setting { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav aria-label="Settings sections">
+    <div class="brand">drip settings</div>
+    <div class="nav-mode" id="mode">
+      <div class="segmented" role="radiogroup" aria-label="Mode">
+        <button type="button" role="radio" data-mode="quiet">Quiet</button>
+        <button type="button" role="radio" data-mode="curated">Curated</button>
+        <button type="button" role="radio" data-mode="full">Full drip</button>
+      </div>
+      <div class="muted" data-mode-hint></div>
+    </div>
+    <ul class="navlist">
+      <li data-part="clock"><button type="button" data-go="watch"><span class="i i-drop"></span><span class="nav-name">Watch time</span><span class="nav-state" data-summary="short_clock"></span></button></li>
+      <li data-part="cards"><button type="button" data-go="cards"><span class="i i-card"></span><span class="nav-name">Cards</span><span class="nav-state" data-summary="short_cards"></span></button></li>
+      <li data-part="stash"><button type="button" data-go="stash"><span class="i i-save"></span><span class="nav-name">Stash</span><span class="nav-state" data-summary="short_stash"></span></button></li>
+      <li data-part="searchCap"><button type="button" data-go="search"><span class="i i-search"></span><span class="nav-name">Search</span><span class="nav-state" data-summary="short_searchCap"></span></button></li>
+      <li><button type="button" data-go="channels"><span class="i i-users"></span><span class="nav-name">Channels</span><span class="planned">Planned</span></button></li>
+      <li><button type="button" data-go="general"><span class="i i-clock"></span><span class="nav-name">Every day</span></button></li>
+    </ul>
+    <ul class="navlist">
+      <li><button type="button" data-go="history"><span class="i i-history"></span><span class="nav-name">History</span><span class="nav-state">0m today</span></button></li>
+      <li><button type="button" data-go="data"><span class="i i-download"></span><span class="nav-name">Your data</span><span class="planned">Planned</span></button></li>
+    </ul>
+  </nav>
+
+  <main>
+    <div class="savebar" data-savebar hidden role="status">
+      <span class="count"></span>
+      <button type="button" class="link" data-undo>Undo all</button>
+      <button type="button" class="primary" data-save>Save</button>
+    </div>
+
+    <section class="pane" id="watch" data-part="clock">
+      <div class="pane-head" data-flash><button type="button" class="back" aria-label="Back"><span class="i i-left"></span></button><h2>Watch time</h2><span data-ctl="clock"></span></div>
+      <p class="lede" data-summary="clock"></p>
+      <div class="off-note">Watch time is off, so videos play with no clock. Turn it on to set drops and minutes.</div>
+      <div class="body">
+        <div class="setting"><span class="setting-label">Drops per day</span><span data-ctl="watchTokensPerDay"></span></div>
+        <div class="setting"><span class="setting-label">Minutes per drop</span><span data-ctl="minutesPerToken"></span></div>
+        <div class="setting"><div><div class="setting-label">Finish the current video</div><div class="hint">When time runs out partway through.</div></div><span data-ctl="graceMode"></span></div>
+        <div class="setting"><div><div class="setting-label">"I need this one" per day</div><div class="hint">Each one needs a typed reason.</div></div><span data-ctl="needThisPerDay"></span></div>
+        <div class="setting"><div><div class="setting-label">Quiet hours <span class="planned">Planned</span></div><div class="hint">No drops can be spent in these hours.</div></div><span data-ctl="quietOn"></span></div>
+        <div class="setting is-dim" data-dep="quietOn"><span class="times">From <span data-ctl="quietFrom"></span> to <span data-ctl="quietTo"></span></span></div>
+      </div>
+    </section>
+
+    <section class="pane" id="cards" data-part="cards" hidden>
+      <div class="pane-head" data-flash><button type="button" class="back" aria-label="Back"><span class="i i-left"></span></button><h2>Cards</h2><span data-ctl="cards"></span></div>
+      <p class="lede" data-summary="cards"></p>
+      <div class="off-note">Cards are off, so Home shows a search box instead of reveals.</div>
+      <div class="body">
+        <div class="setting" data-cards-kind><span class="setting-label">Cards per day</span><span class="controls"><span data-ctl="recTokensPerDay"></span><span data-ctl="cardsKind"></span></span></div>
+        <div class="setting"><span class="setting-label">Reveal from</span><span data-ctl="feedSource"></span></div>
+        <div class="setting"><div><div class="setting-label">Reveal live streams</div><div class="hint">Live now and past streams. Upcoming and members-only videos never come up.</div></div><span data-ctl="streams"></span></div>
+      </div>
+    </section>
+
+    <section class="pane" id="stash" data-part="stash" hidden>
+      <div class="pane-head" data-flash><button type="button" class="back" aria-label="Back"><span class="i i-left"></span></button><h2>Stash</h2><span data-ctl="stash"></span></div>
+      <p class="lede" data-summary="stash"></p>
+      <div class="off-note">The stash is off, so cards and videos have no Stash button.</div>
+      <div class="body">
+        <div class="setting"><div><div class="setting-label">Stash holds</div><div class="hint">A full stash asks which video to swap out.</div></div><span data-ctl="stashMax"></span></div>
+      </div>
+    </section>
+
+    <section class="pane" id="search" data-part="searchCap" hidden>
+      <div class="pane-head" data-flash><button type="button" class="back" aria-label="Back"><span class="i i-left"></span></button><h2>Search</h2><span data-ctl="searchCap"></span></div>
+      <p class="lede" data-summary="searchCap"></p>
+      <div class="body"><p class="muted">Search results stop after 10, each with a Stash button. There's nothing else to set.</p></div>
+    </section>
+
+    <section class="pane" id="channels" hidden>
+      <div class="pane-head" data-flash><button type="button" class="back" aria-label="Back"><span class="i i-left"></span></button><h2>Channels <span class="planned">Planned</span></h2></div>
+      <div class="list"><div class="list-title">Always allowed</div><div class="empty">None yet. Add one from a reveal card.</div></div>
+      <div class="list"><div class="list-title">Never revealed</div><div class="empty">None yet. Add one from a reveal card.</div></div>
+    </section>
+
+    <section class="pane" id="general" hidden>
+      <div class="pane-head" data-flash><button type="button" class="back" aria-label="Back"><span class="i i-left"></span></button><h2>Every day</h2></div>
+      <div class="setting"><span class="setting-label">New day starts at</span><span data-ctl="resetHour"></span></div>
+      <div class="setting"><div><div class="setting-label">Save unspent for</div><div class="hint">Unspent drops and cards carry over up to this many days.</div></div><span data-ctl="rolloverDays"></span></div>
+      <div class="setting"><span class="setting-label">Hide the notification bell</span><span data-ctl="hideBell"></span></div>
+    </section>
+
+    <section class="pane" id="history" hidden>
+      <div class="pane-head" data-flash><button type="button" class="back" aria-label="Back"><span class="i i-left"></span></button><h2>History</h2></div>
+      <div class="card">
+        <div class="label">Daily average</div>
+        <div class="big">0m</div>
+        <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+    </section>
+
+    <section class="pane" id="data" hidden>
+      <div class="pane-head" data-flash><button type="button" class="back" aria-label="Back"><span class="i i-left"></span></button><h2>Your data <span class="planned">Planned</span></h2></div>
+      <p class="lede">Everything drip knows stays in this browser.</p>
+      <div class="setting"><div><div class="setting-label">Export</div><div class="hint">Settings, stash, and history, as one file.</div></div><button type="button">Download file</button></div>
+      <div class="setting"><div><div class="setting-label">Import</div><div class="hint">Raising a limit still waits for the reset.</div></div><button type="button">Choose file</button></div>
+      <div class="setting"><div><div class="setting-label">Reset settings</div><div class="hint">Back to drip's defaults. Today's drops and cards stay.</div></div><button type="button">Reset</button></div>
+    </section>
+  </main>
+</div>
+<script src="base.js"></script>
+<script>
+  // One pane at a time. On a phone the list is its own screen.
+  function go(id) {
+    for (const p of document.querySelectorAll('.pane')) p.hidden = p.id !== id;
+    for (const b of document.querySelectorAll('[data-go]')) b.setAttribute('aria-current', String(b.dataset.go === id));
+    document.body.classList.add('in-pane');
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-go]');
+    if (b) go(b.dataset.go);
+    if (e.target.closest('.back')) document.body.classList.remove('in-pane');
+  });
+  document.addEventListener('drip-goto', (e) => go(e.detail));
+  if (!location.hash && innerWidth > 860) go('watch');
+</script>
+</body>
+</html>
