@@ -23,7 +23,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q13 | The reveal card offers Watch, Save, Pass. Pass is free and final. Save keeps the card up and the button turns into "Saved". "Reveal next · -1 card" passes and reveals in one click. Pass is a round × button with a tooltip, free and still final. A video saved and then passed stays in the backlog (Jesse, 2026-10-07; built 2026-10-10). On screen, Save is "Stash" and "Stashed", and the Saved list is "Stash", so drip's button doesn't look like YouTube's own Save (Jesse, 2026-10-11). Stash on a full stash asks which video to swap out (Q28). |
 | Q14 | Backlog videos cost no rec token. Save button on watch pages and search results. Backlog is a text list (title, channel, length), no thumbnails. It holds at most "Stash holds" videos (Q28). |
 | Q15 | Search: remove injected shelves, stop at 10 results, free "more" button. |
-| Q16 | Replace subscriptions and Explore with the token page. So does the bare Shorts feed, `/shorts` with no video (Jesse, 2026-10-15). Channel pages stay as they are. The bell is hidden by default, with a "Hide the notification bell" switch in Customize and Settings (Jesse, 2026-10-15; until then it stayed). Watch page comments are hidden behind a "Show comments" button that lasts for that video (Jesse, 2026-10-06). |
+| Q16 | Replace subscriptions and Explore with the token page. So does the bare Shorts feed, `/shorts` with no video (Jesse, 2026-10-15), and hashtag pages like `/hashtag/ludwig`, feeds of anyone's videos and Shorts linked from descriptions (Claude's call, which Jesse left to Claude, 2026-10-15). Channel pages stay as they are. The bell is hidden by default, with a "Hide the notification bell" switch in Customize and Settings (Jesse, 2026-10-15; until then it stayed). Watch page comments are hidden behind a "Show comments" button that lasts for that video (Jesse, 2026-10-06). |
 | Q17 | Name: `drip` (tentative). |
 | Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. While a card is up, Watch is free if minutes are left. At 0 minutes it reads "Watch · -1 drop", and clicking it buys one watch token's minutes and starts the video. "+15 min" shows only when no card is up (Jesse, 2026-10-07; built 2026-10-10). |
 | Q19 | Background audio counts like any watching. `music.youtube.com` is out of scope. |
@@ -89,6 +89,15 @@ Jesse asked to strip YouTube's page down to what's needed, maybe with dropdowns 
 - menu.js runs at document_start, so the sidebar and the bell never show for a moment first. If it can't find the menu button, it gives YouTube's sidebar back. Logged out, YouTube's Sign in button is the same kind of button as Create, so it stays.
 - The menu's links use YouTube's in-page navigation: menu.js asks guard.js, in YouTube's page world, to fire YouTube's `yt-navigate` event. A full page load would drop the watch time watch.js hasn't sent yet, up to 5 seconds (Codex review, 2026-10-15). If YouTube ignores the event for a second, the page loads the plain way. A new-tab click stays a plain link. Your videos opens YouTube Studio, because YouTube's own link needs the channel's id (Claude's call).
 - The welcome tour's table has a Sidebar row: "A short menu", under the menu button.
+
+## The watch page, centered (2026-10-15)
+
+Jesse asked to center the watch page now that its recommendations are gone, and whether anything under the video should go (IDEAS.md had it from 2026-10-11). He agreed to Claude's keep and cut lists the same day.
+
+- The empty right column is gone, and the video and everything under it sit in the middle of the window, in default and theater mode. The column comes back while it has something in it: a playlist's queue, live chat, or an open panel such as the transcript or chapters. Opening the transcript moves the video back to the left, as YouTube lays it out.
+- Kept: the title, the channel row with its subscriber count and Subscribe, Like and dislike, Share, Save, the collapsed description, and Show comments. Save stays. It doesn't crowd Stash, which is on the pill inside the player, and it does a different job, Watch later and playlists (Jesse, 2026-10-15).
+- Cut: Join, the merch shelf ("Shop the ... store"), and Download, Clip, Thanks, and Ask in the action row. At full width YouTube's "..." menu doesn't hold them, so they're gone, not moved. In the expanded description, the game card, which links to the game's topic channel, and the channel card, which repeats the channel row. Chapters, the transcript, "How this was made", and the video's details stay.
+- The CSS is in `early.css`, so none of it paints first.
 
 ## Visual design (in progress, home page, lock screen, popup, and Settings built)
 

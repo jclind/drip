@@ -20,7 +20,8 @@ test('Shorts open as ordinary watch pages (Q2)', () => {
 
 test('subscriptions, Explore, and the topic pages go to the token page (Q16)', () => {
   for (const path of ['/feed/subscriptions', '/feed/explore', '/feed/trending', '/gaming', '/music', '/news', '/sports',
-    '/podcasts', '/live', '/shopping', '/channel/UCkYQyvc_i9hXEo4xic9Hh2g', '/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ', '/tv', '/tv/x']) {
+    '/podcasts', '/live', '/shopping', '/channel/UCkYQyvc_i9hXEo4xic9Hh2g', '/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ', '/tv', '/tv/x',
+    '/hashtag/ludwig', '/hashtag/ludwig/', '/hashtag/ludwig/shorts']) {
     assert.equal(D.redirectTarget(`https://www.youtube.com${path}`), HOME, path);
   }
 });

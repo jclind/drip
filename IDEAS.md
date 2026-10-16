@@ -16,7 +16,6 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - Charts and streaks built from the 90-day log.
 - Search results have their own "Ask YouTube" chip in the filter row, which design C left alone (2026-10-15).
 - "Your videos" in drip's menu could open Studio's videos list instead of its dashboard, if the channel id can be read from the page.
-- On a watch page, center the video and what's under it, now that the recommendations column is gone, and trim what sits under the video. Jesse, 2026-10-11.
 - Hide live streams and past streams (VODs) in Subscriptions by default, with a Settings toggle to show them. Jesse sees a lot of them there now. Jesse, 2026-10-11.
 
 ## Welcome tour
