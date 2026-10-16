@@ -38,6 +38,32 @@ html:not([data-drip-comments-shown]) .ytp-fullscreen-quick-actions toggle-button
   display: none !important;
 }
 
+/* With #related hidden, the right column stays as an empty 428px gap, so the video and what's under it sat left of
+   center. Drop the column and center the rest, in default and theater mode. The column comes back for what still
+   lives there: a playlist's queue, live chat, and open panels like the transcript or chapters (attributes checked on
+   air 2026-10-15). The theater-mode chat sits outside it but shrinks to nothing without it. */
+ytd-watch-flexy:not([playlist]):not([should-stamp-chat]):not([panel-expanded]):not([engagement-panel-expanded]) #secondary {
+  display: none !important;
+}
+
+ytd-watch-flexy:not([playlist]):not([should-stamp-chat]):not([panel-expanded]):not([engagement-panel-expanded]) #columns {
+  justify-content: center !important;
+}
+
+/* Under the video: Join (a paid membership), the merch shelf, and the flexible action buttons other than Save and
+   Download, which on some videos are Clip, Thanks, and Ask. Download stays for drip's Downloads menu entry (Jesse,
+   2026-10-15). At full width the "..." menu doesn't hold these, so they're gone, not moved. Save is matched by its
+   English label, so in another language it hides with the rest. In the expanded description, the game card (it links
+   to the game's topic channel, a feed of other people's videos) and the channel card, which repeats the channel row.
+   Chapters, the transcript, and the details stay (checked on air 2026-10-15). */
+ytd-watch-metadata #sponsor-button,
+ytd-watch-flexy ytd-merch-shelf-renderer,
+ytd-watch-metadata #flexible-item-buttons > :not(ytd-download-button-renderer):not(:has(button[aria-label="Save to playlist"])),
+ytd-watch-metadata yt-video-attributes-section-view-model,
+ytd-watch-metadata ytd-video-description-infocards-section-renderer {
+  display: none !important;
+}
+
 /* The miniplayer keeps a video going while you browse. watch.js pauses it when it opens. */
 ytd-miniplayer,
 .ytdMiniplayerComponentHost {

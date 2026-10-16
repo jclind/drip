@@ -729,8 +729,9 @@
 
   // Subscriptions, Explore, and its topic pages (Q16). The two channel ids are Shopping and Music, which YouTube links
   // as channels (checked on the MacBook 2026-10-06). Other channel pages stay. Bare /shorts is the Shorts feed, with no
-  // video to open as a watch page (Jesse, 2026-10-15).
-  const FEEDS = /^\/(?:channel\/(?:UCkYQyvc_i9hXEo4xic9Hh2g|UC-9-kyTW8ZkZNDHQJ6FgpwQ)|feed\/(?:subscriptions|explore|trending|storefront|courses_destination|news_destination|music_destination)|gaming|shopping|podcasts|playables|hype|courses|learning|fashion|news|sports|music|live|shorts)\/?$/;
+  // video to open as a watch page (Jesse, 2026-10-15). A hashtag page, linked from descriptions and titles, is a feed
+  // of videos and Shorts from anyone (2026-10-15).
+  const FEEDS = /^\/(?:channel\/(?:UCkYQyvc_i9hXEo4xic9Hh2g|UC-9-kyTW8ZkZNDHQJ6FgpwQ)|feed\/(?:subscriptions|explore|trending|storefront|courses_destination|news_destination|music_destination)|gaming|shopping|podcasts|playables|hype|courses|learning|fashion|news|sports|music|live|shorts|hashtag\/[^/]+(?:\/shorts)?)\/?$/;
 
   /**
    * Where a top-level YouTube URL should go instead, or '' to leave it. Shorts and embeds become watch pages, so the
