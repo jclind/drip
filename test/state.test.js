@@ -25,7 +25,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
-    'isLoosening', 'mayReveal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
+    'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
@@ -266,6 +266,9 @@ test('a reveal never deals an upcoming or members-only video, and deals streams 
     assert.equal(D.mayReveal(as('a', kind), { ...D.DEFAULT_SETTINGS, streams: true }), true, `${kind} with streams on`);
   }
 
+  const { streams, ...old } = D.DEFAULT_SETTINGS;
+  assert.equal(D.mayReveal(as('a', 'live'), old), false, 'settings from before streams existed');
+
   const state = fresh();
   const pool = [as('soon', 'upcoming'), as('paid', 'members'), as('now', 'live'), as('vod', 'streamed'), as('plain', 'video')];
   assert.deepEqual(D.reveal(state, pool), { ok: true, video: video('plain') }, 'the kind is not kept on the card');
@@ -274,6 +277,10 @@ test('a reveal never deals an upcoming or members-only video, and deals streams 
   refusesUnchanged(state, () => D.reveal(state, pool.slice(0, 4)), 'pool-empty');
   state.settings.streams = true;
   assert.equal(D.reveal(state, pool).video.id, 'now');
+
+  assert.equal(D.canDeal(state, as('vod', 'streamed')), true);
+  assert.equal(D.canDeal(state, video('plain')), false, 'seen');
+  assert.equal(D.canDeal(state, { id: 'bad id!' }), false, 'not a video');
 
   const next = fresh();
   D.reveal(next, [video('a')]);

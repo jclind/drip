@@ -270,9 +270,8 @@
     if (state.settings.cards === 'off') return { ok: false, error: 'cards-off' };
     const paid = state.settings.cards === 'limited';
     if (paid && state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
-    const seen = new Set(state.seen);
-    const saved = new Set(state.backlog.map(video => video.id));
-    const video = dealable(state, candidates).find(candidate => !seen.has(candidate.id) && !saved.has(candidate.id));
+    const pick = candidates.find(candidate => canDeal(state, candidate));
+    const video = pick ? cleanVideo(pick) : null;
     if (!video) return { ok: false, error: 'pool-empty' };
     if (paid) state.tokens.rec--;
     state.current = video;
@@ -293,13 +292,19 @@
   function mayReveal(candidate, settings) {
     const kind = candidate && typeof candidate === 'object' ? /** @type {{kind?: unknown}} */ (candidate).kind : undefined;
     if (kind === 'upcoming' || kind === 'members') return false;
-    if (kind === 'live' || kind === 'streamed') return settings.streams;
+    if (kind === 'live' || kind === 'streamed') return settings.streams === true;
     return true;
   }
 
-  /** The candidates a reveal may deal, cleaned. @param {State} state @param {unknown[]} candidates @returns {Video[]} */
-  function dealable(state, candidates) {
-    return /** @type {Video[]} */ (candidates.filter(c => mayReveal(c, state.settings)).map(cleanVideo).filter(Boolean));
+  /**
+   * Whether a reveal could deal this candidate now. It has to be a video, a kind mayReveal allows, not revealed before,
+   * and not in the stash. The home page asks the same thing to know when to stop looking.
+   * @param {State} state @param {unknown} candidate
+   */
+  function canDeal(state, candidate) {
+    const video = cleanVideo(candidate);
+    return !!video && mayReveal(candidate, state.settings) && !state.seen.includes(video.id)
+      && !state.backlog.some(saved => saved.id === video.id);
   }
 
   /**
@@ -375,9 +380,7 @@
     if (videoId !== state.current.id) return { ok: false, error: 'stale-card' };
     if (state.settings.cards === 'off') return { ok: false, error: 'cards-off' };
     if (state.settings.cards === 'limited' && state.tokens.rec <= 0) return { ok: false, error: 'no-rec-tokens' };
-    const seen = new Set(state.seen);
-    const saved = new Set(state.backlog.map(video => video.id));
-    if (!dealable(state, candidates).some(c => !seen.has(c.id) && !saved.has(c.id))) return { ok: false, error: 'pool-empty' };
+    if (!candidates.some(candidate => canDeal(state, candidate))) return { ok: false, error: 'pool-empty' };
     endCard(state, 'pass');
     return reveal(state, candidates);
   }
@@ -918,7 +921,7 @@
     DEFAULT_SETTINGS, MODES, modeOf, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
-    isLoosening, mayReveal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
+    isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
   };
 })();

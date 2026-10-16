@@ -36,11 +36,13 @@
     watched: 'ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHost',
     ad: 'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer',
     // What kind of video an item is, for what a reveal may deal (Q30). Read on air on 2026-10-16 from channel pages,
-    // which use the home grid's markup. Upcoming videos have a "Notify me" button under the card. The older markup
-    // marked upcoming and live on the length overlay.
-    upcoming: 'lockup-attachments-view-model, ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"]',
+    // which use the home grid's markup. An upcoming video has a "Notify me" button under the card and no length. The
+    // holder has no name of its own, so it only counts on a card without a length. The older markup marked upcoming
+    // and live on the length overlay, and members-only with its own badge.
+    notify: 'lockup-attachments-view-model',
+    upcoming: 'ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"]',
     live: '.ytBadgeShapeThumbnailLive, ytd-thumbnail-overlay-time-status-renderer[overlay-style="LIVE"]',
-    members: '.ytBadgeShapeCommerce',
+    members: '.ytBadgeShapeCommerce, .badge-style-type-members-only',
     // The top bar's search box and voice search, which Quiet's home page moves into the middle of the page (Q29).
     searchBox: 'ytd-masthead #center',
   };
@@ -48,6 +50,9 @@
   const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
   // A past stream's markup is a normal video's, except its age reads "Streamed 23h ago". English only, like AGE.
   const STREAMED = /^streamed\b/i;
+  // An upcoming video's line under the title, for when its "Notify me" button hasn't rendered. English only too.
+  const SCHEDULED = /^(scheduled for|premieres)\b/i;
+  const DURATION = /^\d+(:\d\d)+$/;
 
   /** @typedef {{id: string, title: string, channel: string, length: string, views: string, age: string, kind: string}} Candidate */
 
@@ -88,12 +93,18 @@
   /**
    * What kind of video a grid item is. The worker decides which kinds a reveal may deal (Drip.mayReveal, Q30).
    * @param {Element} item
+   * @param {string} channel Left out of the text checks, so a channel named "Premieres Daily" isn't read as one.
+   * @param {string} length
    * @param {string} age From viewsAndAge, which leaves out the channel, so a channel named "Streamed Highlights" doesn't
    *   make every upload a past stream (Codex, 2026-10-16).
    * @returns {'video' | 'upcoming' | 'live' | 'streamed' | 'members'}
    */
-  function kindOf(item, age) {
-    if (item.querySelector(SEL.upcoming)) return 'upcoming';
+  function kindOf(item, channel, length, age) {
+    if (item.querySelector(SEL.upcoming) || (item.querySelector(SEL.notify) && !DURATION.test(length))) return 'upcoming';
+    for (const el of item.querySelectorAll(SEL.metaPart)) {
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text !== channel && SCHEDULED.test(text)) return 'upcoming';
+    }
     if (item.querySelector(SEL.members)) return 'members';
     if (item.querySelector(SEL.live)) return 'live';
     return STREAMED.test(age) ? 'streamed' : 'video';
@@ -121,8 +132,9 @@
       if (!title) continue;
       ids.add(id);
       const channel = firstText(item, SEL.channel);
+      const length = firstText(item, SEL.length);
       const { views, age } = viewsAndAge(item, channel);
-      pool.push({ id, title, channel, length: firstText(item, SEL.length), views, age, kind: kindOf(item, age) });
+      pool.push({ id, title, channel, length, views, age, kind: kindOf(item, channel, length, age) });
     }
     return pool;
   }
@@ -138,13 +150,9 @@
     return pool;
   }
 
-  /**
-   * Not revealed before, not in the backlog, and a kind a reveal may deal: the same test reveal() applies.
-   * @param {Candidate} video
-   */
+  /** Whether the worker's reveal could deal this video, by its own rule. @param {Candidate} video */
   function isNew(video) {
-    return !!state && Drip.mayReveal(video, state.settings) && !state.seen.includes(video.id)
-      && !state.backlog.some((/** @type {any} */ v) => v.id === video.id);
+    return !!state && Drip.canDeal(state, video);
   }
 
   /**

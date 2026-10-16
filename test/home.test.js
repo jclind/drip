@@ -392,6 +392,22 @@ function gridMarks(document, item, kind) {
     badge('ytBadgeShapeThumbnailDefault', '14:02');
     badge('ytBadgeShapeCommerce', 'Members only');
     meta('3d ago');
+  } else if (kind === 'attached') {
+    // Not seen yet: a normal video with something under the card, like a Join button. It still has a length.
+    gridMarks(document, item, 'video');
+    item.append(new FakeElement(document, 'lockup-attachments-view-model'));
+  } else if (kind === 'premiere') {
+    // An upcoming premiere whose "Notify me" button hasn't rendered, with the channel line Home and Subscriptions have.
+    badge('ytBadgeShapeThumbnailDefault', 'Upcoming');
+    meta('Some Channel');
+    meta('Premieres 10/23/26, 2:00 PM');
+  } else if (kind === 'members-old') {
+    // The older markup's members-only badge.
+    const old = new FakeElement(document, 'div');
+    old.className = 'badge badge-style-type-members-only';
+    old.textContent = 'Members only';
+    item.append(old);
+    meta('3d ago');
   } else throw new Error(`no markup for ${kind}`);
 }
 
@@ -755,6 +771,16 @@ test('a channel named "Streamed ..." does not make its uploads past streams (Q30
   await tab.advance(100);
   const sent = world.sent.find((msg) => msg.type === 'reveal');
   assert.equal(sent.candidates[0].kind, 'video');
+  assert.equal(world.state.current.id, 'v1');
+});
+
+test('a card with a length is not upcoming, a premiere is upcoming by its text, and the older members badge counts (Q30)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { grid: ['premiere:s1', 'members-old:m1', 'attached:v1'] });
+  await tab.click('reveal');
+  await tab.advance(100);
+  const sent = world.sent.find((msg) => msg.type === 'reveal');
+  assert.deepEqual(Array.from(sent.candidates, (/** @type {any} */ v) => `${v.kind}:${v.id}`), ['upcoming:s1', 'members:m1', 'video:v1']);
   assert.equal(world.state.current.id, 'v1');
 });
 
