@@ -87,6 +87,7 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 - Switches for what drip hides: comments, Shorts, the sidebar menu, the end screen. Unhook is built on these. Each one is a leak someone can turn on at 1am, so maybe only "always show comments".
 - A cooldown and a typed reason before pausing drip (under Friction).
 - A "Reduce motion" switch that overrides the system setting.
+- A page Chrome opens on uninstall (`chrome.runtime.setUninstallURL`) with one question, "Why are you leaving?". It needs a small hosted page (Claude's suggestion, 2026-10-16, with the Settings feedback link).
 - Not worth it yet: syncing across devices, and notifications like "5 minutes left".
 
 ## Efficiency

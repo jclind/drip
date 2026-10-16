@@ -309,6 +309,23 @@ input.toggle:checked::after {
   transform: translateX(28px);
 }
 
+/* The feedback line under the last section. */
+.feedback {
+  margin: 20px 0 0;
+  font-size: 13px;
+}
+
+.feedback a {
+  color: var(--muted);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.feedback a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 /* The save bar: floats at the bottom of the window while there are edits not saved. */
 .savebar {
   position: fixed;
