@@ -26,4 +26,19 @@
       return vt;
     };
   }
+
+  // drip's menu (menu.js) lives in the isolated world, and its plain links would load a whole new page. That drops the
+  // watch time watch.js hasn't sent yet. So menu.js asks here, and YouTube's own in-page navigation takes the link.
+  // Canceling the event tells menu.js it was handled. If YouTube ignores the event, the page loads the plain way.
+  const APP = 'ytd-app';
+  document.addEventListener('drip-navigate', (e) => {
+    const url = /** @type {CustomEvent} */ (e).detail;
+    const app = document.querySelector(APP);
+    if (typeof url !== 'string' || !app) return;
+    e.preventDefault();
+    let started = false;
+    document.addEventListener('yt-navigate-start', () => { started = true; }, { once: true });
+    app.dispatchEvent(new CustomEvent('yt-navigate', { bubbles: true, composed: true, detail: { endpoint: { commandMetadata: { webCommandMetadata: { url } } } } }));
+    setTimeout(() => { if (!started) location.assign(url); }, 1000);
+  });
 })();

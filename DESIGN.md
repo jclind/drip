@@ -87,7 +87,7 @@ Jesse asked to strip YouTube's page down to what's needed, maybe with dropdowns 
 - No Subscriptions entry, since drip sends that page to Home (Q16). Channels opens YouTube's channels page, `/feed/channels`, a list of your subscriptions without their videos, instead of listing them in the menu. The sidebar's new-video dots go with it (Jesse agreed, 2026-10-15).
 - The top bar loses Create and Ask YouTube, and the search box says "Search". The bell is hidden by default and has its own switch (Q16). It's a setting, `hideBell`, not a mode part, so a mode pick leaves it alone and it never makes a mix "Changed". Showing it again waits for the reset like any loosening (Q6, Claude's call).
 - menu.js runs at document_start, so the sidebar and the bell never show for a moment first. If it can't find the menu button, it gives YouTube's sidebar back. Logged out, YouTube's Sign in button is the same kind of button as Create, so it stays.
-- The menu's links load the page in full, since only YouTube's own links use its in-page navigation. Your videos opens YouTube Studio, because YouTube's own link needs the channel's id (Claude's call).
+- The menu's links use YouTube's in-page navigation: menu.js asks guard.js, in YouTube's page world, to fire YouTube's `yt-navigate` event. A full page load would drop the watch time watch.js hasn't sent yet, up to 5 seconds (Codex review, 2026-10-15). If YouTube ignores the event for a second, the page loads the plain way. A new-tab click stays a plain link. Your videos opens YouTube Studio, because YouTube's own link needs the channel's id (Claude's call).
 - The welcome tour's table has a Sidebar row: "A short menu", under the menu button.
 
 ## Visual design (in progress, home page, lock screen, popup, and Settings built)

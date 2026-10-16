@@ -86,12 +86,29 @@
     if (refocus) opener?.focus();
   }
 
+  /**
+   * A plain link would load a whole new page and lose the watch time watch.js hasn't sent yet, so guard.js hands
+   * YouTube's links to its in-page navigation. A new-tab click, or Studio's link, goes the plain way.
+   * @param {MouseEvent} e
+   */
+  function follow(e) {
+    const link = /** @type {Element} */ (e.target).closest('a');
+    if (!link || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const url = new URL(link.getAttribute('href') || '', location.href);
+    if (url.origin !== location.origin) return;
+    const handled = !document.dispatchEvent(new CustomEvent('drip-navigate', { cancelable: true, detail: url.pathname + url.search }));
+    if (!handled) return;
+    e.preventDefault();
+    close();
+  }
+
   // Capture on window runs before YouTube's own handler on the button, which would open the hidden sidebar.
   window.addEventListener('click', (e) => {
     if (!root.hasAttribute('data-drip-menu') || !(e.target instanceof Element)) return;
     const button = e.target.closest(SEL.guideButton);
     if (!button) {
       if (menu && !menu.contains(e.target)) close();
+      else if (menu) follow(e);
       return;
     }
     e.preventDefault();
