@@ -69,8 +69,8 @@ Each run:
 
 1. Open a new tab at youtube.com, then open DevTools and undock it as in check 2.
 2. In the Memory panel, choose Heap snapshot and click Take snapshot.
-3. In the Console panel, paste the contents of `dev/perf-nav.js` from drip's clone (`pbcopy < dev/perf-nav.js` copies it). Chrome may ask you to type `allow pasting` first. Then run `await dripNav(50)`. It takes about two minutes, and prints a small table when it's done.
-4. Screenshot the console's table and save it as `~/drip-perf/check3-on-table.png` (or `-off-`).
+3. In the Console panel, paste the contents of `dev/perf-nav.js` from drip's clone (`pbcopy < dev/perf-nav.js` copies it). Chrome may ask you to type `allow pasting` first. Then run `await dripNav(50)`. It takes about two minutes. When it's done, the console prints the same numbers twice: a small table, then the returned object. The table can be above the view, or hidden by the console's level filter.
+4. Copy the returned object into `~/drip-perf/check3-on.txt` (or `-off-`).
 5. In the Memory panel, take a second snapshot.
 6. Save both snapshots: right-click each one in the left column, Save, as `~/drip-perf/check3-on-1.heapsnapshot` and `check3-on-2.heapsnapshot` (or `-off-`). They're big, often 100 to 300 MB each.
 
