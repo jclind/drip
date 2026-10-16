@@ -53,6 +53,8 @@
    * @type {{searchCap: boolean, cards: 'off' | 'unlimited' | 'limited', clock: boolean, stash: boolean}}
    */
   let parts = { ...Drip.MODES.full };
+  /** Customize's bell switch (Q16). Not a mode part, so a mode pick leaves it alone. */
+  let hideBell = settings.hideBell;
   const sand = freshState();
 
   function freshState() {
@@ -77,13 +79,14 @@
     { name: 'full', label: 'Full drip', what: `${hourDaily} of watching and ${settings.recTokensPerDay} new videos a day. The video stops when the time runs out.`,
       mini: '<span class="m-stats"><span class="m-glass"></span><span class="m-num"></span><span class="m-pip is-drop"></span><span class="m-pip is-card"></span></span><span class="m-btns"><span class="m-btn"></span><span class="m-btn gold"></span></span><span class="m-line"></span><span class="m-line"></span>' },
   ];
-  /** @type {{key: 'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash', label: string, how: () => string}[]} */
+  /** @type {{key: 'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash' | 'hideBell', label: string, how: () => string}[]} */
   const OPTS = [
     { key: 'feeds', label: "Hide YouTube's feeds", how: () => 'Home, Subscriptions, the sidebar, end screens, autoplay, and Shorts. Always on.' },
     { key: 'searchCap', label: 'Stop search at 10 results', how: () => 'A button loads 10 more.' },
     { key: 'cards', label: 'Reveal one video at a time', how: cardsHow },
     { key: 'clock', label: 'Limit watch time', how: () => `${hourDaily} a day, in ${Drip.formatMinutes(settings.minutesPerToken * 60)} drops. The video stops when it runs out.` },
     { key: 'stash', label: 'Stash videos for later', how: () => `Up to ${settings.stashMax}, from search and watch pages.` },
+    { key: 'hideBell', label: 'Hide the notification bell', how: () => 'The same in every mode.' },
   ];
   /**
    * What the cards switch gives: the cards as saved, or with it off, what turning it on would give. A mix saved in
@@ -135,7 +138,7 @@
         }, customizing ? 'Hide' : 'Customize'));
         if (customizing) {
           el.append(h('div', { class: 'opts' }, ...OPTS.map((o) => {
-            const on = o.key === 'feeds' || (o.key === 'cards' ? parts.cards !== 'off' : parts[o.key]);
+            const on = o.key === 'feeds' || (o.key === 'hideBell' ? hideBell : o.key === 'cards' ? parts.cards !== 'off' : parts[o.key]);
             return h('div', { class: 'opt' },
               h('div', { class: 'opt-text' }, o.label, h('div', { class: 'opt-sub' }, o.how())),
               h('button', {
@@ -163,10 +166,17 @@
   /**
    * Customize's switches. The one cards switch counts cards while watch time is limited and leaves them unlimited
    * otherwise, so it needs no count of its own (DESIGN.md "Modes").
-   * @param {'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash'} key
+   * @param {'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash' | 'hideBell'} key
    */
   function switchPart(key) {
     if (key === 'feeds') return;
+    if (key === 'hideBell') {
+      hideBell = !hideBell;
+      chrome.runtime.sendMessage({ type: 'updateSettings', changes: { hideBell } }).catch(() => {});
+      drawLadder(key);
+      retour();
+      return;
+    }
     if (key === 'cards') parts.cards = parts.cards === 'off' ? (parts.clock ? 'limited' : 'unlimited') : 'off';
     else {
       parts[key] = !parts[key];
@@ -1070,6 +1080,7 @@
       parts.cards === 'off'
         ? { icon: 'house', place: 'Home', youtube: 'A feed', drip: 'A search box', note: 'Subscriptions too.' }
         : { icon: 'house', place: 'Home', youtube: 'A feed', drip: 'Your drip page', note: 'Subscriptions too. Reveal from either.' },
+      { icon: 'menu', place: 'Sidebar', youtube: 'Channels, Explore, more', drip: 'A short menu', note: hideBell ? 'Under the menu button. No bell.' : 'Under the menu button.' },
       { icon: 'play-line', place: 'Watch pages', youtube: 'Suggestions, autoplay', drip: 'Just the video', note: 'No end screen. Comments wait behind a button.' },
       { icon: 'smartphone', place: 'Shorts', youtube: 'The Shorts player', drip: 'Regular videos', note: parts.clock ? 'They use minutes like any other.' : 'No endless scroll.' },
       parts.searchCap && { icon: 'search', place: 'Search', youtube: 'One long list', drip: '10 results at a time', note: 'With a button for more.' },
@@ -1100,7 +1111,9 @@
     const saved = res && res.state && res.state.settings;
     if (!saved) return;
     const next = { searchCap: saved.searchCap, cards: saved.cards, clock: saved.clock, stash: saved.stash };
-    if (Drip.modeOf(next) === Drip.modeOf(parts) && Drip.modeOf(parts)) return;
+    const bell = saved.hideBell !== false;
+    if (Drip.modeOf(next) === Drip.modeOf(parts) && Drip.modeOf(parts) && bell === hideBell) return;
+    hideBell = bell;
     parts = next;
     modeBase = Drip.modeOf(next) || 'full';
     drawLadder();

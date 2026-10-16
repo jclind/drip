@@ -39,6 +39,7 @@
  * @property {'off' | 'unlimited' | 'limited'} cards Reveal cards (Q13): none, free, or spending rec tokens. A mode part (Q29).
  * @property {boolean} clock The watch clock: drops, minutes, the pill, and the lock (Q3, Q10). A mode part (Q29).
  * @property {boolean} stash The stash and its buttons (Q14, Q28). A mode part (Q29).
+ * @property {boolean} hideBell YouTube's notification bell is hidden. The same in every mode, so not a part (Q16).
  */
 /**
  * @typedef {Object} Video
@@ -85,6 +86,7 @@
     cards: 'limited',
     clock: true,
     stash: true,
+    hideBell: true,
   });
   /**
    * The three modes (Q29). Each is a set of parts, and a mix that matches none of them is a custom mode. The defaults
@@ -529,7 +531,7 @@
         cleaned.graceMode = Boolean(value);
       } else if (key === 'feedSource' && (value === 'home' || value === 'subscriptions')) {
         cleaned.feedSource = value;
-      } else if ((key === 'searchCap' || key === 'clock' || key === 'stash') && typeof value === 'boolean') {
+      } else if ((key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell') && typeof value === 'boolean') {
         cleaned[key] = value;
       } else if (key === 'cards' && (value === 'off' || value === 'unlimited' || value === 'limited')) {
         cleaned.cards = value;
@@ -544,7 +546,8 @@
     if (key === 'feedSource') return false;
     if (key === 'graceMode') return from === false && to === true;
     // Turning a mode part off, or cards from a count to unlimited, gives less drip, so it waits (Q29).
-    if (key === 'searchCap' || key === 'clock' || key === 'stash') return from === true && to === false;
+    // Showing the bell again waits too.
+    if (key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell') return from === true && to === false;
     if (key === 'cards') return CARDS_RANK[/** @type {Settings['cards']} */ (to)] < CARDS_RANK[/** @type {Settings['cards']} */ (from)];
     return typeof from === 'number' && typeof to === 'number' && to > from;
   }

@@ -47,6 +47,18 @@ test('cleanSettings keeps valid parts and drops anything else', () => {
   assert.deepEqual(D.cleanSettings({ searchCap: 'no', cards: 'some', clock: 0, stash: null }), {});
 });
 
+test('the bell: hidden by default, not a mode part, and showing it waits for the reset', () => {
+  assert.equal(D.DEFAULT_SETTINGS.hideBell, true);
+  assert.equal(D.modeOf({ ...D.DEFAULT_SETTINGS, hideBell: false }), 'full');
+  assert.deepEqual(D.cleanSettings({ hideBell: false }), { hideBell: false });
+  assert.deepEqual(D.cleanSettings({ hideBell: 'no' }), {});
+  assert.equal(D.isLoosening('hideBell', true, false), true);
+  assert.equal(D.isLoosening('hideBell', false, true), false);
+  const raw = structuredClone(settled());
+  delete /** @type {any} */ (raw.settings).hideBell;
+  assert.equal(D.hydrate(raw, time(1, 13)).settings.hideBell, true);
+});
+
 test('isLoosening: a part turned off, or cards going from a count to unlimited, waits', () => {
   for (const key of /** @type {const} */ (['searchCap', 'clock', 'stash'])) {
     assert.equal(D.isLoosening(key, true, false), true);

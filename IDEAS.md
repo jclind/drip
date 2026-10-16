@@ -13,9 +13,9 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 
 - Thumbnails in the backlog as a setting. Jesse noted they sometimes carry real information.
 - Channel page grids, if they turn into a leak. Going to a channel is deliberate, so they're allowed for now.
-- The notification bell.
 - Charts and streaks built from the 90-day log.
-- A smaller left sidebar on the home page: only the "You" section (Your channel, History, Playlists, Watch later, Liked videos, Your videos, Downloads, Show more), with the rest gone. Jesse, 2026-10-11.
+- Search results have their own "Ask YouTube" chip in the filter row, which design C left alone (2026-10-15).
+- "Your videos" in drip's menu could open Studio's videos list instead of its dashboard, if the channel id can be read from the page.
 - On a watch page, center the video and what's under it, now that the recommendations column is gone, and trim what sits under the video. Jesse, 2026-10-11.
 - Hide live streams and past streams (VODs) in Subscriptions by default, with a Settings toggle to show them. Jesse sees a lot of them there now. Jesse, 2026-10-11.
 
