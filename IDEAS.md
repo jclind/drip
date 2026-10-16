@@ -20,6 +20,7 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 ## Welcome tour
 
 - Arrows with a short label in the tour, pointing at what to watch. In the watching step, one could point at the glass's water draining while the "video" plays, so the step shows something happening instead of a still frame through the whole countdown. Jesse, 2026-10-12.
+- Planned for 1.0 (RELEASE-PLAN.md, 2026-10-16). Jesse wants arrows or text that show what to look for, like the time counting down while the video plays, and more feeling that a video is playing. Three to mock up, which can mix: callouts that appear when the thing they point at moves and then go ("Your time drains while a video plays" at the pill), one or two per step; a player that looks like it's playing, with a moving progress bar, a running timecode, a picture with some motion, and a "90× speed" tag so the fast drain reads as on purpose; and a spotlight that dims the rest of the stage. Claude's guess is the first two together.
 
 ## Watching
 
@@ -76,7 +77,17 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 
 ## Settings page
 
-- Unsaved changes get a banner that stays in view while you scroll, instead of only the "Not saved yet." line by Save. Leaving the page with changes unsaved asks first (Jesse, 2026-10-16).
+- Unsaved changes get a banner that stays in view while you scroll, instead of only the "Not saved yet." line by Save. Leaving the page with changes unsaved asks first (Jesse, 2026-10-16). Planned for 1.0 with the Settings regroup (RELEASE-PLAN.md).
+
+## After 1.0
+
+From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0. Quiet hours, the channel lists, and export/import/reset went into 1.0 instead (RELEASE-PLAN.md).
+
+- A different allowance on weekends. Same as "Different allowances per weekday" under Earning tokens.
+- Switches for what drip hides: comments, Shorts, the sidebar menu, the end screen. Unhook is built on these. Each one is a leak someone can turn on at 1am, so maybe only "always show comments".
+- A cooldown and a typed reason before pausing drip (under Friction).
+- A "Reduce motion" switch that overrides the system setting.
+- Not worth it yet: syncing across devices, and notifications like "5 minutes left".
 
 ## Efficiency
 

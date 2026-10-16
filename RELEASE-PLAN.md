@@ -12,6 +12,19 @@ Written 2026-10-06 on air, against `main` at `9555307`. Draft for Jesse to appro
 - Left as is, by judgment: finding 8 (the fullscreen Comments button in other languages; the comments themselves stay hidden), and findings 2 and 3 (timers and search layout work), which only a DevTools trace on the MacBook can measure.
 - Dropped from the feature list: "Reset all data", because it hands back a full day's tokens in one click, against Q6.
 
+## Added 2026-10-16: Settings, three features, and the tour
+
+Jesse's picks from a review of the Settings page. In this order, because the three features need a place in the new layout:
+
+1. **Settings grouped by part.** One section each for Watch time (drops, minutes per drop, finish the current video, "I need this one"), Cards (per day, reveal from, live streams), Stash (holds), and Search, with the part's switch in the section header. A section folds to one line while its part is off, instead of showing dimmed rows. The mode picker stays on top. The reset hour and carry-over go in a small section for every day. Jesse said yes; the look comes from a `/design-variants` round, with room for the three new settings. The sticky unsaved-changes banner (IDEAS.md, "Settings page") ships with it.
+2. **Links into Settings from where the question comes up.** The lock, a reveal card, and the popup each link to the matching section (`options.html#cards`), which flashes on arrival. Jesse is leaning yes and wants to see it in the same mockups first.
+3. **Quiet hours.** A time range with no spending drops, like 11pm to 6am. Open: whether it stops a video already playing or only new drops, and how it meets Q6 (turning it off loosens a limit).
+4. **Channel allow and block lists.** Allowed channels cost nothing; blocked channels never come up in a reveal. Open: whether an allowed channel skips cards, drops, or both, and whether channels get added from the reveal card, Settings, or both. Allowing a channel loosens a limit, so Q6 applies.
+5. **Export, import, and reset.** A JSON file of settings, stash, and log, and a way back to defaults. Reset was dropped on 2026-10-06 because it handed back a day's tokens (Status, above). So none of the three may touch today's balances, and imported or reset settings go through `updateSettings`, so loosening still waits for the reset. Open: whether that's enough, and whether reset clears the log.
+6. **Tour callouts.** See "Welcome tour" in IDEAS.md. Its own `/design-variants` round.
+
+Each feature starts with Jesse's answers to its open questions, then gets its own PR. The rest of what came up is under "After 1.0" in IDEAS.md.
+
 ## Where things stood at the start
 
 - 3,313 lines in total. `src/lib/state.js` (324 lines) holds the rules. The content scripts hold everything YouTube-specific (watch.js 417, home.js 331, search.js 144, redirect.js 62, early.js 102, comments.js 45, fade.js 52, guard.js 27).
