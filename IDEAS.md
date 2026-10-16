@@ -48,6 +48,7 @@ Decided 2026-10-14 as Quiet and Curated, beside Full drip. See "Modes" in DESIGN
 
 - Explore as a third reveal source. On 2026-10-06, `/feed/explore` loaded in a frame came back titled "Home - YouTube" with the home grid, so there's no separate Explore feed to read. Topic pages like `/gaming` might work as sources, one at a time.
 - Put the feed source back on the Settings page if the toggle on the token page isn't enough. Removed 2026-10-06.
+- Decide what a reveal may pick. On 2026-10-16 a reveal dealt an upcoming video, which can't be watched yet, so the card bought nothing (Jesse). `readPool` in home.js skips ads, watched videos, playlists and mixes, and items with no title. It doesn't look at upcoming videos and premieres, live streams, past streams, or members-only videos. Each needs its live markup checked, then a call from Jesse: reveal it, skip it, or a Settings toggle. The live-streams item under "What you see" is part of this.
 
 ## Playlists
 
