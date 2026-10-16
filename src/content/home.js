@@ -209,6 +209,8 @@
   const SLOW_MS = 5000;
   /** Watch was pressed and the watch page is loading. Redraws stop, so the card stays up instead of the empty page. */
   let leaving = false;
+  /** Where Watch went, once the worker said yes. */
+  let goingTo = '';
 
   /**
    * The reveal animation is running (reveal.js). It draws on the page's own elements until it's done, so render()
@@ -249,22 +251,28 @@
       for (const el of document.querySelectorAll('#drip-home .drip-card.is-loading .drip-meta')) el.textContent = loadingText();
     }, SLOW_MS);
     try {
-      const pool = await readCandidates();
-      // No videos at all, not just none new: the grid's markup changed (Q25).
-      const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
-      if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
-        reportBroken('grid', SEL.item);
-        message = errorText('pool-empty');
+      let pool;
+      try {
+        pool = await readCandidates();
+        // No videos at all, not just none new: the grid's markup changed (Q25).
+        const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
+        if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
+          reportBroken('grid', SEL.item);
+          message = errorText('pool-empty');
+          return null;
+        }
+      } catch (err) {
+        // A read that throws never got as far as asking the worker, so nothing was spent. Without this the reveal ended
+        // with no message, and Reveal next's half-dealt card stayed on the old thumbnail (Codex, 2026-10-16). In a tab
+        // whose drip was reloaded, reportBroken is what throws, and the page asks for a refresh instead.
+        console.error('drip: reading the feed failed', err);
+        if (!chrome.runtime?.id) disconnected = true;
+        message = errorText('');
         return null;
       }
       const res = absorb(await send({ ...msg, candidates: pool }));
       if (res && !res.ok) message = errorText(res.error);
       return res && res.ok ? res : null;
-    } catch {
-      // A read that throws never got as far as asking the worker, so nothing was spent. Without this the reveal ended
-      // with no message, and Reveal next's half-dealt card stayed on the old thumbnail (Codex, 2026-10-16).
-      message = errorText('');
-      return null;
     } finally {
       clearTimeout(timer);
       slow = false;
@@ -362,8 +370,11 @@
   /** @type {number | null} */
   let heldLeft = null;
 
+  /** +15m's purchase is on its way to the worker. Without the drop's fall, this holds a second press (code review, 2026-10-16). */
+  let buying = false;
+
   async function onAddTime() {
-    if (pouring) return;
+    if (pouring || buying) return;
     message = '';
     const counter = document.querySelector('#drip-home .drip-stats .drip-token-drop');
     // A tab in the background has nobody to watch the drop.
@@ -373,7 +384,13 @@
       pouring = true;
       heldLeft = state.watchSecondsLeft;
     }
-    const res = absorb(await send({ type: 'spendWatch' }));
+    buying = true;
+    let res;
+    try {
+      res = absorb(await send({ type: 'spendWatch' }));
+    } finally {
+      buying = false;
+    }
     if (!from || !res || !res.ok) {
       pouring = false;
       heldLeft = null;
@@ -405,6 +422,12 @@
   async function onResolve(action, videoId, keyboard = false) {
     // While a reveal is in flight the card's buttons are disabled, but its picture still links to Watch (Codex, 2026-10-16).
     if (moving || busy) return;
+    // Watch is on its way, or its page is loading. Asking the worker again would get no-current and draw an error over the
+    // page as it leaves. Once the trip has started, another Watch repeats it, which also restarts a load the user stopped.
+    if (leaving) {
+      if (action === 'watch' && goingTo) location.assign(goingTo);
+      return;
+    }
     message = '';
     if (action === 'pass' && deals() && document.querySelector('#drip-home .drip-card .drip-deal')) {
       // Redraws wait while the worker answers, so the card is still there to animate.
@@ -441,7 +464,8 @@
     if (res && !res.ok) message = errorText(res.error);
     if (action === 'watch' && res && res.ok) {
       // A stashed card that was started in another tab opens where it stopped, like its stash row (Codex).
-      location.assign(resumeUrl(res.video.id));
+      goingTo = resumeUrl(res.video.id);
+      location.assign(goingTo);
       return;
     }
     leaving = false;
@@ -1354,8 +1378,8 @@
     root.addEventListener('click', (e) => {
       if (e.detail > 1) e.stopPropagation();
     }, true);
-    // Holding Enter repeats a button's click, and keyboard clicks get past the guard above. Each repeat could spend:
-    // +15m when the drop doesn't fall, or the Watch a finished reveal moves focus to (Codex, 2026-10-16).
+    // Holding Enter repeats a button's click, and keyboard clicks get past the guard above. A repeat could carry on into
+    // the Watch a finished reveal moves focus to, or start another Reveal next (Codex, 2026-10-16).
     root.addEventListener('keydown', (e) => {
       if (e.repeat && e.key === 'Enter') e.preventDefault();
     }, true);
@@ -1384,6 +1408,7 @@
   window.addEventListener('pageshow', (e) => {
     if (!e.persisted || !leaving) return;
     leaving = false;
+    goingTo = '';
     mount(true);
   });
   setInterval(() => mount(), 500);

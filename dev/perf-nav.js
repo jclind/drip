@@ -7,7 +7,8 @@
 /** @param {string} url @returns {Promise<boolean>} Whether YouTube finished the move within 10 seconds. */
 function dripGo(url) {
   return new Promise((resolve) => {
-    document.addEventListener('yt-navigate-finish', () => resolve(true), { once: true });
+    const done = () => resolve(true);
+    document.addEventListener('yt-navigate-finish', done, { once: true });
     const watch = url.startsWith('/watch');
     const id = watch ? new URL(url, location.origin).searchParams.get('v') : null;
     // The same event a click on one of YouTube's own links sends.
@@ -20,7 +21,11 @@ function dripGo(url) {
         },
       },
     }));
-    setTimeout(() => resolve(false), 10000);
+    // A move that times out takes its listener with it, so its late finish can't end the next move early.
+    setTimeout(() => {
+      document.removeEventListener('yt-navigate-finish', done);
+      resolve(false);
+    }, 10000);
   });
 }
 

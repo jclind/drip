@@ -213,6 +213,8 @@ class FakeElement {
     for (const el of [...chain].reverse().slice(0, -1)) fire(el, true);
     if (!event.stopped) fire(this, false);
     if (event.bubbles !== false) for (const el of chain.slice(1)) { if (event.stopped) break; fire(el, false); }
+    // As in a browser, Enter on a button clicks it, with detail 0, unless a listener prevented the keydown.
+    if (event.type === 'keydown' && event.key === 'Enter' && !event.defaultPrevented && this.localName === 'button') this.click(0);
     return !event.defaultPrevented;
   }
   /** A real click: nothing on a disabled button, or inside an inert element. @param {number} [detail] */
@@ -433,7 +435,9 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
   };
   const tab = {
     reduced,
-    document, location, world, errors, browse,
+    document, location, world, errors, browse, runtime,
+    /** What home.js logged with console.error. @type {any[][]} */
+    logged: [],
     /** @type {any[]} */
     reveals: [],
     /** The card the animation stub dealt, which home.js draws for real once the animation is done. @type {any} */
@@ -442,7 +446,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
 
   /** @type {any} */
   const context = {
-    document, location, console, JSON, Math, Number, String, Boolean, Set, Map, WeakMap, Array, Object, Promise, Error,
+    document, location, console: { ...console, error: (/** @type {any[]} */ ...args) => tab.logged.push(args) }, JSON, Math, Number, String, Boolean, Set, Map, WeakMap, Array, Object, Promise, Error,
     URL, URLSearchParams, structuredClone, navigator: { userAgent: 'test', clipboard: { writeText: async () => {} } },
     CSS: { escape: (/** @type {string} */ s) => s.replace(/["\\]/g, '\\$&') },
     innerHeight: 900,
@@ -644,6 +648,7 @@ for (const reduced of [true, false]) {
     assert.equal(world.count('reveal'), 0, 'nothing sent');
     assert.match(tab.message(), /Something went wrong/);
     assert.deepEqual(tab.errors, [], 'no error escapes');
+    assert.equal(tab.logged.length, 1, 'the error is logged');
     assert.ok(tab.button('reveal') && !tab.button('reveal').hasAttribute('disabled'), 'Reveal works again');
   });
 
@@ -727,13 +732,63 @@ test('the thumbnail does nothing while Reveal next waits on the worker (reduced 
 test('holding Enter on a button clicks it once, not once per key repeat', async () => {
   const world = makeWorld();
   const tab = await makeTab(world, { reduced: true });
-  const add = tab.button('add');
-  const first = { type: 'keydown', key: 'Enter', repeat: false };
-  const held = { type: 'keydown', key: 'Enter', repeat: true };
-  add.dispatchEvent(first);
-  add.dispatchEvent(held);
-  assert.equal(/** @type {any} */ (first).defaultPrevented, undefined, 'the first press goes through');
-  assert.equal(/** @type {any} */ (held).defaultPrevented, true, 'a repeat is held back');
+  tab.button('add').dispatchEvent({ type: 'keydown', key: 'Enter', repeat: false });
+  await tab.advance(100);
+  assert.equal(world.count('spendWatch'), 1);
+  // The first purchase is done, so only the keydown guard stands in the way of the repeats.
+  for (let i = 0; i < 3; i++) tab.button('add').dispatchEvent({ type: 'keydown', key: 'Enter', repeat: true });
+  await tab.advance(100);
+  assert.equal(world.count('spendWatch'), 1);
+  assert.equal(world.state.tokens.watch, 3);
+});
+
+test('two presses on +15m before the first is answered buy one drop (reduced motion)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { reduced: true });
+  /** @type {() => void} */
+  let release = () => {};
+  world.hold = new Promise((r) => { release = () => r(undefined); });
+  // A click, then Enter: separate presses, so neither the double-click guard nor the repeat guard catches the second.
+  tab.button('add').click(1);
+  tab.button('add').dispatchEvent({ type: 'keydown', key: 'Enter', repeat: false });
+  await tab.advance(100);
+  world.hold = null;
+  release();
+  await tab.advance(100);
+  assert.equal(world.count('spendWatch'), 1);
+  assert.equal(world.state.tokens.watch, 3);
+});
+
+test('a second Watch while the watch page loads goes there again without asking the worker', async () => {
+  const world = makeWorld();
+  world.state.watchSecondsLeft = 600;
+  const tab = await makeTab(world, { reduced: true });
+  await tab.click('reveal');
+  await loadPicture(tab);
+  await tab.advance(100);
+  await tab.click('watch');
+  await tab.advance(100);
+  assert.deepEqual(tab.location.assigned, ['/watch?v=v1']);
+  // The page is held while it leaves, so the old card and its Watch are still there.
+  await tab.click('watch');
+  await tab.advance(100);
+  assert.equal(world.count('resolve'), 1);
+  assert.deepEqual(tab.location.assigned, ['/watch?v=v1', '/watch?v=v1']);
+  assert.equal(tab.message(), '');
+});
+
+test('a feed read that throws in a tab whose drip was reloaded asks for a refresh', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { reduced: true, grid: [] });
+  // What Chrome does to a content script whose extension was reloaded: the id goes, and its APIs throw.
+  tab.runtime.id = undefined;
+  tab.runtime.getManifest = () => { throw new Error('Extension context invalidated.'); };
+  await tab.click('reveal');
+  // 6 seconds waiting for the grid, then about 30 for the hidden frame that looks for more.
+  await tab.advance(40000);
+  assert.equal(world.count('reveal'), 0);
+  assert.match(tab.root().textContent, /drip was updated\. Refresh this page\./);
+  assert.equal(tab.logged.length, 1);
 });
 
 test('+15m that fails says why, and a later press works (reduced motion)', async () => {

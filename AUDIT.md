@@ -98,11 +98,13 @@ Two rows above need a correction:
 |---|---|---|
 | The feed read throws (a grid link that can't be parsed, or `reportBroken` in a tab whose drip was reloaded) | Nothing spent, but no message, an unhandled rejection, and in Reveal next the half-dealt card could stay on the old thumbnail | Fixed: `findWith` catches it and says "Something went wrong" |
 | The card's picture during Reveal next with reduced motion | Its buttons are disabled, but the picture still linked to Watch, which could buy a drop and end the old card | Fixed: `onResolve` ignores clicks while a reveal is in flight |
-| Enter held on a button | Chrome repeats the click, and keyboard clicks get past the double-click guard. +15m bought a drop per repeat when the drop didn't fall, and a held Enter could carry from Reveal into Watch | Fixed: drip's home page ignores repeated Enter keydowns. Browser checklist item 5 |
+| Enter held on a button, or two quick presses | Chrome repeats the click, and keyboard clicks get past the double-click guard. +15m bought a drop per press when the drop didn't fall, and a held Enter could carry from Reveal into Watch | Fixed: +15m, on the home page and the lock, ignores a press while its purchase is on the way, and the home page ignores repeated Enter keydowns. Browser checklist item 5 |
 | Watch whose navigation the user cancels (Esc) | Redraws stay held, so the page shows the old card | Left: the next click on it gets `no-current`, which lets redraws back |
 | Play from Stash at 0 minutes when the purchase fails | It goes to the watch page anyway | Left: the lock there offers +15m (Q18) |
 | The loading text says Subscriptions "can take 15 seconds" | The worst case is about 30 (15 to load, 15 to poll) | Left for Jesse to decide |
 | An animation in a tab hidden mid-reveal | Unknown whether Web Animations' `finished` waits until the tab shows again. If it does, the reveal finishes on return | Not tested: air's driven tab wouldn't go hidden |
+
+A code review of PR 51 found four more, fixed in the same PR: a second Watch while the watch page loads asked the worker again and drew "That card changed in another tab" over the page as it left (it now repeats the trip instead); the new catch in `findWith` hid the error and didn't ask for a refresh in a tab whose drip was reloaded (it now logs the error and does); the catch also covered the message to the worker, where a throw could come after a spend (it now covers only the read); and `dev/perf-nav.js` let a timed-out move's late event end the next move early.
 
 `test/home.test.js` now runs home.js against a fake page, fake timers, and a fake worker with the real rules, in both the animated and the reduced-motion paths. It covers every row above that can be reached without a real browser.
 
