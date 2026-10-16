@@ -75,6 +75,10 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 - A soft water "plip" on "Done for now", off by default. drip has no sound anywhere yet, so it's a bigger decision than it looks.
 - Grace mode: while a video finishes on grace, the pill shows an empty glass with a faded outline at 35% opacity and "Finishing this one". Built on 2026-10-14 with the faded outline instead of a dotted one (DESIGN.md, "Grace on the pill as built").
 
+## Settings page
+
+- Unsaved changes get a banner that stays in view while you scroll, instead of only the "Not saved yet." line by Save. Leaving the page with changes unsaved asks first (Jesse, 2026-10-16).
+
 ## Efficiency
 
 - An efficiency pass over the whole extension, which Jesse wants later, not now (2026-10-13). One known lead: the lock's water rise hitches every so often on the MacBook while the motion keeps its timing. On air it runs at 60fps (80 frames, the slowest 29ms, no long tasks). The rise animates `--drip-water`, a registered property, which moves `#drip-lock`'s mask and clip every frame. That repaints a full-window `backdrop-filter: blur(20px)` on the main thread, so any of YouTube's scripts can delay a frame. Running out mid-video also grows an ellipse clip (pour.js `riseFrom`), which costs more than the flat edge. Compare a watch page opened at 0 minutes, which rises flat, with minutes running out: if only the second hitches, the ellipse is the cause. Otherwise move the rise onto the compositor, with the water sliding up as a transform instead of being repainted.

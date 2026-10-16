@@ -6,7 +6,7 @@ Results go in `~/drip-perf/` on the MacBook, then get copied to air, where a ses
 
 ## Before you start
 
-1. Update drip: `git pull` in drip's clone, then click reload on drip's card in `chrome://extensions`.
+1. Update drip to the branch with this checklist and `dev/perf-nav.js`: in drip's clone, `git fetch && git checkout test/reveal-failures && git pull`, then click reload on drip's card in `chrome://extensions`. Once PR 51 is merged, `git checkout main && git pull` instead.
 2. Run `mkdir -p ~/drip-perf`.
 3. In drip's Settings, turn on Developer mode. The dev panel shows at the bottom left of YouTube pages.
 4. Write down your minutes, drops, and cards now. Checks 2 and 3 change them through the dev panel, and the last step puts them back.
@@ -23,10 +23,16 @@ Four rounds, in this order, so drip ends turned on. Each round:
 
 | Round | drip | Tabs | Screenshots |
 |---|---|---|---|
-| A | on | Tab 1, plus youtube.com, plus `https://www.youtube.com/results?search_query=lofi` | `A-1.png`, `A-2.png`, `A-3.png` |
-| B | off | the same 3 | `B-1.png` to `B-3.png` |
+| A | on | The 3 tabs below | `A-1.png`, `A-2.png`, `A-3.png` |
+| B | off | The same 3 tabs | `B-1.png` to `B-3.png` |
 | C | off | 20: the same 3, plus 10 more of youtube.com and 7 more of the search page | `C-1.png` to `C-3.png` |
-| D | on | the same 20 | `D-1.png` to `D-3.png` |
+| D | on | The same 20 | `D-1.png` to `D-3.png` |
+
+The 3 tabs, in this order:
+
+1. `https://www.youtube.com/watch?v=wvFT4MgEJFA`, playing, the tab in front.
+2. `https://www.youtube.com/`, drip's home page.
+3. `https://www.youtube.com/results?search_query=lofi`, search results.
 
 To turn drip off or on, flip its switch in `chrome://extensions`, then reload every YouTube tab: select them all (click the first, Shift-click the last) and press Cmd+R. A tab that isn't reloaded keeps the old copy of drip's scripts.
 
