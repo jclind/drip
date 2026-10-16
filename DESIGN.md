@@ -96,7 +96,8 @@ Jesse asked to center the watch page now that its recommendations are gone, and 
 
 - The empty right column is gone, and the video and everything under it sit in the middle of the window, in default and theater mode. The column comes back while it has something in it: a playlist's queue, live chat, or an open panel such as the transcript or chapters. Opening the transcript moves the video back to the left, as YouTube lays it out.
 - Kept: the title, the channel row with its subscriber count and Subscribe, Like and dislike, Share, Save, the collapsed description, and Show comments. Save stays. It doesn't crowd Stash, which is on the pill inside the player, and it does a different job, Watch later and playlists (Jesse, 2026-10-15).
-- Cut: Join, the merch shelf ("Shop the ... store"), and Download, Clip, Thanks, and Ask in the action row. At full width YouTube's "..." menu doesn't hold them, so they're gone, not moved. In the expanded description, the game card, which links to the game's topic channel, and the channel card, which repeats the channel row. Chapters, the transcript, "How this was made", and the video's details stay.
+- Download stays too, so drip's Downloads menu entry has something to list (Jesse, 2026-10-15). He'd agreed to cut it when Claude said the "..." menu would still have it, which isn't so at full width.
+- Cut: Join, the merch shelf ("Shop the ... store"), and Clip, Thanks, and Ask in the action row. At full width YouTube's "..." menu doesn't hold them, so they're gone, not moved. In the expanded description, the game card, which links to the game's topic channel, and the channel card, which repeats the channel row. Chapters, the transcript, "How this was made", and the video's details stay.
 - The CSS is in `early.css`, so none of it paints first.
 
 ## Visual design (in progress, home page, lock screen, popup, and Settings built)

@@ -50,16 +50,15 @@ ytd-watch-flexy:not([playlist]):not([should-stamp-chat]):not([panel-expanded]):n
   justify-content: center !important;
 }
 
-/* Under the video: Join (a paid membership), the merch shelf, and the flexible action buttons other than Save, which
-   are Download and, on some videos, Clip, Thanks, and Ask. In a narrow window YouTube moves those into the "..."
-   menu, where Download is hidden too; that menu item's name wasn't checked, since air's window can't be narrowed.
-   Save is matched by its English label, so in another language it hides with the rest. In the expanded description,
-   the game card (it links to the game's topic channel, a feed of other people's videos) and the channel card, which
-   repeats the channel row. Chapters, the transcript, and the details stay (checked on air 2026-10-15). */
+/* Under the video: Join (a paid membership), the merch shelf, and the flexible action buttons other than Save and
+   Download, which on some videos are Clip, Thanks, and Ask. Download stays for drip's Downloads menu entry (Jesse,
+   2026-10-15). At full width the "..." menu doesn't hold these, so they're gone, not moved. Save is matched by its
+   English label, so in another language it hides with the rest. In the expanded description, the game card (it links
+   to the game's topic channel, a feed of other people's videos) and the channel card, which repeats the channel row.
+   Chapters, the transcript, and the details stay (checked on air 2026-10-15). */
 ytd-watch-metadata #sponsor-button,
 ytd-watch-flexy ytd-merch-shelf-renderer,
-ytd-watch-metadata #flexible-item-buttons > :not(:has(button[aria-label="Save to playlist"])),
-ytd-menu-popup-renderer ytd-menu-service-item-download-renderer,
+ytd-watch-metadata #flexible-item-buttons > :not(ytd-download-button-renderer):not(:has(button[aria-label="Save to playlist"])),
 ytd-watch-metadata yt-video-attributes-section-view-model,
 ytd-watch-metadata ytd-video-description-infocards-section-renderer {
   display: none !important;
