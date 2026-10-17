@@ -894,31 +894,35 @@
   }
 
   /**
-   * What Settings' Save sends: each setting the form changed from today's, plus each mode part a mode pick set whose
-   * waiting change it overrides. updateSettings cancels a waiting change when it's sent today's value, so without the
-   * second kind, Quiet saved and then Curated left Quiet's waiting search cap and stash, and the reset applied a mix
-   * (Codex, 2026-10-15).
+   * The settings as they'll be after the next reset: today's, with every waiting change applied. Settings shows these,
+   * so a saved change that waits stays in the form (Jesse, 2026-10-16).
+   * @param {State} state
+   * @returns {Settings}
+   */
+  function planned(state) {
+    return { ...state.settings, ...(state.pending ? state.pending.changes : {}) };
+  }
+
+  /**
+   * What Settings' Save sends: each setting the form changed from `planned`. Sent today's value, updateSettings cancels
+   * the waiting change, so Quiet saved and then Curated replaces all of Quiet at the reset (Codex, 2026-10-15).
    * @param {State} state
    * @param {Record<string, any>} draft The form's values.
    * @param {string[]} keys The settings the form has.
-   * @param {Iterable<string>} picked The parts a mode pick set since the last save.
    * @returns {Partial<Settings>}
    */
-  function settingsToSave(state, draft, keys, picked) {
-    const waiting = /** @type {Record<string, any>} */ (state.pending ? state.pending.changes : {});
-    const sticky = new Set(picked);
+  function settingsToSave(state, draft, keys) {
+    const base = /** @type {Record<string, any>} */ (planned(state));
     /** @type {Record<string, any>} */
     const changes = {};
     for (const key of keys) {
-      const value = draft[key];
-      const current = /** @type {Record<string, any>} */ (state.settings)[key];
-      if (value !== current || (sticky.has(key) && key in waiting && waiting[key] !== value)) changes[key] = value;
+      if (draft[key] !== base[key]) changes[key] = draft[key];
     }
     return changes;
   }
 
   /** @type {any} */ (globalThis).Drip = {
-    DEFAULT_SETTINGS, MODES, modeOf, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
+    DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
