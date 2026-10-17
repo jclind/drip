@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>drip tour callouts</title>
+<script>
+  // dev/page.html for the welcome page only, plus one variant's script and styles. ?v=a, b, or c picks the variant,
+  // &live=1 adds the playing player, &theme=dark or light overrides Chrome's theme, and &mode=curated (or quiet) starts
+  // the page as if that mode were saved. Serve the worktree's root and open /designs/tour-callouts/tour.html?v=a#tour-1.
+  (() => {
+  const listeners = { addListener() {}, removeListener() {} };
+  const params = new URLSearchParams(location.search);
+  const mode = params.get('mode');
+  /** @type {any} */
+  let state = null;
+  /** @type {any} */ (window).chrome = {
+    runtime: {
+      id: 'dev',
+      getURL: (/** @type {string} */ p) => `/${p}`,
+      openOptionsPage() {},
+      onMessage: listeners,
+      sendMessage(/** @type {any} */ msg) {
+        const D = /** @type {any} */ (globalThis).Drip;
+        if (!D) return Promise.resolve({ ok: true });
+        if (!state) {
+          state = D.initialState(Date.now());
+          if (mode && D.MODES[mode]) Object.assign(state.settings, D.MODES[mode]);
+        }
+        const res = msg.type === 'updateSettings' ? D.updateSettings(state, msg.changes, Date.now()) : { ok: true };
+        return Promise.resolve({ ...res, state: structuredClone(state) });
+      },
+    },
+    storage: { onChanged: listeners, local: { get: async () => ({}) } },
+    windows: { getCurrent: async () => ({}) },
+    tabs: { query: async () => [] },
+  };
+  fetch('/src/welcome/welcome.html').then((r) => r.text()).then((html) => {
+    const extra = '<link rel="stylesheet" href="/designs/tour-callouts/variants.css">'
+      + '<script src="/designs/tour-callouts/variants.js"><\/script>';
+    document.open();
+    document.write(html.replace('<head>', '<head><base href="/src/welcome/">').replace('</body>', `${extra}</body>`));
+    document.close();
+  });
+  })();
+</script>

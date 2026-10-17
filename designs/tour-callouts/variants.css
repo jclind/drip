@@ -1,0 +1,261 @@
+/* Tour callouts, round 1. See variants.js for what each variant is. The layer sits over the stage, above the pill
+   (z-index 70), and never takes a click. */
+
+.cv-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  font-family: "Roboto", "Arial", sans-serif;
+}
+
+.cv-chip {
+  position: absolute;
+  max-width: 250px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, var(--bg));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--text) 7%, var(--bg));
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* A: notes. The chip comes in, then its line draws to the target. */
+
+.cv-note .cv-chip {
+  animation: cv-in 240ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+
+.cv-note.is-above .cv-chip {
+  --from: 6px;
+}
+
+.cv-note.is-below .cv-chip {
+  --from: -6px;
+}
+
+.cv-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+
+.cv-line path {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cv-line path:first-child {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: cv-draw 380ms ease-out 140ms forwards;
+}
+
+.cv-line .cv-head {
+  opacity: 0;
+  animation: cv-fade 120ms linear 480ms forwards;
+}
+
+.cv-note {
+  transition: opacity 300ms ease;
+}
+
+.cv-note.is-going {
+  opacity: 0;
+}
+
+@keyframes cv-in {
+  from { opacity: 0; transform: translateY(var(--from, 6px)); }
+}
+
+@keyframes cv-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes cv-fade {
+  to { opacity: 1; }
+}
+
+/* C: the spotlight. A hole in a dim veil, ringed in drip's blue, that glides to each new target. */
+
+.cv-spot {
+  position: absolute;
+  border-radius: 14px;
+  box-shadow: 0 0 0 2px transparent, 0 0 0 2000px rgba(6, 10, 14, 0);
+  transition: left 450ms cubic-bezier(0.3, 0.7, 0.2, 1), top 450ms cubic-bezier(0.3, 0.7, 0.2, 1),
+    width 450ms cubic-bezier(0.3, 0.7, 0.2, 1), height 450ms cubic-bezier(0.3, 0.7, 0.2, 1), box-shadow 350ms ease;
+}
+
+.cv-layer.is-lit .cv-spot {
+  box-shadow: 0 0 0 2px var(--blue), 0 0 0 2000px rgba(6, 10, 14, 0.5);
+}
+
+html[dark] .cv-layer.is-lit .cv-spot {
+  box-shadow: 0 0 0 2px var(--blue), 0 0 0 2000px rgba(0, 0, 0, 0.62);
+}
+
+.cv-spot-chip {
+  opacity: 0;
+  transition: opacity 250ms ease, left 450ms cubic-bezier(0.3, 0.7, 0.2, 1), top 450ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.cv-layer.is-lit .cv-spot-chip {
+  opacity: 1;
+  transition-delay: 150ms, 0ms, 0ms;
+}
+
+/* B: how much a number changed, beside it, floating up and away. */
+
+.cv-delta {
+  position: absolute;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: cv-float 1600ms cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+}
+
+.cv-delta.is-up {
+  color: var(--blue);
+}
+
+@keyframes cv-float {
+  0% { opacity: 0; transform: translateY(-50%) scale(0.8); }
+  15% { opacity: 1; transform: translateY(-50%) scale(1.05); }
+  30% { transform: translateY(-50%) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(calc(-50% - 18px)); }
+}
+
+/* The playing player. The picture moves only while it plays, and fast, since the video runs at 90 times. */
+
+.lv-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.lv-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.35), transparent 28%, transparent 66%, rgba(0, 0, 0, 0.45));
+}
+
+.lv-pic {
+  position: absolute;
+  inset: -10%;
+  background: var(--thumb);
+  animation: lv-pan 7s ease-in-out infinite alternate paused;
+}
+
+.lv-glow {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  filter: blur(16px);
+  animation: lv-drift 4s ease-in-out infinite alternate paused;
+}
+
+.lv-g1 { width: 34%; height: 46%; left: 8%; top: 18%; }
+.lv-g2 { width: 22%; height: 30%; left: 58%; top: 40%; animation-duration: 3.1s; animation-direction: alternate-reverse; }
+.lv-g3 { width: 16%; height: 22%; left: 36%; top: 62%; animation-duration: 2.4s; background: rgba(255, 220, 170, 0.18); }
+
+.tour-player.is-playing .lv-pic,
+.tour-player.is-playing .lv-glow {
+  animation-play-state: running;
+}
+
+@keyframes lv-pan {
+  from { transform: scale(1) translate(0, 0); }
+  to { transform: scale(1.12) translate(-4%, 3%); }
+}
+
+@keyframes lv-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(40%, -18%) scale(1.25); }
+}
+
+.lv-title {
+  position: absolute;
+  top: 18px;
+  left: 14px;
+  max-width: calc(100% - 200px);
+  overflow: hidden;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.lv-time,
+.lv-speed {
+  position: absolute;
+  bottom: 22px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  pointer-events: none;
+}
+
+.lv-time {
+  left: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lv-speed {
+  right: 12px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.tour-player.is-playing .lv-speed {
+  opacity: 1;
+}
+
+/* The play button's hover shade sits over the new picture. */
+.tour-player .tour-player-play {
+  z-index: 1;
+}
+
+.tour-player .tour-player-bar {
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-pic,
+  .lv-glow,
+  .cv-note .cv-chip,
+  .cv-line path:first-child,
+  .cv-line .cv-head {
+    animation: none;
+  }
+
+  .cv-line path:first-child {
+    stroke-dashoffset: 0;
+  }
+
+  .cv-line .cv-head {
+    opacity: 1;
+  }
+
+  .cv-delta {
+    animation-duration: 2400ms;
+  }
+}
