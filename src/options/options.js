@@ -124,12 +124,11 @@ const cardsOnAs = (d) => cardsKind || (d.clock ? 'limited' : 'unlimited');
 
 /** @type {any} */
 let state = null;
-/** Settings as the form shows them, saved or not. */
+/** Settings as the form shows them, saved or not. Saved, they're the planned ones, waiting changes included. */
 /** @type {Record<string, any>} */
 let draft = {};
-/** The mode parts a mode pick set since the last save. Save sends them even at today's values (Drip.settingsToSave). */
-const picked = new Set();
-let justSaved = false;
+/** What the save bar says for a moment after Save, or ''. */
+let savedNote = '';
 /** How many weeks back History shows, and the day its block under the chart is about. */
 let weeksBack = 0;
 let selectedDay = '';
@@ -163,6 +162,9 @@ function valueWords(f, value) {
   if (f.kind === 'choice') return (f.options?.find(([v]) => v === value) || [value, value])[1];
   return f.say ? f.say(value) : String(value);
 }
+
+/** "4:00am", today's reset, when every waiting change starts. */
+const resetLabel = () => DripPage.hourLabel(state.settings.resetHour);
 
 /** "Tue, Oct 12, 4:00 AM", for the chip's tooltip. */
 function effectiveLabel() {
@@ -289,15 +291,19 @@ function resetCardsKind() {
 }
 
 /**
- * The gray chip for a loosening change that waits for the reset: "→ 3 days from 4:00am · Undo". A folded section shows
- * its rows' chips in its header, named: "Stash holds → 12 videos from 4:00am · Undo".
+ * The gray chip beside a saved change that waits for the reset. The control shows the change, and the chip what holds
+ * until then: "2 days until 4:00am · Undo" (Jesse, 2026-10-16). A folded section shows its rows' chips in its header,
+ * named: "Stash holds 11 videos until 4:00am · Undo".
  * @param {Field} f @param {boolean} [named]
  */
 function chip(f, named) {
   if (!state.pending || !(f.key in state.pending.changes)) return null;
   const { h } = DripPage;
-  return h('span', { class: 'chip', title: `Starts ${effectiveLabel()}` },
-    h('span', {}, `${named ? `${f.label} ` : ''}→ ${valueWords(f, state.pending.changes[f.key])} from ${DripPage.hourLabel(state.settings.resetHour)}`),
+  // "4:00am until 4:00am" says nothing, so a new reset hour names the end of today instead.
+  const text = f.key === 'resetHour' ? `Today ends at ${resetLabel()}`
+    : `${named ? `${f.label} ` : ''}${valueWords(f, state.settings[f.key])} until ${resetLabel()}`;
+  return h('span', { class: 'chip', title: `Your change starts ${effectiveLabel()}` },
+    h('span', {}, text),
     h('span', { 'aria-hidden': 'true' }, '·'),
     h('button', { type: 'button', class: 'chip-undo', 'aria-label': `Undo the waiting change to ${f.label}`, onclick: () => cancel(f.key) }, 'Undo'));
 }
@@ -323,6 +329,22 @@ setInterval(renderFirstDay, 60000);
 
 /** The three modes (Q29), named in Settings as on the welcome page. */
 const MODE_NAMES = /** @type {const} */ ([['quiet', 'Quiet'], ['curated', 'Curated'], ['full', 'Full drip']]);
+/** The four mode parts. */
+const MODE_KEYS = Object.keys(Drip.MODES.full);
+
+/** "Quiet", or "Your own mix" for a mix that matches no mode. @param {string | null} mode */
+const modeName = (mode) => (MODE_NAMES.find(([name]) => name === mode) || [null, 'Your own mix'])[1];
+
+/**
+ * "Quiet from 4:00am. Until then, Full drip.", while a saved mix waits for the reset and the form's parts still show it.
+ * Otherwise ''.
+ */
+function modeWaitingLine() {
+  const plan = Drip.planned(state);
+  if (MODE_KEYS.every((k) => plan[k] === state.settings[k]) || MODE_KEYS.some((k) => draft[k] !== plan[k])) return '';
+  const today = Drip.modeOf(state.settings);
+  return `${modeName(Drip.modeOf(plan))} from ${resetLabel()}. Until then, ${today ? modeName(today) : 'your own mix'}.`;
+}
 
 /**
  * Quiet, Curated, and Full drip, as one row of three. Picking one sets the four parts in the form, still waiting for
@@ -334,7 +356,7 @@ function modeRow() {
   return h('div', { class: 'setting mode-row' },
     h('div', { class: 'setting-text' },
       h('div', { class: 'setting-line' }, h('span', { class: 'setting-label', id: 'label-mode' }, 'Mode')),
-      h('div', { class: 'hint' }, now ? 'Switch a part below to make your own mix.' : 'Your own mix.')),
+      h('div', { class: 'hint' }, modeWaitingLine() || (now ? 'Switch a part below to make your own mix.' : 'Your own mix.'))),
     // One Tab stop, with the arrow keys moving the pick, like the welcome page's list (Codex, 2026-10-15).
     h('div', {
       class: 'segmented', role: 'radiogroup', 'aria-labelledby': 'label-mode',
@@ -356,7 +378,6 @@ function modeRow() {
 /** @param {string} name */
 function pickMode(name) {
   Object.assign(draft, Drip.MODES[name]);
-  for (const key of Object.keys(Drip.MODES[name])) picked.add(key);
   if (draft.cards !== 'off') cardsKind = draft.cards;
   renderForm();
   draftChanged();
@@ -444,30 +465,28 @@ function syncModeRow() {
 }
 
 /** What Save would send. */
-const toSave = () => Drip.settingsToSave(state, draft, FIELDS.map((f) => f.key), picked);
+const toSave = () => Drip.settingsToSave(state, draft, FIELDS.map((f) => f.key));
 
 function dirty() {
   return Object.keys(toSave()).length > 0;
 }
 
 /**
- * The fields the user changed and hasn't saved: draft values that differ from `base`, the settings the form was drawn
+ * The fields the user changed and hasn't saved: draft values that differ from the planned settings the form was drawn
  * from. Only these carry over when the settings change underneath, so Save never sends a stale copy of another field.
- * @param {Record<string, any>} base
  */
-function edits(base) {
+function edits() {
+  const base = Drip.planned(state);
   return Object.fromEntries(FIELDS.filter((f) => draft[f.key] !== base[f.key]).map((f) => [f.key, draft[f.key]]));
 }
 
 /**
  * The save bar at the bottom of the window: "2 changes not saved" with Undo all and Save while there are edits, then
- * "Saved." and the waiting count for a moment after Save (IDEAS.md, "Settings page").
+ * what the save did for a moment after it (IDEAS.md, "Settings page").
  */
 function renderBar() {
   const n = Object.keys(toSave()).length;
-  const waiting = state.pending ? Object.keys(state.pending.changes).length : 0;
-  const text = n ? `${plural(n, 'change', 'changes')} not saved`
-    : justSaved ? ['Saved.', waiting && `${waiting} waiting for the reset.`].filter(Boolean).join(' ') : '';
+  const text = n ? `${plural(n, 'change', 'changes')} not saved` : savedNote;
   $('savebar').hidden = !text;
   $('savebar').classList.toggle('is-saved', !n);
   $('result').textContent = text;
@@ -478,7 +497,7 @@ function renderBar() {
 let savedTimer;
 
 function draftChanged() {
-  justSaved = false;
+  savedNote = '';
   syncParts();
   syncIdle();
   renderBar();
@@ -492,6 +511,20 @@ function absorb(res) {
 
 /** Save and Undo all hide the button pressed, so focus goes to the mode picker, the top of the form, not the page's. */
 const focusForm = () => /** @type {HTMLElement | null} */ (document.querySelector('.segmented [tabindex="0"]'))?.focus();
+
+/**
+ * "Saved.", then when this save's waiting changes start: "Quiet starts at 4:00am." for a mode, else "2 changes start
+ * at 4:00am.". The form already shows them, so the bar says when.
+ * @param {string[]} waiting The keys this save left waiting.
+ */
+function savedLine(waiting) {
+  if (!waiting.length) return 'Saved.';
+  const mode = Drip.modeOf(Drip.planned(state));
+  if (mode && waiting.some((k) => MODE_KEYS.includes(k)) && mode !== Drip.modeOf(state.settings)) {
+    return `Saved. ${modeName(mode)} starts at ${resetLabel()}.`;
+  }
+  return `Saved. ${plural(waiting.length, 'change starts', 'changes start')} at ${resetLabel()}.`;
+}
 
 async function save() {
   const changes = toSave();
@@ -511,39 +544,37 @@ async function save() {
   }
   absorb(res);
   const hadFocus = $('savebar').contains(document.activeElement);
-  picked.clear();
-  draft = { ...state.settings };
+  draft = Drip.planned(state);
   resetCardsKind();
-  justSaved = true;
+  savedNote = savedLine(Object.keys(res.pending || {}));
   renderForm();
   renderHistory();
   if (hadFocus) focusForm();
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => {
-    justSaved = false;
+    savedNote = '';
     renderBar();
   }, 2500);
 }
 
-/** Undo all: the form goes back to the saved settings. */
+/** Undo all: the form goes back to the saved settings, waiting changes included. */
 function undoAll() {
   const hadFocus = $('savebar').contains(document.activeElement);
-  picked.clear();
-  draft = { ...state.settings };
+  draft = Drip.planned(state);
   resetCardsKind();
-  justSaved = false;
+  savedNote = '';
   renderForm();
   if (hadFocus) focusForm();
 }
 
 /** @param {string} key */
 async function cancel(key) {
-  // Undo keeps any other edit in progress.
-  const kept = edits(state.settings);
+  // Undo puts back today's value and keeps any other edit in progress.
+  const kept = edits();
   delete kept[key];
   absorb(await send({ type: 'cancelPending', key }));
-  justSaved = false;
-  draft = { ...state.settings, ...kept };
+  savedNote = '';
+  draft = { ...Drip.planned(state), ...kept };
   resetCardsKind();
   renderForm();
 }
@@ -672,13 +703,13 @@ window.addEventListener('beforeunload', (e) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !changes.drip || !state || sample) return;
   const before = JSON.stringify([state.settings, state.pending]);
-  const kept = edits(state.settings);
+  const kept = edits();
   const today = state.day;
   state = Drip.hydrate(changes.drip.newValue, Date.now());
   if (selectedDay === today) selectedDay = state.day;
   if (JSON.stringify([state.settings, state.pending]) !== before) {
     // Fields being edited keep their values. Every other field follows the new settings (Codex, 2026-10-11).
-    draft = { ...state.settings, ...kept };
+    draft = { ...Drip.planned(state), ...kept };
     if (draft.cards !== 'off') cardsKind = draft.cards;
     renderForm();
   }
@@ -757,8 +788,7 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
   }
   renderSamples(dev);
   if (!state) return;
-  picked.clear();
-  draft = { ...state.settings };
+  draft = Drip.planned(state);
   resetCardsKind();
   renderForm();
   renderHistory();
