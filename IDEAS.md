@@ -77,7 +77,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 
 ## Settings page
 
-- Unsaved changes get a banner that stays in view while you scroll, instead of only the "Not saved yet." line by Save. Leaving the page with changes unsaved asks first (Jesse, 2026-10-16). Planned for 1.0 with the Settings regroup (RELEASE-PLAN.md).
+- Unsaved changes get a banner that stays in view while you scroll, instead of only the "Not saved yet." line by Save. Leaving the page with changes unsaved asks first (Jesse, 2026-10-16). Built with the Settings regroup on 2026-10-16: a save bar at the bottom of the window.
 
 ## After 1.0
 
@@ -87,6 +87,7 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 - Switches for what drip hides: comments, Shorts, the sidebar menu, the end screen. Unhook is built on these. Each one is a leak someone can turn on at 1am, so maybe only "always show comments".
 - A cooldown and a typed reason before pausing drip (under Friction).
 - A "Reduce motion" switch that overrides the system setting.
+- A page Chrome opens on uninstall (`chrome.runtime.setUninstallURL`) with one question, "Why are you leaving?". It needs a small hosted page (Claude's suggestion, 2026-10-16, with the Settings feedback link).
 - Not worth it yet: syncing across devices, and notifications like "5 minutes left".
 
 ## Efficiency

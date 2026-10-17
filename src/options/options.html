@@ -17,13 +17,13 @@
 
       <p class="muted first-day" id="firstDay" hidden></p>
       <form id="settings" novalidate></form>
-      <div class="save-row">
-        <button class="primary" id="save" type="button">Save</button>
-        <span class="muted" id="result" role="status"></span>
-      </div>
+      <!-- Where someone ends up after scrolling past every setting without finding theirs. Email, so nothing leaves the
+           browser unless they send it. -->
+      <p class="feedback">
+        <a href="mailto:apps@jesselind.com?subject=drip%3A%20a%20setting%20I%27d%20want">Missing a setting? Tell me what you'd want.</a>
+      </p>
 
-      <h1 class="watch-title">Watch time</h1>
-      <h2 class="caps">History</h2>
+      <h1 class="history-title">History</h1>
       <div class="card" id="history"></div>
 
       <section id="reasons-section" hidden>
@@ -48,6 +48,14 @@
         </p>
       </section>
     </main>
+
+    <!-- Stays in view while there are edits not saved. The live region sits outside it, since a hidden one can't speak. -->
+    <div class="savebar" id="savebar" hidden>
+      <span class="savebar-text" id="result"></span>
+      <button class="link" id="undoAll" type="button">Undo all</button>
+      <button class="primary" id="save" type="button">Save</button>
+    </div>
+    <span class="sr" id="status" role="status"></span>
     <script src="../lib/state.js"></script>
     <script src="../pages.js"></script>
     <script src="options.js"></script>
