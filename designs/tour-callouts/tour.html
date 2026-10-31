@@ -3,8 +3,9 @@
 <title>drip tour callouts</title>
 <script>
   // dev/page.html for the welcome page only, plus one variant's script and styles. ?v=a, b, or c picks the variant,
-  // &live=1 adds the playing player, &theme=dark or light overrides Chrome's theme, and &mode=curated (or quiet) starts
-  // the page as if that mode were saved. Serve the worktree's root and open /designs/tour-callouts/tour.html?v=a#tour-1.
+  // &live=1 adds the playing player, and &mode=curated (or quiet) starts the page as if that mode were saved. The theme
+  // follows Chrome's; index.html sets it on its frame. Serve the worktree's root and open
+  // /designs/tour-callouts/tour.html?v=a#tour-1.
   (() => {
   const listeners = { addListener() {}, removeListener() {} };
   const params = new URLSearchParams(location.search);
@@ -33,8 +34,9 @@
     tabs: { query: async () => [] },
   };
   fetch('/src/welcome/welcome.html').then((r) => r.text()).then((html) => {
-    const extra = '<link rel="stylesheet" href="/designs/tour-callouts/variants.css">'
-      + '<script src="/designs/tour-callouts/variants.js"><\/script>';
+    // The query keeps Chrome from serving an old copy while the mockups change.
+    const extra = `<link rel="stylesheet" href="/designs/tour-callouts/variants.css?${Date.now()}">`
+      + `<script src="/designs/tour-callouts/variants.js?${Date.now()}"><\/script>`;
     document.open();
     document.write(html.replace('<head>', '<head><base href="/src/welcome/">').replace('</body>', `${extra}</body>`));
     document.close();

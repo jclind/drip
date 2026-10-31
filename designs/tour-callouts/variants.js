@@ -12,8 +12,6 @@
   const params = new URLSearchParams(location.search);
   const v = params.get('v') || 'a';
   const live = v === 'b' ? params.get('live') !== '0' : params.get('live') === '1';
-  const theme = params.get('theme');
-  if (theme === 'dark' || theme === 'light') document.documentElement.toggleAttribute('dark', theme === 'dark');
   document.documentElement.dataset.variant = v;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -48,49 +46,98 @@
 
   /** @type {Map<string, HTMLElement>} */
   const notes = new Map();
+  /** How to put each note back on its target. @type {Map<HTMLElement, () => void>} */
+  const placers = new Map();
+  /** Where each note's chip sits, oldest first. @type {Map<HTMLElement, { left: number, top: number, w: number, h: number }>} */
+  const chipBoxes = new Map();
 
-  /** @param {string} sel @param {string} text @param {number} [hold] */
-  function note(sel, text, hold = 2800) {
-    const target = q(sel);
-    if (!target) return;
-    notes.get(sel)?.remove();
-    const b = box(target);
-    const below = b.cy < b.sh * 0.55;
+  /**
+   * `side` puts the chip above or below its target; by default the stats row gets notes above it, since the buttons sit
+   * right under it, and anything else goes to the roomier half. `align` 'start' runs the chip right from the target and
+   * 'end' runs it left, so two notes on one row don't cover each other.
+   * @param {string} sel @param {string} text @param {number} [hold]
+   * @param {{ side?: 'above' | 'below' | 'right', align?: 'start' | 'end', gap?: number, width?: number }} [opt]
+   */
+  function note(sel, text, hold = 2800, opt = {}) {
+    if (!q(sel)) return;
+    const old = notes.get(sel);
+    if (old) { old.remove(); placers.delete(old); chipBoxes.delete(old); }
     const el = document.createElement('div');
-    el.className = `cv-note ${below ? 'is-below' : 'is-above'}`;
+    el.className = 'cv-note';
     const chip = document.createElement('span');
     chip.className = 'cv-chip';
     chip.textContent = text;
-    el.append(chip);
-    layer.append(el);
-    // The chip sits 40px past the target, centered on it but kept inside the stage.
-    const cw = chip.offsetWidth;
-    const ch = chip.offsetHeight;
-    const gap = 40;
-    const left = Math.max(10, Math.min(b.sw - cw - 10, b.cx - cw / 2));
-    const top = below ? b.y + b.h + gap : b.y - gap - ch;
-    chip.style.left = `${left}px`;
-    chip.style.top = `${top}px`;
-    // The line: from the chip's near edge to just short of the target, bowed to one side.
-    const fromX = Math.max(left + 14, Math.min(left + cw - 14, b.cx + (b.cx < b.sw / 2 ? 18 : -18)));
-    const fromY = below ? top - 4 : top + ch + 4;
-    const toX = b.cx;
-    const toY = below ? b.y + b.h + 5 : b.y - 5;
-    const bow = (fromX < toX ? -1 : 1) * 16;
-    const midX = (fromX + toX) / 2 + bow;
-    const midY = (fromY + toY) / 2;
-    const ang = Math.atan2(toY - midY, toX - midX);
-    const head = (/** @type {number} */ turn) => `${toX - 7 * Math.cos(ang + turn)},${toY - 7 * Math.sin(ang + turn)}`;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'cv-line');
-    svg.setAttribute('width', String(b.sw));
-    svg.setAttribute('height', String(b.sh));
-    svg.innerHTML = `<path pathLength="1" d="M${fromX},${fromY} Q${midX},${midY} ${toX},${toY}"/><path class="cv-head" d="M${head(0.5)} L${toX},${toY} L${head(-0.5)}"/>`;
-    el.prepend(svg);
+    svg.innerHTML = '<path pathLength="1"/><path class="cv-head"/>';
+    el.append(svg, chip);
+    layer.append(el);
+    // The target can still be moving when the note starts (a card dealt in pushes the stats up), so tick() calls this
+    // again every 100ms and the note follows it.
+    const place = () => {
+      const target = q(sel);
+      if (!target) return;
+      const b = box(target);
+      const cw = chip.offsetWidth;
+      const ch = chip.offsetHeight;
+      const gap = 40;
+      let side = opt.side || (target.closest('.drip-stats') ? 'above' : b.cy < b.sh * 0.55 ? 'below' : 'above');
+      // No room above (the stats at the stage's top edge): go below instead.
+      if (side === 'above' && b.y - gap - ch < 6) side = 'below';
+      const below = side === 'below';
+      const right = side === 'right';
+      el.classList.toggle('is-below', below);
+      el.classList.toggle('is-above', side === 'above');
+      el.classList.toggle('is-right', right);
+      if (opt.width) chip.style.maxWidth = `${opt.width}px`;
+      let left, top, fromX, fromY, toX, toY, midX, midY;
+      if (right) {
+        // Beside the target, in the strip between it and the stage's edge.
+        left = Math.min(b.sw - cw - 8, b.x + b.w + (opt.gap ?? 22));
+        top = b.cy - ch / 2;
+        fromX = left - 4;
+        fromY = top + ch / 2;
+        toX = b.x + b.w + 4;
+        toY = b.cy;
+        midX = (fromX + toX) / 2;
+        midY = (fromY + toY) / 2;
+      } else {
+        // The chip sits 40px past the target, kept inside the stage.
+        const want = opt.align === 'start' ? b.cx - 14 : opt.align === 'end' ? b.cx - cw + 14 : b.cx - cw / 2;
+        left = Math.max(10, Math.min(b.sw - cw - 10, want));
+        top = below ? b.y + b.h + gap : b.y - gap - ch;
+        // On a narrow stage two notes on one row can meet: this one stacks past any earlier note it would cover.
+        for (const [other, r] of chipBoxes) {
+          if (other === el) break;
+          if (left < r.left + r.w && left + cw > r.left && top < r.top + r.h && top + ch > r.top) {
+            top = below ? r.top + r.h + 6 : r.top - ch - 6;
+          }
+        }
+        // The line: from the chip's near edge to just short of the target, bowed to one side.
+        fromX = Math.max(left + 14, Math.min(left + cw - 14, b.cx + (b.cx < b.sw / 2 ? 18 : -18)));
+        fromY = below ? top - 4 : top + ch + 4;
+        toX = b.cx;
+        toY = below ? b.y + b.h + 5 : b.y - 5;
+        midX = (fromX + toX) / 2 + (fromX < toX ? -1 : 1) * 16;
+        midY = (fromY + toY) / 2;
+      }
+      chip.style.left = `${left}px`;
+      chip.style.top = `${top}px`;
+      chipBoxes.set(el, { left, top, w: cw, h: ch });
+      const ang = Math.atan2(toY - midY, toX - midX);
+      const head = (/** @type {number} */ turn) => `${toX - 7 * Math.cos(ang + turn)},${toY - 7 * Math.sin(ang + turn)}`;
+      svg.setAttribute('width', String(b.sw));
+      svg.setAttribute('height', String(b.sh));
+      const [line, tip] = svg.children;
+      line.setAttribute('d', `M${fromX},${fromY} Q${midX},${midY} ${toX},${toY}`);
+      tip.setAttribute('d', `M${head(0.5)} L${toX},${toY} L${head(-0.5)}`);
+    };
+    place();
+    placers.set(el, place);
     notes.set(sel, el);
     later(() => {
       el.classList.add('is-going');
-      later(() => { el.remove(); if (notes.get(sel) === el) notes.delete(sel); }, 400);
+      later(() => { el.remove(); placers.delete(el); chipBoxes.delete(el); if (notes.get(sel) === el) notes.delete(sel); }, 400);
     }, hold);
   }
 
@@ -101,13 +148,21 @@
   const spotChip = document.createElement('span');
   spotChip.className = 'cv-chip cv-spot-chip';
   let spotSel = '';
+  /** @type {{ side?: 'above' | 'below', align?: 'start', under?: string }} */
+  let spotOpt = {};
   let spotGen = 0;
 
-  /** @param {string} sel @param {string} text @param {number} [hold] */
-  function light(sel, text, hold = 3000) {
+  /**
+   * `side` picks above or below the hole; `align` 'start' lines the chip up with the hole's left edge; `under` puts the
+   * chip below another element (the lock's panel) instead of right against the hole.
+   * @param {string} sel @param {string} text @param {number} [hold]
+   * @param {{ side?: 'above' | 'below', align?: 'start', under?: string }} [opt]
+   */
+  function light(sel, text, hold = 3000, opt = {}) {
     const target = q(sel);
     if (!target) return;
     spotSel = sel;
+    spotOpt = opt;
     const gen = ++spotGen;
     spotChip.textContent = text;
     if (!spot.isConnected) layer.append(spot, spotChip);
@@ -129,24 +184,37 @@
     const b = box(target);
     const pad = 8;
     Object.assign(spot.style, { left: `${b.x - pad}px`, top: `${b.y - pad}px`, width: `${b.w + pad * 2}px`, height: `${b.h + pad * 2}px` });
-    const below = b.cy < b.sh * 0.55;
+    // The stats row's chip goes above it, since the buttons sit right under it; anything else goes to the roomier half,
+    // or below when there's no room above.
+    const ch = spotChip.offsetHeight;
+    let below = spotOpt.side ? spotOpt.side === 'below' : target.closest('.drip-stats') ? false : b.cy < b.sh * 0.55;
+    if (!below && b.y - pad - 12 - ch < 6) below = true;
     const cw = spotChip.offsetWidth;
-    spotChip.style.left = `${Math.max(10, Math.min(b.sw - cw - 10, b.cx - cw / 2))}px`;
-    spotChip.style.top = below ? `${b.y + b.h + pad + 12}px` : `${b.y - pad - 12 - spotChip.offsetHeight}px`;
+    const want = spotOpt.align === 'start' ? b.x : b.cx - cw / 2;
+    spotChip.style.left = `${Math.max(10, Math.min(b.sw - cw - 10, want))}px`;
+    const under = spotOpt.under && q(spotOpt.under);
+    const floor = under ? box(under) : b;
+    spotChip.style.top = below || under ? `${floor.y + floor.h + (under ? 14 : pad + 12)}px` : `${b.y - pad - 12 - ch}px`;
   }
 
   // B: a number that changed says by how much, beside it, and floats away.
 
-  /** @param {string} sel @param {string} text */
-  function delta(sel, text) {
+  /** `above` centers it over the number instead, for a number with another right beside it. @param {string} sel @param {string} text @param {'right' | 'above'} [at] */
+  function delta(sel, text, at = 'right') {
     const target = q(sel);
     if (!target) return;
     const b = box(target);
     const el = document.createElement('span');
     el.className = `cv-delta${text.startsWith('+') ? ' is-up' : ''}`;
     el.textContent = text;
-    el.style.left = `${b.x + b.w + 6}px`;
-    el.style.top = `${b.cy}px`;
+    if (at === 'above') {
+      el.classList.add('is-above');
+      el.style.left = `${b.cx}px`;
+      el.style.top = `${b.y - 6}px`;
+    } else {
+      el.style.left = `${b.x + b.w + 6}px`;
+      el.style.top = `${b.cy}px`;
+    }
     layer.append(el);
     later(() => el.remove(), 1800);
   }
@@ -228,12 +296,15 @@
     if (!layer.isConnected) stage.append(layer);
     if (live) dressPlayer();
     if (spotSel) placeSpot();
+    for (const place of placers.values()) place();
     const now = read();
     if (!was || was.key !== now.key) {
       for (const t of timers) clearTimeout(t);
       timers.clear();
       layer.replaceChildren();
       notes.clear();
+      placers.clear();
+      chipBoxes.clear();
       dark();
       was = now;
       const kind = now.kind;
@@ -264,7 +335,7 @@
   function arrive(kind) {
     if (kind === 'lock' && was) on('lock', was);
     if (v !== 'c') return;
-    if (kind === 'home') light('.drip-actions .drip-add', 'Spend a drop for 15 minutes of watching', 0);
+    if (kind === 'home') light('.drip-actions .drip-add', 'Spend a drop for 15 minutes of watching', 0, { side: 'below' });
     if (kind === 'player') light('#drip-pill', 'Your time left. It drains while a video plays.', 0);
   }
 
@@ -274,27 +345,33 @@
    */
   function on(what, now) {
     if (v === 'a') {
-      if (what === 'drop') note(DROP, `One drop spent. ${left(now.drops ?? 0, 'drop')}.`);
-      if (what === 'time') note('.drip-stats .drip-glass-tile', 'The drop fills your glass');
-      if (what === 'card') note(CARD, `One card used. ${left(now.cards ?? 0, 'card')}.`);
-      if (what === 'shown') later(() => note('.drip-card .drip-pass', 'Passing is free', 2600), 1100);
+      if (what === 'drop') note(DROP, `One drop spent. ${left(now.drops ?? 0, 'drop')}.`, 2800, { align: 'start' });
+      if (what === 'time') note('.drip-stats .drip-glass-tile', 'The drop fills your glass', 2800, { align: 'end' });
+      if (what === 'card') note(CARD, `One card used. ${left(now.cards ?? 0, 'card')}.`, 2800, { align: 'start' });
+      if (what === 'shown') later(() => note('.drip-card .drip-pass', 'Passing is free', 2600, { side: 'right', width: 60, gap: 14 }), 1100);
       if (what === 'play') note('#drip-pill', 'Your time drains while a video plays', 3200);
       if (what === 'pause') note('#drip-pill', 'Paused. Nothing drains.', 2400);
-      if (what === 'lock') later(() => note('#drip-lock .drip-lock-link', 'Unlocks one video you need, with a reason', 3400), 1300);
+      if (what === 'lock') later(() => note('#drip-lock .drip-lock-link', 'Unlocks one video you need, with a reason', 3400, { side: 'below' }), 1300);
     }
     if (v === 'b') {
       if (what === 'drop') delta(DROP, '−1');
-      if (what === 'time') delta('.drip-stats .drip-time', `+15m`);
+      if (what === 'time') delta('.drip-stats .drip-time', '+15m', 'above');
       if (what === 'card') delta(CARD, '−1');
     }
     if (v === 'c') {
       if (what === 'drop') light(DROP, left(now.drops ?? 0, 'drop'), 0);
-      if (what === 'time') light('.drip-stats .drip-glass-tile', 'The drop fills your glass', 2600);
+      // The drop counter and the minutes change in the same tick: light the glass first, then the drops left.
+      if (what === 'time') {
+        light('.drip-stats .drip-glass-tile', 'The drop fills your glass', 0);
+        const gen = spotGen;
+        const drops = now.drops ?? 0;
+        later(() => { if (gen === spotGen) light(DROP, left(drops, 'drop'), 0); }, 2400);
+      }
       if (what === 'card') light(CARD, left(now.cards ?? 0, 'card'), 0);
-      if (what === 'shown') later(() => light('.drip-card .drip-card-actions', 'Stash it for later, or pass for free', 3200), 1100);
+      if (what === 'shown') later(() => light('.drip-card .drip-card-actions', 'Stash it, or pass for free', 3200, { side: 'above', align: 'start' }), 1100);
       if (what === 'play') light('#drip-pill', 'Your time drains while a video plays', 0);
       if (what === 'pause') light('#drip-pill', 'Paused. Nothing drains.', 0);
-      if (what === 'lock') later(() => light('#drip-lock .drip-lock-actions', 'Spend another drop, or stop here', 3400), 1300);
+      if (what === 'lock') later(() => light('#drip-lock .drip-lock-actions', 'Spend another drop, or stop here', 3400, { under: '#drip-lock .drip-lock-panel' }), 1300);
     }
   }
 

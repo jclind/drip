@@ -94,8 +94,9 @@
     width 450ms cubic-bezier(0.3, 0.7, 0.2, 1), height 450ms cubic-bezier(0.3, 0.7, 0.2, 1), box-shadow 350ms ease;
 }
 
+/* In light mode the rest fades toward white: a dark veil turned the stage a muddy gray. */
 .cv-layer.is-lit .cv-spot {
-  box-shadow: 0 0 0 2px var(--blue), 0 0 0 2000px rgba(6, 10, 14, 0.5);
+  box-shadow: 0 0 0 2px var(--blue), 0 0 0 2000px rgba(255, 255, 255, 0.74);
 }
 
 html[dark] .cv-layer.is-lit .cv-spot {
@@ -126,6 +127,13 @@ html[dark] .cv-layer.is-lit .cv-spot {
 
 .cv-delta.is-up {
   color: var(--blue);
+}
+
+/* Centered over its number, and it rises from there. */
+.cv-delta.is-above {
+  margin-left: -2.5ch;
+  width: 5ch;
+  text-align: center;
 }
 
 @keyframes cv-float {
