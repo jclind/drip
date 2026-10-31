@@ -22,7 +22,8 @@
    * }} Ctx
    */
   /** @typedef {'above' | 'below' | 'right' | 'left'} Side */
-  /** @typedef {{ at: string, say: (c: Ctx) => string, sides?: Side[] }} Callout */
+  /** `at` is what the note sits beside (or the spotlight lights); `point`, when given, is the part its arrow ends on. */
+  /** @typedef {{ at: string, point?: string, say: (c: Ctx) => string, sides?: Side[] }} Callout */
   /** @typedef {Callout & { need?: (c: Ctx) => boolean, ready?: (c: Ctx) => boolean, until?: string[], then?: Callout }} Stop */
 
   /** @param {number} n @param {string} word */
@@ -32,6 +33,8 @@
   const SEL = {
     // The glass and the minutes beside it, lit as one.
     time: '.drip-stats .drip-glass-tile, .drip-stats .drip-time-block',
+    minutes: '.drip-stats .drip-time',
+    glass: '.drip-stats .drip-glass-tile',
     drops: '.drip-stats .drip-count:has(.drip-token-drop)',
     cards: '.drip-stats .drip-count:has(.drip-token-card)',
     add: '#drip-home .drip-add',
@@ -39,8 +42,9 @@
     cardActions: '.drip-card .drip-card-actions',
     watch: '.drip-card .drip-watch',
     stash: '.drip-card .drip-stash',
-    play: '.tour-player',
-    pill: '#drip-pill',
+    playIcon: '.tour-player-play .drip-i',
+    // The pill's glass and minutes, not the whole pill, whose middle is the line before Stash.
+    pill: '#drip-pill .drip-pill-time',
     lockAdd: '#drip-lock .drip-lock-add',
     lockLink: '#drip-lock .drip-lock-link',
     done: '#drip-lock .drip-done',
@@ -65,7 +69,7 @@
     home: {
       arrive: () => ({ at: SEL.add, say: () => 'Spend a drop here', sides: ['below', 'left'] }),
       on: {
-        add: () => ({ at: SEL.time, say: (c) => `${c.dropTime()} in your glass. ${dropsLeft(c)}`, sides: STATS_SIDES }),
+        add: () => ({ at: SEL.time, point: SEL.glass, say: (c) => `${c.dropTime()} in your glass. ${dropsLeft(c)}`, sides: STATS_SIDES }),
       },
     },
     reveal: {
@@ -100,17 +104,18 @@
   /** @type {Record<string, Stop[]>} */
   const STOPS = {
     home: [
-      { at: SEL.time, say: () => 'What you can watch today. Nothing until you spend a drop.', sides: STATS_SIDES },
+      { at: SEL.time, point: SEL.minutes, say: () => 'What you can watch today. Nothing until you spend a drop.', sides: STATS_SIDES },
       { at: SEL.drops, say: (c) => `Your drops. New ones come at ${c.resetLabel()}.`, sides: STATS_SIDES },
       {
         at: SEL.add, say: (c) => `Press +${c.dropTime()} to spend one.`, sides: ['below', 'left'], until: ['add'],
-        then: { at: SEL.time, say: (c) => `${c.dropTime()} in your glass. ${dropsLeft(c)}`, sides: STATS_SIDES },
+        then: { at: SEL.time, point: SEL.glass, say: (c) => `${c.dropTime()} in your glass. ${dropsLeft(c)}`, sides: STATS_SIDES },
       },
     ],
     reveal: [
       { at: SEL.cards, say: (c) => `That reveal used a card. ${cardsLeft(c)}`, sides: STATS_SIDES, need: (c) => c.counted(), ready: dealt },
       {
-        at: SEL.cardActions, ready: dealt, sides: ['right', 'left', 'above'],
+        // From the left, so the arrow lands on Stash, the start of the row the sentence reads along.
+        at: SEL.cardActions, point: SEL.stash, ready: dealt, sides: ['left', 'right', 'above'],
         say: (c) => (c.stash() ? 'Stash it for later, reveal another, or pass. Passing is free.' : 'Reveal another, or pass. Passing is free.'),
       },
       { at: SEL.watch, say: () => 'Or watch it, and your minutes start.', ready: dealt, sides: ['right', 'below', 'above'] },
@@ -118,7 +123,8 @@
     player: [
       { at: SEL.pill, say: () => 'Your minutes, on every video.', sides: ['below', 'left'] },
       {
-        at: SEL.play, say: () => 'Press play, and watch the glass.', sides: ['below', 'above'], until: ['play'],
+        // Right under the play button, inside the player, where there's room.
+        at: SEL.playIcon, say: () => 'Press play, and watch the glass.', sides: ['below', 'above'], until: ['play'],
         then: { at: SEL.pill, say: playing, sides: ['below', 'left'] },
       },
     ],
@@ -178,6 +184,8 @@
   let placed = '';
   let swapTimer = 0;
   let glideTimer = 0;
+  /** While a note fades out to move, it stays where it is: frame() leaves it alone until the new one is placed. */
+  let fading = false;
 
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -203,23 +211,22 @@
       return;
     }
     const moved = !shown || shown.at !== next.at;
-    if (!shown) {
-      // From nothing: the chip and line come in at the new place.
-      text.textContent = next.text;
-      placed = '';
-      drawLine();
-    } else if (moved && mode !== 'spot') {
-      // A note moving to another thing goes out and comes back in there, line and all, instead of sliding over the page.
+    if (!shown || (moved && mode !== 'spot')) {
+      // From nothing, or a note moving to another thing: the old one fades out where it is, and the new one comes in
+      // at its own place, placed with its own words, line drawn fresh. Nothing slides across the page.
+      const wasOn = layer.classList.contains('is-on');
       layer.classList.remove('is-on');
+      fading = true;
       clearTimeout(swapTimer);
       const target = next;
       swapTimer = window.setTimeout(() => {
+        fading = false;
         text.textContent = target.text;
         placed = '';
-        drawLine();
         frame();
+        drawLine();
         layer.classList.add('is-on');
-      }, reduced() ? 0 : 160);
+      }, reduced() ? 0 : wasOn ? 170 : 120);
       shown = next;
       return;
     } else if (moved) {
@@ -300,7 +307,7 @@
 
   /** Puts the chip, line, and hole on the target. Runs every frame while a callout shows, and writes only on a change. */
   function frame() {
-    if (!ctx || !shown) return;
+    if (!ctx || !shown || fading) return;
     if (ctx.tour.hidden) {
       flag('is-away', true);
       return;
@@ -324,7 +331,8 @@
     const h = chip.offsetHeight;
     const co = current();
     const p = spot(r, s, w, h, co?.sides || ['below']);
-    const key = [r.left, r.top, r.width, r.height, s.left, s.top, s.width, s.height, w, h].map(Math.round).join();
+    const pointRect = co?.point ? ctx.stage.querySelector(co.point)?.getBoundingClientRect() : null;
+    const key = [r.left, r.top, r.width, r.height, s.left, s.top, s.width, s.height, w, h, pointRect?.left ?? 0, pointRect?.top ?? 0].map(Math.round).join();
     if (key === placed) return;
     // Settling after an animation (not a first draw) slides there instead of jumping.
     if (placed && !layer.classList.contains('is-gliding') && mode === 'spot') glide();
@@ -337,15 +345,17 @@
       Object.assign(hole.style, { left: `${r.left - s.left - pad}px`, top: `${r.top - s.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
       return;
     }
-    // The line: from the chip's near edge to just short of the target, bowed a little.
-    const cxr = r.left + r.width / 2;
-    const cyr = r.top + r.height / 2;
+    // The line: from the chip's near edge to just short of the part it points at, bowed a little.
+    const pointAt = co?.point ? ctx.stage.querySelector(co.point) : null;
+    const pr = pointAt ? pointAt.getBoundingClientRect() : r;
+    const cxr = pr.left + pr.width / 2;
+    const cyr = pr.top + pr.height / 2;
     const clampX = (/** @type {number} */ x) => Math.max(p.x + 16, Math.min(p.x + w - 16, x));
     /** @type {[number, number, number, number]} */
-    const ends = p.side === 'above' ? [clampX(cxr + 14), p.y + h + 4, cxr, r.top - 4]
-      : p.side === 'below' ? [clampX(cxr + 14), p.y - 4, cxr, r.bottom + 4]
-        : p.side === 'right' ? [p.x - 4, p.y + h / 2, r.right + 4, cyr]
-          : [p.x + w + 4, p.y + h / 2, r.left - 4, cyr];
+    const ends = p.side === 'above' ? [clampX(cxr + 14), p.y + h + 4, cxr, pr.top - 4]
+      : p.side === 'below' ? [clampX(cxr + 14), p.y - 4, cxr, pr.bottom + 4]
+        : p.side === 'right' ? [p.x - 4, p.y + h / 2, pr.right + 4, cyr]
+          : [p.x + w + 4, p.y + h / 2, pr.left - 4, cyr];
     const [fx, fy, tx, ty] = ends;
     const vertical = p.side === 'above' || p.side === 'below';
     const mx = (fx + tx) / 2 + (vertical ? 12 : 0);
@@ -377,8 +387,13 @@
       stops = (STOPS[id] || []).filter((s) => !s.need || s.need(c));
       note = NOTES[id]?.arrive?.(c) || null;
       // A new step starts clean: whatever the last step showed goes, and this one's first callout comes in fresh.
+      // The stage redraws at once, so the old callout goes at once too, with no fade over the new screen.
+      layer.classList.add('is-instant');
       layer.classList.remove('is-on', 'is-gliding');
+      layer.getBoundingClientRect();
+      layer.classList.remove('is-instant');
       shown = null;
+      fading = false;
       clearTimeout(swapTimer);
       render();
     },
