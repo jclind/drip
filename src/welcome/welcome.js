@@ -20,6 +20,10 @@
   /** @type {any} */
   const DripCounter = /** @type {any} */ (globalThis).DripCounter;
 
+  /** Tour callouts, round 2 (coach.js). Its calls do nothing unless the page was opened with ?v=d, e, or f. */
+  /** @type {any} */
+  const coach = /** @type {any} */ (globalThis).DripCoach || { start() {}, did() {}, next: () => false, back: () => false };
+
   /** @param {string} id */
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
   const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -342,6 +346,7 @@
       stopStep = STEPS[step].show();
     });
     renderControls();
+    coach.start(stepId(), coachCtx);
   }
 
   function renderControls() {
@@ -357,16 +362,21 @@
     next.replaceChildren(...(last ? ['Open YouTube', icon('arrow-up-right')] : ['Next', icon('arrow-right')]));
   }
 
-  $('back').addEventListener('click', () => (step === 0 ? toChoice() : go(step - 1)));
+  $('back').addEventListener('click', () => {
+    if (coach.back()) return;
+    if (step === 0) toChoice();
+    else go(step - 1);
+  });
   $('skip').addEventListener('click', () => go(STEPS.length - 1));
   $('next').addEventListener('click', () => {
+    if (coach.next()) return;
     if (step === STEPS.length - 1) location.href = 'https://www.youtube.com/';
     else go(step + 1);
   });
   $('tour').addEventListener('keydown', (e) => {
     if (/** @type {Element} */ (e.target).closest('textarea, input')) return;
-    if (e.key === 'ArrowRight' && step < STEPS.length - 1) go(step + 1);
-    else if (e.key === 'ArrowLeft' && step > 0) go(step - 1);
+    if (e.key === 'ArrowRight' && !coach.next() && step < STEPS.length - 1) go(step + 1);
+    else if (e.key === 'ArrowLeft' && !coach.back() && step > 0) go(step - 1);
   });
 
   // Steps 1 and 2: the home page, as home.js draws it.
@@ -391,6 +401,20 @@
   let pouring = false;
   /** @type {number | null} */
   let heldLeft = null;
+
+  /** What coach.js reads to word its callouts. Functions, so each reads the tour's state when it's drawn. */
+  const coachCtx = {
+    stage: $('stage'),
+    tour: $('tour'),
+    busy: () => moving || pouring,
+    dropTime: () => Drip.formatMinutes(sand.settings.minutesPerToken * 60),
+    drops: () => sand.tokens.watch,
+    cards: () => sand.tokens.rec,
+    counted: () => parts.cards === 'limited',
+    stash: () => parts.stash,
+    needLeft: () => Math.max(0, sand.settings.needThisPerDay - sand.unlocked.length),
+    resetLabel: () => hourLabel(sand.settings.resetHour),
+  };
 
   /** +15m, as on the home page: a drop leaves the counter and falls into the glass (pour.js). */
   function addTime() {
@@ -417,9 +441,11 @@
         pouring = false;
         heldLeft = null;
         redraw();
+        coach.did('add');
       });
     }
     drawHome();
+    if (!pours) coach.did('add');
   }
 
   /** The home page's stats. `heldDrops` are drops still on their way into the counter, which it doesn't show yet. */
@@ -500,7 +526,7 @@
       h('div', { class: 'drip-card-actions' },
         parts.stash && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
-          onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); },
+          onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); coach.did(saved ? 'unstash' : 'stash'); },
         }, ...stash.nodes),
         h('button', {
           class: 'drip-b drip-b-gray drip-next', disabled: parts.cards === 'limited' && sand.tokens.rec < 1,
@@ -509,10 +535,11 @@
               if (!Drip.revealNext(sand, video.id, pool()).ok) refill();
               return sand.current && sand.current.id !== video.id ? sand.current : null;
             };
-            if (deals()) animate(DripReveal.next, find, 'next');
+            if (deals()) animate(DripReveal.next, find, 'next', 'next');
             else {
               find();
               drawHome();
+              coach.did('next');
             }
           },
         }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), parts.cards === 'limited' && price('card')),
@@ -520,8 +547,11 @@
           class: 'drip-b drip-b-gray drip-pass', 'aria-label': 'Pass', title: "Pass. It's free, and this video won't come back.",
           onclick: () => {
             Drip.resolveCurrent(sand, 'pass', video.id);
-            if (deals()) animate(DripReveal.pass, () => null, 'reveal');
-            else drawHome();
+            if (deals()) animate(DripReveal.pass, () => null, 'reveal', 'pass');
+            else {
+              drawHome();
+              coach.did('pass');
+            }
           },
         }, icon('x'))));
   }
@@ -552,8 +582,9 @@
    * @param {(o: any) => Promise<boolean | void>} run
    * @param {() => any} find
    * @param {string} focusKey The button keyboard focus goes to afterwards, if the tour had it: watch, next, or reveal.
+   * @param {string} action What coach.js is told once it's done: reveal, next, or pass.
    */
-  async function animate(run, find, focusKey) {
+  async function animate(run, find, focusKey, action) {
     const root = /** @type {HTMLElement | null} */ (stage.querySelector('#drip-home'));
     const page = root?.querySelector('.drip-page');
     if (!root || !page || moving) return;
@@ -574,6 +605,7 @@
         moving = false;
         drawHome();
         if (focused && !stage.contains(document.activeElement)) /** @type {HTMLElement | null} */ (stage.querySelector(`.drip-${focusKey}`))?.focus();
+        coach.did(action);
       }
     }
   }
@@ -592,10 +624,11 @@
 
   function reveal() {
     const find = () => (!sand.current && Drip.reveal(sand, pool()).ok ? sand.current : null);
-    if (deals() && !sand.current) animate(DripReveal.reveal, find, 'watch');
+    if (deals() && !sand.current) animate(DripReveal.reveal, find, 'watch', 'reveal');
     else {
       find();
       drawHome();
+      coach.did('reveal');
     }
   }
 
@@ -752,7 +785,11 @@
         if (isPlaying) {
           stop();
           draw();
-        } else play();
+          coach.did('pause');
+        } else {
+          play();
+          if (isPlaying) coach.did('play');
+        }
       },
     });
     box.append(button, h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
@@ -889,6 +926,7 @@
       sand.watchSecondsLeft = 0;
       sand.unlocked = [];
       raise();
+      coach.did('lock');
     } }, 'Show the lock again');
 
     /**
@@ -942,11 +980,13 @@
       if (reducedMotion()) {
         home();
         lift(lock);
+        coach.did('done');
         return;
       }
       leaveRings(panel, button, e);
       later(() => {
         home();
+        coach.did('done');
         lock.classList.add('is-surfacing');
         later(() => lift(lock), 1000);
       }, 700);
@@ -966,6 +1006,7 @@
           drain();
           // An unlocked video never runs out, so the lock only comes back from here.
           stage.append(again());
+          coach.did('unlock');
         } else {
           note = res.error === 'reason-required' ? 'Write a few words about why.' : "You've used all of today's unlocks.";
           redraw();
@@ -1028,6 +1069,7 @@
       const lockPanel = button.closest('.drip-lock-panel');
       if (reducedMotion() || !lockPanel) {
         drain();
+        coach.did('lockadd');
         return;
       }
       adding = true;
@@ -1038,6 +1080,7 @@
         if (motion !== m) return;
         drain();
         if (pillGlass?.isConnected) DripPour.refill(pillGlass, PILL_GLASS_PX, DripGlass.fraction(sand), 180);
+        coach.did('lockadd');
       });
     };
 

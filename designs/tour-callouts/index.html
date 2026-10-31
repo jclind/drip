@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>drip tour callouts, round 1</title>
+<title>drip tour callouts, round 2</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap">
 <style>
   :root { --bg: #0f0f0f; --bar: #1c1c1c; --text: #f1f1f1; --muted: #aaa; --chip: rgba(255,255,255,.1); --on: #fff; --on-fg: #0f0f0f; }
@@ -12,7 +12,8 @@
   body { display: flex; flex-direction: column; font: 13px/1.4 Roboto, Arial, sans-serif; color: var(--text); background: var(--bg); }
   .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; background: var(--bar); }
   .round { color: var(--muted); }
-  .group { display: flex; flex-wrap: wrap; gap: 4px; }
+  .group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  #round1 .round { margin-right: 4px; }
   .bar button, .bar a { height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: var(--chip); color: var(--text); font: inherit; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
   .bar button[aria-pressed="true"] { background: var(--on); color: var(--on-fg); }
   .bar button:disabled { opacity: .4; cursor: default; }
@@ -25,13 +26,17 @@
 </head>
 <body>
 <div class="bar">
-  <span class="round">Round 1</span>
+  <span class="round">Round 2</span>
   <div class="group" id="variants">
-    <button type="button" data-v="a">A, Notes</button>
-    <button type="button" data-v="b">B, Live</button>
-    <button type="button" data-v="c">C, Spotlight</button>
+    <button type="button" data-v="d">D, Notes rebuilt</button>
+    <button type="button" data-v="e">E, Spotlight on Next</button>
+    <button type="button" data-v="f">F, Notes on Next</button>
   </div>
-  <div class="group">
+  <div class="group" id="round1">
+    <span class="round">Round 1</span>
+    <button type="button" data-v="a">A</button>
+    <button type="button" data-v="b">B</button>
+    <button type="button" data-v="c">C</button>
     <button type="button" id="live">Playing player</button>
   </div>
   <div class="group">
@@ -55,16 +60,20 @@
   // Every variant runs the real tour from src/welcome. Click through it in the frame: the notes, numbers, and
   // spotlight react to what you do there.
   const IDEAS = {
+    d: 'D, Notes rebuilt: A\'s notes, built into the tour. One note at a time: it points where to start, then answers each thing you do (+15m, a reveal, a pass, play, pause, the lock\'s buttons). A note only changes when you do something.',
+    e: 'E, Spotlight on Next: each step is a few stops. The rest of the stage dims, and Next moves the light to the next stop. Doing what a stop asks (like +15m or play) shows its answer. Next only leaves the step after its last stop.',
+    f: 'F, Notes on Next: E\'s stops, drawn as D\'s notes, with nothing dimmed. Next walks through the stops, then the steps.',
     a: 'A, Notes: when something on the stage changes, a short note appears beside it with a drawn blue line, then goes after about 3 seconds. Nothing shows until something moves.',
     b: 'B, Live: no notes. The player looks like a video is playing (the picture pans, a running timecode, "90× speed"), and a number that changes says by how much, like "−1" or "+15m".',
     c: 'C, Spotlight: the stage dims except for the one thing to look at now, with a short line under it. The light moves to each new thing as you go.',
   };
-  const st = { v: 'a', live: false, m: 'full', t: 'dark', w: 'wide' };
-  try { Object.assign(st, JSON.parse(sessionStorage.getItem('tour-callouts') || '{}')); } catch {}
+  const st = { v: 'd', live: false, m: 'full', t: 'dark', w: 'wide' };
+  try { Object.assign(st, JSON.parse(sessionStorage.getItem('tour-callouts-2') || '{}')); } catch {}
   /** @param {boolean} [fresh] a new query, so the frame reloads even when only the hash would change */
   function url(fresh) {
     const p = new URLSearchParams({ v: st.v });
-    if (st.v !== 'b' && st.live) p.set('live', '1');
+    const round1 = ['a', 'b', 'c'].includes(st.v);
+    if (round1 && st.v !== 'b' && st.live) p.set('live', '1');
     if (st.m !== 'full') p.set('mode', st.m);
     if (fresh) p.set('n', String(Date.now()));
     return `tour.html?${p}#tour-1`;
@@ -77,16 +86,17 @@
     if (f.getAttribute('src') !== u) f.src = u;
     document.getElementById('open').href = u;
     document.getElementById('open').title = 'Opens in its own tab, in Chrome\'s own theme';
-    document.getElementById('idea').textContent = IDEAS[st.v] + (st.v !== 'b' && st.live ? ' With B\'s playing player added.' : '');
+    const round1 = ['a', 'b', 'c'].includes(st.v);
+    document.getElementById('idea').textContent = (round1 ? 'Round 1. ' : '') + IDEAS[st.v] + (round1 && st.v !== 'b' && st.live ? ' With B\'s playing player added.' : '');
     document.getElementById('view').classList.toggle('is-phone', st.w === 'phone');
     const live = document.getElementById('live');
-    live.disabled = st.v === 'b';
+    live.disabled = !round1 || st.v === 'b';
     live.setAttribute('aria-pressed', String(st.v === 'b' || st.live));
     for (const b of document.querySelectorAll('[data-v]')) b.setAttribute('aria-pressed', String(b.dataset.v === st.v));
     for (const b of document.querySelectorAll('[data-m]')) b.setAttribute('aria-pressed', String(b.dataset.m === st.m));
     for (const b of document.querySelectorAll('[data-t]')) b.setAttribute('aria-pressed', String(b.dataset.t === st.t));
     for (const b of document.querySelectorAll('[data-w]')) b.setAttribute('aria-pressed', String(b.dataset.w === st.w));
-    try { sessionStorage.setItem('tour-callouts', JSON.stringify(st)); } catch {}
+    try { sessionStorage.setItem('tour-callouts-2', JSON.stringify(st)); } catch {}
   }
   for (const b of document.querySelectorAll('[data-v],[data-m],[data-t],[data-w]')) b.addEventListener('click', () => {
     for (const k of ['v', 'm', 't', 'w']) if (b.dataset[k]) st[k] = b.dataset[k];
