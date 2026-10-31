@@ -17,14 +17,18 @@
    * What welcome.js hands over: the stage, and the tour's numbers, read when a callout is drawn.
    * @typedef {{
    *   stage: HTMLElement, tour: HTMLElement, busy: () => boolean, dropTime: () => string, drops: () => number,
-   *   cards: () => number, counted: () => boolean, stash: () => boolean, needLeft: () => number, resetLabel: () => string,
+   *   cards: () => number, counted: () => boolean, clock: () => boolean, stash: () => boolean, needLeft: () => number, resetLabel: () => string,
    *   last?: string,
    * }} Ctx
    */
   /** @typedef {'above' | 'below' | 'right' | 'left'} Side */
   /** `at` is what the note sits beside (or the spotlight lights); `point`, when given, is the part its arrow ends on. */
   /** @typedef {{ at: string, point?: string, say: (c: Ctx) => string, sides?: Side[] }} Callout */
-  /** @typedef {Callout & { need?: (c: Ctx) => boolean, ready?: (c: Ctx) => boolean, until?: string[], then?: Callout }} Stop */
+  /**
+   * A stop with `until` waits for that action. Doing it shows `then`, or, with no `then` (or one whose `need` is false),
+   * moves on to the next stop.
+   * @typedef {Callout & { need?: (c: Ctx) => boolean, ready?: (c: Ctx) => boolean, until?: string[], then?: Callout & { need?: (c: Ctx) => boolean } }} Stop
+   */
 
   /** @param {number} n @param {string} word */
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -55,6 +59,8 @@
   /** @type {Side[]} The stats row: above when there's room, beside it when it's at the stage's top edge. */
   const STATS_SIDES = ['above', 'right', 'below'];
 
+  /** The reveal step's first words. Curated's tour starts here, so it says what the page is first. @param {Ctx} c */
+  const pressReveal = (c) => (c.counted() ? 'Press Reveal video. It uses a card.' : 'This is your home page now. No feed, one button. Press Reveal video.');
   /** @param {Ctx} c */
   const cardsLeft = (c) => `${plural(c.cards(), 'card')} left today.`;
   /** @param {Ctx} c */
@@ -73,10 +79,14 @@
       },
     },
     reveal: {
+      arrive: (c) => ({ at: SEL.revealBtn, say: () => pressReveal(c), sides: ['below', 'above'] }),
       on: {
-        reveal: (c) => (c.counted() ? { at: SEL.cards, say: (x) => `One card used. ${cardsLeft(x)}`, sides: STATS_SIDES } : null),
+        // Curated's cards are free, so its first reveal points at what to do with the card instead.
+        reveal: (c) => (c.counted()
+          ? { at: SEL.cards, say: (x) => `One card used. ${cardsLeft(x)}`, sides: STATS_SIDES }
+          : { at: SEL.cardActions, point: SEL.stash, say: (x) => (x.stash() ? 'Stash it for later, reveal another, or pass.' : 'Reveal another, or pass.'), sides: ['left', 'right', 'above'] }),
         next: (c) => (c.counted() ? { at: SEL.cards, say: (x) => `One card used. ${cardsLeft(x)}`, sides: STATS_SIDES } : null),
-        pass: () => ({ at: SEL.revealBtn, say: () => "Passed, for free. That one won't come back.", sides: ['below', 'above'] }),
+        pass: () => ({ at: SEL.revealBtn, say: (c) => `${c.counted() ? 'Passed, for free.' : 'Passed.'} That one won't come back.`, sides: ['below', 'above'] }),
         stash: () => ({ at: SEL.stash, say: () => 'Stashed for later', sides: ['below', 'left', 'above'] }),
         unstash: () => ({ at: SEL.stash, say: () => 'Out of your stash', sides: ['below', 'left', 'above'] }),
       },
@@ -112,13 +122,18 @@
       },
     ],
     reveal: [
-      { at: SEL.cards, say: (c) => `That reveal used a card. ${cardsLeft(c)}`, sides: STATS_SIDES, need: (c) => c.counted(), ready: dealt },
+      {
+        at: SEL.revealBtn, say: pressReveal, sides: ['below', 'above'], until: ['reveal'],
+        // Full drip shows what the card cost. Curated's cards are free, so it moves straight on to the card.
+        then: { at: SEL.cards, say: (c) => `That reveal used a card. ${cardsLeft(c)}`, sides: STATS_SIDES, need: (c) => c.counted() },
+      },
       {
         // From the left, so the arrow lands on Stash, the start of the row the sentence reads along.
         at: SEL.cardActions, point: SEL.stash, ready: dealt, sides: ['left', 'right', 'above'],
-        say: (c) => (c.stash() ? 'Stash it for later, reveal another, or pass. Passing is free.' : 'Reveal another, or pass. Passing is free.'),
+        // "Passing is free" only means something where cards cost one.
+        say: (c) => `${c.stash() ? 'Stash it for later, reveal another, or pass.' : 'Reveal another, or pass.'}${c.counted() ? ' Passing is free.' : ''}`,
       },
-      { at: SEL.watch, say: () => 'Or watch it, and your minutes start.', ready: dealt, sides: ['right', 'below', 'above'] },
+      { at: SEL.watch, say: (c) => (c.clock() ? 'Or watch it, and your minutes start.' : 'Or watch it.'), ready: dealt, sides: ['right', 'below', 'above'] },
     ],
     player: [
       { at: SEL.pill, say: () => 'Your minutes, on every video.', sides: ['below', 'left'] },
@@ -413,8 +428,14 @@
         // visitor already is.
         const i = stops.findIndex((s, n) => n >= at && s.until?.includes(action));
         if (i >= 0) {
-          at = i;
-          thenShown = true;
+          const then = stops[i].then;
+          if (then && (!then.need || then.need(ctx))) {
+            at = i;
+            thenShown = true;
+          } else if (i + 1 < stops.length) {
+            at = i + 1;
+            thenShown = false;
+          }
         }
       }
       render();

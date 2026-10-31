@@ -411,6 +411,7 @@
     drops: () => sand.tokens.watch,
     cards: () => sand.tokens.rec,
     counted: () => parts.cards === 'limited',
+    clock: () => parts.clock,
     stash: () => parts.stash,
     needLeft: () => Math.max(0, sand.settings.needThisPerDay - sand.unlocked.length),
     resetLabel: () => hourLabel(sand.settings.resetHour),
@@ -500,7 +501,14 @@
     return h('div', { class: 'drip-actions' },
       parts.clock && addButton(),
       h('button', {
-        class: 'drip-b drip-b-gold drip-reveal', disabled: counted && sand.tokens.rec < 1, onclick: () => (stepId() === 'reveal' ? reveal() : go(at('reveal'))),
+        class: 'drip-b drip-b-gold drip-reveal', disabled: counted && sand.tokens.rec < 1,
+        onclick: () => {
+          if (stepId() === 'reveal') reveal();
+          else {
+            revealOnArrive = true;
+            go(at('reveal'));
+          }
+        },
       }, h('span', {}, 'Reveal video'), counted && price('card')));
   }
 
@@ -646,14 +654,22 @@
     return undefined;
   }
 
+  /**
+   * The reveal step opens on the home page and waits for Reveal video, so the visitor deals the first card themselves
+   * (Jesse, 2026-10-31: Curated's tour "just start[s] in the middle" when the step dealt one on arrival). Reveal video
+   * pressed on step 1 deals on arriving here, since that press already asked for it.
+   */
   function showReveal() {
-    const dealsOne = !sand.current && (parts.cards !== 'limited' || sand.tokens.rec > 0);
-    if (dealsOne && !deals()) Drip.reveal(sand, pool());
     drawHome();
-    // Arriving with no card up, the step deals one, so the first thing it shows is a reveal.
-    if (dealsOne && deals()) later(reveal, 250);
+    if (revealOnArrive) {
+      revealOnArrive = false;
+      later(reveal, 250);
+    }
     return undefined;
   }
+
+  /** Set by step 1's Reveal video, which moves the tour here and then deals. */
+  let revealOnArrive = false;
 
   // Step 3: a video playing, with the pill as watch.js draws it. The minutes drain 90 times faster than real ones.
 
