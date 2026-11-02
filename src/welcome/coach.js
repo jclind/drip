@@ -672,7 +672,11 @@
         // The lock came back up, with what it offers now (no +15m once the drops are gone). The note goes to the first
         // thing not tried yet, so buying more and having the lock return doesn't ask for +15m again.
         stops = (STOPS.lock || []).filter((s) => !s.need || s.need(/** @type {Ctx} */ (ctx)));
-        const fresh = stops.findIndex((s, n) => !answered.has(s) && open(n));
+        // After what was just done, so unlocking goes on to Done rather than back to +15m.
+        const untried = (/** @type {number} */ n) => !answered.has(stops[n]) && open(n);
+        let fresh = -1;
+        for (let n = at + 1; n < stops.length && fresh < 0; n++) if (untried(n)) fresh = n;
+        for (let n = 0; n < stops.length && fresh < 0; n++) if (untried(n)) fresh = n;
         at = fresh >= 0 ? fresh : stops.length - 1;
         thenShown = false;
       } else if (mode === 'notes') {
@@ -710,6 +714,13 @@
      */
     next() {
       return go(1);
+    },
+
+    /** Whether the lock step has callouts left that need the lock up, so Next brings it back instead of leaving. */
+    wantsLock() {
+      if ((mode !== 'spot' && mode !== 'paced') || stepId !== 'lock') return false;
+      const all = (STOPS.lock || []).filter((s) => !s.need || !ctx || s.need(ctx));
+      return all.some((s) => !answered.has(s));
     },
 
     /** Back. True when it went back a stop. */

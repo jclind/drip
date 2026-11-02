@@ -338,6 +338,7 @@
     motion++;
     moving = false;
     stopStep?.();
+    bringLock = null;
     for (const t of timers) clearTimeout(t);
     timers.clear();
     step = Math.max(0, Math.min(STEPS.length - 1, n));
@@ -377,14 +378,26 @@
     }
   });
   $('skip').addEventListener('click', () => go(STEPS.length - 1));
+  /**
+   * Next on the lock step with the lock down (bought more, or unlocked) and callouts still to see: the lock comes back
+   * up for them instead of the tour leaving (Jesse, 2026-11-02). The callouts say when some are left.
+   */
+  function lockBack() {
+    if (stepId() !== 'lock' || !bringLock || stage.querySelector('#drip-lock, #drip-home') || !coach.wantsLock?.()) return false;
+    bringLock();
+    return true;
+  }
+  /** @type {(() => void) | null} Set by the lock step, to raise the lock again. */
+  let bringLock = null;
+
   $('next').addEventListener('click', () => {
-    if (coach.next()) return;
+    if (coach.next() || lockBack()) return;
     if (step === STEPS.length - 1) location.href = 'https://www.youtube.com/';
     else go(step + 1);
   });
   $('tour').addEventListener('keydown', (e) => {
     if (/** @type {Element} */ (e.target).closest('textarea, input')) return;
-    if (e.key === 'ArrowRight' && !coach.next() && step < STEPS.length - 1) go(step + 1);
+    if (e.key === 'ArrowRight' && !coach.next() && !lockBack() && step < STEPS.length - 1) go(step + 1);
     else if (e.key === 'ArrowLeft' && !coach.back() && step > 0) {
       backing = true;
       go(step - 1);
@@ -960,12 +973,14 @@
       else stage.prepend(wrap);
     };
 
-    const again = () => h('button', { type: 'button', class: 'tour-again', onclick: () => {
+    const lockAgain = () => {
       sand.watchSecondsLeft = 0;
       sand.unlocked = [];
       raise();
       coach.did('lock');
-    } }, 'Show the lock again');
+    };
+    bringLock = lockAgain;
+    const again = () => h('button', { type: 'button', class: 'tour-again', onclick: lockAgain }, 'Show the lock again');
 
     /**
      * The stage holds its height while the water moves, so nothing under it jumps mid-animation. Once the lock is gone,
