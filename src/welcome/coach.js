@@ -6,19 +6,28 @@
 //   E, Spotlight on Next: each step is a few stops. The rest of the stage dims, and Next, or doing what the stop asks,
 //      moves the light on. Nothing else moves it.
 //   F, Notes on Next: E's stops drawn as D's notes, with nothing dimmed.
-// ?v=d, e, or f picks one. Anything else leaves the callouts off, so round 1's mockups and the real page are unchanged.
+//   G, F with a ring: one thing on the page always has a blue ring, the button a stop waits for, or else the tour's
+//      Next. "Press what's glowing" (Jesse asked how a visitor knows which to press, 2026-11-02).
+//   H, F with a quiet ring: the ring shows on a step's last stop, and on any stop left alone for 4 seconds.
+// ?v=d, e, f, g, or h picks one. Anything else leaves the callouts off, so round 1's mockups and the real page are unchanged.
 
 (() => {
   const v = new URLSearchParams(location.search).get('v') || '';
   /** @type {'notes' | 'spot' | 'paced' | ''} */
-  const mode = v === 'd' ? 'notes' : v === 'e' ? 'spot' : v === 'f' ? 'paced' : '';
+  const mode = v === 'd' ? 'notes' : v === 'e' ? 'spot' : ['f', 'g', 'h'].includes(v) ? 'paced' : '';
+  /** @type {'always' | 'quiet' | ''} */
+  const ringMode = v === 'g' ? 'always' : v === 'h' ? 'quiet' : '';
+  /** How long H waits on a stop before it rings. */
+  const IDLE_MS = 4000;
+  /** What the last stop's count says Next goes to, by the next step's id. @type {Record<string, string>} */
+  const NEXT_NAMES = { reveal: 'the cards', player: 'the player', lock: 'the lock', changes: 'the rest of YouTube' };
 
   /**
    * What welcome.js hands over: the stage, and the tour's numbers, read when a callout is drawn.
    * @typedef {{
    *   stage: HTMLElement, tour: HTMLElement, busy: () => boolean, dropTime: () => string, drops: () => number,
    *   cards: () => number, counted: () => boolean, clock: () => boolean, stash: () => boolean, needLeft: () => number, resetLabel: () => string,
-   *   carries: () => boolean, last?: string,
+   *   carries: () => boolean, nextStep: () => string, last?: string,
    * }} Ctx
    */
   /** 'over' sits inside the bottom of the target, for a picture with nothing to read in it. */
@@ -52,6 +61,7 @@
     stash: '.drip-card .drip-stash',
     thumb: '.drip-card .drip-thumb',
     playIcon: '.tour-player-play .drip-i',
+    playButton: '.tour-player-play',
     // The pill's glass, which holds still while the minutes beside it change width. An unlocked video's pill has no
     // glass, so then its time.
     pill: '#drip-pill .drip-pill-time > svg, #drip-pill .drip-pill-time:not(:has(> svg))',
@@ -213,6 +223,15 @@
   const count = document.createElement('span');
   count.className = 'co-count';
   chip.append(text, count);
+  // G and H's ring: its own element, outside the layer, since it can sit on the tour's Next below the stage.
+  const ring = document.createElement('div');
+  ring.className = 'co-ring';
+  ring.setAttribute('aria-hidden', 'true');
+  /** When the current stop started, for H's wait. */
+  let stopSince = 0;
+  let lastStopKey = '';
+  /** What the ring is on and where, so a frame only writes on a change. */
+  let ringPlaced = '';
   if (mode === 'spot') layer.append(veil);
   if (mode !== 'spot') layer.append(svg);
   layer.append(chip);
@@ -253,11 +272,25 @@
     return stop;
   }
 
+  /** "2 of 3", and on G and H's last stop where Next goes from here. */
+  function countLine() {
+    if (mode === 'notes' || !ctx) return '';
+    const where = ringMode && at === stops.length - 1 ? NEXT_NAMES[ctx.nextStep()] : '';
+    const n = stops.length > 1 ? `${at + 1} of ${stops.length}` : '';
+    return where ? `${n ? `${n} · ` : ''}Next: ${where}` : n;
+  }
+
   /** Draws what current() says, changing only what differs from what's drawn. */
   function render() {
     const co = current();
+    const stopKey = `${stepId}:${at}:${thenShown}`;
+    if (stopKey !== lastStopKey) {
+      lastStopKey = stopKey;
+      stopSince = performance.now();
+      ring.classList.remove('is-on');
+    }
     const next = co && ctx
-      ? { at: co.at, text: co.say(ctx), count: mode !== 'notes' && stops.length > 1 ? `${at + 1} of ${stops.length}` : '' }
+      ? { at: co.at, text: co.say(ctx), count: countLine() }
       : null;
     if (!next) {
       clearTimeout(fadeTimer);
@@ -480,8 +513,45 @@
     return true;
   }
 
+  /**
+   * The one thing to press now: the button a waiting stop asks for, or the tour's Next.
+   * @returns {Element | null}
+   */
+  function ringTarget() {
+    if (!ctx || !shown || waiting) return null;
+    const stop = stops[at];
+    if (!stop) return null;
+    if (stop.until && !thenShown) {
+      const sel = stop.at === SEL.playIcon ? SEL.playButton : stop.at;
+      const el = ctx.stage.querySelector(sel);
+      if (el) return el;
+    }
+    return document.getElementById('next');
+  }
+
+  /** Puts the ring on ringTarget(), when this variant shows it now. */
+  function ringFrame() {
+    if (!ringMode || !ctx) return;
+    const el = ringTarget();
+    const quietWait = ringMode === 'quiet' && at < stops.length - 1 && performance.now() - stopSince < IDLE_MS;
+    const show = !!el && !fading && !ctx.busy() && !ctx.tour.hidden && layer.classList.contains('is-on') && !quietWait;
+    if (!show || !el) {
+      if (ring.classList.contains('is-on')) ring.classList.remove('is-on');
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const radius = getComputedStyle(el).borderTopLeftRadius;
+    const key = [r.left, r.top, r.width, r.height].map(Math.round).join() + radius;
+    if (key !== ringPlaced) {
+      ringPlaced = key;
+      Object.assign(ring.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: radius });
+    }
+    if (!ring.classList.contains('is-on')) ring.classList.add('is-on');
+  }
+
   function loop() {
     frame();
+    ringFrame();
     requestAnimationFrame(loop);
   }
 
@@ -494,7 +564,7 @@
     start(id, c, opts = {}) {
       if (!mode) return;
       if (!ctx) {
-        document.body.append(layer);
+        document.body.append(layer, ring);
         requestAnimationFrame(loop);
       }
       ctx = c;

@@ -126,7 +126,32 @@ html[dark] .co-hole {
   transition: transform 420ms cubic-bezier(0.3, 0.7, 0.2, 1);
 }
 
+/* G and H: the ring on the one thing to press. It pulses softly, so it reads as "here" without flashing. */
+
+.co-ring {
+  position: fixed;
+  z-index: 99;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 0 0 2px var(--blue);
+  transition: opacity 200ms ease;
+}
+
+.co-ring.is-on {
+  opacity: 1;
+  animation: co-ring 1600ms ease-in-out 200ms infinite;
+}
+
+@keyframes co-ring {
+  0%, 100% { box-shadow: 0 0 0 2px var(--blue), 0 0 0 2px color-mix(in srgb, var(--blue) 40%, transparent); }
+  50% { box-shadow: 0 0 0 2px var(--blue), 0 0 0 7px color-mix(in srgb, var(--blue) 0%, transparent); }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .co-ring.is-on {
+    animation: none;
+  }
+
   .co-layer,
   .co-chip > span {
     transition: none;

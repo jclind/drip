@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>drip tour callouts, round 2</title>
+<title>drip tour callouts, round 3</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap">
 <style>
   :root { --bg: #0f0f0f; --bar: #1c1c1c; --text: #f1f1f1; --muted: #aaa; --chip: rgba(255,255,255,.1); --on: #fff; --on-fg: #0f0f0f; }
@@ -26,11 +26,13 @@
 </head>
 <body>
 <div class="bar">
-  <span class="round">Round 2</span>
+  <span class="round">Rounds 2 and 3</span>
   <div class="group" id="variants">
     <button type="button" data-v="d">D, Notes rebuilt</button>
     <button type="button" data-v="e">E, Spotlight on Next</button>
     <button type="button" data-v="f">F, Notes on Next</button>
+    <button type="button" data-v="g">G, F + ring</button>
+    <button type="button" data-v="h">H, F + quiet ring</button>
   </div>
   <div class="group" id="round1">
     <span class="round">Round 1</span>
@@ -63,6 +65,8 @@
     d: 'D, Notes rebuilt: A\'s notes, built into the tour. One note at a time: it points where to start, then answers each thing you do (+15m, a reveal, a pass, play, pause, the lock\'s buttons). A note only changes when you do something.',
     e: 'E, Spotlight on Next: each step is a few stops. The rest of the stage dims, and Next moves the light to the next stop. Doing what a stop asks (like +15m or play) shows its answer. Next only leaves the step after its last stop.',
     f: 'F, Notes on Next: E\'s stops, drawn as D\'s notes, with nothing dimmed. Next walks through the stops, then the steps.',
+    g: 'G, F + ring: press what\'s glowing. One thing always has a blue ring: the button a stop waits for (+15m, Reveal video, play), or else the tour\'s Next. The last stop of a step says where Next goes.',
+    h: 'H, F + quiet ring: the same ring, but only on a step\'s last stop, or on any stop left alone for 4 seconds. The last stop of a step says where Next goes.',
     a: 'A, Notes: when something on the stage changes, a short note appears beside it with a drawn blue line, then goes after about 3 seconds. Nothing shows until something moves.',
     b: 'B, Live: no notes. The player looks like a video is playing (the picture pans, a running timecode, "90× speed"), and a number that changes says by how much, like "−1" or "+15m".',
     c: 'C, Spotlight: the stage dims except for the one thing to look at now, with a short line under it. The light moves to each new thing as you go.',

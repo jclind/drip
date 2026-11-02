@@ -418,6 +418,7 @@
     needLeft: () => Math.max(0, sand.settings.needThisPerDay - sand.unlocked.length),
     resetLabel: () => hourLabel(sand.settings.resetHour),
     carries: () => sand.settings.rolloverDays > 1,
+    nextStep: () => STEPS[step + 1]?.id || '',
   };
 
   /** The lock rising, draining, or leaving, or the stage changing height around it: callouts wait for it to settle. */
