@@ -1,5 +1,5 @@
-/* Tour callouts, round 2 (coach.js). One fixed layer over the page that never takes a click. The chip looks like round
-   1's, which Jesse liked in A: drip's gray chip and a thin blue line. */
+/* The welcome tour's callouts (coach.js). One fixed layer over the page that never takes a click: drip's gray chip, a
+   thin blue line, and a ring on the one thing to press. */
 
 .co-layer {
   position: fixed;
@@ -48,7 +48,7 @@
   opacity: 0;
 }
 
-/* Which stop of how many, for the variants that step through stops with Next. */
+/* Which stop of how many, and on a step's last stop where Next goes. */
 .co-count {
   display: block;
   margin-top: 2px;
@@ -98,35 +98,7 @@
   to { opacity: 1; }
 }
 
-/* E: the veil covers the stage only, with one hole. */
-
-.co-veil {
-  position: absolute;
-  overflow: hidden;
-  border-radius: 16px;
-}
-
-.co-hole {
-  position: absolute;
-  border-radius: 12px;
-  box-shadow: 0 0 0 2px var(--blue), 0 0 0 2000px rgba(255, 255, 255, 0.74);
-}
-
-html[dark] .co-hole {
-  box-shadow: 0 0 0 2px var(--blue), 0 0 0 2000px rgba(0, 0, 0, 0.62);
-}
-
-/* A move between stops slides the hole and the chip together. Following a target that shifts doesn't. */
-.co-layer.is-gliding .co-hole {
-  transition: left 420ms cubic-bezier(0.3, 0.7, 0.2, 1), top 420ms cubic-bezier(0.3, 0.7, 0.2, 1),
-    width 420ms cubic-bezier(0.3, 0.7, 0.2, 1), height 420ms cubic-bezier(0.3, 0.7, 0.2, 1);
-}
-
-.co-layer.is-gliding .co-chip {
-  transition: transform 420ms cubic-bezier(0.3, 0.7, 0.2, 1);
-}
-
-/* G and H: the ring on the one thing to press. It pulses softly, so it reads as "here" without flashing. */
+/* The ring on the one thing to press. It pulses softly, so it reads as "here" without flashing. */
 
 .co-ring {
   position: fixed;

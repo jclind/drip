@@ -1,23 +1,14 @@
 // @ts-check
-// Tour callouts, round 2 (design/tour-callouts only). welcome.js says when a step starts and when the visitor does
-// something on the stage, and this file draws one callout for it. Nothing here watches the stage for changes: round 1's
-// layer did, and the tour's own redraws made its notes replay and its spotlight jump (Jesse, 2026-10-31).
-//   D, Notes: a note answers each thing you do, with a line to what changed. One note at a time.
-//   E, Spotlight on Next: each step is a few stops. The rest of the stage dims, and Next, or doing what the stop asks,
-//      moves the light on. Nothing else moves it.
-//   F, Notes on Next: E's stops drawn as D's notes, with nothing dimmed.
-//   G, F with a ring: one thing on the page always has a blue ring, the button a stop waits for, or else the tour's
-//      Next. "Press what's glowing" (Jesse asked how a visitor knows which to press, 2026-11-02).
-//   H, F with a quiet ring: the ring shows on a step's last stop, and on any stop left alone for 4 seconds.
-// ?v=d, e, f, g, or h picks one. Anything else leaves the callouts off, so round 1's mockups and the real page are unchanged.
+// The welcome tour's callouts. welcome.js says when a step starts and when the visitor does something on the stage, and
+// this file draws one note for it: a gray chip with a blue line to what it's about. Each step is a few stops, walked by
+// Next and Back. A stop can wait for an action (+15m, Reveal video, play), and doing it shows the stop's answer.
+// A blue ring marks the one thing to press: the button a stop waits for, or else the tour's Next. It shows on a step's
+// last stop, and on any stop left alone for 4 seconds.
+// Picked from three design rounds as H (Jesse, 2026-11-02). Nothing here watches the stage for changes: an early round
+// did, and the tour's own redraws made its notes replay (Jesse, 2026-10-31).
 
 (() => {
-  const v = new URLSearchParams(location.search).get('v') || '';
-  /** @type {'notes' | 'spot' | 'paced' | ''} */
-  const mode = v === 'd' ? 'notes' : v === 'e' ? 'spot' : ['f', 'g', 'h'].includes(v) ? 'paced' : '';
-  /** @type {'always' | 'quiet' | ''} */
-  const ringMode = v === 'g' ? 'always' : v === 'h' ? 'quiet' : '';
-  /** How long H waits on a stop before it rings. */
+  /** How long a stop waits before it rings, except a step's last stop, which rings at once. */
   const IDLE_MS = 4000;
   /** What the last stop's count says Next goes to, by the next step's id. @type {Record<string, string>} */
   const NEXT_NAMES = { reveal: 'the cards', player: 'the player', lock: 'the lock', changes: 'the rest of YouTube' };
@@ -33,10 +24,10 @@
   /** 'over' sits inside the bottom of the target, for a picture with nothing to read in it. */
   /** @typedef {'above' | 'below' | 'right' | 'left' | 'over'} Side */
   /**
-   * `at` is what the note sits beside (or the spotlight lights); `point`, when given, is the part its arrow ends on.
+   * `at` is what the note sits beside; `point`, when given, is the part its arrow ends on.
    * `alt` is where it goes when none of `sides` fits, as on a phone, where a side note would cover the next thing to read.
-   * `go` is a button on the stage that also moves the tour on from here, like Reveal video after +15m, which G and H's
-   * ring goes to instead of the tour's Next.
+   * `go` is a button on the stage that also moves the tour on from here, like Reveal video after +15m, which the ring
+   * goes to instead of the tour's Next.
    * @typedef {{ at: string, point?: string, say: (c: Ctx) => string, sides?: Side[], alt?: { at: string, sides: Side[] }, go?: string }} Callout
    */
   /**
@@ -51,7 +42,7 @@
 
   // Where each callout points, inside the stage. YouTube's markup isn't involved: these are the tour's own drawings.
   const SEL = {
-    // The glass and the minutes beside it, lit as one.
+    // The glass and the minutes beside it, as one.
     time: '.drip-stats .drip-glass-tile, .drip-stats .drip-time-block',
     minutes: '.drip-stats .drip-time',
     glass: '.drip-stats .drip-glass-tile',
@@ -101,57 +92,12 @@
     // "Passing is free" only means something where cards cost one.
     return `${s[0].toUpperCase()}${s.slice(1)}.${c.counted() ? ' Passing is free.' : ''}`;
   };
-  /** @param {Ctx} c */
-  const playing = (c) => (c.last === 'pause' ? 'Paused. Nothing drains.' : 'Draining, 90 times faster for the tour.');
-  /** F, G, and H's answer to play: what the pill is, now that it's moving. @param {Ctx} c */
+  /** The answer to play: what the pill is, now that it's moving. @param {Ctx} c */
   const pillAnswer = (c) => (c.last === 'pause'
     ? 'Paused, so nothing drains.'
     : 'Your minutes, on every YouTube video. They drain while it plays, 90 times faster here.');
 
-  // D: what each step says on arriving, and what answers each thing the visitor does. Null says nothing new.
-
-  /** @type {Record<string, { arrive?: (c: Ctx) => Callout | null, on?: Record<string, (c: Ctx) => Callout | null> }>} */
-  const NOTES = {
-    home: {
-      arrive: () => ({ at: SEL.add, say: () => 'Spend a drop here', sides: ['below', 'left'] }),
-      on: {
-        add: () => ({ at: SEL.time, point: SEL.glass, say: (c) => `${c.dropTime()} in your glass. ${dropsLeft(c)}`, sides: STATS_SIDES }),
-      },
-    },
-    reveal: {
-      arrive: (c) => ({ at: SEL.revealBtn, say: () => pressReveal(c), sides: ['below', 'above'] }),
-      on: {
-        // Curated's cards are free, so its first reveal points at what to do with the card instead.
-        reveal: (c) => (c.counted()
-          ? { at: SEL.cards, say: (x) => `One card used. ${cardsLeft(x)}`, sides: STATS_SIDES }
-          : { at: SEL.cardActions, point: SEL.stash, say: (x) => (x.stash() ? 'Stash it for later, reveal another, or pass.' : 'Reveal another, or pass.'), sides: ['left', 'right', 'above'] }),
-        next: (c) => (c.counted() ? { at: SEL.cards, say: (x) => `One card used. ${cardsLeft(x)}`, sides: STATS_SIDES } : null),
-        pass: () => ({ at: SEL.revealBtn, say: (c) => `${c.counted() ? 'Passed, for free.' : 'Passed.'} That one won't come back.`, sides: ['below', 'above'] }),
-        stash: () => ({ at: SEL.stash, say: () => 'Stashed for later', sides: ['below', 'left', 'above'] }),
-        unstash: () => ({ at: SEL.stash, say: () => 'Out of your stash', sides: ['below', 'left', 'above'] }),
-      },
-    },
-    player: {
-      arrive: () => ({ at: SEL.pill, say: () => 'Your minutes, on every video', sides: ['below', 'left'] }),
-      on: {
-        play: () => ({ at: SEL.pill, say: playing, sides: ['below', 'left'] }),
-        pause: () => ({ at: SEL.pill, say: playing, sides: ['below', 'left'] }),
-      },
-    },
-    lock: {
-      arrive: (c) => (c.needLeft() ? { at: SEL.lockLink, say: () => 'Need this video? Unlock it with a reason.', sides: ['below'] } : null),
-      on: {
-        lock: (c) => (c.needLeft() ? { at: SEL.lockLink, say: () => 'Need this video? Unlock it with a reason.', sides: ['below'] } : null),
-        lockadd: () => ({ at: SEL.pill, say: (c) => `${c.dropTime()} more. It plays on.`, sides: ['below', 'left'] }),
-        unlock: () => ({ at: SEL.pill, say: () => "Unlocked. This one won't use minutes.", sides: ['below', 'left'] }),
-        done: (c) => (c.drops() ? { at: SEL.drops, say: (x) => `Back home. The ${plural(x.drops(), 'drop')} you didn't spend are still here.`, sides: STATS_SIDES } : null),
-      },
-    },
-  };
-
-  // E and F: each step's stops, in order. A stop with `until` waits for that action, and doing it shows `then`.
-
-  /** @type {Record<string, Stop[]>} */
+  /** Each step's stops, in order. @type {Record<string, Stop[]>} */
   const STOPS = {
     home: [
       { at: SEL.time, point: SEL.minutes, say: () => 'What you can watch today. Nothing until you spend a drop.', sides: TIME_SIDES },
@@ -177,6 +123,11 @@
         // Any of them moves on to Watch, once its animation is done.
         at: SEL.cardActions, point: SEL.stash, ready: dealt, sides: ['left', 'right'], alt: { at: SEL.thumb, sides: ['over'] }, say: cardChoices,
         until: ['stash', 'unstash', 'next', 'pass'],
+        // A pass takes the card away, so there's no Watch to go on to: it says so and points at Reveal video.
+        then: {
+          at: SEL.revealBtn, sides: ['below', 'above'], go: SEL.revealBtn, need: (c) => c.last === 'pass',
+          say: () => "Passed. That one won't come back. Press Reveal video for another.",
+        },
       },
       {
         // Watch opens the player, the next step.
@@ -221,16 +172,11 @@
   };
 
   // The drawing. One fixed layer over the page, outside the stage, so the stage's redraws never touch it and a chip can
-  // sit past the stage's edge where there's room. One chip, one line, one hole, each built once and moved.
+  // sit past the stage's edge where there's room. One chip and one line, each built once and moved.
 
   const layer = document.createElement('div');
-  layer.className = `co-layer co-${mode}`;
+  layer.className = 'co-layer';
   layer.setAttribute('aria-hidden', 'true');
-  const veil = document.createElement('div');
-  veil.className = 'co-veil';
-  const hole = document.createElement('div');
-  hole.className = 'co-hole';
-  veil.append(hole);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'co-line');
   svg.innerHTML = '<path pathLength="1"/><path class="co-head"/>';
@@ -241,18 +187,11 @@
   const count = document.createElement('span');
   count.className = 'co-count';
   chip.append(text, count);
-  // G and H's ring: its own element, outside the layer, since it can sit on the tour's Next below the stage.
+  layer.append(svg, chip);
+  // The ring: its own element, outside the layer, since it can sit on the tour's Next below the stage.
   const ring = document.createElement('div');
   ring.className = 'co-ring';
   ring.setAttribute('aria-hidden', 'true');
-  /** When the current stop started, for H's wait. */
-  let stopSince = 0;
-  let lastStopKey = '';
-  /** What the ring is on and where, so a frame only writes on a change. */
-  let ringPlaced = '';
-  if (mode === 'spot') layer.append(veil);
-  if (mode !== 'spot') layer.append(svg);
-  layer.append(chip);
 
   /** @type {Ctx | null} */
   let ctx = null;
@@ -272,28 +211,29 @@
   const kept = { home: new Set(), reveal: new Set() };
   /** Step 1's Reveal video already asked for a card, so step 2 says nothing until it's dealt. */
   let waiting = false;
-  /** D's current note. @type {Callout | null} */
-  let note = null;
   /** What's drawn now, or about to be once a fade ends. @type {{ at: string, text: string, count: string } | null} */
   let shown = null;
   /** Where it was last placed, so a frame only writes styles when something moved. */
   let placed = '';
   let swapTimer = 0;
   let fadeTimer = 0;
-  let glideTimer = 0;
   /** While a note fades out to move, it stays where it is: frame() leaves it alone until the new one is placed. */
   let fading = false;
   /** Where the shown note sits. @type {{ at: string, x: number, y: number } | null} */
   let held = null;
   /** A note waiting to come in: frame() turns the layer on once it has placed it, never before. */
   let revealing = false;
+  /** When the current stop started, for the ring's wait. */
+  let stopSince = 0;
+  let lastStopKey = '';
+  /** What the ring is on and where, so a frame only writes on a change. */
+  let ringPlaced = '';
 
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /** The callout this moment calls for. @returns {Callout | null} */
   function current() {
     if (!ctx || waiting) return null;
-    if (mode === 'notes') return note;
     const stop = stops[at];
     if (!stop) return null;
     if (thenShown && stop.then) return stop.then;
@@ -301,10 +241,10 @@
     return stop;
   }
 
-  /** "2 of 3", and on G and H's last stop where Next goes from here. */
+  /** "2 of 3", and on a step's last stop where Next goes from here. */
   function countLine() {
-    if (mode === 'notes' || !ctx) return '';
-    const where = ringMode && at === stops.length - 1 ? NEXT_NAMES[ctx.nextStep()] : '';
+    if (!ctx) return '';
+    const where = at === stops.length - 1 ? NEXT_NAMES[ctx.nextStep()] : '';
     const n = stops.length > 1 ? `${at + 1} of ${stops.length}` : '';
     return where ? `${n ? `${n} · ` : ''}Next: ${where}` : n;
   }
@@ -318,9 +258,7 @@
       stopSince = performance.now();
       ring.classList.remove('is-on');
     }
-    const next = co && ctx
-      ? { at: co.at, text: co.say(ctx), count: countLine() }
-      : null;
+    const next = co && ctx ? { at: co.at, text: co.say(ctx), count: countLine() } : null;
     if (!next) {
       clearTimeout(fadeTimer);
       fading = false;
@@ -342,8 +280,7 @@
       shown = next;
       return;
     }
-    const moved = !shown || shown.at !== next.at;
-    if (!shown || (moved && mode !== 'spot')) {
+    if (!shown || shown.at !== next.at) {
       // From nothing, or a note moving to another thing: the old one fades out where it is, and the new one comes in
       // at its own place, placed with its own words, line drawn fresh. Nothing slides across the page.
       const wasOn = layer.classList.contains('is-on');
@@ -363,13 +300,7 @@
       }, reduced() ? 0 : wasOn ? 170 : 120);
       return;
     }
-    if (moved) {
-      // The spotlight glides to its next stop, and its words change on the way.
-      glide();
-      swap(next);
-    } else if (shown.text !== next.text || shown.count !== next.count) {
-      swap(next);
-    }
+    if (shown.text !== next.text || shown.count !== next.count) swap(next);
     shown = next;
     // Placed before it shows, so it never appears where the last one was.
     if (!layer.classList.contains('is-on')) revealing = true;
@@ -395,14 +326,6 @@
     }, 130);
   }
 
-  /** Turns on the slide for the hole and chip for one move. */
-  function glide() {
-    if (reduced()) return;
-    layer.classList.add('is-gliding');
-    clearTimeout(glideTimer);
-    glideTimer = window.setTimeout(() => layer.classList.remove('is-gliding'), 480);
-  }
-
   /** Starts the line drawing from the chip again. */
   function drawLine() {
     for (const p of [line, tip]) {
@@ -420,7 +343,7 @@
    * @param {boolean} [strict]
    */
   function spot(r, s, w, h, sides, strict = false) {
-    const gap = mode === 'spot' ? 16 : 34;
+    const gap = 34;
     const vw = document.documentElement.clientWidth;
     const minX = 8;
     const maxX = vw - 8;
@@ -442,7 +365,7 @@
       below: { x: cx, y: r.bottom + gap, fits: r.bottom + gap + h <= bottom },
       right: { x: rx, y: cy, fits: rx + w <= maxX },
       left: { x: lx, y: cy, fits: lx >= minX },
-      over: { x: Math.max(inLeft, Math.min(inRight - w, r.left + r.width / 2 - w / 2)), y: r.bottom - h - 14, fits: r.height >= h + 28 && r.width >= w + 16 },
+      over: { x: cx, y: r.bottom - h - 14, fits: r.height >= h + 28 && r.width >= w + 16 },
     };
     /** @type {Side[]} */
     const all = ['below', 'above', 'right', 'left'];
@@ -467,7 +390,7 @@
     if (layer.classList.contains(name) !== on) layer.classList.toggle(name, on);
   }
 
-  /** Puts the chip, line, and hole on the target. Runs every frame while a callout shows, and writes only on a change. */
+  /** Puts the chip and line on the target. Runs every frame while a callout shows, and writes only on a change. */
   function frame() {
     if (!ctx || !shown || fading) return;
     if (ctx.tour.hidden) {
@@ -497,8 +420,6 @@
     const pointRect = co?.point ? ctx.stage.querySelector(co.point)?.getBoundingClientRect() : altBox ? main : null;
     const key = [r.left, r.top, r.width, r.height, s.left, s.top, s.width, s.height, w, h, pointRect?.left ?? 0, pointRect?.top ?? 0].map(Math.round).join();
     if (key === placed) return comeIn();
-    // Settling after an animation (not a first draw) slides there instead of jumping.
-    if (placed && !layer.classList.contains('is-gliding') && mode === 'spot') glide();
     placed = key;
     // A shown note ignores its target creeping a few pixels (the pill's minutes changing width), so it never twitches.
     if (!revealing && held && held.at === shown.at && Math.abs(p.x - held.x) <= 12 && Math.abs(p.y - held.y) <= 12) {
@@ -508,12 +429,6 @@
     held = { at: shown.at, x: p.x, y: p.y };
     chip.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
     chip.dataset.side = p.side;
-    if (mode === 'spot') {
-      const pad = 8;
-      Object.assign(veil.style, { left: `${s.left}px`, top: `${s.top}px`, width: `${s.width}px`, height: `${s.height}px` });
-      Object.assign(hole.style, { left: `${r.left - s.left - pad}px`, top: `${r.top - s.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
-      return comeIn();
-    }
     // The line: from the chip's near edge to just short of the part it points at, bowed a little.
     const pr = pointRect || r;
     const cxr = pr.left + pr.width / 2;
@@ -539,7 +454,7 @@
   function comeIn() {
     if (!revealing) return;
     revealing = false;
-    if (mode !== 'spot') drawLine();
+    drawLine();
     layer.classList.add('is-on');
   }
 
@@ -559,7 +474,7 @@
 
   /** Next (1) or Back (-1) through the stops. @param {1 | -1} dir @returns {boolean} whether it moved */
   function go(dir) {
-    if (mode !== 'spot' && mode !== 'paced') return false;
+    if (!ctx) return false;
     let i = at + dir;
     while (i >= 0 && i < stops.length && !open(i)) i += dir;
     if (i < 0 || i >= stops.length) return false;
@@ -585,16 +500,16 @@
       if (el) return el;
     }
     const co = current();
-    const go = co?.go ? ctx.stage.querySelector(co.go) : null;
-    return go || document.getElementById('next');
+    const button = co?.go ? ctx.stage.querySelector(co.go) : null;
+    return button || document.getElementById('next');
   }
 
-  /** Puts the ring on ringTarget(), when this variant shows it now. */
+  /** Puts the ring on ringTarget() once it's time: at once on a step's last stop, after IDLE_MS on the others. */
   function ringFrame() {
-    if (!ringMode || !ctx) return;
+    if (!ctx) return;
     const el = ringTarget();
-    const quietWait = ringMode === 'quiet' && at < stops.length - 1 && performance.now() - stopSince < IDLE_MS;
-    const show = !!el && !fading && !ctx.busy() && !ctx.tour.hidden && layer.classList.contains('is-on') && !quietWait;
+    const early = at < stops.length - 1 && performance.now() - stopSince < IDLE_MS;
+    const show = !!el && !fading && !ctx.busy() && !ctx.tour.hidden && layer.classList.contains('is-on') && !early;
     if (!show || !el) {
       if (ring.classList.contains('is-on')) ring.classList.remove('is-on');
       return;
@@ -623,7 +538,6 @@
      * @param {string} id @param {Ctx} c @param {{ wait?: boolean, fromEnd?: boolean }} [opts]
      */
     start(id, c, opts = {}) {
-      if (!mode) return;
       if (!ctx) {
         document.body.append(layer, ring);
         requestAnimationFrame(loop);
@@ -636,18 +550,17 @@
       answered = kept[id] || new Set();
       waiting = !!opts.wait;
       stops = (STOPS[id] || []).filter((s) => !s.need || s.need(c));
-      note = NOTES[id]?.arrive?.(c) || null;
       // A new step starts clean: whatever the last step showed goes, and this one's first callout comes in fresh.
       // The stage redraws at once, so the old callout goes at once too, with no fade over the new screen.
       layer.classList.add('is-instant');
-      layer.classList.remove('is-on', 'is-gliding');
+      layer.classList.remove('is-on');
       layer.getBoundingClientRect();
       layer.classList.remove('is-instant');
       shown = null;
       fading = false;
       revealing = false;
       flag('is-away', false);
-      if (mode !== 'notes' && !waiting) {
+      if (!waiting) {
         if (opts.fromEnd) {
           at = stops.length - 1;
           while (at > 0 && !open(at)) at--;
@@ -665,26 +578,19 @@
 
     /** The visitor did something on the stage. @param {string} action */
     did(action) {
-      if (!mode || !ctx) return;
+      if (!ctx) return;
       ctx.last = action;
       waiting = false;
-      if (action === 'lock' && stepId === 'lock' && mode !== 'notes') {
-        // The lock came back up, with what it offers now (no +15m once the drops are gone). The note goes to the first
-        // thing not tried yet, so buying more and having the lock return doesn't ask for +15m again.
+      if (action === 'lock' && stepId === 'lock') {
+        // The lock came back up, with what it offers now (no +15m once the drops are gone). The note goes to the next
+        // thing not tried yet, after what was just done, so unlocking goes on to Done rather than back to +15m.
         stops = (STOPS.lock || []).filter((s) => !s.need || s.need(/** @type {Ctx} */ (ctx)));
-        // After what was just done, so unlocking goes on to Done rather than back to +15m.
         const untried = (/** @type {number} */ n) => !answered.has(stops[n]) && open(n);
         let fresh = -1;
         for (let n = at + 1; n < stops.length && fresh < 0; n++) if (untried(n)) fresh = n;
         for (let n = 0; n < stops.length && fresh < 0; n++) if (untried(n)) fresh = n;
         at = fresh >= 0 ? fresh : stops.length - 1;
         thenShown = false;
-      } else if (mode === 'notes') {
-        const make = NOTES[stepId]?.on?.[action];
-        if (make) {
-          const next = make(ctx);
-          if (next) note = next;
-        }
       } else {
         // Doing what a stop asks shows its answer, wherever Next has got to, since that's where the visitor already is.
         const i = stops.findIndex((s) => s.until?.includes(action));
@@ -716,16 +622,16 @@
       return go(1);
     },
 
-    /** Whether the lock step has callouts left that need the lock up, so Next brings it back instead of leaving. */
-    wantsLock() {
-      if ((mode !== 'spot' && mode !== 'paced') || stepId !== 'lock') return false;
-      const all = (STOPS.lock || []).filter((s) => !s.need || !ctx || s.need(ctx));
-      return all.some((s) => !answered.has(s));
-    },
-
     /** Back. True when it went back a stop. */
     back() {
       return go(-1);
+    },
+
+    /** Whether the lock step has callouts left that need the lock up, so Next brings it back instead of leaving. */
+    wantsLock() {
+      if (stepId !== 'lock') return false;
+      const all = (STOPS.lock || []).filter((s) => !s.need || !ctx || s.need(ctx));
+      return all.some((s) => !answered.has(s));
     },
   };
 })();

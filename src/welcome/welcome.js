@@ -20,9 +20,9 @@
   /** @type {any} */
   const DripCounter = /** @type {any} */ (globalThis).DripCounter;
 
-  /** Tour callouts, round 2 (coach.js). Its calls do nothing unless the page was opened with ?v=d, e, or f. */
+  /** The tour's callouts (coach.js), or nothing if it didn't load. */
   /** @type {any} */
-  const coach = /** @type {any} */ (globalThis).DripCoach || { start() {}, did() {}, next: () => false, back: () => false };
+  const coach = /** @type {any} */ (globalThis).DripCoach || { start() {}, did() {}, next: () => false, back: () => false, wantsLock: () => false };
 
   /** @param {string} id */
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
