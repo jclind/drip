@@ -40,11 +40,11 @@
   text-wrap: pretty;
 }
 
-.co-chip > span:first-child {
+.co-chip > span {
   transition: opacity 130ms ease;
 }
 
-.co-chip.is-swapping > span:first-child {
+.co-chip.is-swapping > span {
   opacity: 0;
 }
 
@@ -128,7 +128,7 @@ html[dark] .co-hole {
 
 @media (prefers-reduced-motion: reduce) {
   .co-layer,
-  .co-chip > span:first-child {
+  .co-chip > span {
     transition: none;
   }
 

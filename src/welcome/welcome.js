@@ -340,13 +340,15 @@
     step = Math.max(0, Math.min(STEPS.length - 1, n));
     if (!$('tour').hidden) history.replaceState(history.state, '', `${location.pathname}${location.search}#tour-${step + 1}`);
     $('say').textContent = STEPS[step].say();
+    const dealing = revealOnArrive && stepId() === 'reveal';
     morph(() => {
       stage.style.minHeight = '';
       stage.replaceChildren();
       stopStep = STEPS[step].show();
     });
     renderControls();
-    coach.start(stepId(), coachCtx);
+    // Step 1's Reveal video deals on arriving at step 2, so step 2's callout waits for that card.
+    coach.start(stepId(), coachCtx, { wait: dealing });
   }
 
   function renderControls() {
@@ -406,7 +408,7 @@
   const coachCtx = {
     stage: $('stage'),
     tour: $('tour'),
-    busy: () => moving || pouring,
+    busy: () => moving || pouring || lockMoving(),
     dropTime: () => Drip.formatMinutes(sand.settings.minutesPerToken * 60),
     drops: () => sand.tokens.watch,
     cards: () => sand.tokens.rec,
@@ -415,7 +417,16 @@
     stash: () => parts.stash,
     needLeft: () => Math.max(0, sand.settings.needThisPerDay - sand.unlocked.length),
     resetLabel: () => hourLabel(sand.settings.resetHour),
+    carries: () => sand.settings.rolloverDays > 1,
   };
+
+  /** The lock rising, draining, or leaving, or the stage changing height around it: callouts wait for it to settle. */
+  function lockMoving() {
+    if (stage.querySelector('#drip-lock.is-leaving, #drip-lock.is-draining')) return true;
+    const panel = stage.querySelector('#drip-lock .drip-lock-panel');
+    const running = (/** @type {Element} */ el) => el.getAnimations().some((a) => a.playState === 'running' || a.playState === 'pending');
+    return (!!panel && running(panel)) || running(stage);
+  }
 
   /** +15m, as on the home page: a drop leaves the counter and falls into the glass (pour.js). */
   function addTime() {
@@ -959,7 +970,11 @@
     const drain = () => {
       const lock = /** @type {HTMLElement} */ (stage.querySelector('#drip-lock'));
       stopRings();
-      const p = player({ autoplay: true, onEmpty: () => lastDrop(raise) });
+      // The lock comes back on its own when the minutes run out, and its callouts start over with it.
+      const p = player({ autoplay: true, onEmpty: () => lastDrop((x) => {
+        raise(x);
+        coach.did('lock');
+      }) });
       setUnder(p.el, p);
       if (reducedMotion()) lift(lock);
       else {
