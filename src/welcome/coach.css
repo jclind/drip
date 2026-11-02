@@ -9,6 +9,13 @@
   font-family: "Roboto", "Arial", sans-serif;
   opacity: 0;
   transition: opacity 160ms ease;
+  /* drip's blue is 2.6:1 on white, under the 3:1 a line or ring needs, so light mode draws them darker. */
+  --co-blue: #1a73e8;
+}
+
+html[dark] .co-layer,
+html[dark] .co-ring {
+  --co-blue: var(--blue);
 }
 
 .co-layer.is-on {
@@ -73,7 +80,7 @@
 
 .co-line path {
   fill: none;
-  stroke: var(--blue);
+  stroke: var(--co-blue);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -105,7 +112,8 @@
   z-index: 99;
   pointer-events: none;
   opacity: 0;
-  box-shadow: 0 0 0 2px var(--blue);
+  --co-blue: #1a73e8;
+  box-shadow: 0 0 0 2px var(--co-blue);
   transition: opacity 200ms ease;
 }
 
@@ -115,8 +123,8 @@
 }
 
 @keyframes co-ring {
-  0%, 100% { box-shadow: 0 0 0 2px var(--blue), 0 0 0 2px color-mix(in srgb, var(--blue) 40%, transparent); }
-  50% { box-shadow: 0 0 0 2px var(--blue), 0 0 0 7px color-mix(in srgb, var(--blue) 0%, transparent); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--co-blue), 0 0 0 2px color-mix(in srgb, var(--co-blue) 40%, transparent); }
+  50% { box-shadow: 0 0 0 2px var(--co-blue), 0 0 0 7px color-mix(in srgb, var(--co-blue) 0%, transparent); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -135,4 +143,14 @@
     stroke-dashoffset: 0;
     opacity: 1;
   }
+}
+
+/* The notes' words for screen readers, off screen. */
+.co-said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

@@ -22,7 +22,7 @@
 
   /** The tour's callouts (coach.js), or nothing if it didn't load. */
   /** @type {any} */
-  const coach = /** @type {any} */ (globalThis).DripCoach || { start() {}, did() {}, next: () => false, back: () => false, wantsLock: () => false };
+  const coach = /** @type {any} */ (globalThis).DripCoach || { start() {}, did() {}, next: () => false, back: () => false, wantsLock: () => false, reset() {} };
 
   /** @param {string} id */
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -199,6 +199,7 @@
   /** The tour for the current mix, from step n. It starts over on its own fresh state. @param {number} [n] */
   function retour(n = 0) {
     Object.assign(sand, freshState());
+    coach.reset();
     lastCardId = '';
     const mode = Drip.modeOf(parts);
     $('tourTitle').textContent = `How ${mode ? MODE_ROWS.find((r) => r.name === mode)?.label : 'your mix'} works`;

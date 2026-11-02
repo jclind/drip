@@ -192,6 +192,17 @@
   const ring = document.createElement('div');
   ring.className = 'co-ring';
   ring.setAttribute('aria-hidden', 'true');
+  // The chip and its line are hidden from screen readers, so each note's words are read out from here instead. Next
+  // often moves between notes without changing the step's sentence, and without this it would say nothing (Codex's
+  // review, 2026-11-02).
+  const said = document.createElement('div');
+  said.className = 'co-said';
+  said.setAttribute('aria-live', 'polite');
+
+  /** Reads a note's words out, once each time they change. @param {string} words */
+  const announce = (words) => {
+    if (said.textContent !== words) said.textContent = words;
+  };
 
   /** @type {Ctx | null} */
   let ctx = null;
@@ -316,6 +327,7 @@
     const put = () => {
       text.textContent = to.text;
       count.textContent = to.count;
+      announce(to.text);
     };
     if (reduced()) return put();
     chip.classList.add('is-swapping');
@@ -456,6 +468,7 @@
     revealing = false;
     drawLine();
     layer.classList.add('is-on');
+    announce(text.textContent || '');
   }
 
   /** Whether stop i shows its answer: its action was done, and the answer applies. @param {number} i */
@@ -539,7 +552,7 @@
      */
     start(id, c, opts = {}) {
       if (!ctx) {
-        document.body.append(layer, ring);
+        document.body.append(layer, ring, said);
         requestAnimationFrame(loop);
       }
       ctx = c;
@@ -625,6 +638,15 @@
     /** Back. True when it went back a stop. */
     back() {
       return go(-1);
+    },
+
+    /**
+     * The tour started over on a fresh sandbox (a new mode, after Change): what was done on steps 1 and 2 is gone, so
+     * their notes forget it too.
+     */
+    reset() {
+      for (const set of Object.values(kept)) set.clear();
+      answered = new Set();
     },
 
     /** Whether the lock step has callouts left that need the lock up, so Next brings it back instead of leaving. */
