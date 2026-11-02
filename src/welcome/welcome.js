@@ -1055,11 +1055,11 @@
         }
       };
       const unlocks = needLeft > 0 && !reasonOpen
-        ? h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = true; redraw(); stage.querySelector('textarea')?.focus(); } }, `I need this one · ${needLeft} left`)
+        ? h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = true; redraw(); stage.querySelector('textarea')?.focus(); coach.did('reason'); } }, `I need this one · ${needLeft} left`)
         : needLeft > 0
           ? h('div', { class: 'drip-reason' }, reason,
             h('div', { class: 'drip-reason-row' },
-              h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = false; note = ''; redraw(); } }, 'Cancel'),
+              h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = false; note = ''; redraw(); coach.did('cancel'); } }, 'Cancel'),
               h('button', { class: 'drip-b drip-b-gray', onclick: unlock }, icon('unlock'), h('span', {}, 'Unlock this video'))))
           : h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`);
       return h('div', { class: 'drip-lock-panel', role: 'group', 'aria-label': 'The lock' },

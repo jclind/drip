@@ -42,7 +42,8 @@
   /**
    * A stop with `until` waits for that action. Doing it shows `then`, or, with no `then` (or one whose `need` is false),
    * moves on to the next stop.
-   * @typedef {Callout & { need?: (c: Ctx) => boolean, ready?: (c: Ctx) => boolean, until?: string[], then?: Callout & { need?: (c: Ctx) => boolean } }} Stop
+   * `touch` lists actions that bring the note back to this stop without finishing it, like opening the reason form.
+   * @typedef {Callout & { need?: (c: Ctx) => boolean, ready?: (c: Ctx) => boolean, until?: string[], touch?: string[], then?: Callout & { need?: (c: Ctx) => boolean } }} Stop
    */
 
   /** @param {number} n @param {string} word */
@@ -102,6 +103,10 @@
   };
   /** @param {Ctx} c */
   const playing = (c) => (c.last === 'pause' ? 'Paused. Nothing drains.' : 'Draining, 90 times faster for the tour.');
+  /** F, G, and H's answer to play: what the pill is, now that it's moving. @param {Ctx} c */
+  const pillAnswer = (c) => (c.last === 'pause'
+    ? 'Paused, so nothing drains.'
+    : 'Your minutes, on every YouTube video. They drain while it plays, 90 times faster here.');
 
   // D: what each step says on arriving, and what answers each thing the visitor does. Null says nothing new.
 
@@ -169,7 +174,9 @@
       {
         // From the left, so the arrow lands on Stash, the start of the row the sentence reads along.
         // On a phone, over the picture, so the title and Watch stay readable.
+        // Any of them moves on to Watch, once its animation is done.
         at: SEL.cardActions, point: SEL.stash, ready: dealt, sides: ['left', 'right'], alt: { at: SEL.thumb, sides: ['over'] }, say: cardChoices,
+        until: ['stash', 'unstash', 'next', 'pass'],
       },
       {
         // Watch opens the player, the next step.
@@ -177,12 +184,12 @@
         say: (c) => (c.clock() ? 'Or watch it, and your minutes start.' : 'Or watch it. No clock runs while you watch.'),
       },
     ],
+    // Play first, then what the pill is, while it's moving (Jesse, 2026-11-02).
     player: [
-      { at: SEL.pill, say: () => 'On every YouTube video, this shows your minutes.', sides: ['below', 'left'] },
       {
         // Right under the play button, inside the player, where there's room.
         at: SEL.playIcon, say: () => 'Press play, and watch the glass.', sides: ['below', 'above'], until: ['play'],
-        then: { at: SEL.pill, say: playing, sides: ['below', 'left'] },
+        then: { at: SEL.pill, say: pillAnswer, sides: ['below', 'left'] },
       },
     ],
     lock: [
@@ -193,7 +200,11 @@
         until: ['lockadd'], then: { at: SEL.pill, say: (c) => `${c.dropTime()} more. It plays on.`, sides: ['below', 'left'] },
       },
       {
-        at: SEL.lockLink, say: () => 'Unlock a video you need, with a reason.', sides: ['below'], need: (c) => c.needLeft() > 0,
+        // The form won't unlock without a reason, so once it's open the note says so.
+        at: SEL.lockLink, sides: ['below'], need: (c) => c.needLeft() > 0, touch: ['reason', 'cancel'],
+        say: (c) => (c.stage.querySelector('#drip-lock .drip-reason')
+          ? 'Write a few words about why, then press Unlock this video.'
+          : 'Unlock a video you need, with a reason.'),
         until: ['unlock'], then: { at: SEL.pill, say: () => "Unlocked. This one won't use minutes.", sides: ['below', 'left'] },
       },
       {
@@ -254,10 +265,10 @@
    * The stops whose action the visitor has done, so coming back to one shows its answer, not the ask again. Steps 1
    * and 2 keep theirs across steps, since what was done there (a drop spent, a card dealt) is still on the page.
    * The player and the lock redraw fresh each time, so theirs start over.
-   * @type {Set<number>}
+   * @type {Set<Stop>}
    */
   let answered = new Set();
-  /** @type {Record<string, Set<number>>} */
+  /** @type {Record<string, Set<Stop>>} */
   const kept = { home: new Set(), reveal: new Set() };
   /** Step 1's Reveal video already asked for a card, so step 2 says nothing until it's dealt. */
   let waiting = false;
@@ -535,7 +546,7 @@
   /** Whether stop i shows its answer: its action was done, and the answer applies. @param {number} i */
   function showsThen(i) {
     const then = stops[i]?.then;
-    return answered.has(i) && !!then && (!then.need || (!!ctx && then.need(ctx)));
+    return !!stops[i] && answered.has(stops[i]) && !!then && (!then.need || (!!ctx && then.need(ctx)));
   }
 
   /** A stop that can show now: whatever it, or its answer once done, points at is on the stage. @param {number} i */
@@ -658,11 +669,12 @@
       ctx.last = action;
       waiting = false;
       if (action === 'lock' && stepId === 'lock' && mode !== 'notes') {
-        // The lock came back up: its stops start over, with what this lock offers now (no +15m once the drops are gone).
+        // The lock came back up, with what it offers now (no +15m once the drops are gone). The note goes to the first
+        // thing not tried yet, so buying more and having the lock return doesn't ask for +15m again.
         stops = (STOPS.lock || []).filter((s) => !s.need || s.need(/** @type {Ctx} */ (ctx)));
-        at = 0;
+        const fresh = stops.findIndex((s, n) => !answered.has(s) && open(n));
+        at = fresh >= 0 ? fresh : stops.length - 1;
         thenShown = false;
-        answered.clear();
       } else if (mode === 'notes') {
         const make = NOTES[stepId]?.on?.[action];
         if (make) {
@@ -672,8 +684,13 @@
       } else {
         // Doing what a stop asks shows its answer, wherever Next has got to, since that's where the visitor already is.
         const i = stops.findIndex((s) => s.until?.includes(action));
+        const t = stops.findIndex((s) => s.touch?.includes(action));
+        if (i < 0 && t >= 0) {
+          at = t;
+          thenShown = false;
+        }
         if (i >= 0) {
-          answered.add(i);
+          answered.add(stops[i]);
           const then = stops[i].then;
           if (then && (!then.need || then.need(ctx))) {
             at = i;
