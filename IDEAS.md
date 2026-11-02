@@ -22,6 +22,8 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - Arrows with a short label in the tour, pointing at what to watch. In the watching step, one could point at the glass's water draining while the "video" plays, so the step shows something happening instead of a still frame through the whole countdown. Jesse, 2026-10-12.
 - Planned for 1.0 (RELEASE-PLAN.md, 2026-10-16). Jesse wants arrows or text that show what to look for, like the time counting down while the video plays, and more feeling that a video is playing. Three to mock up, which can mix: callouts that appear when the thing they point at moves and then go ("Your time drains while a video plays" at the pill), one or two per step; a player that looks like it's playing, with a moving progress bar, a running timecode, a picture with some motion, and a "90× speed" tag so the fast drain reads as on purpose; and a spotlight that dims the rest of the stage. Claude's guess is the first two together.
 
+- A small animation in the tour's player while its video plays, so it feels like something is playing (Jesse, 2026-11-02, after the callouts round). Round 1's B of the tour callouts built one: the picture pans, soft lights drift, and a "90× speed" tag shows. The mockups are deleted; its CSS is the `.lv-` rules in `git show cdf07e5:designs/tour-callouts/variants.css`, and the markup is in `variants.js` at the same commit.
+
 ## Watching
 
 - Background audio at half rate when the tab isn't visible.

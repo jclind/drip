@@ -20,6 +20,10 @@
   /** @type {any} */
   const DripCounter = /** @type {any} */ (globalThis).DripCounter;
 
+  /** The tour's callouts (coach.js), or nothing if it didn't load. */
+  /** @type {any} */
+  const coach = /** @type {any} */ (globalThis).DripCoach || { start() {}, did() {}, next: () => false, back: () => false, wantsLock: () => false, reset() {} };
+
   /** @param {string} id */
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
   const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -195,6 +199,7 @@
   /** The tour for the current mix, from step n. It starts over on its own fresh state. @param {number} [n] */
   function retour(n = 0) {
     Object.assign(sand, freshState());
+    coach.reset();
     lastCardId = '';
     const mode = Drip.modeOf(parts);
     $('tourTitle').textContent = `How ${mode ? MODE_ROWS.find((r) => r.name === mode)?.label : 'your mix'} works`;
@@ -325,23 +330,31 @@
     stage.animate([{ height: `${before}px` }, { height: `${after}px` }], { duration: 260, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
   }
 
+  /** Set by Back and the left arrow, so the step they go back to starts on its last callout. */
+  let backing = false;
+
   /** @param {number} n */
   function go(n) {
     // A reveal animation still running belongs to the old step's screen, which is about to go.
     motion++;
     moving = false;
     stopStep?.();
+    bringLock = null;
     for (const t of timers) clearTimeout(t);
     timers.clear();
     step = Math.max(0, Math.min(STEPS.length - 1, n));
     if (!$('tour').hidden) history.replaceState(history.state, '', `${location.pathname}${location.search}#tour-${step + 1}`);
     $('say').textContent = STEPS[step].say();
+    const dealing = revealOnArrive && stepId() === 'reveal';
     morph(() => {
       stage.style.minHeight = '';
       stage.replaceChildren();
       stopStep = STEPS[step].show();
     });
     renderControls();
+    // Step 1's Reveal video deals on arriving at step 2, so step 2's callout waits for that card.
+    coach.start(stepId(), coachCtx, { wait: dealing, fromEnd: backing });
+    backing = false;
   }
 
   function renderControls() {
@@ -357,16 +370,39 @@
     next.replaceChildren(...(last ? ['Open YouTube', icon('arrow-up-right')] : ['Next', icon('arrow-right')]));
   }
 
-  $('back').addEventListener('click', () => (step === 0 ? toChoice() : go(step - 1)));
+  $('back').addEventListener('click', () => {
+    if (coach.back()) return;
+    if (step === 0) toChoice();
+    else {
+      backing = true;
+      go(step - 1);
+    }
+  });
   $('skip').addEventListener('click', () => go(STEPS.length - 1));
+  /**
+   * Next on the lock step with the lock down (bought more, or unlocked) and callouts still to see: the lock comes back
+   * up for them instead of the tour leaving (Jesse, 2026-11-02). The callouts say when some are left.
+   */
+  function lockBack() {
+    if (stepId() !== 'lock' || !bringLock || stage.querySelector('#drip-lock, #drip-home') || !coach.wantsLock?.()) return false;
+    bringLock();
+    return true;
+  }
+  /** @type {(() => void) | null} Set by the lock step, to raise the lock again. */
+  let bringLock = null;
+
   $('next').addEventListener('click', () => {
+    if (coach.next() || lockBack()) return;
     if (step === STEPS.length - 1) location.href = 'https://www.youtube.com/';
     else go(step + 1);
   });
   $('tour').addEventListener('keydown', (e) => {
     if (/** @type {Element} */ (e.target).closest('textarea, input')) return;
-    if (e.key === 'ArrowRight' && step < STEPS.length - 1) go(step + 1);
-    else if (e.key === 'ArrowLeft' && step > 0) go(step - 1);
+    if (e.key === 'ArrowRight' && !coach.next() && !lockBack() && step < STEPS.length - 1) go(step + 1);
+    else if (e.key === 'ArrowLeft' && !coach.back() && step > 0) {
+      backing = true;
+      go(step - 1);
+    }
   });
 
   // Steps 1 and 2: the home page, as home.js draws it.
@@ -391,6 +427,31 @@
   let pouring = false;
   /** @type {number | null} */
   let heldLeft = null;
+
+  /** What coach.js reads to word its callouts. Functions, so each reads the tour's state when it's drawn. */
+  const coachCtx = {
+    stage: $('stage'),
+    tour: $('tour'),
+    busy: () => moving || pouring || lockMoving(),
+    dropTime: () => Drip.formatMinutes(sand.settings.minutesPerToken * 60),
+    drops: () => sand.tokens.watch,
+    cards: () => sand.tokens.rec,
+    counted: () => parts.cards === 'limited',
+    clock: () => parts.clock,
+    stash: () => parts.stash,
+    needLeft: () => Math.max(0, sand.settings.needThisPerDay - sand.unlocked.length),
+    resetLabel: () => hourLabel(sand.settings.resetHour),
+    carries: () => sand.settings.rolloverDays > 1,
+    nextStep: () => STEPS[step + 1]?.id || '',
+  };
+
+  /** The lock rising, draining, or leaving, or the stage changing height around it: callouts wait for it to settle. */
+  function lockMoving() {
+    if (stage.querySelector('#drip-lock.is-leaving, #drip-lock.is-draining')) return true;
+    const panel = stage.querySelector('#drip-lock .drip-lock-panel');
+    const running = (/** @type {Element} */ el) => el.getAnimations().some((a) => a.playState === 'running' || a.playState === 'pending');
+    return (!!panel && running(panel)) || running(stage);
+  }
 
   /** +15m, as on the home page: a drop leaves the counter and falls into the glass (pour.js). */
   function addTime() {
@@ -417,9 +478,11 @@
         pouring = false;
         heldLeft = null;
         redraw();
+        coach.did('add');
       });
     }
     drawHome();
+    if (!pours) coach.did('add');
   }
 
   /** The home page's stats. `heldDrops` are drops still on their way into the counter, which it doesn't show yet. */
@@ -474,7 +537,14 @@
     return h('div', { class: 'drip-actions' },
       parts.clock && addButton(),
       h('button', {
-        class: 'drip-b drip-b-gold drip-reveal', disabled: counted && sand.tokens.rec < 1, onclick: () => (stepId() === 'reveal' ? reveal() : go(at('reveal'))),
+        class: 'drip-b drip-b-gold drip-reveal', disabled: counted && sand.tokens.rec < 1,
+        onclick: () => {
+          if (stepId() === 'reveal') reveal();
+          else {
+            revealOnArrive = true;
+            go(at('reveal'));
+          }
+        },
       }, h('span', {}, 'Reveal video'), counted && price('card')));
   }
 
@@ -500,7 +570,7 @@
       h('div', { class: 'drip-card-actions' },
         parts.stash && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
-          onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); },
+          onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); coach.did(saved ? 'unstash' : 'stash'); },
         }, ...stash.nodes),
         h('button', {
           class: 'drip-b drip-b-gray drip-next', disabled: parts.cards === 'limited' && sand.tokens.rec < 1,
@@ -509,10 +579,11 @@
               if (!Drip.revealNext(sand, video.id, pool()).ok) refill();
               return sand.current && sand.current.id !== video.id ? sand.current : null;
             };
-            if (deals()) animate(DripReveal.next, find, 'next');
+            if (deals()) animate(DripReveal.next, find, 'next', 'next');
             else {
               find();
               drawHome();
+              coach.did('next');
             }
           },
         }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), parts.cards === 'limited' && price('card')),
@@ -520,8 +591,11 @@
           class: 'drip-b drip-b-gray drip-pass', 'aria-label': 'Pass', title: "Pass. It's free, and this video won't come back.",
           onclick: () => {
             Drip.resolveCurrent(sand, 'pass', video.id);
-            if (deals()) animate(DripReveal.pass, () => null, 'reveal');
-            else drawHome();
+            if (deals()) animate(DripReveal.pass, () => null, 'reveal', 'pass');
+            else {
+              drawHome();
+              coach.did('pass');
+            }
           },
         }, icon('x'))));
   }
@@ -552,8 +626,9 @@
    * @param {(o: any) => Promise<boolean | void>} run
    * @param {() => any} find
    * @param {string} focusKey The button keyboard focus goes to afterwards, if the tour had it: watch, next, or reveal.
+   * @param {string} action What coach.js is told once it's done: reveal, next, or pass.
    */
-  async function animate(run, find, focusKey) {
+  async function animate(run, find, focusKey, action) {
     const root = /** @type {HTMLElement | null} */ (stage.querySelector('#drip-home'));
     const page = root?.querySelector('.drip-page');
     if (!root || !page || moving) return;
@@ -574,6 +649,7 @@
         moving = false;
         drawHome();
         if (focused && !stage.contains(document.activeElement)) /** @type {HTMLElement | null} */ (stage.querySelector(`.drip-${focusKey}`))?.focus();
+        coach.did(action);
       }
     }
   }
@@ -592,10 +668,11 @@
 
   function reveal() {
     const find = () => (!sand.current && Drip.reveal(sand, pool()).ok ? sand.current : null);
-    if (deals() && !sand.current) animate(DripReveal.reveal, find, 'watch');
+    if (deals() && !sand.current) animate(DripReveal.reveal, find, 'watch', 'reveal');
     else {
       find();
       drawHome();
+      coach.did('reveal');
     }
   }
 
@@ -613,14 +690,22 @@
     return undefined;
   }
 
+  /**
+   * The reveal step opens on the home page and waits for Reveal video, so the visitor deals the first card themselves
+   * (Jesse, 2026-10-31: Curated's tour "just start[s] in the middle" when the step dealt one on arrival). Reveal video
+   * pressed on step 1 deals on arriving here, since that press already asked for it.
+   */
   function showReveal() {
-    const dealsOne = !sand.current && (parts.cards !== 'limited' || sand.tokens.rec > 0);
-    if (dealsOne && !deals()) Drip.reveal(sand, pool());
     drawHome();
-    // Arriving with no card up, the step deals one, so the first thing it shows is a reveal.
-    if (dealsOne && deals()) later(reveal, 250);
+    if (revealOnArrive) {
+      revealOnArrive = false;
+      later(reveal, 250);
+    }
     return undefined;
   }
+
+  /** Set by step 1's Reveal video, which moves the tour here and then deals. */
+  let revealOnArrive = false;
 
   // Step 3: a video playing, with the pill as watch.js draws it. The minutes drain 90 times faster than real ones.
 
@@ -752,7 +837,11 @@
         if (isPlaying) {
           stop();
           draw();
-        } else play();
+          coach.did('pause');
+        } else {
+          play();
+          if (isPlaying) coach.did('play');
+        }
       },
     });
     box.append(button, h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
@@ -885,11 +974,14 @@
       else stage.prepend(wrap);
     };
 
-    const again = () => h('button', { type: 'button', class: 'tour-again', onclick: () => {
+    const lockAgain = () => {
       sand.watchSecondsLeft = 0;
       sand.unlocked = [];
       raise();
-    } }, 'Show the lock again');
+      coach.did('lock');
+    };
+    bringLock = lockAgain;
+    const again = () => h('button', { type: 'button', class: 'tour-again', onclick: lockAgain }, 'Show the lock again');
 
     /**
      * The stage holds its height while the water moves, so nothing under it jumps mid-animation. Once the lock is gone,
@@ -905,7 +997,11 @@
     const drain = () => {
       const lock = /** @type {HTMLElement} */ (stage.querySelector('#drip-lock'));
       stopRings();
-      const p = player({ autoplay: true, onEmpty: () => lastDrop(raise) });
+      // The lock comes back on its own when the minutes run out, and its callouts start over with it.
+      const p = player({ autoplay: true, onEmpty: () => lastDrop((x) => {
+        raise(x);
+        coach.did('lock');
+      }) });
       setUnder(p.el, p);
       if (reducedMotion()) lift(lock);
       else {
@@ -942,11 +1038,13 @@
       if (reducedMotion()) {
         home();
         lift(lock);
+        coach.did('done');
         return;
       }
       leaveRings(panel, button, e);
       later(() => {
         home();
+        coach.did('done');
         lock.classList.add('is-surfacing');
         later(() => lift(lock), 1000);
       }, 700);
@@ -966,17 +1064,18 @@
           drain();
           // An unlocked video never runs out, so the lock only comes back from here.
           stage.append(again());
+          coach.did('unlock');
         } else {
           note = res.error === 'reason-required' ? 'Write a few words about why.' : "You've used all of today's unlocks.";
           redraw();
         }
       };
       const unlocks = needLeft > 0 && !reasonOpen
-        ? h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = true; redraw(); stage.querySelector('textarea')?.focus(); } }, `I need this one · ${needLeft} left`)
+        ? h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = true; redraw(); stage.querySelector('textarea')?.focus(); coach.did('reason'); } }, `I need this one · ${needLeft} left`)
         : needLeft > 0
           ? h('div', { class: 'drip-reason' }, reason,
             h('div', { class: 'drip-reason-row' },
-              h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = false; note = ''; redraw(); } }, 'Cancel'),
+              h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = false; note = ''; redraw(); coach.did('cancel'); } }, 'Cancel'),
               h('button', { class: 'drip-b drip-b-gray', onclick: unlock }, icon('unlock'), h('span', {}, 'Unlock this video'))))
           : h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`);
       return h('div', { class: 'drip-lock-panel', role: 'group', 'aria-label': 'The lock' },
@@ -1028,6 +1127,7 @@
       const lockPanel = button.closest('.drip-lock-panel');
       if (reducedMotion() || !lockPanel) {
         drain();
+        coach.did('lockadd');
         return;
       }
       adding = true;
@@ -1038,6 +1138,7 @@
         if (motion !== m) return;
         drain();
         if (pillGlass?.isConnected) DripPour.refill(pillGlass, PILL_GLASS_PX, DripGlass.fraction(sand), 180);
+        coach.did('lockadd');
       });
     };
 

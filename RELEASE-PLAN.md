@@ -21,7 +21,7 @@ Jesse's picks from a review of the Settings page. In this order, because the thr
 3. **Quiet hours.** A time range with no spending drops, like 11pm to 6am. Open: whether it stops a video already playing or only new drops, and how it meets Q6 (turning it off loosens a limit).
 4. **Channel allow and block lists.** Allowed channels cost nothing; blocked channels never come up in a reveal. Open: whether an allowed channel skips cards, drops, or both, and whether channels get added from the reveal card, Settings, or both. Allowing a channel loosens a limit, so Q6 applies.
 5. **Export, import, and reset.** A JSON file of settings, stash, and log, and a way back to defaults. Reset was dropped on 2026-10-06 because it handed back a day's tokens (Status, above). So none of the three may touch today's balances, and imported or reset settings go through `updateSettings`, so loosening still waits for the reset. Open: whether that's enough, and whether reset clears the log.
-6. **Tour callouts.** See "Welcome tour" in IDEAS.md. Its own `/design-variants` round.
+6. **Tour callouts.** See "Welcome tour" in IDEAS.md. Its own `/design-variants` round. Built 2026-11-02 from three rounds: Jesse picked H (DESIGN.md, "Tour callouts as built").
 
 Each feature starts with Jesse's answers to its open questions, then gets its own PR. The rest of what came up is under "After 1.0" in IDEAS.md.
 
