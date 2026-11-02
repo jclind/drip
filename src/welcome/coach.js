@@ -35,7 +35,9 @@
   /**
    * `at` is what the note sits beside (or the spotlight lights); `point`, when given, is the part its arrow ends on.
    * `alt` is where it goes when none of `sides` fits, as on a phone, where a side note would cover the next thing to read.
-   * @typedef {{ at: string, point?: string, say: (c: Ctx) => string, sides?: Side[], alt?: { at: string, sides: Side[] } }} Callout
+   * `go` is a button on the stage that also moves the tour on from here, like Reveal video after +15m, which G and H's
+   * ring goes to instead of the tour's Next.
+   * @typedef {{ at: string, point?: string, say: (c: Ctx) => string, sides?: Side[], alt?: { at: string, sides: Side[] }, go?: string }} Callout
    */
   /**
    * A stop with `until` waits for that action. Doing it shows `then`, or, with no `then` (or one whose `need` is false),
@@ -151,7 +153,11 @@
       { at: SEL.drops, say: (c) => `Your drops. New ones come at ${c.resetLabel()}.`, sides: STATS_SIDES },
       {
         at: SEL.add, say: (c) => `Press +${c.dropTime()} to spend one.`, sides: ['below', 'left'], until: ['add'],
-        then: { at: SEL.time, point: SEL.glass, say: (c) => `${c.dropTime()} in your glass. ${dropsLeft(c)}`, sides: TIME_SIDES },
+        // Reveal video is what comes next, and pressing it moves the tour on and deals.
+        then: {
+          at: SEL.time, point: SEL.glass, sides: TIME_SIDES, go: SEL.revealBtn,
+          say: (c) => `${c.dropTime()} in your glass. ${dropsLeft(c)}${c.stage.querySelector(SEL.revealBtn) ? ' Next, press Reveal video.' : ''}`,
+        },
       },
     ],
     reveal: [
@@ -166,7 +172,8 @@
         at: SEL.cardActions, point: SEL.stash, ready: dealt, sides: ['left', 'right'], alt: { at: SEL.thumb, sides: ['over'] }, say: cardChoices,
       },
       {
-        at: SEL.watch, ready: dealt, sides: ['right'], alt: { at: SEL.thumb, sides: ['over'] },
+        // Watch opens the player, the next step.
+        at: SEL.watch, ready: dealt, sides: ['right'], alt: { at: SEL.thumb, sides: ['over'] }, go: SEL.watch,
         say: (c) => (c.clock() ? 'Or watch it, and your minutes start.' : 'Or watch it. No clock runs while you watch.'),
       },
     ],
@@ -243,8 +250,15 @@
   let stops = [];
   let at = 0;
   let thenShown = false;
-  /** The stops whose action the visitor has done this step, so coming back to one shows its answer, not the ask again. */
-  const answered = new Set();
+  /**
+   * The stops whose action the visitor has done, so coming back to one shows its answer, not the ask again. Steps 1
+   * and 2 keep theirs across steps, since what was done there (a drop spent, a card dealt) is still on the page.
+   * The player and the lock redraw fresh each time, so theirs start over.
+   * @type {Set<number>}
+   */
+  let answered = new Set();
+  /** @type {Record<string, Set<number>>} */
+  const kept = { home: new Set(), reveal: new Set() };
   /** Step 1's Reveal video already asked for a card, so step 2 says nothing until it's dealt. */
   let waiting = false;
   /** D's current note. @type {Callout | null} */
@@ -258,6 +272,10 @@
   let glideTimer = 0;
   /** While a note fades out to move, it stays where it is: frame() leaves it alone until the new one is placed. */
   let fading = false;
+  /** Where the shown note sits. @type {{ at: string, x: number, y: number } | null} */
+  let held = null;
+  /** A note waiting to come in: frame() turns the layer on once it has placed it, never before. */
+  let revealing = false;
 
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -295,8 +313,16 @@
     if (!next) {
       clearTimeout(fadeTimer);
       fading = false;
+      revealing = false;
       layer.classList.remove('is-on');
       shown = null;
+      return;
+    }
+    // Placed but waiting for the stage to settle: it comes in with the newest words.
+    if (revealing && shown?.at === next.at) {
+      shown = next;
+      text.textContent = next.text;
+      count.textContent = next.count;
       return;
     }
     // Mid-fade, the note that comes in is whatever's newest when the fade ends. Starting over here would leave a
@@ -321,9 +347,8 @@
         text.textContent = shown.text;
         count.textContent = shown.count;
         placed = '';
+        revealing = true;
         frame();
-        drawLine();
-        layer.classList.add('is-on');
       }, reduced() ? 0 : wasOn ? 170 : 120);
       return;
     }
@@ -336,8 +361,8 @@
     }
     shown = next;
     // Placed before it shows, so it never appears where the last one was.
+    if (!layer.classList.contains('is-on')) revealing = true;
     frame();
-    layer.classList.add('is-on');
   }
 
   /**
@@ -439,10 +464,10 @@
       return;
     }
     const main = box(shown.at);
-    // The tour's own animations (a card dealt, a drop poured, the lock rising) move things around: the callout holds
-    // still until they're done, then goes to where things settled.
+    // The tour's own animations (a card dealt, a drop poured, the lock rising or leaving) move things around: the
+    // callout steps out of the way until they're done, then comes back where things settled.
     if (!main || ctx.busy()) {
-      flag('is-away', !main);
+      flag('is-away', true);
       return;
     }
     flag('is-away', false);
@@ -460,17 +485,23 @@
     // The arrow ends on `point`, or on the target itself when the chip moved to its alt.
     const pointRect = co?.point ? ctx.stage.querySelector(co.point)?.getBoundingClientRect() : altBox ? main : null;
     const key = [r.left, r.top, r.width, r.height, s.left, s.top, s.width, s.height, w, h, pointRect?.left ?? 0, pointRect?.top ?? 0].map(Math.round).join();
-    if (key === placed) return;
+    if (key === placed) return comeIn();
     // Settling after an animation (not a first draw) slides there instead of jumping.
     if (placed && !layer.classList.contains('is-gliding') && mode === 'spot') glide();
     placed = key;
+    // A shown note ignores its target creeping a few pixels (the pill's minutes changing width), so it never twitches.
+    if (!revealing && held && held.at === shown.at && Math.abs(p.x - held.x) <= 12 && Math.abs(p.y - held.y) <= 12) {
+      p.x = held.x;
+      p.y = held.y;
+    }
+    held = { at: shown.at, x: p.x, y: p.y };
     chip.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
     chip.dataset.side = p.side;
     if (mode === 'spot') {
       const pad = 8;
       Object.assign(veil.style, { left: `${s.left}px`, top: `${s.top}px`, width: `${s.width}px`, height: `${s.height}px` });
       Object.assign(hole.style, { left: `${r.left - s.left - pad}px`, top: `${r.top - s.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
-      return;
+      return comeIn();
     }
     // The line: from the chip's near edge to just short of the part it points at, bowed a little.
     const pr = pointRect || r;
@@ -490,12 +521,29 @@
     const head = (/** @type {number} */ turn) => `${tx - 7 * Math.cos(ang + turn)},${ty - 7 * Math.sin(ang + turn)}`;
     line.setAttribute('d', `M${fx},${fy} Q${mx},${my} ${tx},${ty}`);
     tip.setAttribute('d', `M${head(0.5)} L${tx},${ty} L${head(-0.5)}`);
+    comeIn();
   }
 
-  /** A stop that can show now: whatever it needs is on the stage. @param {number} i */
+  /** Shows a note frame() has just placed for the first time, drawing its line from the chip. */
+  function comeIn() {
+    if (!revealing) return;
+    revealing = false;
+    if (mode !== 'spot') drawLine();
+    layer.classList.add('is-on');
+  }
+
+  /** Whether stop i shows its answer: its action was done, and the answer applies. @param {number} i */
+  function showsThen(i) {
+    const then = stops[i]?.then;
+    return answered.has(i) && !!then && (!then.need || (!!ctx && then.need(ctx)));
+  }
+
+  /** A stop that can show now: whatever it, or its answer once done, points at is on the stage. @param {number} i */
   function open(i) {
     const stop = stops[i];
-    return !!stop && !!ctx && (!stop.ready || stop.ready(ctx)) && !!ctx.stage.querySelector(stop.at);
+    if (!stop || !ctx) return false;
+    if (showsThen(i)) return !!ctx.stage.querySelector(/** @type {Callout} */ (stop.then).at);
+    return (!stop.ready || stop.ready(ctx)) && !!ctx.stage.querySelector(stop.at);
   }
 
   /** Next (1) or Back (-1) through the stops. @param {1 | -1} dir @returns {boolean} whether it moved */
@@ -507,8 +555,7 @@
     at = i;
     waiting = false;
     // A stop already done shows its answer.
-    const then = stops[i].then;
-    thenShown = answered.has(i) && !!then && (!then.need || !!ctx && then.need(ctx));
+    thenShown = showsThen(i);
     render();
     return true;
   }
@@ -526,7 +573,9 @@
       const el = ctx.stage.querySelector(sel);
       if (el) return el;
     }
-    return document.getElementById('next');
+    const co = current();
+    const go = co?.go ? ctx.stage.querySelector(co.go) : null;
+    return go || document.getElementById('next');
   }
 
   /** Puts the ring on ringTarget(), when this variant shows it now. */
@@ -559,7 +608,8 @@
     /**
      * A step started. With `wait`, it says nothing until the next thing the visitor does lands (step 1's Reveal video,
      * whose card is dealt on arriving here).
-     * @param {string} id @param {Ctx} c @param {{ wait?: boolean }} [opts]
+     * With `fromEnd` (Back from the next step), it starts on the step's last stop that can show.
+     * @param {string} id @param {Ctx} c @param {{ wait?: boolean, fromEnd?: boolean }} [opts]
      */
     start(id, c, opts = {}) {
       if (!mode) return;
@@ -572,7 +622,7 @@
       stepId = id;
       at = 0;
       thenShown = false;
-      answered.clear();
+      answered = kept[id] || new Set();
       waiting = !!opts.wait;
       stops = (STOPS[id] || []).filter((s) => !s.need || s.need(c));
       note = NOTES[id]?.arrive?.(c) || null;
@@ -584,6 +634,18 @@
       layer.classList.remove('is-instant');
       shown = null;
       fading = false;
+      revealing = false;
+      flag('is-away', false);
+      if (mode !== 'notes' && !waiting) {
+        if (opts.fromEnd) {
+          at = stops.length - 1;
+          while (at > 0 && !open(at)) at--;
+        } else {
+          while (at < stops.length - 1 && !open(at)) at++;
+        }
+        at = Math.max(0, at);
+        thenShown = showsThen(at);
+      }
       clearTimeout(swapTimer);
       clearTimeout(fadeTimer);
       chip.classList.remove('is-swapping');

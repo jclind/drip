@@ -329,6 +329,9 @@
     stage.animate([{ height: `${before}px` }, { height: `${after}px` }], { duration: 260, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' });
   }
 
+  /** Set by Back and the left arrow, so the step they go back to starts on its last callout. */
+  let backing = false;
+
   /** @param {number} n */
   function go(n) {
     // A reveal animation still running belongs to the old step's screen, which is about to go.
@@ -348,7 +351,8 @@
     });
     renderControls();
     // Step 1's Reveal video deals on arriving at step 2, so step 2's callout waits for that card.
-    coach.start(stepId(), coachCtx, { wait: dealing });
+    coach.start(stepId(), coachCtx, { wait: dealing, fromEnd: backing });
+    backing = false;
   }
 
   function renderControls() {
@@ -367,7 +371,10 @@
   $('back').addEventListener('click', () => {
     if (coach.back()) return;
     if (step === 0) toChoice();
-    else go(step - 1);
+    else {
+      backing = true;
+      go(step - 1);
+    }
   });
   $('skip').addEventListener('click', () => go(STEPS.length - 1));
   $('next').addEventListener('click', () => {
@@ -378,7 +385,10 @@
   $('tour').addEventListener('keydown', (e) => {
     if (/** @type {Element} */ (e.target).closest('textarea, input')) return;
     if (e.key === 'ArrowRight' && !coach.next() && step < STEPS.length - 1) go(step + 1);
-    else if (e.key === 'ArrowLeft' && !coach.back() && step > 0) go(step - 1);
+    else if (e.key === 'ArrowLeft' && !coach.back() && step > 0) {
+      backing = true;
+      go(step - 1);
+    }
   });
 
   // Steps 1 and 2: the home page, as home.js draws it.
