@@ -365,6 +365,18 @@ html[dark] #drip-lock {
   margin-top: 0;
 }
 
+/* The link into Settings, under a hairline, so it reads as a footnote to the lock. */
+#drip-lock .drip-lock-foot {
+  align-self: stretch;
+  margin-top: 18px;
+  padding-top: 10px;
+  border-top: 1px solid var(--drip-line);
+}
+
+#drip-lock .drip-lock-foot .drip-lock-link {
+  margin-top: 0;
+}
+
 #drip-lock .drip-reason-row .drip-i-unlock {
   width: 15px;
   height: 18px;
@@ -1187,6 +1199,37 @@ html[dark] #drip-home .drip-out-sea {
   display: flex;
   gap: 8px;
   margin-top: 16px;
+}
+
+/* The link into Settings under the card's buttons, gray so it doesn't compete with them. */
+#drip-home .drip-card-foot {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+#drip-home .drip-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--drip-muted);
+  background: none;
+  cursor: pointer;
+}
+
+#drip-home .drip-card-link:hover {
+  color: var(--drip-text);
+}
+
+#drip-home .drip-card-link .drip-i {
+  width: 14px;
+  height: 14px;
 }
 
 #drip-home .drip-card-save {

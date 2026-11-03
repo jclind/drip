@@ -794,5 +794,30 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
   renderHistory();
   renderReasons();
   // The sections didn't exist when Chrome looked for the #fragment, so options.html#cards goes there now.
-  if (location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
+  if (location.hash) arrive(decodeURIComponent(location.hash.slice(1)), false);
 });
+
+/**
+ * A link from the lock, a card, or the popup (RELEASE-PLAN.md, item 2): scroll to its section and flash the header
+ * once, so it's clear which part the link meant.
+ * @param {string} id @param {boolean} smooth
+ */
+function arrive(id, smooth) {
+  const section = document.getElementById(id);
+  if (!section || !section.classList.contains('part')) return;
+  if (location.hash !== `#${id}`) history.replaceState(null, '', `#${id}`);
+  section.scrollIntoView({ block: 'start', behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' });
+  const head = section.querySelector('.part-head');
+  if (!head) return;
+  head.classList.remove('is-arriving');
+  void (/** @type {HTMLElement} */ (head)).offsetWidth;
+  head.classList.add('is-arriving');
+  head.addEventListener('animationend', () => head.classList.remove('is-arriving'), { once: true });
+}
+
+// A link used while Settings is already open: the worker brought this tab forward, and this page goes there itself,
+// so a change not yet saved stays.
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg && msg.type === 'settingsGoto' && typeof msg.section === 'string') arrive(msg.section, true);
+});
+window.addEventListener('hashchange', () => arrive(decodeURIComponent(location.hash.slice(1)), true));

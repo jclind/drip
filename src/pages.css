@@ -20,6 +20,7 @@
   --primary-hover: #272727;
   --glass-line: #909090;
   --focus: #065fd4;
+  --flash: rgba(6, 95, 212, 0.1);
   color-scheme: light dark;
 }
 
@@ -41,6 +42,7 @@
     --primary-hover: #e5e5e5;
     --glass-line: #d9d9d9;
     --focus: #3ea6ff;
+    --flash: rgba(66, 165, 246, 0.16);
   }
 }
 

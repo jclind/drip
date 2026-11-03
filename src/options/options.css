@@ -43,6 +43,28 @@
   align-items: center;
   gap: 14px;
   padding: 14px 0;
+  border-radius: 12px;
+}
+
+/* Arriving from a link on the lock, a card, or the popup: the section's header flashes blue once. The shadow widens
+   the tint past the header's edges without moving anything. */
+.part {
+  scroll-margin-top: 24px;
+}
+
+.part-head.is-arriving {
+  animation: part-arrive 1.6s ease-out;
+}
+
+@keyframes part-arrive {
+  0%, 30% {
+    background-color: var(--flash);
+    box-shadow: 0 0 0 10px var(--flash);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 10px transparent;
+  }
 }
 
 .part-icon {
@@ -805,6 +827,18 @@ button.col.is-selected .letter {
 
   .savebar {
     animation: none;
+  }
+
+  /* No fade: the tint holds, then goes. */
+  .part-head.is-arriving {
+    animation: part-arrive-still 1.6s steps(1, end);
+  }
+}
+
+@keyframes part-arrive-still {
+  0% {
+    background-color: var(--flash);
+    box-shadow: 0 0 0 10px var(--flash);
   }
 }
 
