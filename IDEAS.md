@@ -87,6 +87,7 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 
 - A different allowance on weekends. Same as "Different allowances per weekday" under Earning tokens.
 - Switches for what drip hides: comments, Shorts, the sidebar menu, the end screen. Unhook is built on these. Each one is a leak someone can turn on at 1am, so maybe only "always show comments".
+- Comments open when the video ends (Jesse, 2026-11-02: "I often find myself with such a bad attention span that I end up scrolling the comments while I am watching the video. I'm already on youtube, I should be able to give my full attention to a video."). Today's "Show comments" button would wait, in gray, saying "Comments open when the video ends", with no countdown. Claude's suggestions, not decided: it opens at the video's end or after about 90% watched, so credits don't hold it back; seeking to the end opens it too, a deliberate skip; a video already finished once opens at once; live streams are left alone. A switch, on by default, in every mode: on applies at once, and off waits for the reset (Q6), like the bell.
 - A cooldown and a typed reason before pausing drip (under Friction).
 - A "Reduce motion" switch that overrides the system setting.
 - A page Chrome opens on uninstall (`chrome.runtime.setUninstallURL`) with one question, "Why are you leaving?". It needs a small hosted page (Claude's suggestion, 2026-10-16, with the Settings feedback link).
