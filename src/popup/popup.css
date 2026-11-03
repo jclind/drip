@@ -68,6 +68,25 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The counts are buttons into Settings. The padding gives the hover fill room, and the margin takes it back, so the
+   layout is the same as plain text. */
+button.count,
+button.sub-count {
+  margin: -3px -8px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: none;
+}
+
+button.count {
+  color: inherit;
+}
+
+button.count:hover,
+button.sub-count:hover {
+  background: var(--chip);
+}
+
 .count .drip-i {
   width: 20px;
   height: 22px;

@@ -28,7 +28,7 @@ function sortKeys(value) {
  *   dev: the checkout has dev/ENABLED. panel: false for a store build, which has no dev panel. stores: storage kept
  *   from an earlier worker, as when Chrome stops the worker and starts it again.
  */
-function worker(initial = undefined, { dev = false, panel = true, stores = undefined } = {}) {
+function worker(initial = undefined, { dev = false, panel = true, stores = undefined, contexts = [] } = {}) {
   /** @type {Record<string, any>} */
   const store = stores ? stores.local : initial === undefined ? {} : { drip: structuredClone(initial) };
   /** @type {Record<string, any>} */
@@ -52,6 +52,10 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   let onStartup = null;
   /** @type {string[]} */
   const opened = [];
+  /** @type {{url: string}[]} */
+  const created = [];
+  /** @type {any[]} What the worker did to existing tabs and windows, and told extension pages. */
+  const calls = [];
   const chrome = {
     runtime: {
       getURL: (/** @type {string} */ p) => p,
@@ -65,7 +69,10 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
       onInstalled: { addListener: (/** @type {Function} */ fn) => { onInstalled = fn; } },
       onStartup: { addListener: (/** @type {Function} */ fn) => { onStartup = fn; } },
       reload() {},
+      getContexts: async () => contexts,
+      sendMessage: async (/** @type {any} */ msg) => { calls.push(['broadcast', msg]); },
     },
+    windows: { update: async (/** @type {number} */ id, /** @type {any} */ props) => { calls.push(['window', id, props]); } },
     storage: {
       local: {
         // Chrome returns stored objects with their keys sorted.
@@ -90,7 +97,10 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
         },
       },
     },
-    tabs: { create: (/** @type {{url: string}} */ opts) => { opened.push(opts.url); } },
+    tabs: {
+      create: (/** @type {{url: string}} */ opts) => { opened.push(opts.url); created.push(opts); },
+      update: async (/** @type {number} */ id, /** @type {any} */ props) => { calls.push(['tab', id, props]); },
+    },
     action: { setIcon: async (/** @type {any} */ icon) => {
       if (failIcon > 0) { failIcon--; throw new Error('setIcon failed'); }
       icons.push(icon);
@@ -133,7 +143,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
     }
     await vm.runInContext('queue', context);
   };
-  return { send, install, restart, opened, store, session, icons,
+  return { send, install, restart, opened, created, calls, store, session, icons,
     advance,
     startup: () => /** @type {Function} */ (onStartup)(), idle: () => vm.runInContext('queue', context),
     failIcons: (n) => { failIcon = n; }, failDrawing: (n) => { failDraw = n; },
@@ -625,4 +635,34 @@ test('Undo can go over the stash cap, but not past the highest cap Settings allo
   await w.send({ type: 'updateSettings', changes: { stashMax: 1 } });
   for (let i = 0; i < 60; i++) await w.send({ type: 'addBacklog', video: { id: `v${i}`, title: '' }, index: 0 });
   assert.equal(w.store.drip.backlog.length, 50);
+});
+
+const OPTIONS = 'src/options/options.html';
+
+test('openSettings opens Settings at the section in a new tab', async () => {
+  const w = worker();
+  assert.equal((await w.send({ type: 'openSettings', section: 'watch' })).ok, true);
+  assert.deepEqual(w.created.map((c) => ({ ...c })), [{ url: `${OPTIONS}#watch` }]);
+  assert.equal(w.writes(), 0);
+});
+
+test('openSettings opens the top of Settings for an unknown or empty section', async () => {
+  const w = worker();
+  await w.send({ type: 'openSettings', section: 'nope' }, PAGE);
+  await w.send({ type: 'openSettings', section: '' }, PAGE);
+  assert.deepEqual(w.created.map((c) => ({ ...c })), [{ url: OPTIONS }, { url: OPTIONS }]);
+});
+
+test('openSettings brings an open Settings tab forward and tells it where to go, without reloading it', async () => {
+  const w = worker(undefined, { contexts: [
+    { contextType: 'TAB', tabId: 7, windowId: 3, documentUrl: `chrome-extension://drip/src/welcome/welcome.html` },
+    { contextType: 'TAB', tabId: 9, windowId: 4, documentUrl: `${OPTIONS}#day` },
+  ] });
+  assert.equal((await w.send({ type: 'openSettings', section: 'cards' })).ok, true);
+  assert.deepEqual(w.created, []);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.calls)), [
+    ['tab', 9, { active: true }],
+    ['window', 4, { focused: true }],
+    ['broadcast', { type: 'settingsGoto', section: 'cards' }],
+  ]);
 });
