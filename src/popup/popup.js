@@ -14,29 +14,45 @@ const GLASS_PX = 34;
 /** @type {SVGSVGElement | null} */
 let glassEl = null;
 
+/** What the stats showed last. A tick saves state every few seconds while a video plays, and redrawing the count
+ * buttons each time would drop keyboard focus and a click caught between mousedown and mouseup (Codex, 2026-11-02). */
+let shown = '';
+
 /** @param {any} state */
 function show(state) {
   const fraction = DripGlass.fraction(state);
   if (!glassEl) glassEl = DripGlass.make(fraction, GLASS_PX);
   else DripGlass.set(glassEl, fraction, GLASS_PX);
+  const { watch, rec } = state.tokens;
+  const view = JSON.stringify([state.settings.clock, state.settings.cards, Drip.modeOf(state.settings), watch, rec, Drip.formatMinutes(state.watchSecondsLeft)]);
+  if (view === shown) return;
+  shown = view;
+  const stats = /** @type {HTMLElement} */ (document.getElementById('stats'));
+  // When the numbers do change, focus stays on the same count.
+  const focused = stats.contains(document.activeElement) ? document.activeElement?.getAttribute('data-k') : null;
+  draw(state, stats);
+  if (focused) /** @type {HTMLElement | null} */ (stats.querySelector(`[data-k="${focused}"]`))?.focus();
+}
+
+/** @param {any} state @param {HTMLElement} stats */
+function draw(state, stats) {
   const { h, icon } = DripPage;
   const { watch, rec } = state.tokens;
   // Each count opens its part of Settings: drops at Watch time, cards at Cards (RELEASE-PLAN.md, item 2).
   /** @param {number} n @param {'drop' | 'card'} token */
   const count = (n, token) => h('button', {
-    type: 'button', class: `count${n ? '' : ' is-zero'}`, title: token === 'drop' ? 'Watch time settings' : 'Cards settings',
+    type: 'button', class: `count${n ? '' : ' is-zero'}`, 'data-k': token, title: token === 'drop' ? 'Watch time settings' : 'Cards settings',
     onclick: () => openSettings(token === 'drop' ? 'watch' : 'cards'),
   }, icon(token, `drip-token-${token}`), h('span', {}, String(n)), h('span', { class: 'sr' }, n === 1 ? ` ${token}` : ` ${token}s`));
   const clock = state.settings.clock !== false;
   const cards = state.settings.cards === 'limited';
-  const stats = /** @type {HTMLElement} */ (document.getElementById('stats'));
   // Without the clock the popup names the mix. Counted cards are a line under it, not a lone number (Jesse, 2026-10-15).
   if (!clock) {
     const name = { quiet: 'Quiet', curated: 'Curated', full: 'Full drip' }[/** @type {string} */ (Drip.modeOf(state.settings))] || 'Custom';
     stats.replaceChildren(h('div', { class: 'top' }, h('div', { class: 'time-block' },
       h('div', { class: 'time' }, name),
       cards
-        ? h('button', { type: 'button', class: `sub sub-count${rec ? '' : ' is-zero'}`, title: 'Cards settings', onclick: () => openSettings('cards') },
+        ? h('button', { type: 'button', class: `sub sub-count${rec ? '' : ' is-zero'}`, 'data-k': 'card', title: 'Cards settings', onclick: () => openSettings('cards') },
           icon('card', 'drip-token-card'), `${rec} ${rec === 1 ? 'card' : 'cards'} left today`)
         : h('div', { class: 'sub' }, "YouTube's feeds are hidden."))));
     return;
