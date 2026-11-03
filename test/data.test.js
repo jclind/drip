@@ -127,3 +127,37 @@ test('reset waits for the reset when a default loosens', () => {
   assert.deepEqual(res.pending, { watchTokensPerDay: 4 });
   assert.equal(state.settings.watchTokensPerDay, 2);
 });
+
+test('import and reset leave today\'s balances alone, over a lowered cap and on the first day (Codex)', () => {
+  const state = settled();
+  Object.assign(state.settings, { watchTokensPerDay: 10 });
+  state.tokens = { watch: 15, rec: 20 };
+  D.resetData(state, NOW);
+  assert.equal(state.settings.watchTokensPerDay, 4);
+  assert.deepEqual(state.tokens, { watch: 15, rec: 20 });
+  D.importData(state, { app: 'drip', format: 1, settings: { watchTokensPerDay: 1 } }, NOW);
+  assert.deepEqual(state.tokens, { watch: 15, rec: 20 });
+
+  const fresh = D.initialState(NOW);
+  D.updateSettings(fresh, { watchTokensPerDay: 0 }, NOW);
+  assert.equal(fresh.tokens.watch, 0);
+  D.resetData(fresh, NOW);
+  assert.equal(fresh.settings.watchTokensPerDay, 4, 'the first day applies everything at once');
+  assert.equal(fresh.tokens.watch, 0, 'but hands back no drops');
+});
+
+test('the card showing counts as saved when import stashes it, and stops when reset empties the stash (Codex)', () => {
+  const imported = settled();
+  D.reveal(imported, [video('a')]);
+  D.importData(imported, { app: 'drip', format: 1, backlog: [video('a')] }, NOW);
+  assert.equal(D.logDay(imported).saved, 1);
+
+  const reset = settled();
+  D.reveal(reset, [video('a')]);
+  D.resolveCurrent(reset, 'save', 'a', NOW);
+  assert.equal(D.logDay(reset).saved, 1);
+  D.resetData(reset, NOW);
+  assert.equal(D.logDay(reset).saved, 0);
+  D.resolveCurrent(reset, 'pass', 'a', NOW);
+  assert.equal(D.cardsLine(D.logDay(reset)), 'Of 1 card, 1 passed.');
+});

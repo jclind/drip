@@ -962,6 +962,18 @@
   }
 
   /**
+   * updateSettings, but today's drops and cards stay as they were. Settings' Save caps them at a lowered limit and moves
+   * them on the first day, but import and reset promise not to touch them (Codex, 2026-11-02). The next reset caps them.
+   * @param {State} state @param {unknown} changes @param {number} now
+   */
+  function settingsKeepingBalances(state, changes, now) {
+    const tokens = { ...state.tokens };
+    const result = updateSettings(state, changes, now);
+    state.tokens = tokens;
+    return result;
+  }
+
+  /**
    * Import: saves the file's settings through updateSettings, adds its stash videos that aren't already stashed (up to
    * the stash's size), and adds its log days that this install doesn't have, before today only. Nothing here replaces or
    * removes what's already there.
@@ -971,7 +983,7 @@
     const file = /** @type {Record<string, any>} */ (raw);
     if (!file || typeof file !== 'object' || file.app !== 'drip') return { ok: false, error: 'not-drip' };
     if (file.format !== EXPORT_FORMAT) return { ok: false, error: 'bad-format' };
-    const settings = updateSettings(state, file.settings, now);
+    const settings = settingsKeepingBalances(state, file.settings, now);
     let added = 0;
     let skipped = 0;
     const have = new Set(state.backlog.map((v) => v.id));
@@ -981,6 +993,8 @@
       if (state.backlog.length >= state.settings.stashMax) { skipped++; continue; }
       state.backlog.push(video);
       have.add(video.id);
+      // The card showing now counts as saved once it's stashed, as addBacklog does (Codex, 2026-11-02).
+      if (state.current && state.current.id === video.id) logDay(state).saved++;
       added++;
     }
     let days = 0;
@@ -1002,9 +1016,10 @@
    * @param {State} state @param {number} now
    */
   function resetData(state, now) {
-    const settings = updateSettings(state, { ...DEFAULT_SETTINGS }, now);
+    const settings = settingsKeepingBalances(state, { ...DEFAULT_SETTINGS }, now);
     const cleared = state.backlog.length;
-    state.backlog = [];
+    // One at a time through removeBacklog, so a saved card still showing stops counting as saved (Codex, 2026-11-02).
+    for (const video of [...state.backlog]) removeBacklog(state, video.id);
     return { ok: true, applied: settings.applied, pending: settings.pending, stashCleared: cleared };
   }
 
