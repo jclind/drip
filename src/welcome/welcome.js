@@ -59,6 +59,8 @@
   let parts = { ...Drip.MODES.full };
   /** Customize's bell switch (Q16). Not a mode part, so a mode pick leaves it alone. */
   let hideBell = settings.hideBell;
+  /** Customize's Shorts switch (Q2). Not a mode part either. */
+  let hideShorts = settings.hideShorts;
   const sand = freshState();
 
   function freshState() {
@@ -83,14 +85,15 @@
     { name: 'full', label: 'Full drip', what: `${hourDaily} of watching and ${settings.recTokensPerDay} new videos a day. The video stops when the time runs out.`,
       mini: '<span class="m-stats"><span class="m-glass"></span><span class="m-num"></span><span class="m-pip is-drop"></span><span class="m-pip is-card"></span></span><span class="m-btns"><span class="m-btn"></span><span class="m-btn gold"></span></span><span class="m-line"></span><span class="m-line"></span>' },
   ];
-  /** @type {{key: 'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash' | 'hideBell', label: string, how: () => string}[]} */
+  /** @type {{key: 'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash' | 'hideBell' | 'hideShorts', label: string, how: () => string}[]} */
   const OPTS = [
-    { key: 'feeds', label: "Hide YouTube's feeds", how: () => 'Home, Subscriptions, the sidebar, end screens, autoplay, and Shorts. Always on.' },
+    { key: 'feeds', label: "Hide YouTube's feeds", how: () => 'Home, Subscriptions, the sidebar, end screens, and autoplay. Always on.' },
     { key: 'searchCap', label: 'Stop search at 10 results', how: () => 'A button loads 10 more.' },
     { key: 'cards', label: 'Reveal one video at a time', how: cardsHow },
     { key: 'clock', label: 'Limit watch time', how: () => `${hourDaily} a day, in ${Drip.formatMinutes(settings.minutesPerToken * 60)} drops. The video stops when it runs out.` },
     { key: 'stash', label: 'Stash videos for later', how: () => `Up to ${settings.stashMax}, from search and watch pages.` },
     { key: 'hideBell', label: 'Hide the notification bell', how: () => 'The same in every mode.' },
+    { key: 'hideShorts', label: 'Hide Shorts', how: () => 'Off shows Shorts in search and on channels. They still open as regular videos.' },
   ];
   /**
    * What the cards switch gives: the cards as saved, or with it off, what turning it on would give. A mix saved in
@@ -142,7 +145,7 @@
         }, customizing ? 'Hide' : 'Customize'));
         if (customizing) {
           el.append(h('div', { class: 'opts' }, ...OPTS.map((o) => {
-            const on = o.key === 'feeds' || (o.key === 'hideBell' ? hideBell : o.key === 'cards' ? parts.cards !== 'off' : parts[o.key]);
+            const on = o.key === 'feeds' || (o.key === 'hideBell' ? hideBell : o.key === 'hideShorts' ? hideShorts : o.key === 'cards' ? parts.cards !== 'off' : parts[o.key]);
             return h('div', { class: 'opt' },
               h('div', { class: 'opt-text' }, o.label, h('div', { class: 'opt-sub' }, o.how())),
               h('button', {
@@ -170,7 +173,7 @@
   /**
    * Customize's switches. The one cards switch counts cards while watch time is limited and leaves them unlimited
    * otherwise, so it needs no count of its own (DESIGN.md "Modes").
-   * @param {'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash' | 'hideBell'} key
+   * @param {'feeds' | 'searchCap' | 'cards' | 'clock' | 'stash' | 'hideBell' | 'hideShorts'} key
    */
   function switchPart(key) {
     if (key === 'feeds') return;
@@ -179,6 +182,12 @@
       chrome.runtime.sendMessage({ type: 'updateSettings', changes: { hideBell } }).catch(() => {});
       drawLadder(key);
       retour();
+      return;
+    }
+    if (key === 'hideShorts') {
+      hideShorts = !hideShorts;
+      chrome.runtime.sendMessage({ type: 'updateSettings', changes: { hideShorts } }).catch(() => {});
+      drawLadder(key);
       return;
     }
     if (key === 'cards') parts.cards = parts.cards === 'off' ? (parts.clock ? 'limited' : 'unlimited') : 'off';
@@ -1213,8 +1222,10 @@
     if (!saved) return;
     const next = { searchCap: saved.searchCap, cards: saved.cards, clock: saved.clock, stash: saved.stash };
     const bell = saved.hideBell !== false;
-    if (Drip.modeOf(next) === Drip.modeOf(parts) && Drip.modeOf(parts) && bell === hideBell) return;
+    const shorts = saved.hideShorts !== false;
+    if (Drip.modeOf(next) === Drip.modeOf(parts) && Drip.modeOf(parts) && bell === hideBell && shorts === hideShorts) return;
     hideBell = bell;
+    hideShorts = shorts;
     parts = next;
     modeBase = Drip.modeOf(next) || 'full';
     drawLadder();

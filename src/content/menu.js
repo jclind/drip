@@ -1,7 +1,8 @@
 // @ts-check
 // YouTube's sidebar becomes a short menu under its menu button, on every page and in every mode (design C, Jesse
 // 2026-10-15). early.css hides the sidebar and its icon strip while <html> has data-drip-menu, and the bell while it has
-// data-drip-hide-bell. Both go on at document_start, so neither shows for a moment first. This also keeps the search
+// data-drip-hide-bell, and the Shorts shelves while it has data-drip-hide-shorts. All go on at document_start, so none
+// shows for a moment first. This also keeps the search
 // box saying "Search", since early.css hides its Ask YouTube chip.
 
 (function () {
@@ -33,6 +34,7 @@
   const root = document.documentElement;
   root.toggleAttribute('data-drip-menu', true);
   root.toggleAttribute('data-drip-hide-bell', true);
+  root.toggleAttribute('data-drip-hide-shorts', true);
 
   /**
    * @param {string} tag
@@ -150,15 +152,17 @@
   document.addEventListener('yt-navigate-finish', onPage);
   document.addEventListener('DOMContentLoaded', watchSearch);
 
-  // The bell is a setting, hidden by default (Q16). A newer storage event wins over the first read.
+  // The bell (Q16) and the Shorts shelves (Q2) are settings, hidden by default. A newer storage event wins over the
+  // first read.
   let known = false;
   /** @param {any} state */
-  function setBell(state) {
+  function setHidden(state) {
     known = true;
     root.toggleAttribute('data-drip-hide-bell', state?.settings?.hideBell !== false);
+    root.toggleAttribute('data-drip-hide-shorts', state?.settings?.hideShorts !== false);
   }
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.drip) setBell(changes.drip.newValue);
+    if (area === 'local' && changes.drip) setHidden(changes.drip.newValue);
   });
-  chrome.storage.local.get('drip').then((stored) => { if (!known) setBell(stored.drip); }).catch(() => {});
+  chrome.storage.local.get('drip').then((stored) => { if (!known) setHidden(stored.drip); }).catch(() => {});
 })();
