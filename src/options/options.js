@@ -103,6 +103,8 @@ const PARTS = [
         hint: 'Unspent drops and cards carry over up to this many days.' },
       // Q16.
       { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle' },
+      // Q2. Off brings back the shelves only. A Short still opens as a regular video.
+      { key: 'hideShorts', label: 'Hide Shorts', kind: 'toggle', hint: 'Shorts still open as regular videos.' },
     ],
   },
 ];

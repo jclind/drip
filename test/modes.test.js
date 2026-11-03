@@ -59,6 +59,21 @@ test('the bell: hidden by default, not a mode part, and showing it waits for the
   assert.equal(D.hydrate(raw, time(1, 13)).settings.hideBell, true);
 });
 
+test('Hide Shorts: on by default, not a mode part, and turning it off waits for the reset (Q2)', () => {
+  assert.equal(D.DEFAULT_SETTINGS.hideShorts, true);
+  assert.equal(D.modeOf({ ...D.DEFAULT_SETTINGS, hideShorts: false }), 'full');
+  assert.deepEqual(D.cleanSettings({ hideShorts: false }), { hideShorts: false });
+  assert.deepEqual(D.cleanSettings({ hideShorts: 'no' }), {});
+  assert.equal(D.isLoosening('hideShorts', true, false), true);
+  assert.equal(D.isLoosening('hideShorts', false, true), false);
+  const raw = structuredClone(settled());
+  delete /** @type {any} */ (raw.settings).hideShorts;
+  assert.equal(D.hydrate(raw, time(1, 13)).settings.hideShorts, true);
+  // A Short still opens as a regular video, and the bare feed still goes to the token page, whatever the setting.
+  assert.equal(D.redirectTarget('https://www.youtube.com/shorts/abc123'), 'https://www.youtube.com/watch?v=abc123');
+  assert.notEqual(D.redirectTarget('https://www.youtube.com/shorts'), '');
+});
+
 test('isLoosening: a part turned off, or cards going from a count to unlimited, waits', () => {
   for (const key of /** @type {const} */ (['searchCap', 'clock', 'stash'])) {
     assert.equal(D.isLoosening(key, true, false), true);

@@ -32,7 +32,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(D.DEFAULT_SETTINGS, {
     watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10,
     rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home', stashMax: 10,
-    searchCap: true, cards: 'limited', clock: true, stash: true, hideBell: true, streams: false,
+    searchCap: true, cards: 'limited', clock: true, stash: true, hideBell: true, hideShorts: true, streams: false,
   });
   assert.ok(Object.isFrozen(D.MODES));
   assert.equal(D.modeOf(D.DEFAULT_SETTINGS), 'full');
