@@ -965,8 +965,7 @@
     el.append(h('div', { class: 'drip-card-actions' },
       h('button', { class: 'drip-b drip-b-gray drip-card-save drip-stash', tabindex: '-1' }, ...DripStash.parts(false, { labelClass: 'drip-save-label' }).nodes),
       h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
-      h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))),
-    settingsLink(true));
+      h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
     return el;
   }
 
@@ -1023,20 +1022,7 @@
           title: "Pass. It's free, and this video won't come back.", 'aria-label': 'Pass',
         }, icon('x')),
         swapping && swapList()),
-      swapped && swapped.newId === video.id && DripSwap.note(swapped.dropped, onSwapUndo),
-      settingsLink(false));
-  }
-
-  /**
-   * The gray line under the card's buttons into Settings' Cards section: how many a day, which feed, live streams
-   * (RELEASE-PLAN.md, item 2). The opening card draws it too, so the card doesn't grow when the real one lands.
-   * @param {boolean} inert
-   */
-  function settingsLink(inert) {
-    return h('div', { class: 'drip-card-foot' },
-      h('button', {
-        class: 'drip-card-link', 'data-k': 'settings', ...(inert ? { tabindex: '-1' } : { onclick: () => send({ type: 'openSettings', section: 'cards' }) }),
-      }, icon('settings'), h('span', {}, 'What reveals show')));
+      swapped && swapped.newId === video.id && DripSwap.note(swapped.dropped, onSwapUndo));
   }
 
   /** @param {'empty' | 'card' | 'out'} [as] Draw it as on that page. The reveal animation opens and folds it ahead of time. */

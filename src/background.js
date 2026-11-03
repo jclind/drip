@@ -292,22 +292,21 @@ async function devStatus() {
   return { toggle: true, file, enabled: file || stored[DEV_KEY] === true };
 }
 
-// The Settings sections a link from the lock, a card, or the popup may open (RELEASE-PLAN.md, item 2).
+// The Settings sections the popup's counts may open (RELEASE-PLAN.md, item 2).
 const SETTINGS_SECTIONS = ['watch', 'cards', 'stash', 'search', 'day'];
 
 /**
  * Opens Settings at a section, which flashes on arrival. A Settings tab that's already open comes forward and goes
- * there itself, without a reload, so changes it hasn't saved stay. Otherwise a new tab opens next to the one asking.
+ * there itself, without a reload, so changes it hasn't saved stay. Otherwise a new tab opens.
  * @param {unknown} section
- * @param {chrome.runtime.MessageSender} sender
  */
-async function openSettings(section, sender) {
+async function openSettings(section) {
   const page = chrome.runtime.getURL('src/options/options.html');
   const id = typeof section === 'string' && SETTINGS_SECTIONS.includes(section) ? section : '';
   const open = (await chrome.runtime.getContexts({ contextTypes: ['TAB'] }))
     .find((c) => c.tabId >= 0 && c.documentUrl?.split('#')[0] === page);
   if (!open) {
-    await chrome.tabs.create({ url: id ? `${page}#${id}` : page, ...(sender.tab?.id !== undefined && { openerTabId: sender.tab.id }) });
+    await chrome.tabs.create({ url: id ? `${page}#${id}` : page });
     return;
   }
   await chrome.tabs.update(open.tabId, { active: true });
@@ -335,7 +334,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return;
   }
   if (msg.type === 'openSettings') {
-    openSettings(msg.section, sender).then(() => sendResponse({ ok: true }), (err) => sendResponse({ ok: false, error: String(err) }));
+    openSettings(msg.section).then(() => sendResponse({ ok: true }), (err) => sendResponse({ ok: false, error: String(err) }));
     return true;
   }
   if (msg.type === 'tick' && (!sender.tab || !sender.url?.startsWith('https://www.youtube.com/'))) {

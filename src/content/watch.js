@@ -857,9 +857,6 @@
         }, h('span', {}, 'Done for now'))),
       lockMessage && h('div', { class: 'drip-lock-note', role: 'status' }, lockMessage),
       unlocks,
-      // Last, under everything else (RELEASE-PLAN.md, item 2). A raise from here waits for the reset anyway (Q6).
-      h('div', { class: 'drip-lock-foot' },
-        h('button', { class: 'drip-lock-link', 'data-k': 'settings', onclick: () => send({ type: 'openSettings', section: 'watch' }) }, 'Change your daily drops')),
     );
     placeLockPanel(panel);
     if (focused && reasonOpen && needLeft > 0) {

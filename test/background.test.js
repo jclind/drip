@@ -52,7 +52,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   let onStartup = null;
   /** @type {string[]} */
   const opened = [];
-  /** @type {{url: string, openerTabId?: number}[]} */
+  /** @type {{url: string}[]} */
   const created = [];
   /** @type {any[]} What the worker did to existing tabs and windows, and told extension pages. */
   const calls = [];
@@ -639,14 +639,14 @@ test('Undo can go over the stash cap, but not past the highest cap Settings allo
 
 const OPTIONS = 'src/options/options.html';
 
-test('openSettings opens Settings at the section, next to the tab that asked', async () => {
+test('openSettings opens Settings at the section in a new tab', async () => {
   const w = worker();
   assert.equal((await w.send({ type: 'openSettings', section: 'watch' })).ok, true);
-  assert.deepEqual(w.created.map((c) => ({ ...c })), [{ url: `${OPTIONS}#watch`, openerTabId: 1 }]);
+  assert.deepEqual(w.created.map((c) => ({ ...c })), [{ url: `${OPTIONS}#watch` }]);
   assert.equal(w.writes(), 0);
 });
 
-test('openSettings opens the top of Settings for an unknown section, and from the popup has no opener', async () => {
+test('openSettings opens the top of Settings for an unknown or empty section', async () => {
   const w = worker();
   await w.send({ type: 'openSettings', section: 'nope' }, PAGE);
   await w.send({ type: 'openSettings', section: '' }, PAGE);

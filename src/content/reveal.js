@@ -372,24 +372,10 @@
     const title = /** @type {HTMLElement} */ (card.querySelector('.drip-card-title'));
     const meta = /** @type {HTMLElement} */ (card.querySelector('.drip-card-meta-row'));
     const row = /** @type {HTMLElement} */ (card.querySelector('.drip-card-actions'));
-    // The link into Settings under the buttons (home.js) opens and closes with the block, or the page under it jumps.
-    const foot = /** @type {HTMLElement | null} */ (card.querySelector('.drip-card-foot'));
     const body = h('div', { class: 'drip-open-body' }, thumb, title, meta);
     const wrap = h('div', { class: 'drip-open-row' }, row);
-    card.replaceChildren(body, wrap, ...(foot ? [foot] : []));
-    return { body, wrap, thumb, title, meta, row, foot };
-  }
-
-  /**
-   * Opens or closes the Settings link under the card's buttons, its height and gap together.
-   * @param {HTMLElement | null} foot @param {boolean} open @param {KeyframeAnimationOptions} timing
-   */
-  function footMove(foot, open, timing) {
-    if (!foot) return Promise.resolve();
-    const full = { height: `${foot.offsetHeight}px`, marginTop: getComputedStyle(foot).marginTop, opacity: 1 };
-    const none = { height: '0px', marginTop: '0px', opacity: 0 };
-    foot.style.overflow = 'hidden';
-    return play(foot, open ? [none, full] : [full, none], timing);
+    card.replaceChildren(body, wrap);
+    return { body, wrap, thumb, title, meta, row };
   }
 
   /**
@@ -477,7 +463,6 @@
         stop(s.body);
         s.body.style.overflow = 'visible';
       });
-    footMove(s.foot, true, { duration: OPEN_MS, easing: OPEN_EASE });
     const putBack = spendShown(o.counter);
     const landing = deal(o.root, o.counter, s.thumb);
     const formed = morph(s.wrap, forward(empty, three)).then(async (layer) => {
@@ -580,7 +565,6 @@
     const timing = { duration: OPEN_MS, delay: 120, easing: EASE };
     // The padding closes with the height, or the buttons jump up 16px once the space is gone.
     const closing = play(s.body, [{ height: `${H}px`, paddingBottom: '16px' }, { height: '0px', paddingBottom: '0px' }], timing);
-    footMove(s.foot, false, timing);
     const saved = foldSaved(o.saved, true, timing);
     const layer = await morph(s.wrap, backward(empty, three));
     await closing;

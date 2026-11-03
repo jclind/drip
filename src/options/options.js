@@ -798,8 +798,8 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
 });
 
 /**
- * A link from the lock, a card, or the popup (RELEASE-PLAN.md, item 2): scroll to its section and flash the header
- * once, so it's clear which part the link meant.
+ * A count in the popup (RELEASE-PLAN.md, item 2): scroll to its section and flash the header once, so it's clear
+ * which part the link meant.
  * @param {string} id @param {boolean} smooth
  */
 function arrive(id, smooth) {
@@ -815,7 +815,7 @@ function arrive(id, smooth) {
   head.addEventListener('animationend', () => head.classList.remove('is-arriving'), { once: true });
 }
 
-// A link used while Settings is already open: the worker brought this tab forward, and this page goes there itself,
+// A popup count used while Settings is already open: the worker brought this tab forward, and this page goes there itself,
 // so a change not yet saved stays.
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg && msg.type === 'settingsGoto' && typeof msg.section === 'string') arrive(msg.section, true);

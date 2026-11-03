@@ -46,7 +46,7 @@
   border-radius: 12px;
 }
 
-/* Arriving from a link on the lock, a card, or the popup: the section's header flashes blue once. The shadow widens
+/* Arriving from a count in the popup: the section's header flashes blue once. The shadow widens
    the tint past the header's edges without moving anything. */
 .part {
   scroll-margin-top: 24px;
