@@ -148,7 +148,9 @@ async function send(msg) {
   if (!sample) return chrome.runtime.sendMessage(msg);
   const result = msg.type === 'updateSettings' ? Drip.updateSettings(state, msg.changes, Date.now())
     : msg.type === 'cancelPending' ? Drip.cancelPending(state, msg.key)
-      : { ok: false, error: 'sample' };
+      : msg.type === 'importData' ? Drip.importData(state, msg.data, Date.now())
+        : msg.type === 'resetData' ? Drip.resetData(state, Date.now())
+          : { ok: false, error: 'sample' };
   return { ...result, state };
 }
 
@@ -692,6 +694,124 @@ function renderReasons() {
       h('a', { href: `https://www.youtube.com/watch?v=${encodeURIComponent(use.videoId)}`, target: '_blank', rel: 'noopener' }, use.title || use.videoId),
       h('div', { class: 'muted' }, `"${use.reason}"`)))));
 }
+
+// Your data (RELEASE-PLAN.md, item 5): export, import, and reset. Import and reset go through the worker's rules, so a
+// change that loosens a limit waits for the reset, and neither touches today's drops or cards.
+
+/** @param {number} n @param {string} one @param {string} many */
+const counted = (n, one, many) => (n ? [plural(n, one, many)] : []);
+
+/** A list as words: "a", "a and b", "a, b, and c". @param {string[]} parts */
+function words(parts) {
+  if (parts.length < 3) return parts.join(' and ');
+  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+}
+
+/** @param {string} text */
+function dataSays(text) {
+  $('dataResult').textContent = text;
+}
+
+/** "2 changes start at 4:00am.", or '' when nothing waits. @param {Record<string, any> | undefined} pending */
+function waitsLine(pending) {
+  const n = Object.keys(pending || {}).length;
+  return n ? ` ${plural(n, 'change starts', 'changes start')} at ${resetLabel()}.` : '';
+}
+
+/**
+ * After an import or reset: the form follows the new settings and keeps an edit in progress, as it does when another
+ * tab saves. The storage event would see no change, since the reply already brought the new state.
+ * @param {any} res @param {Record<string, any>} kept
+ */
+function afterData(res, kept) {
+  absorb(res);
+  draft = { ...Drip.planned(state), ...kept };
+  resetCardsKind();
+  renderForm();
+  renderHistory();
+  renderReasons();
+}
+
+function exportData() {
+  const data = JSON.stringify(Drip.exportData(state, Date.now()), null, 2);
+  const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+  const a = DripPage.h('a', { href: url, download: `drip-${state.day}.json` });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  dataSays('Exported your settings, stash, and history.');
+}
+
+/** The largest file Import reads. An export with years of history is well under this. */
+const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+
+async function importFile() {
+  const input = /** @type {HTMLInputElement} */ ($('importFile'));
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (file.size > IMPORT_MAX_BYTES) return dataSays("That file is too big to be a drip export.");
+  /** @type {unknown} */
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    return dataSays("That file isn't a drip export.");
+  }
+  const kept = edits();
+  /** @type {any} */
+  let res = null;
+  try {
+    res = await send({ type: 'importData', data });
+  } catch {
+    // The worker didn't answer. Handled below.
+  }
+  if (!res || !res.ok || !res.state) {
+    const why = res && res.error === 'bad-format' ? 'That export is from a newer drip. Update drip and try again.'
+      : res && res.error === 'not-drip' ? "That file isn't a drip export." : "Couldn't import. Try again.";
+    return dataSays(why);
+  }
+  afterData(res, kept);
+  const added = [...counted(res.stashAdded, 'stashed video', 'stashed videos'), ...counted(res.daysAdded, 'day of history', 'days of history')];
+  const full = res.stashSkipped ? ` ${plural(res.stashSkipped, "video didn't", "videos didn't")} fit in the stash.` : '';
+  dataSays(`Imported.${added.length ? ` Added ${words(added)}.` : ''}${full}${waitsLine(res.pending)}`);
+}
+
+/** @param {boolean} open */
+function showResetConfirm(open) {
+  $('resetConfirm').hidden = !open;
+  $('dataButtons').hidden = open;
+  if (open) {
+    $('resetWhen').textContent = resetLabel();
+    $('resetNo').focus();
+  } else {
+    $('resetData').focus();
+  }
+}
+
+async function resetData() {
+  /** @type {any} */
+  let res = null;
+  try {
+    res = await send({ type: 'resetData' });
+  } catch {
+    // Handled below.
+  }
+  showResetConfirm(false);
+  if (!res || !res.ok || !res.state) return dataSays("Couldn't reset. Try again.");
+  // A reset drops edits in progress too, since they were changes to the settings it just put back.
+  afterData(res, {});
+  const cleared = res.stashCleared ? ` Emptied the stash of ${plural(res.stashCleared, 'video', 'videos')}.` : '';
+  dataSays(`Settings are back to how drip started.${cleared}${waitsLine(res.pending)}`);
+}
+
+$('exportData').addEventListener('click', exportData);
+$('importData').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', importFile);
+$('resetData').addEventListener('click', () => showResetConfirm(true));
+$('resetNo').addEventListener('click', () => showResetConfirm(false));
+$('resetYes').addEventListener('click', resetData);
 
 $('save').addEventListener('click', save);
 $('undoAll').addEventListener('click', undoAll);

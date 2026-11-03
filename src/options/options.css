@@ -685,6 +685,7 @@ button.col.is-selected .letter {
 /* Why you needed one. */
 
 #reasons-section,
+#data,
 #dev {
   margin-top: 32px;
   padding-top: 32px;
@@ -889,4 +890,23 @@ button.col.is-selected .letter {
 
 .savebar button.link:hover {
   text-decoration: underline;
+}
+
+/* Your data (RELEASE-PLAN.md, item 5): Export, Import, and Reset in a row, and Reset's question in place of them. */
+.data-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.data-confirm p {
+  margin: 0 0 12px;
+}
+
+.data-result:empty {
+  display: none;
+}
+
+.data-result {
+  margin: 12px 0 0;
 }

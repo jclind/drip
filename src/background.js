@@ -215,6 +215,10 @@ function handle(msg, state, now, clock) {
       return Drip.cancelPending(state, msg.key);
     case 'refillSeen':
       return Drip.refillSeen(state);
+    case 'importData':
+      return Drip.importData(state, msg.data, now);
+    case 'resetData':
+      return Drip.resetData(state, now);
     default:
       return { ok: false, error: 'unknown-message' };
   }
