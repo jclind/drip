@@ -52,10 +52,11 @@
   /**
    * Moves a count to `n`: a roll by one, a spin through a jump, or with `animate` false, at once. Resolves once it
    * shows `n`. `most` caps how many numbers a spin shows, and `settle` is how long its last one takes to settle.
+   * `roll` sets the length and easing of a one-number roll, for counts that roll on a clock (rain).
    * @param {HTMLElement} el A num() element. @param {number} n
-   * @param {{animate?: boolean, most?: number, settle?: number}} [o]
+   * @param {{animate?: boolean, most?: number, settle?: number, roll?: {ms: number, easing: string}}} [o]
    */
-  function to(el, n, { animate = true, most = 10, settle = 300 } = {}) {
+  function to(el, n, { animate = true, most = 10, settle = 300, roll = undefined } = {}) {
     let q = queues.get(el);
     if (!q) queues.set(el, (q = { chain: Promise.resolve(), gen: 0 }));
     const queue = q;
@@ -73,22 +74,23 @@
     }
     if (from === n) return queue.chain;
     const gen = queue.gen;
-    queue.chain = queue.chain.then(() => (queue.gen === gen ? move(el, from, n, most, settle, () => queue.gen !== gen) : undefined));
+    queue.chain = queue.chain.then(() => (queue.gen === gen ? move(el, from, n, most, settle, () => queue.gen !== gen, roll) : undefined));
     return queue.chain;
   }
 
   /**
    * @param {HTMLElement} el @param {number} from @param {number} n @param {number} most @param {number} settle
    * @param {() => boolean} stale Whether a set at once has taken over.
+   * @param {{ms: number, easing: string}} [roll]
    */
-  async function move(el, from, n, most, settle, stale) {
+  async function move(el, from, n, most, settle, stale, roll) {
     const up = n > from;
     const steps = Math.min(Math.abs(n - from), most);
     for (let i = 1; i <= steps; i += 1) {
       if (stale()) return;
       const last = i === steps;
       // One step is the odometer's roll. Several run fast and even, and the last settles with a small overshoot.
-      const timing = steps === 1 ? { ms: 280, easing: OUT }
+      const timing = steps === 1 ? roll || { ms: 280, easing: OUT }
         : last ? { ms: settle, easing: 'cubic-bezier(0.3, 1.45, 0.5, 1)' }
         : { ms: Math.max(38, 340 / steps), easing: 'linear' };
       await swap(el, Math.round(from + ((n - from) * i) / steps), up, timing);
@@ -166,13 +168,13 @@
 
   /**
    * Drops fall into the counter from the top of the window, one every `gap` ms, and the count rolls up as each lands.
-   * Five fall at most. With more to add, each carries its share and the count spins up by it, quickly enough (3
-   * numbers, about 0.24 seconds) to be done before the next one lands. If the page goes away meanwhile, the rest come
-   * in at once.
+   * Five fall at most. With more to add, the count rolls on a clock instead (`climb`). If the page goes away meanwhile,
+   * the rest come in at once.
    * @param {Arrival} c @param {number} gap
    */
   async function rain(c, gap) {
-    const count = Math.min(c.add, 5);
+    if (c.add > 5) return climb(c, gap);
+    const count = c.add;
     let released = 0;
     const falls = [];
     for (let i = 1; i <= count; i += 1) {
@@ -182,6 +184,52 @@
       falls.push(fall(c.icon).then(() => c.release(share, { most: 3, settle: 160 })));
       if (i < count) await sleep(gap);
     }
+    await Promise.all(falls);
+    if (released < c.add) await c.release(c.add - released, { animate: false });
+  }
+
+  /** The most numbers a climb shows. Past it, each roll skips ahead by an even share. */
+  const CLIMB_MOST = 24;
+  /** How early a climb queues its next roll. */
+  const LEAD_MS = 40;
+
+  /**
+   * Five drops fall, and the count climbs one number at a time, at one even pace, from the first landing to the last,
+   * with only the last number settling. Spinning up by each drop's share in turn read as five jumps, each with its
+   * own bounce (Jesse, 2026-11-02, on 15 kept drops: "it jumps and then jumps again and then jumps again").
+   * @param {Arrival} c @param {number} gap
+   */
+  async function climb(c, gap) {
+    const drops = 5;
+    const steps = Math.min(c.add, CLIMB_MOST);
+    // From the first landing to the last. The last number lands with the last drop.
+    const span = gap * (drops - 1);
+    const tick = span / (steps - 1);
+    const falls = [fall(c.icon)];
+    const dropping = (async () => {
+      for (let i = 2; i <= drops; i += 1) {
+        await sleep(gap);
+        if (gone(c)) return;
+        falls.push(fall(c.icon));
+      }
+    })();
+    await falls[0];
+    let released = 0;
+    const start = performance.now();
+    for (let i = 1; i <= steps; i += 1) {
+      if (gone(c)) break;
+      const share = Math.round((c.add * i) / steps) - Math.round((c.add * (i - 1)) / steps);
+      released += share;
+      const last = i === steps;
+      // Even rolls, back to back, so the digits never stop between numbers. The last eases in.
+      // most: 1, so a share bigger than one is still one roll, not a spin of its own.
+      const rolled = c.release(share, { most: 1, roll: last ? { ms: 280, easing: OUT } : { ms: tick, easing: 'linear' } });
+      if (last) await rolled;
+      // Paced off the clock, so a slow frame doesn't push every later number back. The next roll is queued a little
+      // before this one ends, so they run back to back instead of resting a frame between numbers.
+      else await sleep(Math.max(0, start + tick * i - LEAD_MS - performance.now()));
+    }
+    await dropping;
     await Promise.all(falls);
     if (released < c.add) await c.release(c.add - released, { animate: false });
   }

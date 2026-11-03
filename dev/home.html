@@ -90,7 +90,8 @@
     subs() { s.settings.feedSource = 'subscriptions'; },
     // Back from the lock's "Done for now" with 3 drops (watch.js leaves the count in sessionStorage). There's no lock
     // here, so they land as soon as the page shows.
-    kept() { s.tokens = { watch: 3, rec: 8 }; sessionStorage.setItem('drip-kept', '3'); },
+    // &kept=15 keeps that many instead, to see the count climb.
+    kept() { const n = Number(params.get('kept')) || 3; s.tokens = { watch: n, rec: 8 }; sessionStorage.setItem('drip-kept', String(n)); },
     // The first page after the reset, on the default settings: 3 drops and 8 cards kept, 4 and 10 new.
     refill() { s.tokens = { watch: 3, rec: 8 }; s.day = D.addDays(s.day, -1); s.watchSecondsLeft = 0; },
     // The same at the settings' maximums: 48 drops and 100 cards a day, kept 7 days, so 336 and 700 at most.
