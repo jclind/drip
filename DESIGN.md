@@ -9,7 +9,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | # | Decision |
 |---|---|
 | Q1 | Personal for now, may publish later. Keep code clean enough to publish. |
-| Q2 | Block home, watch-page sidebar, end screens, autoplay, Shorts. Search stays, minus the injected "discover" shelves. Playlists and mixes keep playing on their own (Jesse, 2026-10-06). |
+| Q2 | Block home, watch-page sidebar, end screens, autoplay, Shorts. Search stays, minus the injected "discover" shelves. Playlists and mixes keep playing on their own (Jesse, 2026-10-06). A "Hide Shorts" switch, on by default, can bring back the Shorts shelves and links, but a Short always opens as a regular video and the Shorts player never comes back (Jesse, 2026-11-02; not built yet, RELEASE-PLAN.md item 7). |
 | Q3 | Out of time means hard stop: pause and overlay. "Finish the current video" grace mode is a setting, off by default. |
 | Q4 | Daily allowance only. Tasks are in IDEAS.md. The whole extension runs on the honor system. |
 | Q5 | Feed source: YouTube home feed (default) or subscriptions. It keeps the last choice. Explore was dropped because `/feed/explore` now serves the home feed (Jesse, 2026-10-06). It's a Settings field for now, not a toggle on the home page; its design comes later (Jesse, 2026-10-10). |
