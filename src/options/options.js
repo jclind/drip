@@ -683,11 +683,24 @@ function renderHistory() {
 const REASONS_FIRST = 5;
 const REASONS_STEP = 20;
 let reasonsShown = REASONS_FIRST;
+/** What the list last drew, so a storage write that changed none of it leaves the buttons and focus alone. */
+let reasonsKey = '';
+
+/** @param {'more' | 'fewer'} which */
+function focusReasonsButton(which) {
+  const buttons = /** @type {HTMLElement[]} */ ([...$('reasons-more').querySelectorAll('button')]);
+  (buttons.find((b) => b.dataset.k === which) || buttons[0])?.focus({ preventScroll: true });
+}
 
 function renderReasons() {
   const { h } = DripPage;
   const uses = Object.keys(state.log).sort().reverse().flatMap((day) =>
     state.log[day].needThis.slice().reverse().map((/** @type {any} */ use) => ({ day, ...use })));
+  // Ticks save the state every few seconds while a video plays, and rebuilt buttons lose focus and clicks (Codex,
+  // 2026-11-03), so redraw only when the list or its count would change.
+  const key = JSON.stringify([state.day, reasonsShown, uses.length, uses.slice(0, reasonsShown).map((use) => [use.day, use.at, use.title])]);
+  if (key === reasonsKey) return;
+  reasonsKey = key;
   $('reasons-section').hidden = uses.length === 0;
   // The count says how often, so the list can stay short.
   const weekStart = Drip.addDays(state.day, -6);
@@ -696,13 +709,17 @@ function renderReasons() {
     : `${plural(uses.length, 'time', 'times')} in all, ${week} in the last 7 days.`;
   const left = uses.length - reasonsShown;
   $('reasons-more').replaceChildren(...[
-    left > 0 && h('button', { type: 'button', onclick: () => { reasonsShown += REASONS_STEP; renderReasons(); } },
-      `Show ${Math.min(left, REASONS_STEP)} more`),
+    left > 0 && h('button', { type: 'button', 'data-k': 'more', onclick: () => {
+      reasonsShown += REASONS_STEP;
+      renderReasons();
+      focusReasonsButton('more');
+    } }, `Show ${Math.min(left, REASONS_STEP)} more`),
     left > 0 && h('span', { class: 'muted' }, `${left} not shown`),
-    reasonsShown > REASONS_FIRST && h('button', { type: 'button', class: 'link', onclick: () => {
+    reasonsShown > REASONS_FIRST && h('button', { type: 'button', class: 'link', 'data-k': 'fewer', onclick: () => {
       reasonsShown = REASONS_FIRST;
       renderReasons();
       $('reasons-section').scrollIntoView({ block: 'start' });
+      focusReasonsButton('more');
     } }, 'Show fewer'),
   ].filter(Boolean));
   $('reasons').replaceChildren(...uses.slice(0, reasonsShown).map((use) => h('li', { class: 'reason' },
