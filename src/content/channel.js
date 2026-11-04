@@ -43,9 +43,12 @@
     // On a move from one channel to another the header can still be the last one's. Its handle must agree with a
     // /@handle URL. A /channel/UC... URL has no handle to check, so the header's name must match the tab's title, which
     // YouTube sets for the new page. Until both agree, it waits for the next draw (Codex, 2026-11-03).
+    // The name must match the tab's title too, on either kind of URL, so a header whose handle isn't found can't lend
+    // the last channel's name. YouTube puts "(3) " before the title for unread notifications (code review, 2026-11-03).
     if (fromPath.startsWith('@') && ids[0] !== fromPath) return null;
     const name = document.querySelector(SEL.name)?.textContent?.trim() || '';
-    if (!fromPath.startsWith('@') && (!name || document.title.replace(/ - YouTube$/, '').trim() !== name)) return null;
+    const title = document.title.replace(/^\(\d+\+?\)\s*/, '').replace(/ - YouTube$/, '').trim();
+    if (!name || title !== name) return null;
     return { ids, name };
   }
 
@@ -53,10 +56,9 @@
   function where(channel) {
     if (!state || !state.channels) return 'none';
     if (state.channels.allow.some((/** @type {any} */ c) => Drip.sameChannel(c, channel))) return 'allowed';
-    const waiting = state.channelsPending && state.channelsPending.allow.some((/** @type {any} */ c) => Drip.sameChannel(c, channel));
-    if (waiting) return 'waiting';
-    const count = state.channels.allow.length + (state.channelsPending ? state.channelsPending.allow.length : 0);
-    return count >= Drip.ALLOW_MAX ? 'full' : 'none';
+    if (Drip.isAllowedOrWaiting(state, channel)) return 'waiting';
+    if (state.channels.block.some((/** @type {any} */ c) => Drip.sameChannel(c, channel))) return 'blocked';
+    return Drip.allowCount(state) >= Drip.ALLOW_MAX ? 'full' : 'none';
   }
 
   /** @param {any} channel */
@@ -65,7 +67,7 @@
     busy = true;
     try {
       const now = where(channel);
-      const type = now === 'allowed' || now === 'waiting' ? 'removeAllowed' : now === 'full' ? 'openSettings' : 'allowChannel';
+      const type = now === 'allowed' || now === 'waiting' ? 'removeAllowed' : now === 'full' || now === 'blocked' ? 'openSettings' : 'allowChannel';
       const res = await send(type === 'openSettings' ? { type, section: 'channels' } : { type, channel });
       if (res && res.ok && res.state) state = res.state;
     } finally {
@@ -84,19 +86,22 @@
       return;
     }
     const at = where(channel);
+    const firstDay = Drip.firstDayUntil(state, Date.now()) > 0;
     const label = {
       allowed: 'Allowed in drip',
       waiting: `Allowed from ${hourLabel(state.settings.resetHour)}`,
       full: 'Allow list full',
+      blocked: 'Blocked in drip',
       none: 'Allow in drip',
     }[at];
     const title = {
       allowed: 'Videos from this channel cost no minutes. Click to take it off.',
       waiting: 'Starts at the next reset. Click to cancel.',
       full: `drip allows ${Drip.ALLOW_MAX} channels. Open Settings to make room.`,
-      none: 'Videos from this channel would cost no minutes. Starts at the next reset.',
+      blocked: 'Reveals never deal this channel. Open Settings to unblock it before allowing it.',
+      none: `Videos from this channel would cost no minutes. ${firstDay ? 'Starts at once in your first day.' : 'Starts at the next reset.'}`,
     }[at];
-    const key = JSON.stringify([channel.ids, at, label]);
+    const key = JSON.stringify([channel.ids, at, label, title]);
     // Redraw only on a change, so a click isn't lost to a rebuilt button.
     if (old && view === key && old.parentElement === actions) return;
     view = key;

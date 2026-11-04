@@ -2267,4 +2267,4 @@ html[dark] #drip-menu {
 }
 .drip-allow:hover { background: var(--drip-chip-hover); }
 .drip-allow:focus-visible { outline: 2px solid var(--drip-text); outline-offset: 2px; }
-.drip-allow.is-waiting, .drip-allow.is-full { color: var(--drip-muted); }
+.drip-allow.is-waiting, .drip-allow.is-full, .drip-allow.is-blocked { color: var(--drip-muted); }

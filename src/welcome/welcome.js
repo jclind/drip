@@ -679,12 +679,18 @@
   /** Samples not revealed yet, starting over once the tour has shown them all. */
   function pool() {
     if (SAMPLES.every((v) => sand.seen.includes(v.id))) sand.seen = [];
+    // Blocking every sample channel would leave the tour with nothing to deal (code review, 2026-11-03).
+    if (!SAMPLES.some((v) => Drip.canDeal(sand, v))) {
+      sand.seen = [];
+      sand.channels.block = [];
+    }
     return SAMPLES;
   }
 
   /** Reveal next found nothing new: start the samples over and try once more. */
   function refill() {
     sand.seen = sand.current ? [sand.current.id] : [];
+    if (!SAMPLES.some((v) => Drip.canDeal(sand, v))) sand.channels.block = [];
     if (sand.current) Drip.revealNext(sand, sand.current.id, SAMPLES);
   }
 

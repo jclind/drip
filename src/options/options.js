@@ -773,6 +773,8 @@ function channelError(res) {
     case 'allow-full': return `drip allows ${Drip.ALLOW_MAX} channels. Remove one first.`;
     case 'block-full': return 'The block list is full. Remove a channel first.';
     case 'bad-channel': return "That isn't a channel handle or link, like @veritasium.";
+    case 'uc-id': return "Use the channel's @handle, shown under its name on the channel page. Watch pages only show the handle, so a UC... id wouldn't match them.";
+    case 'channel-blocked': return 'That channel is blocked. Unblock it first.';
     case 'sample': return 'Sample data: nothing here is saved.';
     default: return 'Something went wrong. Refresh and try again.';
   }
@@ -791,8 +793,9 @@ async function channelSend(msg, list, done = '') {
 async function addChannel(list) {
   const input = /** @type {HTMLInputElement | null} */ (channelsEl?.querySelector(`[data-k="${list}-input"]`));
   const id = Drip.channelId(input?.value || '');
-  if (!id) {
-    channelsNote[list] = channelError({ error: 'bad-channel' });
+  // A UC id never meets a watch page's @handle, so it would never match (code review, 2026-11-03).
+  if (!id || !id.startsWith('@')) {
+    channelsNote[list] = channelError({ error: id ? 'uc-id' : 'bad-channel' });
     renderChannels();
     return;
   }
@@ -849,7 +852,12 @@ function renderChannels(force = false) {
         extra && h('span', { class: 'muted channel-id' }, ` ${extra}`),
         note && h('div', { class: 'muted channel-note' }, note)),
       h('button', { type: 'button', 'data-k': `${list}-${i}`, 'aria-label': `${action.label} ${name}`,
-        onclick: () => channelSend({ type: action.type, channel: c }, list, done) }, action.label));
+        // The next row takes this one's place, and with it this button's data-k. Focus goes to the add field instead, so
+        // a second Enter can't remove the next channel (code review, 2026-11-03).
+        onclick: async () => {
+          await channelSend({ type: action.type, channel: c }, list, done);
+          /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="${list}-input"]`) || channelsEl?.querySelector('.channel-lists .setting-label'))?.focus();
+        } }, action.label));
   };
 
   /** @param {'allow' | 'block'} list */
@@ -867,12 +875,12 @@ function renderChannels(force = false) {
       h('button', { type: 'button', 'data-k': `${list}-add`, onclick: () => addChannel(list) }, list === 'allow' ? 'Allow' : 'Block'));
   };
 
-  const full = allowed.length >= Drip.ALLOW_MAX;
+  const full = Drip.allowCount(state) >= Drip.ALLOW_MAX;
   const waitWord = firstDay ? 'In your first day it starts at once.' : `Adding one starts at ${resetLabel()}, after the reset.`;
   const pad = /** @type {HTMLElement} */ (channelsEl.querySelector('.channel-lists'));
   pad.replaceChildren(
     h('div', { class: 'channel-list' },
-      h('div', { class: 'setting-label' }, `Allowed (${allowed.length} of ${Drip.ALLOW_MAX})`),
+      h('div', { class: 'setting-label', tabindex: '-1' }, `Allowed (${allowed.length} of ${Drip.ALLOW_MAX})`),
       h('div', { class: 'hint' }, `Their videos cost no minutes and play even with no drops left. ${waitWord}`),
       allowed.length > 0 && h('ul', { class: 'channels-ul' }, ...allowed.map((item, i) => row('allow', item, i))),
       full ? h('div', { class: 'hint' }, 'The list is full. Remove one to add another.') : adder('allow'),
@@ -992,6 +1000,7 @@ async function importFile() {
     'Settings now match the file.',
     added.length ? `Added ${words(added)}.` : 'Nothing new for the stash, history, or channel lists.',
     ...(res.stashSkipped ? [`${plural(res.stashSkipped, "video didn't", "videos didn't")} fit in the stash.`] : []),
+    ...(res.channelsWaiting ? [`${plural(res.channelsWaiting, 'allowed channel starts', 'allowed channels start')} at ${resetLabel()}.`] : []),
     ...(waitsLine(res.pending) ? [waitsLine(res.pending)] : []),
   ]);
 }

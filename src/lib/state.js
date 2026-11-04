@@ -1067,16 +1067,20 @@
     }
     // The lists go through the same rules as a click: an allow waits, a block applies now, and nothing is removed.
     let channelsAdded = 0;
+    let channelsWaiting = 0;
     const lists = file.channels && typeof file.channels === 'object' ? file.channels : {};
     for (const raw of Array.isArray(lists.allow) ? lists.allow : []) {
       const channel = cleanChannel(raw);
-      if (channel && !isAllowedOrWaiting(state, channel) && allowChannel(state, channel, now).ok) channelsAdded++;
+      if (!channel || isAllowedOrWaiting(state, channel)) continue;
+      const allowed = allowChannel(state, channel, now);
+      if (allowed.ok) channelsAdded++;
+      if (allowed.ok && allowed.waits) channelsWaiting++;
     }
     for (const raw of Array.isArray(lists.block) ? lists.block : []) {
       const channel = cleanChannel(raw);
       if (channel && !findChannel(state.channels.block, channel) && blockChannel(state, channel).ok) channelsAdded++;
     }
-    return { ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days, channelsAdded };
+    return { ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days, channelsAdded, channelsWaiting };
   }
 
   /**
@@ -1231,8 +1235,15 @@
     state.channelsPending = null;
   }
 
-  /** @param {State} state @param {Channel} channel */
-  function isAllowedOrWaiting(state, channel) {
+  /** Allowed and waiting channels, which the cap of 5 counts. @param {State} state */
+  function allowCount(state) {
+    return state.channels.allow.length + (state.channelsPending ? state.channelsPending.allow.length : 0);
+  }
+
+  /** @param {State} state @param {unknown} raw */
+  function isAllowedOrWaiting(state, raw) {
+    const channel = cleanChannel(raw);
+    if (!channel) return false;
     return !!findChannel(state.channels.allow, channel) || !!(state.channelsPending && findChannel(state.channelsPending.allow, channel));
   }
 
@@ -1244,12 +1255,13 @@
   function allowChannel(state, raw, now) {
     const channel = cleanChannel(raw);
     if (!channel || !channel.ids.length) return { ok: false, error: 'bad-channel' };
+    // One channel is never on both lists: a blocked one has to be unblocked first (code review, 2026-11-03).
+    if (findChannel(state.channels.block, channel)) return { ok: false, error: 'channel-blocked' };
     const have = findChannel(state.channels.allow, channel);
     if (have) { mergeChannel(have, channel); return { ok: true, waits: false }; }
     const waiting = state.channelsPending && findChannel(state.channelsPending.allow, channel);
     if (waiting) { mergeChannel(waiting, channel); return { ok: true, waits: true }; }
-    const count = state.channels.allow.length + (state.channelsPending ? state.channelsPending.allow.length : 0);
-    if (count >= ALLOW_MAX) return { ok: false, error: 'allow-full' };
+    if (allowCount(state) >= ALLOW_MAX) return { ok: false, error: 'allow-full' };
     if (firstDayUntil(state, now) > 0) {
       state.channels.allow.push(channel);
       return { ok: true, waits: false };
@@ -1280,6 +1292,8 @@
     const have = findChannel(state.channels.block, channel);
     if (have) { mergeChannel(have, channel); return { ok: true }; }
     if (state.channels.block.length >= BLOCK_MAX) return { ok: false, error: 'block-full' };
+    // Blocking an allowed channel takes it off the allow list, at once, since that tightens.
+    removeAllowed(state, channel);
     state.channels.block.push(channel);
     return { ok: true };
   }
@@ -1403,6 +1417,6 @@
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,
     ALLOW_MAX, channelId, cleanChannel, sameChannel, allowChannel, removeAllowed, blockChannel, unblockChannel,
-    cancelChannelPending, seenChannel, allowedVideo, isFree, freeToStart, plannedChannels,
+    cancelChannelPending, seenChannel, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
   };
 })();

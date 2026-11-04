@@ -341,3 +341,24 @@ test('a handle in another script works, and a broken % escape is refused without
   assert.equal(D.channelId('/@bad%'), '');
   assert.deepEqual(D.cleanChannel({ ids: ['@料理'], name: 'x' })?.ids, ['@料理']);
 });
+
+test('a channel is never on both lists: blocking takes it off the allow list, and a blocked one can\'t be allowed (code review)', () => {
+  const state = settled();
+  state.channels.allow.push({ ...VERI });
+  D.allowedVideo(state, 'vid1', VERI);
+  D.allowChannel(state, BLUE, NOW);
+  D.blockChannel(state, VERI);
+  D.blockChannel(state, BLUE);
+  assert.equal(state.channels.allow.length, 0);
+  assert.equal(state.channelsPending, null, 'the waiting allow goes too');
+  assert.equal(D.isFree(state, 'vid1'), false);
+  assert.deepEqual(D.allowChannel(state, VERI, NOW), { ok: false, error: 'channel-blocked' });
+});
+
+test('import says how many allowed channels wait for the reset (code review)', () => {
+  const state = settled();
+  const res = D.importData(state, { app: 'drip', format: 1, settings: {}, channels: { allow: [VERI, BLUE], block: [] } }, NOW);
+  assert.equal(res.channelsAdded, 2);
+  assert.equal(res.channelsWaiting, 2);
+  assert.equal(D.allowCount(state), 2);
+});

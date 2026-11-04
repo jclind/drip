@@ -29,7 +29,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData',
     'ALLOW_MAX', 'channelId', 'cleanChannel', 'sameChannel', 'allowChannel', 'removeAllowed', 'blockChannel', 'unblockChannel',
-    'cancelChannelPending', 'seenChannel', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels',
+    'cancelChannelPending', 'seenChannel', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels', 'allowCount', 'isAllowedOrWaiting',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
