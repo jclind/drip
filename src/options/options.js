@@ -53,8 +53,8 @@ const PARTS = [
       { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
       { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', hint: 'When time runs out partway through.' },
-      { key: 'needThisPerDay', label: '"I need this one" per day', kind: 'stepper', min: 0, max: 10,
-        say: (n) => String(n), hint: 'Each one needs a typed reason.' },
+      { key: 'needThisPerWeek', label: '"I need this one" per week', kind: 'stepper', min: 0, max: 20,
+        say: (n) => String(n), hint: 'Each one needs a typed reason. Counted over the last 7 days.' },
     ],
   },
   {
@@ -641,7 +641,7 @@ function renderHistory() {
   // Rebuild only when something on screen changed. Ticks save the state every few seconds while a video plays, and a
   // bar rebuilt mid-click loses the click.
   const shown = JSON.stringify([w.days.map((/** @type {any} */ d) => [d.day, Math.floor(d.watchedSec / 60), d.counted]),
-    Math.floor((w.lastAverage ?? -60) / 60), weeksBack, selectedDay, state.day, state.settings.needThisPerDay,
+    Math.floor((w.lastAverage ?? -60) / 60), weeksBack, selectedDay, state.day,
     entry && [Math.floor(entry.watchedSec / 60), entry.watchSpent, entry.recSpent, entry.saved, entry.passed, entry.watched, entry.needThis.length]]);
   if (shown === historyShown) return;
   historyShown = shown;
@@ -684,7 +684,8 @@ function renderHistory() {
       h('div', { class: 'tiles' },
         tile('drop', 'drip-token-drop', entry ? entry.watchSpent : 0, 'Drops used'),
         tile('card', 'drip-token-card', entry ? entry.recSpent : 0, 'Cards used'),
-        tile('unlock', 'tile-lock', entry ? entry.needThis.length : 0, 'Unlocks used', state.settings.needThisPerDay)),
+        // A day has no unlock limit since Q20 went weekly, so no "/ N".
+        tile('unlock', 'tile-lock', entry ? entry.needThis.length : 0, 'Unlocks used')),
       line && h('p', { class: 'cards-line' }, line)),
   ].filter(Boolean));
 }
@@ -708,13 +709,13 @@ function renderReasons() {
     state.log[day].needThis.slice().reverse().map((/** @type {any} */ use) => ({ day, ...use })));
   // Ticks save the state every few seconds while a video plays, and rebuilt buttons lose focus and clicks (Codex,
   // 2026-11-03), so redraw only when the list or its count would change.
-  const key = JSON.stringify([state.day, reasonsShown, uses.length, uses.slice(0, reasonsShown).map((use) => [use.day, use.at, use.title])]);
+  // The same rolling 7 × 24 hours the lock counts (Q20), not the last 7 reset days.
+  const week = Drip.needThisUsed(state, Date.now());
+  const key = JSON.stringify([state.day, reasonsShown, uses.length, week, uses.slice(0, reasonsShown).map((use) => [use.day, use.at, use.title])]);
   if (key === reasonsKey) return;
   reasonsKey = key;
   $('reasons-section').hidden = uses.length === 0;
   // The count says how often, so the list can stay short.
-  const weekStart = Drip.addDays(state.day, -6);
-  const week = uses.filter((use) => use.day >= weekStart).length;
   $('reasons-count').textContent = uses.length === 1 ? 'Once.'
     : `${plural(uses.length, 'time', 'times')} in all, ${week} in the last 7 days.`;
   const left = uses.length - reasonsShown;

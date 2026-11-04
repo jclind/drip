@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send: sendMessage, h, onState, hourLabel, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send: sendMessage, h, onState, hourLabel, dayTimeLabel, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
@@ -859,7 +859,9 @@
       return;
     }
     drainNext = false;
-    lockMessage = res && res.error === 'reason-required' ? 'Write a few words about why.' : "You've used all of today's unlocks.";
+    // A refusal's state shows the count now, which another tab may have used up.
+    if (res && res.state) state = res.state;
+    lockMessage = res && res.error === 'reason-required' ? 'Write a few words about why.' : "You've used this week's unlocks.";
     showLock();
   }
 
@@ -887,11 +889,14 @@
   function showLock() {
     if (!state || disconnected || playerBroken || leavingLock()) return;
     const s = state.settings;
-    const needLeft = Math.max(0, s.needThisPerDay - state.unlocked.length);
+    const now = Date.now();
+    const needLeft = Drip.needThisLeft(state, now);
+    // When the next unlock comes back, once the week's are used (Q20).
+    const needBack = Drip.needThisBack(state, now);
     const canBuy = state.tokens.watch > 0;
     const line = watchedLine();
     const existing = liveLock();
-    const view = JSON.stringify([videoId(), canBuy, needLeft, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
+    const view = JSON.stringify([videoId(), canBuy, needLeft, needBack, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
     if (existing && lockView === view) return;
     lockView = view;
     lockVideoId = videoId();
@@ -907,13 +912,15 @@
     }));
     reason.value = reasonText;
     const unlocks = needLeft > 0 && !reasonOpen
-      ? h('button', { class: 'drip-lock-link', 'data-k': 'need', onclick: openReason }, `I need this one · ${needLeft} left`)
+      ? h('button', { class: 'drip-lock-link', 'data-k': 'need', onclick: openReason }, `I need this one · ${needLeft} left this week`)
       : needLeft > 0
         ? h('div', { class: 'drip-reason' }, reason,
           h('div', { class: 'drip-reason-row' },
             h('button', { class: 'drip-lock-link', 'data-k': 'cancel', onclick: closeReason }, 'Cancel'),
             h('button', { class: 'drip-b drip-b-gray', 'data-k': 'unlock', onclick: () => onNeedThis(reason.value) }, icon('unlock'), h('span', {}, 'Unlock this video'))))
-        : h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`);
+        : h('div', {},
+          h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`),
+          needBack > 0 && h('div', { class: 'drip-lock-note' }, `Next unlock back ${dayTimeLabel(needBack, now)}.`));
     const panel = h(
       'div',
       { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },

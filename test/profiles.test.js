@@ -20,6 +20,7 @@ test('every sample profile is a state the rules would have made', () => {
     }
     for (const day of Object.keys(state.log)) assert.ok(day <= state.day && day >= D.addDays(state.day, -89), `${profile.id}: ${day}`);
     assert.ok(D.weekView(state).average !== null, profile.id);
+    assert.ok(D.needThisUsed(state, now) <= state.settings.needThisPerWeek, `${profile.id}: more unlocks this week than allowed`);
   }
   assert.equal(P.find('nope'), null);
 });

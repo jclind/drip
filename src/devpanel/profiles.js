@@ -110,13 +110,14 @@
       name: 'Heavy, settings at max',
       /** @param {number} now */
       build(now) {
-        const state = start(now, { watchTokensPerDay: 48, minutesPerToken: 120, recTokensPerDay: 100, rolloverDays: 7, needThisPerDay: 10, graceMode: true });
+        const state = start(now, { watchTokensPerDay: 48, minutesPerToken: 120, recTokensPerDay: 100, rolloverDays: 7, needThisPerWeek: 20, graceMode: true });
         const rand = random(2);
         for (let i = 89; i >= 0; i--) {
           const day = Drip.addDays(state.day, -i);
           // One 16-hour day this week stretches the scale to its top step.
           const minutes = i === 1 ? 16 * 60 : 180 + rand() * 480;
-          state.log[day] = entry(minutes, { ...cards(rand, 100), needThis: [use(day, i), use(day, i + 1)] });
+          // Two unlocks a day, but one a day this week, so the week holds 17 of its 20.
+          state.log[day] = entry(minutes, { ...cards(rand, 100), needThis: i <= 7 ? [use(day, i)] : [use(day, i), use(day, i + 1)] });
         }
         state.log[state.day].needThis = Array.from({ length: 10 }, (_, i) => use(state.day, i));
         // A change waits even at the top: a new reset hour always waits.
@@ -129,13 +130,13 @@
       name: 'Strict, all changes waiting',
       /** @param {number} now */
       build(now) {
-        const state = start(now, { watchTokensPerDay: 0, minutesPerToken: 1, recTokensPerDay: 0, rolloverDays: 1, needThisPerDay: 0, graceMode: false });
+        const state = start(now, { watchTokensPerDay: 0, minutesPerToken: 1, recTokensPerDay: 0, rolloverDays: 1, needThisPerWeek: 0, graceMode: false });
         // Nothing watched for days, then under a minute today.
         for (let i = 9; i >= 1; i--) state.log[Drip.addDays(state.day, -i)] = entry(0, { watchSpent: 0 });
         state.log[state.day] = entry(0.5, { watchSpent: 0 });
         state.pending = {
           effectiveDay: Drip.addDays(state.day, 1),
-          changes: { watchTokensPerDay: 48, minutesPerToken: 120, recTokensPerDay: 100, rolloverDays: 7, resetHour: 23, graceMode: true, needThisPerDay: 10 },
+          changes: { watchTokensPerDay: 48, minutesPerToken: 120, recTokensPerDay: 100, rolloverDays: 7, resetHour: 23, graceMode: true, needThisPerWeek: 20 },
         };
         return state;
       },
@@ -154,7 +155,7 @@
         for (let i = 0; i < 7; i++) state.log[Drip.addDays(thisSunday, -7 + i)] = entry(60);
         // This week so far: exactly 1 hour a day too, so "Same as last week", and the bars touch a 1h scale.
         for (let day = thisSunday; day <= state.day; day = Drip.addDays(day, 1)) state.log[day] = entry(60);
-        // Today: one card, saved, and one of two unlocks used.
+        // Today: one card, saved, and one of the week's three unlocks used.
         state.log[state.day] = entry(60, { recSpent: 1, saved: 1, needThis: [use(state.day, 3)] });
         return state;
       },
