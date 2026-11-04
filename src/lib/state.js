@@ -1091,9 +1091,18 @@
     for (const video of [...state.backlog]) removeBacklog(state, video.id);
     // Emptying the allow list tightens, so it's at once, and waiting allows go too. Emptying the block list loosens,
     // so it waits (CHANNEL-LISTS-PLAN.md, call 14).
-    for (const channel of [...state.channels.allow, ...(state.channelsPending ? state.channelsPending.allow : [])]) removeAllowed(state, channel);
-    for (const channel of [...state.channels.block]) unblockChannel(state, channel, now);
-    return { ok: true, applied: settings.applied, pending: settings.pending, stashCleared: cleared };
+    const allowing = [...state.channels.allow, ...(state.channelsPending ? state.channelsPending.allow : [])];
+    for (const channel of allowing) removeAllowed(state, channel);
+    let unblocked = 0;
+    let unblocking = 0;
+    for (const channel of [...state.channels.block]) {
+      if (unblockChannel(state, channel, now).waits) unblocking++;
+      else unblocked++;
+    }
+    return {
+      ok: true, applied: settings.applied, pending: settings.pending, stashCleared: cleared,
+      allowCleared: allowing.length, unblocked, unblocking,
+    };
   }
 
 
