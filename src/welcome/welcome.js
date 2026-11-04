@@ -12,7 +12,7 @@
   /** @type {any} */
   const DripStash = /** @type {any} */ (globalThis).DripStash;
   /** @type {any} */
-  const { h, icon, price, hourLabel, cardMenu, updateCardMenu, blockedCardView } = /** @type {any} */ (globalThis).DripUI;
+  const { h, icon, price, hourLabel, dayTimeLabel, cardMenu, updateCardMenu, blockedCardView } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
   /** @type {any} */
@@ -450,7 +450,7 @@
     counted: () => parts.cards === 'limited',
     clock: () => parts.clock,
     stash: () => parts.stash,
-    needLeft: () => Math.max(0, sand.settings.needThisPerDay - sand.unlocked.length),
+    needLeft: () => Drip.needThisLeft(sand, Date.now()),
     resetLabel: () => hourLabel(sand.settings.resetHour),
     carries: () => sand.settings.rolloverDays > 1,
     nextStep: () => STEPS[step + 1]?.id || '',
@@ -1158,7 +1158,9 @@
 
     const panel = () => {
       const s = sand.settings;
-      const needLeft = Math.max(0, s.needThisPerDay - sand.unlocked.length);
+      const now = Date.now();
+      const needLeft = Drip.needThisLeft(sand, now);
+      const needBack = Drip.needThisBack(sand, now);
       const canBuy = sand.tokens.watch > 0;
       /** @type {HTMLTextAreaElement} */
       const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?' }));
@@ -1172,18 +1174,20 @@
           stage.append(again());
           coach.did('unlock');
         } else {
-          note = res.error === 'reason-required' ? 'Write a few words about why.' : "You've used all of today's unlocks.";
+          note = res.error === 'reason-required' ? 'Write a few words about why.' : "You've used this week's unlocks.";
           redraw();
         }
       };
       const unlocks = needLeft > 0 && !reasonOpen
-        ? h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = true; redraw(); stage.querySelector('textarea')?.focus(); coach.did('reason'); } }, `I need this one · ${needLeft} left`)
+        ? h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = true; redraw(); stage.querySelector('textarea')?.focus(); coach.did('reason'); } }, `I need this one · ${needLeft} left this week`)
         : needLeft > 0
           ? h('div', { class: 'drip-reason' }, reason,
             h('div', { class: 'drip-reason-row' },
               h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = false; note = ''; redraw(); coach.did('cancel'); } }, 'Cancel'),
               h('button', { class: 'drip-b drip-b-gray', onclick: unlock }, icon('unlock'), h('span', {}, 'Unlock this video'))))
-          : h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`);
+          : h('div', {},
+            h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`),
+            needBack > 0 && h('div', { class: 'drip-lock-note' }, `Next unlock back ${dayTimeLabel(needBack, now)}.`));
       return h('div', { class: 'drip-lock-panel', role: 'group', 'aria-label': 'The lock' },
         h('h2', { class: 'drip-lock-title' }, canBuy ? 'Time for a breather.' : "You've had your fill."),
         h('div', { class: 'drip-lock-sub' }, watchedLine()),

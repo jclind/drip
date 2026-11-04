@@ -63,8 +63,11 @@ test('clear buttons empty what they name, and fresh starts over', () => {
   D.addBacklog(state, { id: 'bbb', title: 'B' });
   D.reveal(state, [{ id: 'ccc', title: 'C' }]);
   D.needThis(state, 'ddd', 'D', 'a reason', time(7));
+  state.log['2026-09-20'] = { ...structuredClone(D.logDay(state)), needThis: [{ videoId: 'old', title: '', reason: 'long ago', at: time(7) - 20 * 864e5 }] };
   D.devAction(state, 'clear-unlocks', time(7));
   assert.deepEqual(state.unlocked, []);
+  assert.equal(D.needThisLeft(state, time(7)), 3, "the week's count starts over");
+  assert.equal(state.log['2026-09-20'].needThis.length, 1, 'uses older than the week stay in History');
   D.devAction(state, 'clear-backlog', time(7));
   assert.deepEqual(state.backlog, []);
   D.devAction(state, 'clear-seen', time(7));

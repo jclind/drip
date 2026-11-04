@@ -174,3 +174,21 @@ test('import skips log days that are not real dates or older than the 90 days ke
   assert.equal(res.daysAdded, 1);
   assert.doesNotThrow(() => D.weekView(state, 0));
 });
+
+test('imported "I need this one" uses from the last 7 days count against the week (DRY-HOURS-PLAN.md A6)', () => {
+  const from = settled();
+  from.log['2026-10-03'] = { ...D.logDay(from), needThis: [{ videoId: 'x', title: 'X', reason: 'class', at: time(3) }, { videoId: 'y', title: 'Y', reason: 'class', at: time(3, 13) }] };
+  const file = JSON.parse(JSON.stringify(D.exportData(from, NOW)));
+  assert.equal(file.log['2026-10-03'].needThis.length, 2, 'export keeps the uses');
+  const to = settled();
+  D.importData(to, file, NOW);
+  assert.equal(D.needThisUsed(to, NOW), 2);
+  assert.equal(D.needThisLeft(to, NOW), 1);
+});
+
+test('reset keeps the week of "I need this one" uses', () => {
+  const state = settled();
+  D.needThis(state, 'a', 'A', 'Study', NOW);
+  D.resetData(state, NOW);
+  assert.equal(D.needThisUsed(state, NOW), 1);
+});

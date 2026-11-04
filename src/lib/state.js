@@ -53,7 +53,7 @@
  * @property {number} rolloverDays
  * @property {number} resetHour
  * @property {boolean} graceMode
- * @property {number} needThisPerDay
+ * @property {number} needThisPerWeek "I need this one" uses in any 7 × 24 hours (Q20).
  * @property {'home' | 'subscriptions'} feedSource
  * @property {number} stashMax The most videos the stash holds (Q28).
  * @property {boolean} searchCap Search stops at 10 results (Q15). A mode part (Q29).
@@ -105,7 +105,7 @@
     rolloverDays: 2,
     resetHour: 4,
     graceMode: false,
-    needThisPerDay: 2,
+    needThisPerWeek: 3,
     feedSource: 'home',
     stashMax: 10,
     searchCap: true,
@@ -132,7 +132,7 @@
   const ranges = {
     watchTokensPerDay: [0, 48], minutesPerToken: [1, 120],
     recTokensPerDay: [0, 100], rolloverDays: [1, 7],
-    resetHour: [0, 23], needThisPerDay: [0, 10], stashMax: [1, 50],
+    resetHour: [0, 23], needThisPerWeek: [0, 20], stashMax: [1, 50],
   };
 
   /** @param {number} now @param {number} resetHour */
@@ -587,10 +587,53 @@
     title = String(title);
     if (trimmed.length < 3) return { ok: false, error: 'reason-required' };
     if (state.unlocked.includes(videoId)) return { ok: true };
-    if (state.unlocked.length >= state.settings.needThisPerDay) return { ok: false, error: 'need-this-limit' };
+    if (needThisLeft(state, now) < 1) return { ok: false, error: 'need-this-limit' };
     state.unlocked.push(videoId);
     logDay(state).needThis.push({ videoId, title, reason: trimmed, at: now });
     return { ok: true };
+  }
+
+  const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+  /**
+   * When each "I need this one" in the last 7 × 24 hours was used, oldest first (Q20, DRY-HOURS-PLAN.md A2). A use with
+   * no time never counts. One from the future, after the computer's clock went back, counts as now.
+   * @param {State} state @param {number} now @returns {number[]}
+   */
+  function weekUses(state, now) {
+    /** @type {number[]} */
+    const times = [];
+    for (const entry of Object.values(state.log || {})) {
+      for (const use of Array.isArray(entry?.needThis) ? entry.needThis : []) {
+        const at = use?.at;
+        if (typeof at !== 'number' || !Number.isFinite(at) || at <= 0) continue;
+        const when = Math.min(at, now);
+        if (now - when < WEEK_MS) times.push(when);
+      }
+    }
+    return times.sort((a, b) => a - b);
+  }
+
+  /** "I need this one" uses in the last 7 × 24 hours. @param {State} state @param {number} now */
+  function needThisUsed(state, now) {
+    return weekUses(state, now).length;
+  }
+
+  /** @param {State} state @param {number} now */
+  function needThisLeft(state, now) {
+    return Math.max(0, state.settings.needThisPerWeek - needThisUsed(state, now));
+  }
+
+  /**
+   * When the next "I need this one" comes back, in ms, or 0 while some are left or the limit is 0. With more uses than
+   * the limit, after it was lowered, enough of the oldest have to age out first.
+   * @param {State} state @param {number} now
+   */
+  function needThisBack(state, now) {
+    const limit = state.settings.needThisPerWeek;
+    const times = weekUses(state, now);
+    if (limit <= 0 || times.length < limit) return 0;
+    return times[times.length - limit] + WEEK_MS;
   }
 
   /** @param {unknown} changes @returns {Partial<Settings>} */
@@ -898,7 +941,12 @@
         state.settings.graceMode = !state.settings.graceMode;
         cancelPending(state, 'graceMode');
         break;
-      case 'clear-unlocks': state.unlocked = []; state.allowedToday = []; break;
+      case 'clear-unlocks':
+        state.unlocked = [];
+        state.allowedToday = [];
+        // The week's count comes from the log (Q20), so its uses go too, or the lock would still say 0 left.
+        for (const entry of Object.values(state.log)) entry.needThis = entry.needThis.filter((use) => !(use.at > 0 && now - Math.min(use.at, now) < WEEK_MS));
+        break;
       case 'first-day-off': state.firstDayOff = true; break;
       case 'first-day-on': state.firstDayOff = false; break;
       case 'clear-backlog': state.backlog = []; break;
@@ -1445,7 +1493,7 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
+    firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,

@@ -76,6 +76,23 @@
     return `${h12}:00${hour < 12 ? 'am' : 'pm'}`;
   }
 
+  /**
+   * "today at 9:14pm", "tomorrow at 9:14pm", "Friday at 9:14pm", or "next Wednesday at 9:14pm" a week out.
+   * @param {number} ms @param {number} now
+   */
+  function dayTimeLabel(ms, now) {
+    const date = new Date(ms);
+    const hour = date.getHours();
+    const time = `${hour % 12 === 0 ? 12 : hour % 12}:${String(date.getMinutes()).padStart(2, '0')}${hour < 12 ? 'am' : 'pm'}`;
+    const today = new Date(now);
+    const days = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+      - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000);
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    // A week out lands on today's weekday, where a bare "Wednesday" would read as today.
+    const day = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : days >= 7 ? `next ${weekday}` : weekday;
+    return `${day} at ${time}`;
+  }
+
   /** @param {string} id */
   function watchUrl(id) {
     return `/watch?v=${encodeURIComponent(id)}`;
@@ -252,5 +269,5 @@
   // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
   const KEPT_KEY = 'drip-kept';
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, dayTimeLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
 })();

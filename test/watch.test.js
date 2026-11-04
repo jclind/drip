@@ -52,7 +52,8 @@ class FakeElement {
   removeAttribute(k) { this.attrs.delete(k); }
   /** @param {string} k @param {boolean} [on] */
   toggleAttribute(k, on) { if (on ?? !this.attrs.has(k)) this.attrs.set(k, ''); else this.attrs.delete(k); }
-  addEventListener() {}
+  /** Kept so a test can press a lock button, never fired on its own. @param {string} type @param {Function} fn */
+  addEventListener(type, fn) { (this.listeners ||= {})[type] = fn; }
   /** @param {...any} kids */
   append(...kids) { for (const k of kids) { if (k instanceof FakeElement) k.parent = this; this.children.push(k); } }
   /** @param {...any} kids */
@@ -207,6 +208,19 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     pill: () => document.getElementById('drip-pill'),
     locked: () => !!document.getElementById('drip-lock'),
     lockText: () => document.getElementById('drip-lock')?.textContent || '',
+    /** Presses the lock button with this data-k. @param {string} k */
+    press: async (k) => {
+      const button = document.getElementById('drip-lock')?.all().find((/** @type {any} */ el) => el.getAttribute('data-k') === k);
+      assert.ok(button, `no lock button ${k}`);
+      button.listeners.click({ detail: 1 });
+      await settle();
+    },
+    /** Types into the lock's reason box. @param {string} text */
+    type: (text) => {
+      const box = document.getElementById('drip-lock')?.all().find((/** @type {any} */ el) => el.tagName === 'TEXTAREA');
+      assert.ok(box, 'no reason box');
+      box.value = text;
+    },
     /** Runs watch.js's 1-second tick. */
     tick: async () => { await /** @type {Function} */ ([...intervals.values()].find((fn) => fn.name === 'tick'))(); await settle(); },
     /** @param {string} id */
@@ -258,6 +272,7 @@ function makeWorld() {
         }
       } else if (msg.type === 'status') result = { ok: true, ...D.watchStatus(world.state, msg.videoId) };
       else if (msg.type === 'spendWatch') result = D.spendWatch(world.state);
+      else if (msg.type === 'needThis') result = D.needThis(world.state, msg.videoId, msg.title || '', msg.reason || '', now);
       else result = { ok: true };
       const saved = structuredClone(world.state);
       for (const fn of world.listeners) fn({ drip: { newValue: saved } }, 'local');
@@ -439,17 +454,49 @@ test('the lock screen says what can still happen: buy minutes, unlock, or nothin
   assert.doesNotMatch(tab.lockText(), /last Monday/, 'no log a week back, so no comparison');
   assert.match(tab.lockText(), /\+15m/);
   assert.match(tab.lockText(), /Done for now/);
-  assert.match(tab.lockText(), /I need this one · 2 left/);
+  assert.match(tab.lockText(), /I need this one · 3 left this week/);
   assert.doesNotMatch(tab.lockText(), /token/i);
+  assert.doesNotMatch(tab.lockText(), /Next unlock back/);
 
   world.state.tokens.watch = 0;
-  world.state.unlocked = ['x', 'y'];
   world.state.log['2026-09-29'] = { ...structuredClone(world.state.log[world.state.day]), watchedSec: 3000 };
+  // Three uses this week, the oldest on Friday the 2nd at 9:14pm, so the next one comes back Friday the 9th.
+  const at = new Date(2026, 9, 2, 21, 14).getTime();
+  world.state.log['2026-10-02'] = { ...structuredClone(world.state.log[world.state.day]), needThis: [{ videoId: 'x', title: '', reason: 'Class', at }] };
+  world.state.log[world.state.day].needThis = [{ videoId: 'y', title: '', reason: 'Class', at: at + 3600e3 }, { videoId: 'z', title: '', reason: 'Class', at: at + 7200e3 }];
   await tab.second();
   assert.match(tab.lockText(), /^You've had your fill\./);
   assert.match(tab.lockText(), /· 50m last Tuesday/);
   assert.doesNotMatch(tab.lockText(), /\+15m|I need this one/);
   assert.match(tab.lockText(), /The glass refills at 4:00am\./);
+  assert.match(tab.lockText(), /Next unlock back Friday at 9:14pm\./);
+});
+
+test('a lock left open past midnight turns "tomorrow" into "today" (Codex, 2026-11-04)', async () => {
+  const { world, tab } = await setup(3);
+  world.state.tokens.watch = 0;
+  // The oldest use comes back at 9:14am on the 7th, tomorrow.
+  const at = new Date(2026, 8, 30, 9, 14).getTime();
+  world.state.log['2026-09-30'] = { ...structuredClone(world.D.logDay(world.state)), needThis: [{ videoId: 'x', title: '', reason: 'Class', at }] };
+  world.state.log[world.state.day] = { ...structuredClone(world.D.logDay(world.state)), needThis: [1, 2].map((n) => ({ videoId: `v${n}`, title: '', reason: 'Class', at: world.epoch - n * 60e3 })) };
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /Next unlock back tomorrow at 9:14am\./);
+  world.advance(12 * 3600 + 60);
+  for (let i = 0; i < 30; i++) await tab.second();
+  assert.match(tab.lockText(), /Next unlock back today at 9:14am\./);
+});
+
+test("a failed unlock says the week's unlocks are used", async () => {
+  const { world, tab } = await setup(3);
+  await play(world, tab, 5);
+  await tab.press('need');
+  tab.type('For school');
+  // Another tab used the week's last one while the reason was being typed.
+  world.state.log[world.state.day].needThis = [1, 2, 3].map((n) => ({ videoId: `v${n}`, title: '', reason: 'Class', at: world.epoch - n * 60e3 }));
+  await tab.press('unlock');
+  assert.match(tab.lockText(), /You've used this week's unlocks\./);
+  assert.doesNotMatch(tab.lockText(), /left this week|Unlock this video/, 'the lock stops offering one');
+  assert.match(tab.lockText(), /Next unlock back next Tuesday at 11:57am\./);
 });
 
 test("time played before a navigation is charged to the video it played on (finding 12)", async () => {

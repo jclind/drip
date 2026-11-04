@@ -111,7 +111,7 @@
       `Day ${state.day}, resets at ${hourLabel(s.resetHour)}`,
       `${Drip.formatMinutes(state.watchSecondsLeft)} left (${Math.round(state.watchSecondsLeft)}s)`,
       `Watch tokens ${state.tokens.watch} · rec tokens ${state.tokens.rec}`,
-      `Unlocks ${state.unlocked.length} of ${s.needThisPerDay} · grace ${s.graceMode ? 'on' : 'off'}`,
+      `Unlocks ${Drip.needThisUsed(state, Date.now())} used this week, ${Drip.needThisLeft(state, Date.now())} left · grace ${s.graceMode ? 'on' : 'off'}`,
       `Pending: ${pending}`,
     ];
   }

@@ -65,7 +65,7 @@ function load() {
       return p && find(p);
     },
   };
-  const state = { day: '2026-10-07', settings: { resetHour: 4, needThisPerDay: 2, graceMode: false }, watchSecondsLeft: 0, tokens: { watch: 4, rec: 10 }, unlocked: [], pending: null };
+  const state = { day: '2026-10-07', settings: { resetHour: 4, needThisPerWeek: 3, graceMode: false }, log: {}, watchSecondsLeft: 0, tokens: { watch: 4, rec: 10 }, unlocked: [], pending: null };
   const context = /** @type {any} */ ({
     document: { documentElement: root, createElement: (/** @type {string} */ t) => new El(t), querySelector: () => null },
     localStorage: { getItem: () => null, setItem() {} },

@@ -27,7 +27,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q17 | Name: `drip` (tentative). |
 | Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. While a card is up, Watch is free if minutes are left. At 0 minutes it reads "Watch · -1 drop", and clicking it buys one watch token's minutes and starts the video. "+15 min" shows only when no card is up (Jesse, 2026-10-07; built 2026-10-10). |
 | Q19 | Background audio counts like any watching. `music.youtube.com` is out of scope. |
-| Q20 | "I need this one" on the overlay: typed reason, unlocks that one video for the day without draining minutes, 2 per day, every use logged. |
+| Q20 | "I need this one" on the overlay: typed reason, unlocks that one video for the day without draining minutes, every use logged. 3 a week, over the last 7 days (Jesse, 2026-11-04; it was 2 per day). |
 | Q21 | Log per day: seconds watched, tokens spent, reveals saved or passed, "I need this" reasons. Keep 90 days. Show today plus the 7 days before it, 8 rows, so today sits next to the same weekday last week (Claude's pick, Jesse deferred, 2026-10-06). Jesse's Settings mockups replaced the 8 rows with the History card, a week at a time (2026-10-09, built 2026-10-11). |
 | Q22 | Popup shows balances and minutes left, plus a Settings link. No spend buttons. |
 | Q23 | v1 is the core loop. The rest of the blocking is step 2. |
@@ -125,11 +125,11 @@ Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Pa
 
 - Headline: "You've had your fill." when no watch tokens are left, "Time for a breather." when there are tokens to buy minutes. Jesse's lines.
 - "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds. The pill's low-time shimmer is the only other one. Clicking it sends rings through the panel, and the water falls away onto the home page.
-- "+15 min · -1 drop" is the gray secondary button, with white text. "I need this one · 2 left" is a gray text link, and its reason box gets no animation.
+- "+15 min · -1 drop" is the gray secondary button, with white text. "I need this one · 2 left this week" is a gray text link, and its reason box gets no animation. The count is the rolling 7 days of Q20.
 - Layout, top to bottom: headline, a gray line "1 h 15 min watched today · 50 min last Tuesday" (only the first half when last week has no data), the two buttons with Done for now on the right, then the link. No token counts on this screen; the headline already says whether minutes can be bought. Jesse's mockup, 2026-10-07.
 - "+15 min" keeps its clock icon here and on the home page, so it looks the same everywhere.
 - The paused frame behind the panel is blurred and tinted blue, as if underwater.
-- "You've had your fill." drops the gray button and leaves Done for now alone in the middle. When the unlocks are gone too, "The glass refills at 4:00am." (the reset hour) takes the link's place.
+- "You've had your fill." drops the gray button and leaves Done for now alone in the middle. When the unlocks are gone too, "The glass refills at 4:00am." (the reset hour) takes the link's place, with "Next unlock back Friday at 9:14pm." under it (DRY-HOURS-PLAN.md A5, Claude's wording). A failed unlock says "You've used this week's unlocks."
 - Leaving the lock screen with drops unspent says so on the home page. It was the gray line "Kept 3 drops." until 2026-10-13, when Jesse's pick replaced it: the drops fall into the drop counter and a gray "3 kept" tag slides out beside it (see "The counter's motion as built").
 - Jesse confirmed these on 2026-10-07.
 
@@ -389,7 +389,7 @@ Each tab measures how long its video played and sends it as `seconds`, every 5 s
     rolloverDays: 2,        // int 1..7, balance cap is perDay * rolloverDays
     resetHour: 4,           // int 0..23, local hour the day turns over
     graceMode: false,       // finish the current video when time runs out
-    needThisPerDay: 2,      // int 0..10
+    needThisPerWeek: 3,     // int 0..20, uses in any 7 × 24 hours (Q20)
     feedSource: 'home',     // 'home' | 'subscriptions'
     stashMax: 10,           // int 1..50, the most videos the stash holds (Q28)
   },
@@ -439,7 +439,8 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, watched, needThis: [
 - `charge(state, seconds, videoId)` adds `seconds` to the log's `watchedSec`. Unless `videoId` is unlocked, it subtracts from `watchSecondsLeft`, never below 0. Returns `watchStatus`.
 - `chargeTick(state, clock, now, seconds, videoId, agoMs = 0, key = '')` moves `now` back by `agoMs` (clamped to an hour), then clamps seconds to 0..3600. With a `key`, it takes off the seconds already charged under that key and records the new total in `clock.ticks`, keeping the last 20. Zero ticks return `watchStatus` without touching the clock. Unlocked videos log those seconds and return `watchStatus` without touching the clock. Paid ticks clear a marker later than `now`, advance `clock.lastChargeEnd` to `now`, and return `charge` for only the interval after the previous end.
 - `watchStatus(state, videoId)` returns `{ secondsLeft, unlocked, locked }`, where `locked` means 0 seconds left and the video isn't unlocked.
-- `needThis(state, videoId, title, reason, now)` unlocks the video for today and logs the reason. Errors, in order: `'bad-video'` if `videoId` isn't a video id string, `'reason-required'` if the trimmed reason is under 3 characters, `'need-this-limit'` if `unlocked.length >= needThisPerDay`. Unlocking a video that's already unlocked is `ok` and doesn't count again.
+- `needThis(state, videoId, title, reason, now)` unlocks the video for today and logs the reason. Errors, in order: `'bad-video'` if `videoId` isn't a video id string, `'reason-required'` if the trimmed reason is under 3 characters, `'need-this-limit'` if `needThisLeft(state, now) < 1`. Unlocking a video that's already unlocked today is `ok` and doesn't count again. `unlocked` is still today's free list and empties at the reset; the count comes from the log.
+- `needThisUsed(state, now)` counts logged uses whose `at` is within the last 7 × 24 hours. A use with no `at` never counts, and one in the future counts as now. `needThisLeft(state, now)` is `needThisPerWeek` minus that, at least 0. `needThisBack(state, now)` is when the next one comes back, in ms, or 0 while some are left or the limit is 0.
 - `cleanSettings(changes)` returns only known keys with valid values. Integers get rounded and clamped to their range, `graceMode` becomes a boolean, `feedSource` must be one of the two values or is dropped.
 - `isLoosening(key, from, to)`. The numeric keys loosen when they go up. `graceMode` loosens going from false to true. Any change to `resetHour` counts as loosening. `feedSource` never does.
 - `updateSettings(state, changes, now)` cleans the changes, then for each key that differs from the current value it either applies it now (tightening or neutral) or puts it in `pending` with `effectiveDay = addDays(state.day, 1)`. Applying a key now removes any pending value for that key. Setting a key back to its current value removes its pending value too. An empty `pending.changes` becomes `null`. Balances above the new cap (`perDay * rolloverDays`) drop to it at once. Returns `{ ok: true, applied: {...}, pending: {...} }` listing just what this call did. In the first day after install (`firstDayUntil(state, now)` is nonzero) every key applies now (Q6). There a new daily allowance also moves today's balance by the difference, floored at 0, so 4 to 6 drops a day shows 6 today and going back takes them away. A new reset hour on that day moves `state.day` forward when the new hour already passed today, and never back, so changing it can't start a new day and refill (Claude's calls, 2026-10-13). Without `now`, the first day doesn't count.

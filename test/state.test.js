@@ -24,7 +24,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'planned', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
-    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'cleanSettings',
+    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUsed', 'needThisLeft', 'needThisBack', 'cleanSettings',
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData',
@@ -34,7 +34,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
     watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10,
-    rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home', stashMax: 10,
+    rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerWeek: 3, feedSource: 'home', stashMax: 10,
     searchCap: true, cards: 'limited', clock: true, stash: true, hideBell: true, hideShorts: true, streams: false,
   });
   assert.ok(Object.isFrozen(D.MODES));
@@ -644,37 +644,141 @@ test('unlocked videos still log watched seconds without draining the balance', (
   assert.equal(D.logDay(state).watchedSec, 100);
 });
 
-test('needThis validates a trimmed reason, logs its text and time, and enforces the daily limit', () => {
+const DAY_MS = 24 * 3600 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+/** Adds a logged "I need this one" use, as needThis would have on that day. @param {ReturnType<typeof fresh>} state @param {string} day @param {number} at */
+function logUse(state, day, at, videoId = `v${at}`) {
+  if (!state.log[day]) state.log[day] = structuredClone(D.logDay(state));
+  state.log[day].needThis.push({ videoId, title: '', reason: 'Old reason', at });
+}
+
+test('needThis validates a trimmed reason, logs its text and time, and enforces the weekly limit', () => {
   const state = fresh();
   refusesUnchanged(state, () => D.needThis(state, 'a', 'A', '  ab ', time(5)), 'reason-required');
   assert.deepEqual(D.needThis(state, 'a', 'A', '  Work tutorial  ', time(5)), { ok: true });
   assert.deepEqual(D.logDay(state).needThis, [{ videoId: 'a', title: 'A', reason: 'Work tutorial', at: time(5) }]);
   assert.deepEqual(D.needThis(state, 'b', 'B', 'Homework', time(5)), { ok: true });
-  refusesUnchanged(state, () => D.needThis(state, 'c', 'C', 'ab', time(5)), 'reason-required');
-  refusesUnchanged(state, () => D.needThis(state, 'c', 'C', 'Homework', time(5)), 'need-this-limit');
+  assert.deepEqual(D.needThis(state, 'c', 'C', 'Homework', time(5)), { ok: true });
+  refusesUnchanged(state, () => D.needThis(state, 'd', 'D', 'ab', time(5)), 'reason-required');
+  refusesUnchanged(state, () => D.needThis(state, 'd', 'D', 'Homework', time(5)), 'need-this-limit');
   const before = structuredClone(state);
-  assert.deepEqual(D.needThis(state, 'a', 'A', 'Different reason', time(5)), { ok: true });
+  assert.deepEqual(D.needThis(state, 'a', 'A', 'Different reason', time(5)), { ok: true }, 'the same video twice in a day costs nothing');
   assert.deepEqual(state, before);
   refusesUnchanged(state, () => D.needThis(state, 'a', 'A', 'ab', time(5)), 'reason-required');
+  // The reset empties the free list but not the week's count.
   D.rollDay(state, time(6));
-  assert.deepEqual(D.needThis(state, 'c', 'C', 'Homework', time(6)), { ok: true });
-  assert.equal(D.logDay(state).needThis.length, 1);
+  assert.deepEqual(state.unlocked, []);
+  refusesUnchanged(state, () => D.needThis(state, 'd', 'D', 'Homework', time(6)), 'need-this-limit');
+  refusesUnchanged(state, () => D.needThis(state, 'a', 'A', 'Homework', time(6)), 'need-this-limit');
+});
+
+test('needThis allows again once the oldest use in the week ages out', () => {
+  const state = fresh();
+  D.needThis(state, 'a', 'A', 'Study', time(5, 12));
+  D.needThis(state, 'b', 'B', 'Study', time(5, 13));
+  D.needThis(state, 'c', 'C', 'Study', time(5, 14));
+  D.rollDay(state, time(12, 11));
+  assert.equal(D.needThisBack(state, time(12, 11)), time(5, 12) + WEEK_MS);
+  refusesUnchanged(state, () => D.needThis(state, 'a', 'A', 'Study again', time(12, 11, 59)), 'need-this-limit');
+  assert.deepEqual(D.needThis(state, 'a', 'A', 'Study again', time(5, 12) + WEEK_MS), { ok: true }, "a video unlocked last week costs a new one today");
+  assert.equal(D.needThisLeft(state, time(5, 12) + WEEK_MS), 0);
+  assert.equal(D.needThisBack(state, time(5, 12) + WEEK_MS), time(5, 13) + WEEK_MS);
 });
 
 test('needThis allowance zero refuses without creating a log', () => {
   const state = fresh();
-  state.settings.needThisPerDay = 0;
+  state.settings.needThisPerWeek = 0;
   refusesUnchanged(state, () => D.needThis(state, 'a', 'A', 'Study', time(5)), 'need-this-limit');
 });
 
+test('the week counts uses within the last 7 × 24 hours, across resets', () => {
+  const now = time(12, 12);
+  const state = D.initialState(now);
+  assert.equal(D.needThisUsed(state, now), 0);
+  assert.equal(D.needThisLeft(state, now), 3);
+  logUse(state, '2026-10-06', now - 6 * DAY_MS);
+  assert.equal(D.needThisUsed(state, now), 1, '6 days ago counts');
+  logUse(state, '2026-10-05', now - WEEK_MS);
+  assert.equal(D.needThisUsed(state, now), 1, 'exactly 7 days ago has aged out');
+  logUse(state, '2026-10-05', now - WEEK_MS - 60000);
+  assert.equal(D.needThisUsed(state, now), 1, '7 days and a minute ago has aged out');
+  logUse(state, '2026-10-11', now - DAY_MS);
+  assert.equal(D.needThisUsed(state, now), 2, 'yesterday, before the reset, counts');
+  assert.equal(D.needThisLeft(state, now), 1);
+});
+
+test('a use with no time never counts, and one in the future counts as now', () => {
+  const now = time(12, 12);
+  const state = D.initialState(now);
+  logUse(state, '2026-10-11', 0);
+  state.log['2026-10-11'].needThis.push(/** @type {any} */ ({ videoId: 'x', title: '', reason: 'No time' }));
+  state.log['2026-10-11'].needThis.push(/** @type {any} */ ({ videoId: 'y', title: '', reason: 'Bad time', at: 'soon' }));
+  assert.equal(D.needThisUsed(state, now), 0);
+  logUse(state, '2026-10-12', now + 3 * DAY_MS);
+  assert.equal(D.needThisUsed(state, now), 1, 'after the clock went back');
+  assert.equal(D.needThisUsed(state, now + 6 * DAY_MS), 1, 'and it still counts as used no later than now');
+});
+
+test('needThisLeft never goes below zero, and needThisBack says when one comes back', () => {
+  const now = time(12, 12);
+  const state = D.initialState(now);
+  assert.equal(D.needThisBack(state, now), 0, 'nothing to wait for while some are left');
+  logUse(state, '2026-10-06', now - 6 * DAY_MS);
+  logUse(state, '2026-10-08', now - 4 * DAY_MS);
+  logUse(state, '2026-10-10', now - 2 * DAY_MS);
+  assert.equal(D.needThisLeft(state, now), 0);
+  assert.equal(D.needThisBack(state, now), now + DAY_MS, 'the oldest use plus 7 days');
+  // Lowered from 3 to 1: all three have to age out before one is free.
+  state.settings.needThisPerWeek = 1;
+  assert.equal(D.needThisLeft(state, now), 0);
+  assert.equal(D.needThisBack(state, now), now + 5 * DAY_MS);
+  state.settings.needThisPerWeek = 2;
+  assert.equal(D.needThisBack(state, now), now + 3 * DAY_MS, 'at 2, the two oldest');
+  state.settings.needThisPerWeek = 0;
+  assert.equal(D.needThisBack(state, now), 0, 'none ever come back at a limit of 0');
+  state.settings.needThisPerWeek = 5;
+  assert.equal(D.needThisLeft(state, now), 2);
+  assert.equal(D.needThisBack(state, now), 0);
+});
+
+test('raising the weekly count waits for the reset, lowering applies, and the first day applies both', () => {
+  const state = fresh();
+  assert.deepEqual(D.updateSettings(state, { needThisPerWeek: 5 }).pending, { needThisPerWeek: 5 });
+  assert.equal(state.settings.needThisPerWeek, 3);
+  assert.deepEqual(D.updateSettings(state, { needThisPerWeek: 1 }).applied, { needThisPerWeek: 1 });
+  assert.equal(state.pending, null);
+  const firstDay = fresh();
+  assert.deepEqual(D.updateSettings(firstDay, { needThisPerWeek: 5 }, time(5, 13)).applied, { needThisPerWeek: 5 });
+  assert.deepEqual(D.updateSettings(firstDay, { needThisPerWeek: 2 }, time(5, 13)).applied, { needThisPerWeek: 2 });
+});
+
+test('the old daily setting drops away from stored state, waiting changes, and imports', () => {
+  const stored = fresh();
+  const raw = /** @type {any} */ (structuredClone(stored));
+  raw.settings.needThisPerDay = 7;
+  delete raw.settings.needThisPerWeek;
+  raw.pending = { effectiveDay: '2026-10-06', changes: { needThisPerDay: 9 } };
+  const state = D.hydrate(raw, time(5));
+  assert.equal('needThisPerDay' in state.settings, false);
+  assert.equal(state.settings.needThisPerWeek, 3);
+  assert.equal(state.pending, null);
+  const file = JSON.parse(JSON.stringify(D.exportData(fresh(), time(5))));
+  file.settings.needThisPerDay = 7;
+  delete file.settings.needThisPerWeek;
+  const into = fresh();
+  D.importData(into, file, time(5));
+  assert.equal('needThisPerDay' in into.settings, false);
+  assert.equal(into.settings.needThisPerWeek, 3);
+});
+
 test('cleanSettings rounds and clamps every numeric range, drops unknown and invalid values', () => {
-  assert.deepEqual(D.cleanSettings({ minutesPerToken: 0, recTokensPerDay: 500, watchTokensPerDay: 2.6, rolloverDays: 0, resetHour: 30, needThisPerDay: -1, stashMax: 0, unknown: 5, feedSource: 'bad', graceMode: 1 }), {
+  assert.deepEqual(D.cleanSettings({ minutesPerToken: 0, recTokensPerDay: 500, watchTokensPerDay: 2.6, rolloverDays: 0, resetHour: 30, needThisPerWeek: -1, stashMax: 0, unknown: 5, feedSource: 'bad', graceMode: 1 }), {
     minutesPerToken: 1, recTokensPerDay: 100, watchTokensPerDay: 3,
-    rolloverDays: 1, resetHour: 23, needThisPerDay: 0, stashMax: 1, graceMode: true,
+    rolloverDays: 1, resetHour: 23, needThisPerWeek: 0, stashMax: 1, graceMode: true,
   });
-  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerDay: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: 0 }), {
+  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerWeek: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: 0 }), {
     minutesPerToken: 120, recTokensPerDay: 0, watchTokensPerDay: 48,
-    rolloverDays: 7, resetHour: 0, needThisPerDay: 10, stashMax: 50, feedSource: 'subscriptions', graceMode: false,
+    rolloverDays: 7, resetHour: 0, needThisPerWeek: 20, stashMax: 50, feedSource: 'subscriptions', graceMode: false,
   });
   assert.deepEqual(D.cleanSettings({ recTokensPerDay: NaN, minutesPerToken: Infinity, resetHour: '5', watchTokensPerDay: null }), {});
   assert.deepEqual(D.cleanSettings({ streams: true }), { streams: true });
@@ -683,7 +787,7 @@ test('cleanSettings rounds and clamps every numeric range, drops unknown and inv
 });
 
 test('isLoosening classifies numeric limits, reset hour, grace mode, and feed', () => {
-  for (const key of /** @type {const} */ (['watchTokensPerDay', 'minutesPerToken', 'recTokensPerDay', 'rolloverDays', 'needThisPerDay', 'stashMax'])) {
+  for (const key of /** @type {const} */ (['watchTokensPerDay', 'minutesPerToken', 'recTokensPerDay', 'rolloverDays', 'needThisPerWeek', 'stashMax'])) {
     assert.equal(D.isLoosening(key, 1, 2), true);
     assert.equal(D.isLoosening(key, 2, 1), false);
     assert.equal(D.isLoosening(key, 2, 2), false);

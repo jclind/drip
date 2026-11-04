@@ -328,6 +328,11 @@ html[dark] #drip-lock {
   font-weight: 500;
 }
 
+/* "Next unlock back ..." sits right under the glass line, as one note. */
+#drip-lock .drip-lock-note + .drip-lock-note {
+  margin-top: 4px;
+}
+
 /* "I need this one" opens a plain box with no animation. Justifying should take a little effort. */
 #drip-lock .drip-reason {
   display: flex;
