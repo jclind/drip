@@ -252,8 +252,11 @@
   let armedFor = '';
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let armTimer;
+  /** When Block was armed. A second click sooner than DOUBLE_MS is one double-click, not two choices. */
+  let armedAt = 0;
   /** How long Block waits for its second click (design K, 2026-11-04). */
   const ARM_MS = 3000;
+  const DOUBLE_MS = 250;
 
   /** What's in flight: a reveal from the empty page, or Reveal next on a card. The page shows a placeholder for it. */
   /** @type {'' | 'reveal' | 'next'} */
@@ -1019,13 +1022,24 @@
     focusIn(opening ? 'block' : 'more');
   }
 
+  /**
+   * Closes the menu without redrawing the card. A redraw on pointerdown would replace the button being pressed, and its
+   * click would be lost (Codex, 2026-11-04). The next redraw draws it closed.
+   */
+  function dropMenu() {
+    closeMenu();
+    document.querySelector('#drip-home .drip-menu')?.remove();
+    document.querySelector('#drip-home [data-k="more"]')?.setAttribute('aria-expanded', 'false');
+  }
+
   /** @param {string} id */
   function pickBlock(id) {
     if (armedFor === id) {
-      onResolve('block', id);
+      if (Date.now() - armedAt >= DOUBLE_MS) onResolve('block', id);
       return;
     }
     armedFor = id;
+    armedAt = Date.now();
     clearTimeout(armTimer);
     armTimer = setTimeout(() => {
       armedFor = '';
@@ -1475,16 +1489,16 @@
     const root = h('div', { id: 'drip-home' });
     // A double-click's second click lands on whatever the first one drew there. With reduced motion, +15m bought two
     // drops and × said "Something went wrong" (2026-10-13). Nothing on the page needs a double-click.
+    // Block's second click is meant, so it's let through; pickBlock still ignores one that's part of a double-click.
     root.addEventListener('click', (e) => {
-      if (e.detail > 1) e.stopPropagation();
+      if (e.detail > 1 && !/** @type {Element} */ (e.target)?.closest?.('.drip-menu-item.is-armed')) e.stopPropagation();
     }, true);
     // Holding Enter repeats a button's click, and keyboard clicks get past the guard above. A repeat could carry on into
     // the Watch a finished reveal moves focus to, or start another Reveal next (Codex, 2026-10-16).
     root.addEventListener('keydown', (e) => {
       if (e.repeat && e.key === 'Enter') e.preventDefault();
       if (e.key === 'Escape' && menuFor) {
-        closeMenu();
-        render();
+        dropMenu();
         focusIn('more');
       }
     }, true);
@@ -1512,8 +1526,7 @@
   // A click anywhere but the card's ⋯ menu closes it.
   document.addEventListener('pointerdown', (e) => {
     if (!menuFor || /** @type {Element} */ (e.target)?.closest?.('.drip-card-menu')) return;
-    closeMenu();
-    render();
+    dropMenu();
   });
   // Back from the watch page can bring this page back from Chrome's cache, still waiting on Watch.
   window.addEventListener('pageshow', (e) => {

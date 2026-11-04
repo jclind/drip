@@ -663,9 +663,12 @@ for (const reduced of [true, false]) {
     await tab.advance(3000);
     assert.doesNotMatch(tab.button('block').getAttribute('class'), /is-armed/, 'the first click is forgotten after 3 seconds');
     await tab.click('block');
-    await tab.click('block');
+    await tab.click('block', 2);
+    assert.equal(world.state.channels.block.length, 0, 'a double-click is one click, not two choices');
+    await tab.advance(300);
+    await tab.click('block', 3);
     await tab.advance(100);
-    assert.deepEqual(world.state.channels.block, [{ ids: [], name: channel }]);
+    assert.deepEqual(world.state.channels.block, [{ ids: [], name: channel }], 'a later click blocks, even one the browser counts as a double-click');
     assert.equal(world.state.current, null);
     assert.equal(world.state.tokens.rec, 9);
     assert.equal(world.state.log[world.state.day].passed, 1);

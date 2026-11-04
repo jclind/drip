@@ -348,6 +348,7 @@
     motion++;
     moving = false;
     stopStep?.();
+    closeMenu();
     bringLock = null;
     for (const t of timers) clearTimeout(t);
     timers.clear();
@@ -567,16 +568,18 @@
     menuOpen = false;
     armed = false;
   }
+  /** Closes it without a redraw, which would replace the button being pressed (home.js dropMenu). */
+  function dropMenu() {
+    closeMenu();
+    stage.querySelector('.drip-menu')?.remove();
+    stage.querySelector('[data-k="more"]')?.setAttribute('aria-expanded', 'false');
+  }
   // A click elsewhere, or Escape, closes it.
   document.addEventListener('pointerdown', (e) => {
-    if (!menuOpen || /** @type {Element} */ (e.target)?.closest?.('.drip-card-menu')) return;
-    closeMenu();
-    drawHome();
+    if (menuOpen && !/** @type {Element} */ (e.target)?.closest?.('.drip-card-menu')) dropMenu();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !menuOpen) return;
-    closeMenu();
-    drawHome();
+    if (e.key === 'Escape' && menuOpen) dropMenu();
   });
 
   /** @param {any} video */
@@ -612,9 +615,10 @@
               return;
             }
             armed = true;
+            // Redraws only if the armed Block is still on screen, not over a step the tour has moved on to (Codex, 2026-11-04).
             armTimer = setTimeout(() => {
               armed = false;
-              drawHome();
+              if (stage.querySelector('.drip-menu-item.is-armed')) drawHome();
             }, 3000);
             drawHome();
           },
