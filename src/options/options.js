@@ -707,15 +707,31 @@ function words(parts) {
   return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
 }
 
-/** @param {string} text */
+/** A line under the buttons, for an export or a refusal. @param {string} text */
 function dataSays(text) {
-  $('dataResult').textContent = text;
+  $('dataResult').classList.remove('is-done');
+  $('dataResult').replaceChildren(text);
+}
+
+/**
+ * A finished import or reset: a panel with a check, a title, and one line per thing that changed. A one-line note
+ * under the buttons was too quiet for something this big (Jesse, 2026-11-03).
+ * @param {string} title @param {string[]} lines
+ */
+function dataDone(title, lines) {
+  const { h, icon } = DripPage;
+  const box = $('dataResult');
+  box.classList.add('is-done');
+  box.replaceChildren(
+    h('div', { class: 'done-title' }, icon('check'), title),
+    h('ul', {}, ...lines.map((line) => h('li', {}, line))));
+  box.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 /** "2 changes start at 4:00am.", or '' when nothing waits. @param {Record<string, any> | undefined} pending */
 function waitsLine(pending) {
   const n = Object.keys(pending || {}).length;
-  return n ? ` ${plural(n, 'change starts', 'changes start')} at ${resetLabel()}.` : '';
+  return n ? `${plural(n, 'change starts', 'changes start')} at ${resetLabel()}.` : '';
 }
 
 /**
@@ -774,12 +790,17 @@ async function importFile() {
   }
   afterData(res, kept);
   const added = [...counted(res.stashAdded, 'stashed video', 'stashed videos'), ...counted(res.daysAdded, 'day of history', 'days of history')];
-  const full = res.stashSkipped ? ` ${plural(res.stashSkipped, "video didn't", "videos didn't")} fit in the stash.` : '';
-  dataSays(`Imported.${added.length ? ` Added ${words(added)}.` : ''}${full}${waitsLine(res.pending)}`);
+  dataDone('Imported', [
+    'Settings now match the file.',
+    added.length ? `Added ${words(added)}.` : 'Nothing new for the stash or history.',
+    ...(res.stashSkipped ? [`${plural(res.stashSkipped, "video didn't", "videos didn't")} fit in the stash.`] : []),
+    ...(waitsLine(res.pending) ? [waitsLine(res.pending)] : []),
+  ]);
 }
 
 /** @param {boolean} open */
 function showResetConfirm(open) {
+  if (open) dataSays('');
   $('resetConfirm').hidden = !open;
   $('dataButtons').hidden = open;
   if (open) {
@@ -802,8 +823,12 @@ async function resetData() {
   if (!res || !res.ok || !res.state) return dataSays("Couldn't reset. Try again.");
   // A reset drops edits in progress too, since they were changes to the settings it just put back.
   afterData(res, {});
-  const cleared = res.stashCleared ? ` Emptied the stash of ${plural(res.stashCleared, 'video', 'videos')}.` : '';
-  dataSays(`Settings are back to how drip started.${cleared}${waitsLine(res.pending)}`);
+  dataDone('Reset', [
+    'Settings are back to how drip started.',
+    res.stashCleared ? `Emptied the stash of ${plural(res.stashCleared, 'video', 'videos')}.` : 'The stash was already empty.',
+    'Your history and today\'s drops and cards are unchanged.',
+    ...(waitsLine(res.pending) ? [waitsLine(res.pending)] : []),
+  ]);
 }
 
 $('exportData').addEventListener('click', exportData);

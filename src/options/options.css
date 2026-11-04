@@ -910,3 +910,49 @@ button.col.is-selected .letter {
 .data-result {
   margin: 12px 0 0;
 }
+
+.data-result.is-done {
+  margin-top: 16px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--gray);
+  animation: data-done-in 240ms ease-out;
+}
+
+.data-result .done-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.data-result .done-title .drip-i {
+  color: var(--blue);
+}
+
+.data-result ul {
+  margin: 0;
+  padding: 0 0 0 26px;
+  list-style: none;
+  color: var(--muted);
+}
+
+.data-result li + li {
+  margin-top: 4px;
+}
+
+@keyframes data-done-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .data-result.is-done {
+    animation: none;
+  }
+}
