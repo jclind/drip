@@ -176,6 +176,15 @@
     return !!graceId && graceId === videoId();
   }
 
+  /** The video that played on this page at a moment that wasn't dry, so it finishes if Dry hours begin (Q32). */
+  let playedBeforeDry = '';
+
+  /** Whether a video that runs out now may finish: grace mode, or it was playing before Dry hours began. @param {string} id */
+  function graceAllowed(id) {
+    if (!state) return false;
+    return state.settings.graceMode === true || Drip.dryGrace(state, Date.now(), !!id && playedBeforeDry === id);
+  }
+
   // Channel lists (CHANNEL-LISTS-PLAN.md, calls 7 and 8). The page tells the worker which channel this video is from,
   // when a list has that channel, and an allowed channel's video is free.
 
@@ -385,7 +394,7 @@
   function applyStatus(status, deferLock = false) {
     if (disconnected) return;
     const id = videoId();
-    if (state && state.settings.graceMode === false) setGrace('');
+    if (state && !graceAllowed(id)) setGrace('');
     locked = !!status.locked;
     if (!locked) {
       setGrace('');
@@ -398,7 +407,7 @@
       return;
     }
     // Storage may arrive before our tick response. Only that response can grant grace.
-    if (deferLock && state.settings.graceMode) return;
+    if (deferLock && graceAllowed(id)) return;
     pausePlayer(video);
     // The channel may be on the allow list. Held, not locked, until checkChannel knows.
     if (waitingForChannel(id)) return;
@@ -447,6 +456,9 @@
       return;
     }
     if (locked && !inGrace()) pausePlayer(video);
+    const id = videoId();
+    if (state && video && !video.paused && !Drip.dryUntil(state, Date.now())) playedBeforeDry = id;
+    else if (playedBeforeDry !== id) playedBeforeDry = '';
     renderPill();
   }
 
@@ -497,7 +509,7 @@
         if (entry.seconds <= 0.001 && unsent[0] === entry) unsent.shift();
         state = res.state;
         if (id === videoId()) {
-          if (request.paid && res.locked && state.settings.graceMode && video && !video.paused) setGrace(id);
+          if (request.paid && res.locked && graceAllowed(id) && video && !video.paused) setGrace(id);
           applyStatus(res);
         } else applyStatus(Drip.watchStatus(state, videoId()));
       } else if (state) applyStatus(Drip.watchStatus(state, videoId()));
@@ -683,7 +695,11 @@
       video?.play();
     } else {
       drainNext = false;
-      lockMessage = 'No drops left.';
+      // Dry hours began between the draw and the click: the lock redraws in its dry form (DRY-HOURS-PLAN.md B8).
+      if (res && res.error === 'dry-hours') {
+        if (res.state) state = res.state;
+        lockMessage = '';
+      } else lockMessage = 'No drops left.';
       showLock();
     }
   }
@@ -895,10 +911,13 @@
     const needBack = Drip.needThisBack(state, now);
     // The label, not the time, goes in the view key, so "tomorrow" turns into "today" at midnight (Codex, 2026-11-04).
     const backLabel = needBack > 0 ? dayTimeLabel(needBack, now) : '';
-    const canBuy = state.tokens.watch > 0;
-    const line = watchedLine();
+    // In Dry hours no drop can be bought, and the line under the title says when they end (Q32).
+    const dryEnd = Drip.dryUntil(state, now);
+    const hasDrops = state.tokens.watch > 0;
+    const canBuy = hasDrops && !dryEnd;
+    const line = dryEnd ? `Dry until ${hourLabel(new Date(dryEnd).getHours())}.` : watchedLine();
     const existing = liveLock();
-    const view = JSON.stringify([videoId(), canBuy, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
+    const view = JSON.stringify([videoId(), canBuy, hasDrops, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
     if (existing && lockView === view) return;
     lockView = view;
     lockVideoId = videoId();
@@ -926,7 +945,7 @@
     const panel = h(
       'div',
       { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },
-      h('h2', { class: 'drip-lock-title', id: 'drip-lock-title' }, canBuy ? 'Time for a breather.' : "You've had your fill."),
+      h('h2', { class: 'drip-lock-title', id: 'drip-lock-title' }, hasDrops ? 'Time for a breather.' : "You've had your fill."),
       h('div', { class: 'drip-lock-sub' }, line),
       h('div', { class: `drip-lock-actions${canBuy ? '' : ' is-alone'}` },
         canBuy && h('button', { class: 'drip-b drip-b-gray drip-lock-add', 'data-k': 'add', onclick: onAddTime, title: `Add ${s.minutesPerToken} minutes for 1 drop` },
@@ -1260,7 +1279,7 @@
     }
     const status = Drip.watchStatus(state, id);
     // Another tab may have used up the minutes. A video playing here when that happened gets grace too (Q3).
-    if (wasFunded && status.locked && state.settings.graceMode && clockActive() && video && !video.paused) setGrace(id);
+    if (wasFunded && status.locked && graceAllowed(id) && clockActive() && video && !video.paused) setGrace(id);
     applyStatus(status, !!(pendingTick && pendingTick.id === id && pendingTick.paid));
     renderPill();
   });

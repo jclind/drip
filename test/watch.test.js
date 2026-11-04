@@ -184,6 +184,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     Date: class extends Date { static now() { return world.epoch + world.now; } },
     CustomEvent: class { /** @param {string} type */ constructor(type) { this.type = type; } },
     setTimeout, matchMedia: () => ({ matches: false }),
+    // Reduced motion, so a lock button press skips the drop animation, which needs real layout.
+    window: { matchMedia: () => ({ matches: true }), innerHeight: 800 },
     setInterval: (/** @type {Function} */ fn) => { intervals.set(++nextInterval, fn); return nextInterval; },
     clearInterval: (/** @type {number} */ id) => { intervals.delete(id); },
     chrome: {
@@ -271,7 +273,7 @@ function makeWorld() {
           return undefined;
         }
       } else if (msg.type === 'status') result = { ok: true, ...D.watchStatus(world.state, msg.videoId) };
-      else if (msg.type === 'spendWatch') result = D.spendWatch(world.state);
+      else if (msg.type === 'spendWatch') result = D.spendWatch(world.state, now);
       else if (msg.type === 'needThis') result = D.needThis(world.state, msg.videoId, msg.title || '', msg.reason || '', now);
       else result = { ok: true };
       const saved = structuredClone(world.state);
@@ -635,6 +637,85 @@ test('with grace off, every playing tab stops at zero', async () => {
   }
   assert.equal(a.video.paused, true);
   assert.equal(b.video.paused, true);
+});
+
+/** A world whose clock starts at this local time on Oct 6, with Dry hours on from 11pm to 6am. @param {number} hour @param {number} minute @param {number} [second] */
+function dryWorld(hour, minute, second = 0) {
+  const world = makeWorld();
+  world.epoch = new Date(2026, 9, 6, hour, minute, second).getTime();
+  world.state.day = world.D.dayKey(world.epoch, 4);
+  Object.assign(world.state.settings, { dryHours: true, dryFrom: 23, dryTo: 6 });
+  return world;
+}
+
+test('a video playing when Dry hours begin finishes, with grace mode off (DRY-HOURS-PLAN.md B2)', async () => {
+  const world = dryWorld(22, 59, 57);
+  world.state.watchSecondsLeft = 5;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 8);
+  assert.equal(world.state.watchSecondsLeft, 0);
+  assert.equal(tab.video.paused, false, 'it keeps playing');
+  assert.equal(tab.root.getAttribute('data-drip-grace'), 'aaa');
+  // A status from the worker doesn't take the grace back.
+  await tab.second();
+  assert.equal(tab.video.paused, false);
+  assert.equal(tab.locked(), false);
+});
+
+test('a video started in Dry hours stops at zero like any other', async () => {
+  const world = dryWorld(23, 30);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.equal(tab.video.paused, true);
+  assert.ok(tab.locked());
+});
+
+test('the lock in Dry hours has no +15m, says when they end, and keeps "I need this one" (B8)', async () => {
+  const world = dryWorld(23, 30);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /^Time for a breather\./, 'the title still follows the drops');
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  assert.doesNotMatch(tab.lockText(), /\+15m/);
+  assert.match(tab.lockText(), /I need this one · 3 left this week/);
+});
+
+test('a +15m refused because Dry hours began redraws the lock in its dry form (B8)', async () => {
+  const world = dryWorld(22, 59, 50);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /\+15m/);
+  world.advance(10);
+  await tab.press('add');
+  await settle();
+  assert.doesNotMatch(tab.lockText(), /No drops left|\+15m/);
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  assert.equal(world.state.tokens.watch, 4, 'no drop spent');
+});
+
+test('the locked page brings +15m back when Dry hours end', async () => {
+  const world = dryWorld(5, 59, 40);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  world.advance(30);
+  for (let i = 0; i < 30; i++) await tab.second();
+  assert.match(tab.lockText(), /\+15m/);
+  assert.doesNotMatch(tab.lockText(), /Dry until/);
 });
 
 test('a watch page with no player for 10 seconds says drip is broken and locks nothing (Q25)', async () => {

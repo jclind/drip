@@ -53,6 +53,9 @@
  * @property {number} rolloverDays
  * @property {number} resetHour
  * @property {boolean} graceMode
+ * @property {boolean} dryHours No new drops from dryFrom up to dryTo (Q32).
+ * @property {number} dryFrom The first dry hour, 0 to 23, local time.
+ * @property {number} dryTo The first hour that isn't dry again.
  * @property {number} needThisPerWeek "I need this one" uses in any 7 × 24 hours (Q20).
  * @property {'home' | 'subscriptions'} feedSource
  * @property {number} stashMax The most videos the stash holds (Q28).
@@ -105,6 +108,9 @@
     rolloverDays: 2,
     resetHour: 4,
     graceMode: false,
+    dryHours: false,
+    dryFrom: 23,
+    dryTo: 6,
     needThisPerWeek: 3,
     feedSource: 'home',
     stashMax: 10,
@@ -132,7 +138,7 @@
   const ranges = {
     watchTokensPerDay: [0, 48], minutesPerToken: [1, 120],
     recTokensPerDay: [0, 100], rolloverDays: [1, 7],
-    resetHour: [0, 23], needThisPerWeek: [0, 20], stashMax: [1, 50],
+    resetHour: [0, 23], needThisPerWeek: [0, 20], stashMax: [1, 50], dryFrom: [0, 23], dryTo: [0, 23],
   };
 
   /** @param {number} now @param {number} resetHour */
@@ -291,9 +297,15 @@
     return state.log[state.day] ?? (state.log[state.day] = emptyLog());
   }
 
-  /** @param {State} state */
-  function spendWatch(state) {
+  /**
+   * Buys a drop's minutes. In Dry hours there are no new drops (Q32), and `until` says when they end.
+   * @param {State} state @param {number} [now] Without it, Dry hours don't count.
+   * @returns {{ok: true} | {ok: false, error: string, until?: number}}
+   */
+  function spendWatch(state, now) {
     if (!state.settings.clock) return { ok: false, error: 'clock-off' };
+    const until = now === undefined ? 0 : dryUntil(state, now);
+    if (until) return { ok: false, error: 'dry-hours', until };
     if (state.tokens.watch <= 0) return { ok: false, error: 'no-watch-tokens' };
     state.tokens.watch--;
     state.watchSecondsLeft += state.settings.minutesPerToken * 60;
@@ -352,13 +364,16 @@
   /**
    * Buys one drop's minutes when none are left, so Watch can start the video (Q18). With no drops left it buys
    * nothing, and the watch page's lock takes over. An unlocked video needs no minutes, and neither does a card or stash
-   * row from an allowed channel (CHANNEL-LISTS-PLAN.md, call 10).
+   * row from an allowed channel (CHANNEL-LISTS-PLAN.md, call 10). In Dry hours it refuses with `dry-hours` (Q32).
    * @param {State} state
    * @param {string} videoId
+   * @param {number} [now]
    */
-  function buyIfOut(state, videoId) {
-    const bought = state.settings.clock && state.watchSecondsLeft <= 0 && !freeToStart(state, videoId) && spendWatch(state).ok;
-    return { ok: true, bought };
+  function buyIfOut(state, videoId, now) {
+    if (!state.settings.clock || state.watchSecondsLeft > 0 || freeToStart(state, videoId)) return { ok: true, bought: false };
+    const spent = spendWatch(state, now);
+    if (!spent.ok && spent.error === 'dry-hours') return spent;
+    return { ok: true, bought: spent.ok };
   }
 
   /** @param {State} state */
@@ -413,7 +428,8 @@
       endCard(state, 'pass');
       return { ok: true, video };
     }
-    const bought = action === 'watch' && buyIfOut(state, video.id).bought;
+    // A refusal in Dry hours still opens the video, and its lock says when they end (DRY-HOURS-PLAN.md B6).
+    const bought = action === 'watch' && buyIfOut(state, video.id, now).bought === true;
     endCard(state, action);
     return action === 'watch' ? { ok: true, video, bought } : { ok: true, video };
   }
@@ -595,6 +611,89 @@
 
   const WEEK_MS = 7 * 24 * 3600 * 1000;
 
+  // Dry hours (Q32, DRY-HOURS-PLAN.md Part B). No new drops in a daily range of whole local hours.
+
+  const DRY_KEYS = /** @type {const} */ (['dryHours', 'dryFrom', 'dryTo']);
+
+  /** The dry hours of a range, 0 to 23. Off, or start and end the same hour, has none. @param {Pick<Settings, 'dryHours' | 'dryFrom' | 'dryTo'>} s */
+  function dryHourSet(s) {
+    /** @type {Set<number>} */
+    const hours = new Set();
+    if (!s.dryHours || s.dryFrom === s.dryTo) return hours;
+    for (let h = s.dryFrom; h !== s.dryTo; h = (h + 1) % 24) hours.add(h);
+    return hours;
+  }
+
+  /**
+   * When the Dry hours going on now end, in ms, or 0 when it isn't dry now or the clock is off. It walks forward an
+   * hour at a time with the settings in force at each hour, so a change waiting for the reset counts from the reset.
+   * Each step is the next hour on the clock, so DST's skipped and repeated hours count as the clock shows them.
+   * @param {State} state @param {number} now
+   */
+  function dryUntil(state, now) {
+    const settings = state && state.settings;
+    if (!settings || settings.clock === false || typeof now !== 'number') return 0;
+    const pending = state.pending;
+    /** @param {number} t */
+    const dryAt = (t) => {
+      const waiting = pending && dayKey(t, settings.resetHour) >= pending.effectiveDay;
+      const s = waiting ? { ...settings, ...pending.changes } : settings;
+      return dryHourSet(s).has(new Date(t).getHours());
+    };
+    if (!dryAt(now)) return 0;
+    let t = now;
+    for (let i = 0; i < 25; i++) {
+      const d = new Date(t);
+      t = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime();
+      if (!dryAt(t)) break;
+    }
+    return t;
+  }
+
+  /**
+   * A video already playing when Dry hours began finishes, even with grace mode off (DRY-HOURS-PLAN.md B2). The watch
+   * page knows whether this video played on it at a moment that wasn't dry.
+   * @param {State} state @param {number} now @param {boolean} playedBeforeDry
+   */
+  function dryGrace(state, now, playedBeforeDry) {
+    return playedBeforeDry && dryUntil(state, now) > 0;
+  }
+
+  /**
+   * Q6 for the three dry keys, judged as one range: today's, then any waiting change, then this one. A range holding
+   * every hour today's does applies at once, and any wait is cancelled. Anything else waits, all three keys together,
+   * so a later edit or Undo never leaves half a range. Takes the dry keys out of `cleaned`.
+   * @param {State} state @param {Partial<Settings>} cleaned @param {boolean} firstDay
+   */
+  function updateDry(state, cleaned, firstDay) {
+    /** @type {Partial<Settings>} */
+    const applied = {};
+    /** @type {Partial<Settings>} */
+    const pending = {};
+    const change = DRY_KEYS.filter((key) => key in cleaned);
+    if (!change.length) return { applied, pending };
+    const today = { dryHours: state.settings.dryHours, dryFrom: state.settings.dryFrom, dryTo: state.settings.dryTo };
+    const proposed = { ...today };
+    for (const key of DRY_KEYS) if (state.pending && key in state.pending.changes) Object.assign(proposed, { [key]: state.pending.changes[key] });
+    for (const key of change) Object.assign(proposed, { [key]: cleaned[key] });
+    for (const key of DRY_KEYS) delete cleaned[key];
+    const now = dryHourSet(today);
+    const next = dryHourSet(proposed);
+    if (firstDay || [...now].every((h) => next.has(h))) {
+      for (const key of DRY_KEYS) {
+        if (proposed[key] !== today[key]) Object.assign(applied, { [key]: proposed[key] });
+      }
+      Object.assign(state.settings, proposed);
+      cancelPending(state, 'dryHours');
+    } else {
+      if (!state.pending) state.pending = { effectiveDay: addDays(state.day, 1), changes: {} };
+      state.pending.effectiveDay = addDays(state.day, 1);
+      Object.assign(state.pending.changes, proposed);
+      Object.assign(pending, proposed);
+    }
+    return { applied, pending };
+  }
+
   /**
    * When each "I need this one" in the last 7 × 24 hours was used, oldest first (Q20, DRY-HOURS-PLAN.md A2). A use with
    * no time never counts. One from the future, after the computer's clock went back, counts as now.
@@ -646,8 +745,8 @@
         if (typeof value !== 'number' || !Number.isFinite(value)) continue;
         const [min, max] = ranges[key];
         Object.assign(cleaned, { [key]: Math.min(max, Math.max(min, Math.round(value))) });
-      } else if (key === 'graceMode') {
-        cleaned.graceMode = Boolean(value);
+      } else if (key === 'graceMode' || key === 'dryHours') {
+        cleaned[key] = Boolean(value);
       } else if (key === 'feedSource' && (value === 'home' || value === 'subscriptions')) {
         cleaned.feedSource = value;
       } else if ((key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell' || key === 'hideShorts' || key === 'streams') && typeof value === 'boolean') {
@@ -697,6 +796,9 @@
     const pending = {};
     const firstDay = firstDayUntil(state, now) > 0;
     const cleaned = cleanSettings(changes);
+    const dry = updateDry(state, cleaned, firstDay);
+    Object.assign(applied, dry.applied);
+    Object.assign(pending, dry.pending);
     for (const key of /** @type {(keyof Settings)[]} */ (Object.keys(cleaned))) {
       const value = cleaned[key];
       if (value === state.settings[key]) {
@@ -733,7 +835,9 @@
   /** @param {State} state @param {string} key */
   function cancelPending(state, key) {
     if (state.pending) {
-      delete state.pending.changes[/** @type {keyof Settings} */ (key)];
+      // The dry keys wait as one range, so Undo on any of them puts back the whole range (DRY-HOURS-PLAN.md B5).
+      const keys = /** @type {readonly string[]} */ (DRY_KEYS).includes(key) ? DRY_KEYS : [key];
+      for (const k of keys) delete state.pending.changes[/** @type {keyof Settings} */ (k)];
       if (!Object.keys(state.pending.changes).length) state.pending = null;
     }
     return { ok: true };
@@ -1493,7 +1597,7 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, cleanSettings,
+    firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, dryUntil, dryGrace, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,

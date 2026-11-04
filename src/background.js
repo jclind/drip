@@ -186,7 +186,7 @@ function handle(msg, state, now, clock) {
     case 'get':
       return { ok: true };
     case 'spendWatch':
-      return Drip.spendWatch(state);
+      return Drip.spendWatch(state, now);
     case 'reveal':
       return Drip.reveal(state, Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'resolve':
@@ -194,7 +194,7 @@ function handle(msg, state, now, clock) {
     case 'revealNext':
       return Drip.revealNext(state, String(msg.videoId), Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'buyIfOut':
-      return Drip.buyIfOut(state, String(msg.videoId));
+      return Drip.buyIfOut(state, String(msg.videoId), now);
     case 'addBacklog':
       return Drip.addBacklog(state, msg.video, msg.index, now);
     case 'removeBacklog':
