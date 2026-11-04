@@ -32,11 +32,11 @@
   /** @type {{video: HTMLVideoElement, id: string} | null} */
   let pausedWhileUnknown = null;
   /**
-   * A video held because no minutes were left. When a watch page then shows it's from an allowed channel, it starts
-   * on its own (CHANNEL-LISTS-PLAN.md, call 8).
-   * @type {{video: HTMLVideoElement, id: string} | null}
+   * The video held because no minutes were left. When a watch page then shows it's from an allowed channel, it starts
+   * on its own (CHANNEL-LISTS-PLAN.md, call 8). Set when the hold goes up, not on a play event, since guard.js refuses
+   * YouTube's play() before one fires (Codex, 2026-11-03).
    */
-  let pausedWhileLocked = null;
+  let heldId = '';
 
   function videoId() {
     return location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
@@ -56,7 +56,7 @@
     const id = videoId();
     if (id !== decisionId) {
       pausedWhileUnknown = null;
-      pausedWhileLocked = null;
+      heldId = '';
     }
     decisionId = id;
     if (!storageKnown) {
@@ -72,13 +72,13 @@
     pausedWhileUnknown = null;
     if (!id) return;
     const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
-    const held = pausedWhileLocked;
-    if (!locked) pausedWhileLocked = null;
+    const held = heldId;
+    heldId = locked ? id : '';
     if (locked && !(fromStorage && state?.settings?.graceMode)) pausePlayer(video);
     else if (!locked && pending && pending.id === id && pending.video === video) {
       // Only undo our temporary pause, once. Autoplay can still reject playback.
       video.play().catch(() => {});
-    } else if (!locked && held && held.id === id && held.video === video && allowedToday(id)) {
+    } else if (!locked && held === id && video && video.paused && allowedToday(id)) {
       video.play().catch(() => {});
     }
   }
@@ -91,10 +91,7 @@
     if (locked === null) {
       pausedWhileUnknown = { video: target, id: videoId() };
       pausePlayer(target);
-    } else if (locked) {
-      pausedWhileLocked = { video: target, id: videoId() };
-      pausePlayer(target);
-    }
+    } else if (locked) pausePlayer(target);
   }, true);
 
   /** Whether the worker has marked this video free through the allow list. @param {string} id */

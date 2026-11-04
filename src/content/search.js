@@ -4,7 +4,7 @@
 // (Q29), so Quiet shows every result with no buttons.
 // The injected shelves and ads are hidden in early.css.
 
-  /** @type {any} */
+(function () {
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   const { send, h, onState, watchFor } = /** @type {any} */ (globalThis).DripUI;

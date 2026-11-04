@@ -67,6 +67,6 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 ## Channel lists (Q31)
 
 40. On a channel page, Allow in drip sits beside Subscribe. Click it: it reads "Allowed from 4:00am". After Run reset now it reads "Allowed in drip".
-41. With 0 minutes, open that channel's video. It plays, the pill says Allowed channel, and the minutes stay at 0. Click to another channel's video in the same tab: the lock rises within about 2 seconds.
+41. With 0 minutes, click a link to that channel's video. It starts on its own (air can't show this: Chrome refuses autoplay there with no click on the page), plays, the pill says Allowed channel, and the minutes stay at 0. Click to another channel's video in the same tab: the lock rises within about 2 seconds.
 42. With the allowed video playing, click Allowed in drip on the channel page in another tab. The video locks within a second or two.
 43. On a reveal card, click Block, then Block again. The card goes, no card comes back, and that channel isn't dealt again. Settings' Channels lists it, and Unblock there waits for the reset.

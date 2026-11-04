@@ -179,8 +179,16 @@
   // Channel lists (CHANNEL-LISTS-PLAN.md, calls 7 and 8). The page tells the worker which channel this video is from,
   // when a list has that channel, and an allowed channel's video is free.
 
-  /** The video whose channel was read and, if a list had it, sent. */
+  /**
+   * The video whose channel was read and, if a list had it, sent, with the day and allow list it was checked against.
+   * A reset clears allowedToday and a new allow can free a video already open, so either one checks again (Codex).
+   */
   let channelDone = '';
+  /** @param {string} id */
+  function channelCheckKey(id) {
+    const allow = state && state.channels ? state.channels.allow.map((/** @type {any} */ c) => c.ids) : [];
+    return JSON.stringify([id, state ? state.day : '', allow]);
+  }
   /** @type {{id: string, until: number} | null} */
   let channelWait = null;
 
@@ -201,24 +209,24 @@
 
   /** Whether a locked video should wait for its channel before the lock shows. @param {string} id */
   function waitingForChannel(id) {
-    if (!id || channelDone === id || !state || !state.channels || !state.channels.allow.length) return false;
+    if (!id || channelDone === channelCheckKey(id) || !state || !state.channels || !state.channels.allow.length) return false;
     if (!channelWait || channelWait.id !== id) channelWait = { id, until: performance.now() + CHANNEL_WAIT_MS };
     return performance.now() < channelWait.until;
   }
 
   async function checkChannel() {
     const id = location.pathname === '/watch' ? videoId() : '';
-    if (!id || channelDone === id || !state || !state.channels) return;
+    if (!id || channelDone === channelCheckKey(id) || !state || !state.channels) return;
     const channel = pageChannel(id);
     if (!channel) {
       // Not readable in time: the lock rises as it would without lists.
       if (channelWait && channelWait.id === id && performance.now() >= channelWait.until) {
-        channelDone = id;
+        channelDone = channelCheckKey(id);
         applyStatus(Drip.watchStatus(state, id));
       }
       return;
     }
-    channelDone = id;
+    channelDone = channelCheckKey(id);
     if (!onAList(channel)) {
       if (locked) applyStatus(Drip.watchStatus(state, id));
       return;

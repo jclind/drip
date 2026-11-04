@@ -1117,7 +1117,8 @@
   const IDS_MAX = 4;
   const ALLOWED_TODAY_MAX = 500;
   const VIDEO_ID = /^[\w-]{1,64}$/;
-  const HANDLE = /^@[\w.-]{1,100}$/;
+  // YouTube handles can be in any script, like @料理 (Codex, 2026-11-03).
+  const HANDLE = /^@[\p{L}\p{M}\p{N}_.\-·]{1,100}$/u;
   const UC_ID = /^UC[\w-]{22}$/;
 
   /**
@@ -1132,7 +1133,15 @@
     if (UC_ID.test(text)) return text;
     const path = text.replace(/^(https?:\/\/)?((www|m)\.)?youtube\.com/i, '').split(/[?#]/)[0];
     const handle = /^\/(@[^/]+)/.exec(path);
-    if (handle && HANDLE.test(decodeURIComponent(handle[1]))) return decodeURIComponent(handle[1]).toLowerCase();
+    if (handle) {
+      let decoded = '';
+      try {
+        decoded = decodeURIComponent(handle[1]);
+      } catch {
+        // A broken % escape isn't a handle.
+      }
+      if (HANDLE.test(decoded)) return decoded.toLowerCase();
+    }
     const uc = /^\/channel\/([^/]+)/.exec(path);
     if (uc && UC_ID.test(uc[1])) return uc[1];
     return '';

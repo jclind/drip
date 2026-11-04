@@ -41,9 +41,12 @@
       }
     }
     // On a move from one channel to another the header can still be the last one's. Its handle must agree with a
-    // /@handle URL. A /channel/UC... URL has nothing to check it against, so it waits for the next draw.
+    // /@handle URL. A /channel/UC... URL has no handle to check, so the header's name must match the tab's title, which
+    // YouTube sets for the new page. Until both agree, it waits for the next draw (Codex, 2026-11-03).
     if (fromPath.startsWith('@') && ids[0] !== fromPath) return null;
-    return { ids, name: document.querySelector(SEL.name)?.textContent?.trim() || '' };
+    const name = document.querySelector(SEL.name)?.textContent?.trim() || '';
+    if (!fromPath.startsWith('@') && (!name || document.title.replace(/ - YouTube$/, '').trim() !== name)) return null;
+    return { ids, name };
   }
 
   /** @param {any} channel */

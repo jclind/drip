@@ -334,3 +334,10 @@ test('reset empties the allow list at once and the block list at the reset', () 
   assert.equal(state.channels.block.length, 0);
   assert.equal(state.channels.allow.length, 0);
 });
+
+test('a handle in another script works, and a broken % escape is refused without throwing (Codex)', () => {
+  assert.equal(D.channelId('@料理'), '@料理');
+  assert.equal(D.channelId(`https://www.youtube.com/@${encodeURIComponent('料理')}/videos`), '@料理');
+  assert.equal(D.channelId('/@bad%'), '');
+  assert.deepEqual(D.cleanChannel({ ids: ['@料理'], name: 'x' })?.ids, ['@料理']);
+});
