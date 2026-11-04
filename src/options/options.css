@@ -685,6 +685,7 @@ button.col.is-selected .letter {
 /* Why you needed one. */
 
 #reasons-section,
+#data,
 #dev {
   margin-top: 32px;
   padding-top: 32px;
@@ -889,4 +890,73 @@ button.col.is-selected .letter {
 
 .savebar button.link:hover {
   text-decoration: underline;
+}
+
+/* Your data (RELEASE-PLAN.md, item 5): Export, Import, and Reset in a row, and Reset's question in place of them. */
+.data-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.data-confirm p {
+  margin: 0 0 12px;
+}
+
+.data-result:empty {
+  display: none;
+}
+
+.data-result {
+  margin: 12px 0 0;
+}
+
+.data-result.is-done {
+  margin-top: 16px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--gray);
+  animation: data-done-in 240ms ease-out;
+}
+
+.data-result .done-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.data-result .done-title .drip-i {
+  color: var(--blue);
+}
+
+.data-result.is-failed .done-title .drip-i {
+  color: var(--note);
+}
+
+.data-result ul {
+  margin: 0;
+  padding: 0 0 0 26px;
+  list-style: none;
+  color: var(--muted);
+}
+
+.data-result li + li {
+  margin-top: 4px;
+}
+
+@keyframes data-done-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .data-result.is-done {
+    animation: none;
+  }
 }

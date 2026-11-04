@@ -924,11 +924,120 @@
     return changes;
   }
 
+  // Export, import, and reset (RELEASE-PLAN.md, item 5). None of them touch today's drops or cards, and settings go
+  // through updateSettings, so anything that loosens a limit waits for the reset (Q6).
+
+  /** The format tag an export carries, so import can refuse any other JSON file. */
+  const EXPORT_FORMAT = 1;
+
+  /**
+   * What Settings' Export saves: the settings as planned (a change waiting for the reset included), the stash, and the
+   * log. Balances, seen videos, and unlocks stay out, since importing them would hand back a day.
+   * @param {State} state @param {number} now
+   */
+  function exportData(state, now) {
+    return {
+      app: 'drip', format: EXPORT_FORMAT, exportedAt: new Date(now).toISOString(),
+      settings: planned(state), backlog: state.backlog.map((v) => ({ ...v })), log: structuredClone(state.log),
+    };
+  }
+
+  /** Whether a log key is a real date written as YYYY-MM-DD. @param {string} day */
+  function realDay(day) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+    const date = new Date(`${day}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
+  }
+
+  /**
+   * One day of an imported log, with only the fields drip keeps and only numbers where it counts.
+   * @param {unknown} raw @returns {LogDay | null}
+   */
+  function cleanLogDay(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const d = /** @type {Record<string, any>} */ (raw);
+    const day = emptyLog();
+    for (const key of /** @type {const} */ (['watchedSec', 'watchSpent', 'recSpent', 'saved', 'passed', 'watched'])) day[key] = count(d[key], 0);
+    if (Array.isArray(d.needThis)) {
+      for (const use of d.needThis) {
+        if (use && typeof use.videoId === 'string' && typeof use.reason === 'string') {
+          day.needThis.push({ videoId: use.videoId, title: typeof use.title === 'string' ? use.title : '', reason: use.reason, at: count(use.at, 0) });
+        }
+      }
+    }
+    return day;
+  }
+
+  /**
+   * updateSettings, but today's drops and cards stay as they were. Settings' Save caps them at a lowered limit and moves
+   * them on the first day, but import and reset promise not to touch them (Codex, 2026-11-02). The next reset caps them.
+   * @param {State} state @param {unknown} changes @param {number} now
+   */
+  function settingsKeepingBalances(state, changes, now) {
+    const tokens = { ...state.tokens };
+    const result = updateSettings(state, changes, now);
+    state.tokens = tokens;
+    return result;
+  }
+
+  /**
+   * Import: saves the file's settings through updateSettings, adds its stash videos that aren't already stashed (up to
+   * the stash's size), and adds its log days that this install doesn't have, before today only. Nothing here replaces or
+   * removes what's already there.
+   * @param {State} state @param {unknown} raw @param {number} now
+   */
+  function importData(state, raw, now) {
+    const file = /** @type {Record<string, any>} */ (raw);
+    if (!file || typeof file !== 'object' || file.app !== 'drip') return { ok: false, error: 'not-drip' };
+    if (file.format !== EXPORT_FORMAT) return { ok: false, error: 'bad-format' };
+    const settings = settingsKeepingBalances(state, file.settings, now);
+    let added = 0;
+    let skipped = 0;
+    const have = new Set(state.backlog.map((v) => v.id));
+    for (const item of Array.isArray(file.backlog) ? file.backlog : []) {
+      const video = cleanVideo(item);
+      if (!video || have.has(video.id)) continue;
+      if (state.backlog.length >= state.settings.stashMax) { skipped++; continue; }
+      state.backlog.push(video);
+      have.add(video.id);
+      // The card showing now counts as saved once it's stashed, as addBacklog does (Codex, 2026-11-02).
+      if (state.current && state.current.id === video.id) logDay(state).saved++;
+      added++;
+    }
+    let days = 0;
+    if (file.log && typeof file.log === 'object' && !Array.isArray(file.log)) {
+      for (const [day, entry] of Object.entries(file.log)) {
+        // A real calendar date, since History's week math throws on one like 2026-00-01, and within the 90 days the
+        // log keeps, as rollDay would prune it (Codex, 2026-11-03).
+        if (!realDay(day) || day >= state.day || day < addDays(state.day, -89) || state.log[day]) continue;
+        const cleaned = cleanLogDay(entry);
+        if (!cleaned) continue;
+        state.log[day] = cleaned;
+        days++;
+      }
+    }
+    return { ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days };
+  }
+
+  /**
+   * Reset: the default settings through updateSettings, so a default that loosens waits for the reset, and an empty
+   * stash. The log and today's balances stay.
+   * @param {State} state @param {number} now
+   */
+  function resetData(state, now) {
+    const settings = settingsKeepingBalances(state, { ...DEFAULT_SETTINGS }, now);
+    const cleared = state.backlog.length;
+    // One at a time through removeBacklog, so a saved card still showing stops counting as saved (Codex, 2026-11-02).
+    for (const video of [...state.backlog]) removeBacklog(state, video.id);
+    return { ok: true, applied: settings.applied, pending: settings.pending, stashCleared: cleared };
+  }
+
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
+    exportData, importData, resetData,
   };
 })();
