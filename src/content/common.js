@@ -104,6 +104,29 @@
       h('span', { class: 'drip-sr' }, `, costs 1 ${token}`));
   }
 
+  /**
+   * The ⋯ beside a reveal card's title and its one-item menu: Block the channel, clicked twice (Jesse's picks, B and K,
+   * 2026-11-04). The first click turns the item red, "Click again to block". Both wordings sit in one grid cell, so the
+   * menu keeps its width when the words change. home.js and the welcome tour keep the open and armed state.
+   * @param {{channel: string, open: boolean, armed: boolean, disabled?: boolean, onToggle: () => void, onPick: () => void}} o
+   */
+  function cardMenu(o) {
+    return h('div', { class: 'drip-card-menu' },
+      h('button', {
+        class: 'drip-card-more', type: 'button', 'data-k': 'more', 'aria-label': 'More', title: 'More',
+        'aria-haspopup': 'menu', 'aria-expanded': String(o.open), disabled: o.disabled, onclick: o.onToggle,
+      }, icon('ellipsis-vertical')),
+      o.open && h('div', { class: 'drip-menu', role: 'menu' },
+        h('button', {
+          class: `drip-menu-item${o.armed ? ' is-armed' : ''}`, type: 'button', role: 'menuitem', 'data-k': 'block',
+          'aria-label': o.armed ? `Click again to block ${o.channel}` : `Block ${o.channel}`, onclick: o.onPick,
+        },
+        icon('ban'),
+        h('span', { class: 'drip-menu-words', 'aria-hidden': 'true' },
+          h('span', { class: 'drip-menu-say is-ask' }, h('span', {}, `Block ${o.channel}`), h('small', {}, 'Reveals never deal this channel again')),
+          h('span', { class: 'drip-menu-say is-sure' }, h('span', {}, 'Click again to block'), h('small', {}, 'Unblocking waits for the reset'))))));
+  }
+
   // When YouTube changes its markup, drip fails open (Q25): nothing locks, and a banner says what broke. Each line has
   // to hold in every mode, so it names what drip can't reach, not a part that may be off (Codex, 2026-10-15).
   const BROKEN = {
@@ -182,5 +205,5 @@
   // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
   const KEPT_KEY = 'drip-kept';
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, icon, price, KEPT_KEY, pausePlayer, reportBroken, watchFor };
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, KEPT_KEY, pausePlayer, reportBroken, watchFor };
 })();

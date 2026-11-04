@@ -363,13 +363,22 @@
   // and closes, with the buttons in a row under it.
 
   /**
+   * The card's title, with the ⋯ menu beside it when it has one (home.js, .drip-card-head). The animations move and fade
+   * it as one piece. A placeholder card has only the title.
+   * @param {HTMLElement} card
+   */
+  function headOf(card) {
+    return /** @type {HTMLElement} */ (card.querySelector('.drip-card-head') || card.querySelector('.drip-card-title'));
+  }
+
+  /**
    * Splits a card into the block that opens and the buttons' row. The layout doesn't change: the block's 16px of
    * padding is the space drip.css puts above the buttons.
    * @param {HTMLElement} card
    */
   function split(card) {
     const thumb = /** @type {HTMLElement} */ (card.querySelector('.drip-thumb'));
-    const title = /** @type {HTMLElement} */ (card.querySelector('.drip-card-title'));
+    const title = headOf(card);
     const meta = /** @type {HTMLElement} */ (card.querySelector('.drip-card-meta-row'));
     const row = /** @type {HTMLElement} */ (card.querySelector('.drip-card-actions'));
     const body = h('div', { class: 'drip-open-body' }, thumb, title, meta);
@@ -387,7 +396,7 @@
     return {
       thumb,
       deal: /** @type {HTMLElement | null} */ (thumb.querySelector('.drip-deal')),
-      title: /** @type {HTMLElement} */ (card.querySelector('.drip-card-title')),
+      title: headOf(card),
       meta: /** @type {HTMLElement} */ (card.querySelector('.drip-card-meta-row')),
       row: /** @type {HTMLElement} */ (card.querySelector('.drip-card-actions')),
     };

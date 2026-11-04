@@ -12,7 +12,7 @@
   /** @type {any} */
   const DripStash = /** @type {any} */ (globalThis).DripStash;
   /** @type {any} */
-  const { h, icon, price, hourLabel } = /** @type {any} */ (globalThis).DripUI;
+  const { h, icon, price, hourLabel, cardMenu } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
   /** @type {any} */
@@ -557,14 +557,34 @@
       }, h('span', {}, 'Reveal video'), counted && price('card')));
   }
 
-  /** The tour card whose Block is asking to be sure, as on the real card (home.js). */
-  let blockAsk = '';
+  /** The tour card's ⋯ menu, and its Block waiting for the second click, as on the real card (home.js). */
+  let menuOpen = false;
+  let armed = false;
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let armTimer;
+  function closeMenu() {
+    clearTimeout(armTimer);
+    menuOpen = false;
+    armed = false;
+  }
+  // A click elsewhere, or Escape, closes it.
+  document.addEventListener('pointerdown', (e) => {
+    if (!menuOpen || /** @type {Element} */ (e.target)?.closest?.('.drip-card-menu')) return;
+    closeMenu();
+    drawHome();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !menuOpen) return;
+    closeMenu();
+    drawHome();
+  });
 
   /** @param {any} video */
   function card(video) {
     const saved = sand.backlog.some((/** @type {any} */ v) => v.id === video.id);
     const isNew = video.id !== lastCardId;
     lastCardId = video.id;
+    if (isNew) closeMenu();
     const fills = stashDrawn.id === video.id && stashDrawn.stashed !== saved;
     stashDrawn = { id: video.id, stashed: saved };
     const stash = DripStash.parts(fills ? !saved : saved, { labelClass: 'drip-save-label' });
@@ -574,17 +594,36 @@
     // The reveal animation deals the card itself, so the card doesn't also rise in.
     return h('div', { class: `drip-card${isNew && !deals() ? ' is-new' : ''}` },
       h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true)),
-      h('div', { class: 'drip-card-title', title: video.title }, video.title),
+      h('div', { class: 'drip-card-head' },
+        h('div', { class: 'drip-card-title', title: video.title }, video.title),
+        cardMenu({
+          channel: video.channel, open: menuOpen, armed,
+          onToggle: () => {
+            const opening = !menuOpen;
+            closeMenu();
+            menuOpen = opening;
+            drawHome();
+          },
+          onPick: () => {
+            if (armed) {
+              closeMenu();
+              Drip.resolveCurrent(sand, 'block', video.id);
+              drawHome();
+              return;
+            }
+            armed = true;
+            armTimer = setTimeout(() => {
+              armed = false;
+              drawHome();
+            }, 3000);
+            drawHome();
+          },
+        })),
       h('div', { class: 'drip-card-meta-row' },
         h('span', { class: 'drip-meta drip-meta-split' }, h('span', { class: 'drip-meta-channel' }, video.channel), h('span', { class: 'drip-meta-rest' }, ` · ${video.views} · ${video.age}`), h('span', { class: 'drip-sr' }, `, length ${video.length}`)),
         h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(at('player')); } },
           icon('play'), h('span', {}, 'Watch'), parts.clock && sand.watchSecondsLeft <= 0 && price('drop'))),
-      blockAsk === video.id ? h('div', { class: 'drip-block-ask', role: 'group', 'aria-label': `Block ${video.channel}` },
-        h('p', { class: 'drip-block-text' }, h('strong', {}, `Block ${video.channel}?`), " drip won't deal their videos again. Unblocking waits for the reset."),
-        h('div', { class: 'drip-block-buttons' },
-          h('button', { class: 'drip-b drip-b-primary', onclick: () => { blockAsk = ''; Drip.resolveCurrent(sand, 'block', video.id); drawHome(); } }, 'Block'),
-          h('button', { class: 'drip-b drip-b-gray', onclick: () => { blockAsk = ''; drawHome(); } }, 'Cancel')))
-      : h('div', { class: 'drip-card-actions' },
+      h('div', { class: 'drip-card-actions' },
         parts.stash && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
           onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); coach.did(saved ? 'unstash' : 'stash'); },
@@ -604,10 +643,6 @@
             }
           },
         }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), parts.cards === 'limited' && price('card')),
-        h('button', {
-          class: 'drip-b drip-b-gray drip-block', title: `Never deal ${video.channel} again`,
-          onclick: () => { blockAsk = video.id; drawHome(); },
-        }, 'Block'),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'aria-label': 'Pass', title: "Pass. It's free, and this video won't come back.",
           onclick: () => {
@@ -630,7 +665,6 @@
       h('div', { class: 'drip-card-actions' },
         h('button', { class: 'drip-b drip-b-gray drip-card-save drip-stash', tabindex: '-1' }, ...DripStash.parts(false, { labelClass: 'drip-save-label' }).nodes),
         h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
-        h('button', { class: 'drip-b drip-b-gray drip-block', tabindex: '-1' }, 'Block'),
         h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
   }
 

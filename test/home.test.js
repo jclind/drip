@@ -645,7 +645,7 @@ for (const reduced of [true, false]) {
     assert.equal(tab.message(), '');
   });
 
-  test(`Block on the card asks once, then blocks the channel and passes the card with no card back (${how})`, async () => {
+  test(`Block in the card's ⋯ menu takes two clicks, then blocks the channel and passes the card with no card back (${how})`, async () => {
     const world = makeWorld();
     const tab = await makeTab(world, { reduced });
     await tab.click('reveal');
@@ -653,13 +653,17 @@ for (const reduced of [true, false]) {
     await tab.advance(100);
     const channel = world.state.current.channel;
     assert.ok(channel);
+    assert.equal(tab.button('block'), null, 'Block is in the menu, not on the card');
+    await tab.click('more');
+    assert.equal(tab.button('block').getAttribute('aria-label'), `Block ${channel}`);
     await tab.click('block');
-    assert.ok(tab.root().querySelector('.drip-block-text').textContent.startsWith(`Block ${channel}?`));
-    assert.equal(world.state.channels.block.length, 0, 'nothing happens before the answer');
-    await tab.click('block-no');
-    assert.ok(tab.button('block'), 'Cancel brings the buttons back');
+    assert.match(tab.button('block').getAttribute('class'), /is-armed/);
+    assert.equal(tab.button('block').getAttribute('aria-label'), `Click again to block ${channel}`);
+    assert.equal(world.state.channels.block.length, 0, 'one click blocks nothing');
+    await tab.advance(3000);
+    assert.doesNotMatch(tab.button('block').getAttribute('class'), /is-armed/, 'the first click is forgotten after 3 seconds');
     await tab.click('block');
-    await tab.click('block-yes');
+    await tab.click('block');
     await tab.advance(100);
     assert.deepEqual(world.state.channels.block, [{ ids: [], name: channel }]);
     assert.equal(world.state.current, null);
