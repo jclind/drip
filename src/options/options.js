@@ -328,8 +328,12 @@ function untilLabel(until) {
 function renderFirstDay() {
   if (!state) return;
   const until = Drip.firstDayUntil(state, Date.now());
-  $('firstDay').hidden = !until;
-  $('firstDay').textContent = until ? `Changes apply right away until ${untilLabel(until)}, while you try drip out. After that, raising a limit waits for the reset.` : '';
+  const el = $('firstDay');
+  el.hidden = !until;
+  // A small tinted note with a clock, so it doesn't read as one more line of settings text (Jesse, 2026-11-04).
+  const text = until ? `First day: changes apply right away until ${untilLabel(until)}. After that, raising a limit waits for the reset.` : '';
+  if (el.textContent === text) return;
+  el.replaceChildren(...(until ? [DripPage.icon('clock-line', 'first-day-icon'), DripPage.h('span', {}, text)] : []));
 }
 setInterval(renderFirstDay, 60000);
 

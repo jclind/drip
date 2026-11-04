@@ -2286,6 +2286,18 @@ html[dark] #drip-menu {
 .drip-allow.is-waiting, .drip-allow.is-full, .drip-allow.is-blocked { color: var(--drip-muted); }
 .drip-allow.is-full .drip-allow-icon, .drip-allow.is-blocked .drip-allow-icon { color: var(--drip-muted); opacity: 0.6; }
 
+/* Hover or focus on a pressed button: "Undo" or "Remove" with an x, in the same cell as the state's label. */
+.drip-allow .drip-allow-text { display: inline-grid; }
+.drip-allow .drip-allow-text > span { grid-area: 1 / 1; text-align: center; }
+.drip-allow .drip-allow-undo,
+.drip-allow .drip-allow-undo-icon { visibility: hidden; }
+.drip-allow .drip-allow-undo-icon { display: none; }
+.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-label { visibility: hidden; }
+.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo { visibility: visible; }
+.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-icon:not(.drip-allow-undo-icon) { display: none; }
+.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo-icon { display: inline-block; visibility: visible; color: var(--drip-text); }
+.drip-allow:is(:hover, :focus-visible):not(.is-fresh):is(.is-waiting, .is-allowed) { color: var(--drip-text); }
+
 /* A click that changed it: the button gives a small pop, a blue ring spreads from its edge, and the new icon drops in. */
 .drip-allow.is-changed {
   animation: drip-allow-pop 320ms ease-out;

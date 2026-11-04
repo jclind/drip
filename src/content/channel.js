@@ -112,11 +112,23 @@
     view = key;
     // A drop to allow, a clock while it waits for the reset, and a check once it's allowed.
     const glyph = { allowed: 'check', waiting: 'clock-line', full: 'drop', blocked: 'drop', none: 'drop' }[at];
+    // On hover or focus a pressed button says what a click does (Jesse, 2026-11-04). Both labels sit in one grid cell,
+    // so the button keeps the wider one's width and doesn't move under the pointer.
+    const undo = { allowed: 'Remove', waiting: 'Undo' }[/** @type {'allowed' | 'waiting'} */ (at)] || '';
     const button = h('button', {
-      id: BUTTON_ID, type: 'button', class: `drip-ui drip-allow is-${at}${changed ? ' is-changed' : ''}`, title,
+      id: BUTTON_ID, type: 'button', class: `drip-ui drip-allow is-${at}${changed ? ' is-changed is-fresh' : ''}`, title,
       'aria-pressed': at === 'allowed' || at === 'waiting' ? 'true' : 'false',
       onclick: () => onClick(channel),
-    }, icon(glyph, 'drip-allow-icon'), h('span', {}, label));
+    }, icon(glyph, 'drip-allow-icon'), undo && icon('x', 'drip-allow-icon drip-allow-undo-icon'),
+    h('span', { class: 'drip-allow-text' },
+      h('span', { class: 'drip-allow-label' }, label),
+      undo && h('span', { class: 'drip-allow-undo', 'aria-hidden': 'true' }, undo)));
+    // Right after a click the pointer is still on the button. It shows the new state until the pointer leaves, so the
+    // undo label doesn't hide what just happened.
+    if (changed) {
+      button.addEventListener('mouseleave', () => button.classList.remove('is-fresh'), { once: true });
+      button.addEventListener('blur', () => button.classList.remove('is-fresh'), { once: true });
+    }
     changed = false;
     const hadFocus = !!old && old.contains(document.activeElement);
     old?.remove();
