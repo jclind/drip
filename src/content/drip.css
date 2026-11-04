@@ -1405,6 +1405,42 @@ html[dark] #drip-home .drip-menu {
   }
 }
 
+/* A blocked video stays in place until the next reveal. The chip stays clear above the dimmed picture. */
+#drip-home .drip-card.is-blocked .drip-deal-front {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+#drip-home .drip-card.is-blocked .drip-card-title {
+  color: var(--drip-muted);
+}
+
+#drip-home .drip-card.is-blocked .drip-meta {
+  white-space: normal;
+}
+
+#drip-home .drip-blocked-chip {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: var(--drip-bg);
+  color: var(--drip-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#drip-home .drip-blocked-chip .drip-i {
+  width: 16px;
+  height: 16px;
+}
+
 /* Loading: the reserved box shimmers, and Reveal next dims the card it's replacing. */
 #drip-home .drip-card.is-loading .drip-thumb,
 #drip-home .drip-card.is-next .drip-thumb,

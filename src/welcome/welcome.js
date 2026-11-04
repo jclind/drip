@@ -12,7 +12,7 @@
   /** @type {any} */
   const DripStash = /** @type {any} */ (globalThis).DripStash;
   /** @type {any} */
-  const { h, icon, price, hourLabel, cardMenu } = /** @type {any} */ (globalThis).DripUI;
+  const { h, icon, price, hourLabel, cardMenu, updateCardMenu, blockedCardView } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
   /** @type {any} */
@@ -349,6 +349,7 @@
     moving = false;
     stopStep?.();
     closeMenu();
+    blockedCard = null;
     bringLock = null;
     for (const t of timers) clearTimeout(t);
     timers.clear();
@@ -529,7 +530,7 @@
    */
   function homePage(top, rest) {
     const search = parts.cards === 'off';
-    return h('div', { class: `drip-page${sand.current ? ' is-open' : ''}${search ? ' is-search' : ''}` }, top, search ? searchPicture() : rest);
+    return h('div', { class: `drip-page${sand.current || blockedCard ? ' is-open' : ''}${search ? ' is-search' : ''}` }, top, search ? searchPicture() : rest);
   }
 
   function searchPicture() {
@@ -561,25 +562,56 @@
   /** The tour card's ⋯ menu, and its Block waiting for the second click, as on the real card (home.js). */
   let menuOpen = false;
   let armed = false;
+  let armedAt = 0;
+  /** The blocked sample kept on this step until another reveal. @type {any} */
+  let blockedCard = null;
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let armTimer;
   function closeMenu() {
     clearTimeout(armTimer);
     menuOpen = false;
     armed = false;
+    updateCardMenu(stage.querySelector('.drip-card-menu'), { open: false });
+  }
+  /** Updates the tour's menu in place, like home.js. */
+  function syncMenu() {
+    const video = sand.current;
+    updateCardMenu(stage.querySelector('.drip-card-menu'), {
+      open: menuOpen && !!video, channel: video?.channel, armed, onPick: () => pickBlock(video),
+    });
+  }
+  /** @param {any} video */
+  function pickBlock(video) {
+    if (armed) {
+      if (Date.now() - armedAt < 250) return;
+      closeMenu();
+      if (Drip.resolveCurrent(sand, 'block', video.id).ok) blockedCard = video;
+      drawHome();
+      /** @type {HTMLElement | null} */ (stage.querySelector('[data-k="next"]'))?.focus();
+      return;
+    }
+    armed = true;
+    armedAt = Date.now();
+    armTimer = setTimeout(() => {
+      armed = false;
+      syncMenu();
+    }, 3000);
+    syncMenu();
+    /** @type {HTMLElement | null} */ (stage.querySelector('[data-k="block"]'))?.focus();
   }
   /** Closes it without a redraw, which would replace the button being pressed (home.js dropMenu). */
   function dropMenu() {
     closeMenu();
-    stage.querySelector('.drip-menu')?.remove();
-    stage.querySelector('[data-k="more"]')?.setAttribute('aria-expanded', 'false');
   }
   // A click elsewhere, or Escape, closes it.
   document.addEventListener('pointerdown', (e) => {
     if (menuOpen && !/** @type {Element} */ (e.target)?.closest?.('.drip-card-menu')) dropMenu();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && menuOpen) dropMenu();
+    if (e.key === 'Escape' && menuOpen) {
+      dropMenu();
+      /** @type {HTMLElement | null} */ (stage.querySelector('[data-k="more"]'))?.focus();
+    }
   });
 
   /** @param {any} video */
@@ -595,8 +627,12 @@
     const thumb = h('div', { class: 'tour-thumb' }, icon('play-line'), h('span', { class: 'drip-length' }, video.length));
     thumb.style.setProperty('--thumb', sample(video.id).thumb);
     // The reveal animation deals the card itself, so the card doesn't also rise in.
+    const picture = h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true));
+    if (blockedCard?.id === video.id) return blockedCardView(video, picture, {
+      counted: parts.cards === 'limited', disabled: parts.cards === 'limited' && sand.tokens.rec < 1, onReveal: reveal,
+    });
     return h('div', { class: `drip-card${isNew && !deals() ? ' is-new' : ''}` },
-      h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true)),
+      picture,
       h('div', { class: 'drip-card-head' },
         h('div', { class: 'drip-card-title', title: video.title }, video.title),
         cardMenu({
@@ -605,23 +641,10 @@
             const opening = !menuOpen;
             closeMenu();
             menuOpen = opening;
-            drawHome();
+            syncMenu();
+            /** @type {HTMLElement | null} */ (stage.querySelector(`[data-k="${opening ? 'block' : 'more'}"]`))?.focus();
           },
-          onPick: () => {
-            if (armed) {
-              closeMenu();
-              Drip.resolveCurrent(sand, 'block', video.id);
-              drawHome();
-              return;
-            }
-            armed = true;
-            // Redraws only if the armed Block is still on screen, not over a step the tour has moved on to (Codex, 2026-11-04).
-            armTimer = setTimeout(() => {
-              armed = false;
-              if (stage.querySelector('.drip-menu-item.is-armed')) drawHome();
-            }, 3000);
-            drawHome();
-          },
+          onPick: () => pickBlock(video),
         })),
       h('div', { class: 'drip-card-meta-row' },
         h('span', { class: 'drip-meta drip-meta-split' }, h('span', { class: 'drip-meta-channel' }, video.channel), h('span', { class: 'drip-meta-rest' }, ` · ${video.views} · ${video.age}`), h('span', { class: 'drip-sr' }, `, length ${video.length}`)),
@@ -733,6 +756,12 @@
   }
 
   function reveal() {
+    if (moving) return;
+    const had = stage.contains(document.activeElement);
+    blockedCard = null;
+    closeMenu();
+    drawHome();
+    if (had) /** @type {HTMLElement | null} */ (stage.querySelector('.drip-reveal'))?.focus();
     const find = () => (!sand.current && Drip.reveal(sand, pool()).ok ? sand.current : null);
     if (deals() && !sand.current) animate(DripReveal.reveal, find, 'watch', 'reveal');
     else {
@@ -744,10 +773,11 @@
 
   function drawHome() {
     if (moving) return;
+    if (sand.current) blockedCard = null;
     const focused = document.activeElement && stage.contains(document.activeElement) ? [...stage.querySelectorAll('button')].indexOf(/** @type {any} */ (document.activeElement)) : -1;
     // With a card up, the page is open: the stats sit a little higher, as the reveal animation leaves them.
     morph(() => stage.replaceChildren(h('div', { id: 'drip-home', class: 'drip-ui' },
-      homePage(stats(), sand.current ? card(sand.current) : actions()))));
+      homePage(stats(), sand.current ? card(sand.current) : blockedCard ? card(blockedCard) : actions()))));
     if (focused >= 0) /** @type {HTMLElement | undefined} */ (stage.querySelectorAll('button')[focused])?.focus();
   }
 

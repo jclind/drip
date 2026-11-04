@@ -628,6 +628,17 @@ async function loadPicture(tab) {
   await settle();
 }
 
+/** Reveals a card and confirms Block through its menu. @param {any} tab */
+async function blockCard(tab) {
+  await tab.click('reveal');
+  await loadPicture(tab);
+  await tab.advance(100);
+  await tab.click('more');
+  await tab.click('block');
+  await tab.advance(300);
+  await tab.click('block');
+}
+
 // Most of these run both ways: with reduced motion, where home.js draws a placeholder and redraws, and with the
 // animation, where reveal.js holds redraws until it's done.
 for (const reduced of [true, false]) {
@@ -645,9 +656,15 @@ for (const reduced of [true, false]) {
     assert.equal(tab.message(), '');
   });
 
-  test(`Block in the card's ⋯ menu takes two clicks, then blocks the channel and passes the card with no card back (${how})`, async () => {
+  test(`Block in the card's ⋯ menu takes two clicks, then keeps the blocked card until Reveal next (${how})`, async () => {
     const world = makeWorld();
     const tab = await makeTab(world, { reduced });
+    for (const [i, item] of tab.browse.querySelectorAll('ytd-rich-item-renderer').entries()) {
+      const channel = new FakeElement(tab.document, 'span');
+      channel.className = 'ytContentMetadataViewModelMetadataText';
+      channel.textContent = `Channel ${i}`;
+      item.prepend(channel);
+    }
     await tab.click('reveal');
     await loadPicture(tab);
     await tab.advance(100);
@@ -673,7 +690,177 @@ for (const reduced of [true, false]) {
     assert.equal(world.state.tokens.rec, 9);
     assert.equal(world.state.log[world.state.day].passed, 1);
     assert.equal(tab.message(), '');
+    assert.ok(tab.card().classList.contains('is-blocked'));
+    assert.equal(tab.cardTitle(), 'Video v1');
+    assert.match(tab.card().textContent, /is blocked/);
+    assert.equal(tab.button('watch'), null);
+    assert.equal(tab.button('more'), null);
+    assert.equal(tab.button('save'), null);
+    assert.equal(tab.button('pass'), null);
+    assert.ok(tab.button('next'));
+    assert.ok(tab.document.activeElement === tab.button('next'), 'focus moves to Reveal next');
+    await tab.click('next');
+    await loadPicture(tab);
+    await tab.advance(100);
+    assert.equal(world.state.tokens.rec, 8, 'Reveal next spends one card');
+    assert.ok(!tab.card().classList.contains('is-blocked'));
+    assert.ok(tab.button('watch'));
+    if (!reduced) assert.equal(tab.reveals.at(-1), 'reveal', 'starts the empty page reveal');
   });
+
+  for (const close of ['Escape', 'outside']) {
+    test(`the card menu opens again after ${close} (${how})`, async () => {
+      const tab = await makeTab(makeWorld(), { reduced });
+      await tab.click('reveal');
+      await loadPicture(tab);
+      await tab.advance(100);
+      const card = tab.card();
+      await tab.click('more');
+      assert.equal(tab.document.activeElement, tab.button('block'));
+      if (close === 'Escape') {
+        tab.button('block').dispatchEvent({ type: 'keydown', key: 'Escape' });
+        assert.equal(tab.document.activeElement, tab.button('more'));
+      } else tab.document.dispatchEvent({ type: 'pointerdown', target: tab.document.body });
+      assert.equal(tab.button('block'), null);
+      assert.equal(tab.button('more').getAttribute('aria-expanded'), 'false');
+      await tab.click('more');
+      assert.ok(tab.button('block'));
+      assert.ok(!tab.button('block').classList.contains('is-armed'));
+      assert.ok(tab.card() === card, 'opening and closing keep the card');
+    });
+  }
+
+  test(`arming and disarming Block keep the card and menu elements (${how})`, async () => {
+    const tab = await makeTab(makeWorld(), { reduced });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    await tab.click('more');
+    const card = tab.card();
+    const thumb = card.querySelector('.drip-thumb');
+    const menu = card.querySelector('.drip-menu');
+    const block = tab.button('block');
+    await tab.click('block');
+    assert.ok(tab.card().querySelector('.drip-thumb') === thumb);
+    assert.ok(tab.card() === card, 'arming does not rebuild the card');
+    assert.ok(tab.card().querySelector('.drip-menu') === menu);
+    assert.ok(tab.document.activeElement === block);
+    await tab.advance(3000);
+    assert.ok(tab.card() === card);
+    assert.ok(tab.button('block') === block);
+    assert.ok(tab.card().querySelector('.drip-menu') === menu, 'disarming keeps the menu animation from replaying');
+    assert.ok(tab.document.activeElement === block);
+  });
+
+  test(`the blocked card survives redraws and its thumbnail cannot Watch (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    await blockCard(tab);
+    await tab.click('saved-head');
+    assert.ok(tab.card().classList.contains('is-blocked'));
+    assert.equal(tab.card().querySelectorAll('.drip-blocked-chip').length, 1);
+    const thumb = tab.card().querySelector('.drip-thumb');
+    assert.equal(thumb.getAttribute('href'), null);
+    thumb.click();
+    await settle();
+    assert.equal(world.count('resolve'), 1, 'only Block was sent');
+    assert.equal(tab.location.assigned.length, 0);
+  });
+
+  for (const clear of ['reload', 'navigation', 'current card']) {
+    test(`the blocked card clears on ${clear} (${how})`, async () => {
+      const world = makeWorld();
+      const tab = await makeTab(world, { reduced });
+      await blockCard(tab);
+      if (clear === 'reload') {
+        const fresh = await makeTab(world, { reduced });
+        assert.equal(fresh.card(), null);
+        assert.ok(fresh.button('reveal'));
+      } else if (clear === 'navigation') {
+        tab.document.dispatchEvent({ type: 'yt-navigate-start' });
+        tab.document.dispatchEvent({ type: 'yt-navigate-finish' });
+        assert.equal(tab.card(), null);
+        assert.ok(tab.button('reveal'));
+      } else {
+        // The same video can return after a reset and an unblock. Its cached picture must work normally again.
+        world.state.channels.block = [];
+        world.state.current = { id: 'v1', title: 'Video v1', channel: 'Channel' };
+        for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+        assert.ok(!tab.card().classList.contains('is-blocked'));
+        assert.equal(tab.card().querySelector('.drip-blocked-chip'), null);
+        assert.equal(tab.card().querySelector('.drip-thumb').getAttribute('href'), '/watch?v=v1');
+        assert.ok(tab.button('watch'));
+      }
+    });
+  }
+
+  test(`a failed block keeps the playable card (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    await tab.click('more');
+    await tab.click('block');
+    await tab.advance(300);
+    world.failNext = 'write';
+    await tab.click('block');
+    assert.ok(!tab.card().classList.contains('is-blocked'));
+    assert.ok(tab.button('watch'));
+    assert.equal(world.state.current.id, 'v1');
+    assert.equal(world.state.channels.block.length, 0);
+    assert.match(tab.message(), /Something went wrong/);
+  });
+
+  test(`a pending block cannot restore its card after navigation (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    await tab.click('more');
+    await tab.click('block');
+    await tab.advance(300);
+    let release = () => {};
+    world.hold = new Promise((resolve) => { release = () => resolve(undefined); });
+    await tab.click('block');
+    tab.document.dispatchEvent({ type: 'yt-navigate-start' });
+    release();
+    await settle();
+    tab.document.dispatchEvent({ type: 'yt-navigate-finish' });
+    assert.equal(world.state.channels.block.length, 1);
+    assert.equal(tab.card(), null);
+    assert.ok(tab.button('reveal'));
+  });
+
+  test(`a state redraw preserves the open and armed menu (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    await tab.click('more');
+    await tab.click('block');
+    world.state.tokens.watch--;
+    for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+    assert.ok(tab.button('block').classList.contains('is-armed'));
+    assert.equal(tab.button('more').getAttribute('aria-expanded'), 'true');
+    assert.ok(tab.document.activeElement === tab.button('block'));
+    await tab.advance(3000);
+    assert.ok(!tab.button('block').classList.contains('is-armed'));
+  });
+
+  for (const cards of ['limited', 'unlimited']) {
+    test(`blocked Reveal next follows ${cards} card price and availability (${how})`, async () => {
+      const world = makeWorld();
+      world.state.settings.cards = cards;
+      world.state.tokens.rec = cards === 'limited' ? 1 : 0;
+      const tab = await makeTab(world, { reduced });
+      await blockCard(tab);
+      assert.equal(tab.button('next').hasAttribute('disabled'), cards === 'limited');
+      assert.equal(!!tab.button('next').querySelector('.drip-price'), cards === 'limited');
+    });
+  }
 
   test(`nothing new in the grid spends nothing and says so (${how})`, async () => {
     const world = makeWorld();
