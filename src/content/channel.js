@@ -16,6 +16,8 @@
     handleText: 'yt-page-header-view-model yt-content-metadata-view-model span',
     // Subscribe and Join sit in this row. The button goes at its end.
     actions: 'yt-page-header-view-model yt-flexible-actions-view-model',
+    // The channel's picture, a yt3.googleusercontent.com image (checked on air, 2026-11-04). Settings shows it.
+    avatar: 'yt-page-header-view-model yt-avatar-shape img',
   };
   const BUTTON_ID = 'drip-allow';
 
@@ -51,7 +53,8 @@
     const name = document.querySelector(SEL.name)?.textContent?.trim() || '';
     const title = document.title.replace(/^\(\d+\+?\)\s*/, '').replace(/ - YouTube$/, '').trim();
     if (!name || title !== name) return null;
-    return { ids, name };
+    const avatar = [...document.querySelectorAll(SEL.avatar)].map((img) => /** @type {HTMLImageElement} */ (img).src).find((src) => /^https:\/\/yt3\./.test(src));
+    return avatar ? { ids, name, avatar } : { ids, name };
   }
 
   /** @param {any} channel */
@@ -142,7 +145,8 @@
     if (!state || !state.channels || !channel.name) return;
     const p = state.channelsPending;
     const entries = [...state.channels.allow, ...state.channels.block, ...(p ? [...p.allow, ...p.unblock] : [])];
-    const stale = entries.some((/** @type {any} */ e) => Drip.sameChannel(e, channel) && (e.name !== channel.name || channel.ids.some((/** @type {string} */ id) => !e.ids.includes(id))));
+    const stale = entries.some((/** @type {any} */ e) => Drip.sameChannel(e, channel) && (e.name !== channel.name
+      || (!!channel.avatar && e.avatar !== channel.avatar) || channel.ids.some((/** @type {string} */ id) => !e.ids.includes(id))));
     if (stale) send({ type: 'seenChannel', channel });
   }
 

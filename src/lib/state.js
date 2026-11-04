@@ -31,6 +31,7 @@
  * @typedef {Object} Channel
  * @property {string[]} ids
  * @property {string} name
+ * @property {string} [avatar] The picture a channel page showed, for Settings' lists. Only YouTube's image hosts.
  */
 /**
  * @typedef {Object} ChannelsPending
@@ -1131,6 +1132,8 @@
   // YouTube handles can be in any script, like @料理 (Codex, 2026-11-03).
   const HANDLE = /^@[\p{L}\p{M}\p{N}_.\-·]{1,100}$/u;
   const UC_ID = /^UC[\w-]{22}$/;
+  /** A channel's picture, as a channel page's header shows it (checked on air, 2026-11-04). */
+  const AVATAR = /^https:\/\/yt3\.(googleusercontent|ggpht)\.com\/[\w\-./=~%]{1,400}$/;
 
   /**
    * A channel's id from what a person or a page gives: `@handle`, `UC...`, or a URL or path with either. Handles are
@@ -1176,7 +1179,8 @@
     const c = /** @type {Record<string, unknown>} */ (raw);
     const ids = cleanIds(c.ids);
     const name = typeof c.name === 'string' ? c.name.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
-    return ids.length || name ? { ids, name } : null;
+    if (!ids.length && !name) return null;
+    return typeof c.avatar === 'string' && AVATAR.test(c.avatar) ? { ids, name, avatar: c.avatar } : { ids, name };
   }
 
   /** @param {unknown} raw @returns {Channel[]} */
@@ -1212,6 +1216,7 @@
     }
     // A name from a page with ids is current. A name-only sighting never renames an entry it matched by name.
     if (seen.name && seen.ids.length && entry.name !== seen.name) { entry.name = seen.name; changed = true; }
+    if (seen.avatar && seen.ids.length && entry.avatar !== seen.avatar) { entry.avatar = seen.avatar; changed = true; }
     return changed;
   }
 

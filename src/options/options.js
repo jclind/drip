@@ -749,6 +749,8 @@ let channelsEl = null;
 let channelsKey = '';
 /** A line under each list after an add, or ''. */
 const channelsNote = { allow: '', block: '' };
+/** Which list the Channels tabs show (Jesse's pick, P, 2026-11-04). @type {'allow' | 'block'} */
+let channelTab = 'allow';
 
 function channelsSection() {
   if (!channelsEl) {
@@ -758,7 +760,7 @@ function channelsSection() {
         h('span', { class: 'part-icon' }, icon('users')),
         h('div', { class: 'part-text' },
           h('div', { class: 'setting-line' }, h('h2', { class: 'part-name' }, 'Channels')),
-          h('div', { class: 'part-sum' }))),
+          h('div', { class: 'part-sum' }, 'Allowed channels are free to watch. Blocked ones never come up in reveals.'))),
       h('div', { class: 'rows' }, h('div', { class: 'rows-inner' }, h('div', { class: 'rows-pad channel-lists' }))));
   }
   renderChannels(true);
@@ -810,92 +812,122 @@ async function addChannel(list) {
     const live = /** @type {HTMLInputElement | null} */ (channelsEl?.querySelector(`[data-k="${list}-input"]`));
     if (live) live.value = '';
     const when = res.waits ? ` from ${resetLabel()}` : '';
-    channelsNote[list] = list === 'allow' ? `Allowed${when}. Its name shows once you open the channel or one of its videos.`
-      : 'Blocked. Its name shows once you open the channel or one of its videos, and only then does it catch home cards, which show just the name.';
+    channelsNote[list] = list === 'allow' ? `Allowed${when}. Its name and picture show once you open the channel.`
+      : 'Blocked. Home cards show only a name, so it catches them once you open the channel or one of its videos.';
   } else channelsNote[list] = channelError(res);
   renderChannels();
 }
 
+/** The channel's page on YouTube, or '' for an entry known only by name. @param {any} c */
+function channelUrl(c) {
+  const id = c.ids.find((/** @type {string} */ i) => i.startsWith('@')) || c.ids[0] || '';
+  if (!id) return '';
+  return id.startsWith('@') ? `https://www.youtube.com/${id}` : `https://www.youtube.com/channel/${id}`;
+}
+
 /**
- * The two lists. Ticks save the state every few seconds, and a rebuilt button loses focus and clicks (PRs 57 and 63),
- * so it redraws only when something it shows changed, and keeps focus and typed text across a redraw.
+ * The two lists, as tabs of one-line tiles (Jesse's picks M and P, 2026-11-04): a tile is the channel's picture, name,
+ * and handle, and links to the channel. A change that waits for the reset gets a gray clock tag with the time, and an
+ * empty list is a dashed placeholder tile. Ticks save the state every few seconds, and a rebuilt button loses focus and
+ * clicks (PRs 57 and 63), so it redraws only when something it shows changed, and keeps focus and typed text.
  * @param {boolean} [force]
  */
 function renderChannels(force = false) {
   if (!channelsEl || !state) return;
-  const { h } = DripPage;
+  const { h, icon } = DripPage;
   const firstDay = Drip.firstDayUntil(state, Date.now()) > 0;
-  const key = JSON.stringify([state.channels, state.channelsPending, state.settings.resetHour, firstDay, channelsNote]);
+  const key = JSON.stringify([state.channels, state.channelsPending, state.settings.resetHour, firstDay, channelsNote, channelTab]);
   if (!force && key === channelsKey) return;
   channelsKey = key;
   const p = state.channelsPending;
   const allowed = [...state.channels.allow.map((c) => ({ c, waits: false })), ...(p ? p.allow.map((c) => ({ c, waits: true })) : [])];
   const blocked = state.channels.block.map((c) => ({ c, waits: !!p && p.unblock.some((u) => Drip.sameChannel(u, c)) }));
-  /** @type {HTMLElement | null} */
-  const sum = channelsEl.querySelector('.part-sum');
-  if (sum) sum.textContent = `${allowed.length} allowed, ${blocked.length} blocked`;
   const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('.channel-lists [data-k]')?.getAttribute('data-k');
   /** @type {Record<string, string>} */
   const typed = {};
   for (const input of channelsEl.querySelectorAll('input')) typed[input.dataset.k || ''] = /** @type {HTMLInputElement} */ (input).value;
 
+  /** @param {any} c */
+  const picture = (c) => {
+    const letter = h('span', { class: 'channel-ava is-letter', 'aria-hidden': 'true' }, (c.name || c.ids[0] || '?').replace(/^@/, '').slice(0, 1).toUpperCase());
+    if (!c.avatar) return letter;
+    // A creator who changes their picture retires the old address. The letter stands in until drip sees the new one.
+    const img = h('img', { class: 'channel-ava', src: c.avatar, alt: '', referrerpolicy: 'no-referrer', loading: 'lazy' });
+    img.addEventListener('error', () => img.replaceWith(letter), { once: true });
+    return img;
+  };
+
   /**
    * @param {'allow' | 'block'} list @param {{c: any, waits: boolean}} item @param {number} i
    */
-  const row = (list, { c, waits }, i) => {
+  const tile = (list, { c, waits }, i) => {
     const handle = c.ids.find((/** @type {string} */ id) => id.startsWith('@')) || c.ids[0] || '';
     const name = c.name || handle;
     const extra = c.name && handle ? handle : '';
-    const note = channelWaitText(list, waits) || (list === 'block' && !c.name ? 'Name not seen yet' : '');
     const action = list === 'allow' ? { type: 'removeAllowed', label: waits ? 'Cancel' : 'Remove' }
       : waits ? { type: 'cancelChannelPending', label: 'Cancel' } : { type: 'unblockChannel', label: 'Unblock' };
     const done = action.type === 'unblockChannel' && !firstDay ? `${name} is unblocked at ${resetLabel()}.` : '';
-    return h('li', { class: `channel${waits ? ' is-waiting' : ''}` },
-      h('div', { class: 'channel-text' },
-        h('span', { class: 'channel-name' }, name),
-        extra && h('span', { class: 'muted channel-id' }, ` ${extra}`),
-        note && h('div', { class: 'muted channel-note' }, note)),
-      h('button', { type: 'button', 'data-k': `${list}-${i}`, 'aria-label': `${action.label} ${name}`,
-        // The next row takes this one's place, and with it this button's data-k. Focus goes to the add field instead, so
-        // a second Enter can't remove the next channel (code review, 2026-11-03).
+    const url = channelUrl(c);
+    const when = waits ? h('span', { class: 'channel-when', title: channelWaitText(list, waits) }, icon('clock-line'), resetLabel()) : null;
+    const body = [picture(c), h('span', { class: 'channel-who' }, h('span', { class: 'channel-name' }, name), extra && h('span', { class: 'channel-id' }, extra)), when];
+    return h('li', { class: `channel-tile${waits ? ' is-waiting' : ''}` },
+      url ? h('a', { class: 'channel-link', href: url, target: '_blank', rel: 'noopener', 'data-k': `${list}-open-${i}`,
+        title: !c.name && list === 'block' ? 'drip learns its name when you open the channel. Until then, home cards from it still come up.' : undefined }, ...body)
+        : h('div', { class: 'channel-link' }, ...body),
+      h('button', { type: 'button', class: 'channel-x', 'data-k': `${list}-${i}`, 'aria-label': `${action.label} ${name}`, title: action.label,
+        // The next tile takes this one's place, and with it this button's data-k. Focus goes to the add field instead,
+        // so a second Enter can't remove the next channel (code review, 2026-11-03).
         onclick: async () => {
           await channelSend({ type: action.type, channel: c }, list, done);
-          /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="${list}-input"]`) || channelsEl?.querySelector('.channel-lists .setting-label'))?.focus();
-        } }, action.label));
+          /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="${list}-input"]`))?.focus();
+        } }, icon('x')));
   };
 
-  /** @param {'allow' | 'block'} list */
-  const adder = (list) => {
+  /** @param {'allow' | 'block'} list @param {boolean} full */
+  const adder = (list, full) => {
     const input = h('input', {
-      type: 'text', class: 'channel-input', 'data-k': `${list}-input`, placeholder: '@handle or channel link',
+      type: 'text', class: 'channel-input', 'data-k': `${list}-input`,
+      placeholder: full ? 'Full. Remove one to add another.' : '@handle or channel link', disabled: full,
       'aria-label': list === 'allow' ? 'Channel to allow' : 'Channel to block', autocomplete: 'off', spellcheck: 'false',
     });
-    /** @type {HTMLInputElement} */ (input).value = typed[`${list}-input`] || '';
+    /** @type {HTMLInputElement} */ (input).value = full ? '' : typed[`${list}-input`] || '';
     // In the settings form, Enter would submit it.
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); addChannel(list); }
     });
     return h('div', { class: 'channel-add' }, input,
-      h('button', { type: 'button', 'data-k': `${list}-add`, onclick: () => addChannel(list) }, list === 'allow' ? 'Allow' : 'Block'));
+      h('button', { type: 'button', 'data-k': `${list}-add`, disabled: full, onclick: () => addChannel(list) }, list === 'allow' ? 'Allow' : 'Block'));
   };
 
-  const full = Drip.allowCount(state) >= Drip.ALLOW_MAX;
-  const waitWord = firstDay ? 'In your first day it starts at once.' : `Adding one starts at ${resetLabel()}, after the reset.`;
+  /** @param {'allow' | 'block'} list @param {{c: any, waits: boolean}[]} items */
+  const pane = (list, items) => h('div', { class: 'channel-pane', role: 'tabpanel', id: `channels-${list}`, 'aria-labelledby': `channels-tab-${list}`, hidden: channelTab !== list },
+    items.length ? h('ul', { class: 'channel-tiles' }, ...items.map((item, i) => tile(list, item, i)))
+      : h('div', { class: 'channel-empty' }, h('span', { class: 'channel-ava' }), h('span', {}, list === 'allow' ? 'No channels allowed yet.' : 'No channels blocked yet.')),
+    adder(list, list === 'allow' && Drip.allowCount(state) >= Drip.ALLOW_MAX),
+    channelsNote[list] && h('p', { class: 'muted channel-said', role: 'status' }, channelsNote[list]));
+
+  /** @param {'allow' | 'block'} list @param {string} label @param {string} count */
+  const tabButton = (list, label, count) => h('button', {
+    type: 'button', role: 'tab', id: `channels-tab-${list}`, 'data-k': `tab-${list}`, 'aria-controls': `channels-${list}`,
+    'aria-selected': String(channelTab === list), tabindex: channelTab === list ? '0' : '-1',
+    onclick: () => { channelTab = list; renderChannels(); /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="tab-${list}"]`))?.focus(); },
+    onkeydown: (/** @type {KeyboardEvent} */ e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      channelTab = channelTab === 'allow' ? 'block' : 'allow';
+      renderChannels();
+      /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="tab-${channelTab}"]`))?.focus();
+    },
+  }, label, h('span', { class: 'channel-count' }, count));
+
   const pad = /** @type {HTMLElement} */ (channelsEl.querySelector('.channel-lists'));
   pad.replaceChildren(
-    h('div', { class: 'channel-list' },
-      h('div', { class: 'setting-label', tabindex: '-1' }, `Allowed (${allowed.length} of ${Drip.ALLOW_MAX})`),
-      h('div', { class: 'hint' }, `Their videos cost no minutes and play even with no drops left. ${waitWord}`),
-      allowed.length > 0 && h('ul', { class: 'channels-ul' }, ...allowed.map((item, i) => row('allow', item, i))),
-      full ? h('div', { class: 'hint' }, 'The list is full. Remove one to add another.') : adder('allow'),
-      channelsNote.allow && h('p', { class: 'muted channel-said', role: 'status' }, channelsNote.allow)),
-    h('div', { class: 'channel-list' },
-      h('div', { class: 'setting-label' }, 'Blocked'),
-      h('div', { class: 'hint' }, `Reveals never deal their videos. ${firstDay ? 'Unblocking is at once in your first day.' : 'Unblocking waits for the reset.'} Block from a reveal card's ⋯ menu too.`),
-      blocked.length > 0 && h('ul', { class: 'channels-ul' }, ...blocked.map((item, i) => row('block', item, i))),
-      adder('block'),
-      channelsNote.block && h('p', { class: 'muted channel-said', role: 'status' }, channelsNote.block)));
-  if (focused) /** @type {HTMLElement | null} */ (pad.querySelector(`[data-k="${focused}"]`) || pad.querySelector(`[data-k="${focused.split('-')[0]}-input"]`))?.focus();
+    h('div', { class: 'channel-tabs', role: 'tablist', 'aria-label': 'Channel lists' },
+      tabButton('allow', 'Allowed', `${allowed.length}/${Drip.ALLOW_MAX}`),
+      tabButton('block', 'Blocked', String(blocked.length))),
+    pane('allow', allowed),
+    pane('block', blocked));
+  if (focused) /** @type {HTMLElement | null} */ (pad.querySelector(`[data-k="${focused}"]:not([disabled])`) || pad.querySelector(`[data-k="${focused.split('-')[0]}-input"]:not([disabled])`))?.focus();
 }
 
 // Your data (RELEASE-PLAN.md, item 5): export, import, and reset. Import and reset go through the worker's rules, so a

@@ -374,3 +374,19 @@ test('Developer mode can end the first day early, so loosening waits, and turn i
   D.devAction(state, 'first-day-on', NOW);
   assert.ok(D.firstDayUntil(state, NOW + 1000) > 0);
 });
+
+test('a channel keeps a picture only from YouTube\'s image hosts, and a channel page updates it', () => {
+  const pic = 'https://yt3.googleusercontent.com/7vCbvtCqtjQ3YLgs-A=s160-c-k-c0x00ffffff-no-rj';
+  assert.deepEqual(D.cleanChannel({ ...VERI, avatar: pic }), { ...VERI, avatar: pic });
+  for (const bad of ['http://yt3.googleusercontent.com/x', 'https://evil.example/x.png', 'javascript:alert(1)', 'https://yt3.googleusercontent.com/a b', 42]) {
+    assert.deepEqual(D.cleanChannel({ ...VERI, avatar: bad }), VERI, String(bad));
+  }
+  const state = settled();
+  D.blockChannel(state, VERI);
+  assert.equal(state.channels.block[0].avatar, undefined);
+  assert.equal(D.seenChannel(state, { ...VERI, avatar: pic }).changed, true);
+  assert.equal(state.channels.block[0].avatar, pic);
+  assert.equal(D.seenChannel(state, { ...VERI, avatar: pic }).changed, false, 'the same picture changes nothing');
+  assert.equal(D.seenChannel(state, { ids: [], name: 'Veritasium', avatar: pic.replace('A=', 'B=') }).changed, false, 'a name-only sighting never sets a picture');
+  assert.equal(D.hydrate(JSON.parse(JSON.stringify(state)), NOW).channels.block[0].avatar, pic, 'it survives storage');
+});
