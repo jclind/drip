@@ -426,6 +426,11 @@
     closeMenu();
     // The reveal animation starts from the empty page's buttons.
     render();
+    // With no minutes or drops, the page is out for the day and has no Reveal: nothing to reveal into (Codex, 2026-11-04).
+    if (outForDay()) {
+      if (had) focusFirst(['saved-head']);
+      return;
+    }
     if (had) focusIn('reveal');
     return revealWith('reveal', { type: 'reveal' });
   }
@@ -548,7 +553,7 @@
     render();
     // Pass without the animation takes its button away too. Focus goes where the animated Pass sends it.
     if (had && res?.ok) {
-      if (action === 'block') focusOn('next');
+      if (action === 'block') focusFirst(['next', 'close']);
       else if (action === 'pass') focusOn(outForDay() ? 'saved-head' : 'reveal');
     }
   }
@@ -1056,7 +1061,7 @@
     closeMenu();
     if (opening) menuFor = id;
     syncMenu();
-    focusIn(opening ? 'block' : 'more');
+    focusIn(opening ? 'block' : 'card-more');
   }
 
   /**
@@ -1084,6 +1089,18 @@
     focusIn('block');
   }
 
+  /**
+   * Focuses the first of these controls that's there and enabled. A disabled button can't take focus, and focus would
+   * be lost (Codex, 2026-11-04).
+   * @param {string[]} keys
+   */
+  function focusFirst(keys) {
+    for (const key of keys) {
+      const el = /** @type {HTMLElement | null} */ (document.querySelector(`#drip-home [data-k="${key}"]`));
+      if (el && !el.hasAttribute('disabled')) return el.focus();
+    }
+  }
+
   /** Focus a button on the page even when focus is already inside it, as after a redraw. @param {string} key */
   function focusIn(key) {
     /** @type {HTMLElement | null} */ (document.querySelector(`#drip-home [data-k="${key}"]`))?.focus();
@@ -1092,12 +1109,14 @@
   /** @param {any} video */
   function card(video) {
     if (blockedCard?.id === video.id) return blockedCardView(video, thumbnail(video), {
-      counted: cardsMode() === 'limited', disabled: cardsMode() === 'limited' && state.tokens.rec < 1,
+      counted: cardsMode() === 'limited',
+      // Out of cards, or out of minutes and drops (the page behind it is out for the day), there's nothing to reveal.
+      disabled: (cardsMode() === 'limited' && state.tokens.rec < 1) || (clockOn() && state.tokens.watch < 1 && state.watchSecondsLeft <= 0),
       onReveal,
       onClose: () => {
         blockedCard = null;
         render();
-        focusIn('reveal');
+        focusFirst(['reveal', 'saved-head']);
       },
     });
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === video.id);
@@ -1544,7 +1563,7 @@
       if (e.repeat && e.key === 'Enter') e.preventDefault();
       if (e.key === 'Escape' && menuFor) {
         dropMenu();
-        focusIn('more');
+        focusIn('card-more');
       }
     }, true);
     target.prepend(root);

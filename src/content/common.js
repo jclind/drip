@@ -113,7 +113,7 @@
   function cardMenu(o) {
     const el = h('div', { class: 'drip-card-menu' },
       h('button', {
-        class: 'drip-card-more', type: 'button', 'data-k': 'more', 'aria-label': 'More', title: 'More',
+        class: 'drip-card-more', type: 'button', 'data-k': 'card-more', 'aria-label': 'More', title: 'More',
         'aria-haspopup': 'menu', 'aria-expanded': String(o.open), disabled: o.disabled, onclick: o.onToggle,
       }, icon('ellipsis-vertical')));
     updateCardMenu(el, o);
@@ -127,7 +127,7 @@
    */
   function updateCardMenu(el, o) {
     if (!el) return;
-    el.querySelector('[data-k="more"]')?.setAttribute('aria-expanded', String(o.open));
+    el.querySelector('[data-k="card-more"]')?.setAttribute('aria-expanded', String(o.open));
     if (!o.open) {
       el.querySelector('.drip-menu')?.remove();
       return;

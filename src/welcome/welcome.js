@@ -587,7 +587,7 @@
       closeMenu();
       if (Drip.resolveCurrent(sand, 'block', video.id).ok) blockedCard = video;
       drawHome();
-      /** @type {HTMLElement | null} */ (stage.querySelector('[data-k="next"]'))?.focus();
+      /** @type {HTMLElement | null} */ ([...stage.querySelectorAll('[data-k="next"], [data-k="close"]')].find((b) => !b.hasAttribute('disabled')))?.focus();
       return;
     }
     armed = true;
@@ -603,6 +603,11 @@
   function dropMenu() {
     closeMenu();
   }
+  // Holding Enter repeats a button's click. On the menu that would open it, arm Block, and block, with one press (Codex,
+  // 2026-11-04). home.js has the same guard.
+  stage.addEventListener('keydown', (e) => {
+    if (e.repeat && e.key === 'Enter') e.preventDefault();
+  }, true);
   // A click elsewhere, or Escape, closes it.
   document.addEventListener('pointerdown', (e) => {
     if (menuOpen && !/** @type {Element} */ (e.target)?.closest?.('.drip-card-menu')) dropMenu();
@@ -610,7 +615,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && menuOpen) {
       dropMenu();
-      /** @type {HTMLElement | null} */ (stage.querySelector('[data-k="more"]'))?.focus();
+      /** @type {HTMLElement | null} */ (stage.querySelector('[data-k="card-more"]'))?.focus();
     }
   });
 
@@ -633,7 +638,7 @@
       onClose: () => {
         blockedCard = null;
         drawHome();
-        /** @type {HTMLElement | null} */ (stage.querySelector('.drip-reveal'))?.focus();
+        /** @type {HTMLElement | null} */ ([...stage.querySelectorAll('.drip-reveal')].find((b) => !b.hasAttribute('disabled')))?.focus();
       },
     });
     return h('div', { class: `drip-card${isNew && !deals() ? ' is-new' : ''}` },
@@ -647,7 +652,7 @@
             closeMenu();
             menuOpen = opening;
             syncMenu();
-            /** @type {HTMLElement | null} */ (stage.querySelector(`[data-k="${opening ? 'block' : 'more'}"]`))?.focus();
+            /** @type {HTMLElement | null} */ (stage.querySelector(`[data-k="${opening ? 'block' : 'card-more'}"]`))?.focus();
           },
           onPick: () => pickBlock(video),
         })),
