@@ -977,53 +977,189 @@ button.col.is-selected .letter {
   }
 }
 
-/* Channels (options.js renderChannels): the allow and block lists, each with an add field. Always open, since the
-   lists aren't a mode part. */
-.channel-list {
-  margin-bottom: 20px;
+/* Channels (options.js renderChannels): Allowed and Blocked as tabs of one-line tiles, each a link to its channel
+   (Jesse's picks M and P, 2026-11-04). Always open, since the lists aren't a mode part. */
+.channel-tabs {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 20px;
+  background: var(--gray);
 }
 
-.channels-ul {
-  list-style: none;
-  margin: 10px 0 0;
+.channel-tabs button {
+  border: 0;
+  border-radius: 17px;
+  padding: 6px 16px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.channel-tabs button[aria-selected="true"] {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+}
+
+.channel-tabs button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.channel-count {
+  margin-left: 4px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.channel-pane {
+  margin: 14px 0 20px;
+}
+
+.channel-tiles {
+  display: grid;
+  gap: 6px;
+  margin: 0;
   padding: 0;
+  list-style: none;
 }
 
-.channel {
+.channel-tile {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px solid var(--line);
+  gap: 4px;
+  padding-right: 8px;
+  border-radius: 12px;
+  background: var(--gray);
 }
 
-.channel:last-child {
-  border-bottom: 1px solid var(--line);
-}
-
-.channel-text {
+.channel-link {
+  flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px 10px 12px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.channel-link:hover .channel-name {
+  text-decoration: underline;
+}
+
+a.channel-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.channel-ava {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--gray-raised);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.channel-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .channel-name {
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.channel-id,
-.channel-note {
-  font-size: 13px;
-}
-
-.channel.is-waiting .channel-name {
+.channel-id {
   color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-tile.is-waiting .channel-name {
+  color: var(--muted);
+}
+
+/* A change that waits for the reset: a small gray clock tag, so the tile keeps one line. */
+.channel-when {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px 0 8px;
+  border-radius: 12px;
+  background: var(--chip);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.channel-when .drip-i {
+  width: 13px;
+  height: 13px;
+}
+
+.channel-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.channel-x:hover,
+.channel-x:focus-visible {
+  background: var(--chip);
+  color: var(--text);
+}
+
+.channel-x .drip-i {
+  width: 14px;
+  height: 14px;
+}
+
+/* An empty list: a dashed tile in the shape of a channel's. */
+.channel-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+}
+
+.channel-empty .channel-ava {
+  background: var(--chip);
 }
 
 .channel-add {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .channel-input {
@@ -1035,6 +1171,10 @@ button.col.is-selected .letter {
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 6px 14px;
+}
+
+.channel-input:disabled {
+  opacity: 0.6;
 }
 
 .channel-input:focus-visible {
@@ -1070,4 +1210,40 @@ button.col.is-selected .letter {
   width: 16px;
   height: 18px;
   color: var(--blue);
+}
+
+.channel-add button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* A channel just unblocked: "Unblocked Veritasium · Undo" in its tile's place for a few seconds, like a stash row
+   taken out on the home page. */
+.channel-tile.is-undo {
+  min-height: 56px;
+  gap: 6px;
+  padding: 0 12px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.channel-undo {
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.channel-undo:hover {
+  text-decoration: underline;
+}
+
+.channel-undo:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }

@@ -141,7 +141,7 @@
         icon('ban'),
         h('span', { class: 'drip-menu-words', 'aria-hidden': 'true' },
           h('span', { class: 'drip-menu-say is-ask' }, h('span', {}, `Block ${o.channel}`), h('small', {}, 'Reveals never deal this channel again')),
-          h('span', { class: 'drip-menu-say is-sure' }, h('span', {}, 'Click again to block'), h('small', {}, 'Unblocking waits for the reset')))));
+          h('span', { class: 'drip-menu-say is-sure' }, h('span', {}, 'Click again to block'), h('small', {}, 'You can unblock it in Settings')))));
       el.append(menu);
       item = menu.querySelector('[data-k="block"]');
     }

@@ -31,6 +31,7 @@
  * @typedef {Object} Channel
  * @property {string[]} ids
  * @property {string} name
+ * @property {string} [avatar] The picture a channel page showed, for Settings' lists. Only YouTube's image hosts.
  */
 /**
  * @typedef {Object} ChannelsPending
@@ -1100,8 +1101,7 @@
     const cleared = state.backlog.length;
     // One at a time through removeBacklog, so a saved card still showing stops counting as saved (Codex, 2026-11-02).
     for (const video of [...state.backlog]) removeBacklog(state, video.id);
-    // Emptying the allow list tightens, so it's at once, and waiting allows go too. Emptying the block list loosens,
-    // so it waits (CHANNEL-LISTS-PLAN.md, call 14).
+    // Both lists empty at once, and waiting allows go too. Unblocking applies at once since 2026-11-04 (Jesse).
     const allowing = [...state.channels.allow, ...(state.channelsPending ? state.channelsPending.allow : [])];
     for (const channel of allowing) removeAllowed(state, channel);
     let unblocked = 0;
@@ -1117,8 +1117,8 @@
   }
 
 
-  // Channel allow and block lists (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md). Allowing and unblocking loosen, so
-  // they wait for the reset (Q6). Removing an allowed channel and blocking one tighten, so they apply at once.
+  // Channel allow and block lists (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md). Allowing loosens, so it waits for the
+  // reset (Q6). Removing an allowed channel, blocking, and unblocking apply at once (unblocking since 2026-11-04).
 
   /** The most channels the allow list holds, waiting ones included (Jesse, 2026-11-02). */
   const ALLOW_MAX = 5;
@@ -1131,6 +1131,8 @@
   // YouTube handles can be in any script, like @料理 (Codex, 2026-11-03).
   const HANDLE = /^@[\p{L}\p{M}\p{N}_.\-·]{1,100}$/u;
   const UC_ID = /^UC[\w-]{22}$/;
+  /** A channel's picture, as a channel page's header shows it (checked on air, 2026-11-04). */
+  const AVATAR = /^https:\/\/yt3\.(googleusercontent|ggpht)\.com\/[\w\-./=~%]{1,400}$/;
 
   /**
    * A channel's id from what a person or a page gives: `@handle`, `UC...`, or a URL or path with either. Handles are
@@ -1176,7 +1178,8 @@
     const c = /** @type {Record<string, unknown>} */ (raw);
     const ids = cleanIds(c.ids);
     const name = typeof c.name === 'string' ? c.name.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
-    return ids.length || name ? { ids, name } : null;
+    if (!ids.length && !name) return null;
+    return typeof c.avatar === 'string' && AVATAR.test(c.avatar) ? { ids, name, avatar: c.avatar } : { ids, name };
   }
 
   /** @param {unknown} raw @returns {Channel[]} */
@@ -1212,6 +1215,7 @@
     }
     // A name from a page with ids is current. A name-only sighting never renames an entry it matched by name.
     if (seen.name && seen.ids.length && entry.name !== seen.name) { entry.name = seen.name; changed = true; }
+    if (seen.avatar && seen.ids.length && entry.avatar !== seen.avatar) { entry.avatar = seen.avatar; changed = true; }
     return changed;
   }
 
@@ -1314,13 +1318,14 @@
     if (!channel) return { ok: false, error: 'bad-channel' };
     const have = findChannel(state.channels.block, channel);
     if (!have) return { ok: true, waits: false };
-    if (firstDayUntil(state, now) > 0) {
-      state.channels.block = state.channels.block.filter((entry) => entry !== have);
-      return { ok: true, waits: false };
+    // At once: a blocked channel only changes which videos a reveal deals, and every reveal still costs a card, so
+    // unblocking gives no more watching (Jesse, 2026-11-04). An unblock saved waiting before this still applies at the reset.
+    state.channels.block = state.channels.block.filter((entry) => entry !== have);
+    if (state.channelsPending) {
+      state.channelsPending.unblock = state.channelsPending.unblock.filter((entry) => !sameChannel(entry, have));
+      tidyChannelsPending(state);
     }
-    const pending = channelsPendingFor(state);
-    if (!findChannel(pending.unblock, have)) pending.unblock.push({ ids: [...have.ids], name: have.name });
-    return { ok: true, waits: true };
+    return { ok: true, waits: false };
   }
 
   /** Drops a waiting allow or unblock for a channel. @param {State} state @param {unknown} raw */
@@ -1349,6 +1354,27 @@
       }
     }
     return { ok: true, changed };
+  }
+
+  /**
+   * A channel from its channel page's HTML, which the worker fetches for an entry added in Settings by handle, so the
+   * list shows its picture and home cards (which show only a name) match it at once (Jesse, 2026-11-04). It reads the
+   * page's og:title, og:image, and og:url tags (checked 2026-11-04). The picture is asked for at 160px, as the header
+   * shows it. Null when the page doesn't have them.
+   * @param {unknown} html @param {string} handle @returns {Channel | null}
+   */
+  function channelFromPage(html, handle) {
+    if (typeof html !== 'string' || !HANDLE.test(handle)) return null;
+    /** @param {string} prop */
+    const meta = (prop) => {
+      const m = new RegExp(`<meta property="og:${prop}" content="([^"]*)"`).exec(html);
+      return m ? m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') : '';
+    };
+    const name = meta('title');
+    if (!name) return null;
+    const uc = /\/channel\/(UC[\w-]{22})$/.exec(meta('url'));
+    const avatar = meta('image').replace(/=s\d+-/, '=s160-');
+    return cleanChannel({ ids: [handle.toLowerCase(), ...(uc ? [uc[1]] : [])], name, avatar });
   }
 
   /**
@@ -1424,6 +1450,6 @@
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,
     ALLOW_MAX, channelId, cleanChannel, sameChannel, allowChannel, removeAllowed, blockChannel, unblockChannel,
-    cancelChannelPending, seenChannel, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
+    cancelChannelPending, seenChannel, channelFromPage, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
   };
 })();

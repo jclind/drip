@@ -67,12 +67,23 @@ test('removing a waiting allow cancels it', () => {
   assert.equal(state.channels.allow.length, 0);
 });
 
-test('blocking applies at once, and unblocking waits for the reset', () => {
+test('blocking and unblocking both apply at once (unblocking since 2026-11-04)', () => {
   const state = settled();
   assert.deepEqual(D.blockChannel(state, BLUE), { ok: true });
   assert.equal(state.channels.block.length, 1);
-  assert.deepEqual(D.unblockChannel(state, BLUE, NOW), { ok: true, waits: true });
-  assert.equal(state.channels.block.length, 1, 'still blocked today');
+  assert.deepEqual(D.unblockChannel(state, BLUE, NOW), { ok: true, waits: false });
+  assert.equal(state.channels.block.length, 0);
+  assert.equal(state.channelsPending, null);
+});
+
+test('an unblock saved waiting before 2026-11-04 still applies at the reset, and unblocking again applies it now', () => {
+  const state = settled();
+  D.blockChannel(state, BLUE);
+  D.blockChannel(state, VERI);
+  state.channelsPending = { effectiveDay: D.addDays(state.day, 1), allow: [], unblock: [{ ...BLUE }, { ...VERI }] };
+  D.unblockChannel(state, VERI, NOW);
+  assert.deepEqual(state.channels.block.map(c => c.name), ['3Blue1Brown']);
+  assert.deepEqual(state.channelsPending.unblock.map(c => c.name), ['3Blue1Brown']);
   nextDay(state);
   assert.equal(state.channels.block.length, 0);
 });
@@ -319,7 +330,7 @@ test('import adds the lists under the same rules, and an old file without them s
   assert.equal(old.channelsAdded, 0);
 });
 
-test('reset empties the allow list at once and the block list at the reset', () => {
+test('reset empties the allow list and the block list at once', () => {
   const state = settled();
   state.channels.allow.push({ ...VERI });
   D.allowChannel(state, BLUE, NOW);
@@ -329,10 +340,7 @@ test('reset empties the allow list at once and the block list at the reset', () 
   assert.equal(state.channels.allow.length, 0);
   assert.equal(D.isFree(state, 'vid1'), false);
   assert.equal(state.channelsPending?.allow.length ?? 0, 0, 'a waiting allow is cancelled');
-  assert.equal(state.channels.block.length, 1);
-  nextDay(state);
   assert.equal(state.channels.block.length, 0);
-  assert.equal(state.channels.allow.length, 0);
 });
 
 test('a handle in another script works, and a broken % escape is refused without throwing (Codex)', () => {
@@ -373,4 +381,37 @@ test('Developer mode can end the first day early, so loosening waits, and turn i
   assert.equal(D.hydrate(JSON.parse(JSON.stringify(state)), NOW).firstDayOff, true, 'it survives storage');
   D.devAction(state, 'first-day-on', NOW);
   assert.ok(D.firstDayUntil(state, NOW + 1000) > 0);
+});
+
+test('a channel keeps a picture only from YouTube\'s image hosts, and a channel page updates it', () => {
+  const pic = 'https://yt3.googleusercontent.com/7vCbvtCqtjQ3YLgs-A=s160-c-k-c0x00ffffff-no-rj';
+  assert.deepEqual(D.cleanChannel({ ...VERI, avatar: pic }), { ...VERI, avatar: pic });
+  for (const bad of ['http://yt3.googleusercontent.com/x', 'https://evil.example/x.png', 'javascript:alert(1)', 'https://yt3.googleusercontent.com/a b', 42]) {
+    assert.deepEqual(D.cleanChannel({ ...VERI, avatar: bad }), VERI, String(bad));
+  }
+  const state = settled();
+  D.blockChannel(state, VERI);
+  assert.equal(state.channels.block[0].avatar, undefined);
+  assert.equal(D.seenChannel(state, { ...VERI, avatar: pic }).changed, true);
+  assert.equal(state.channels.block[0].avatar, pic);
+  assert.equal(D.seenChannel(state, { ...VERI, avatar: pic }).changed, false, 'the same picture changes nothing');
+  assert.equal(D.seenChannel(state, { ids: [], name: 'Veritasium', avatar: pic.replace('A=', 'B=') }).changed, false, 'a name-only sighting never sets a picture');
+  assert.equal(D.hydrate(JSON.parse(JSON.stringify(state)), NOW).channels.block[0].avatar, pic, 'it survives storage');
+});
+
+test('a channel page\'s og tags give its name, UC id, and a 160px picture', () => {
+  const html = '<head><meta property="og:title" content="Tom &amp; Jerry&#39;s"><meta property="og:url" content="https://www.youtube.com/channel/UCHnyfMqiRRG1u-2MsSQLbXA">'
+    + '<meta property="og:image" content="https://yt3.googleusercontent.com/7vCbvtCq-1GoA=s900-c-k-c0x00ffffff-no-rj"></head>';
+  assert.deepEqual(D.channelFromPage(html, '@Veritasium'), {
+    ids: ['@veritasium', 'UCHnyfMqiRRG1u-2MsSQLbXA'], name: "Tom & Jerry's",
+    avatar: 'https://yt3.googleusercontent.com/7vCbvtCq-1GoA=s160-c-k-c0x00ffffff-no-rj',
+  });
+  assert.equal(D.channelFromPage('<html>no tags</html>', '@veritasium'), null, 'no title, nothing to fill in');
+  assert.equal(D.channelFromPage(html, 'not a handle'), null);
+  const bad = html.replace('https://yt3.googleusercontent.com', 'https://evil.example');
+  assert.equal(D.channelFromPage(bad, '@veritasium').avatar, undefined, 'a picture from anywhere else is dropped');
+  const state = settled();
+  D.blockChannel(state, { ids: ['@veritasium'], name: '' });
+  D.seenChannel(state, D.channelFromPage(html, '@veritasium'));
+  assert.equal(state.channels.block[0].name, "Tom & Jerry's", 'a block added by handle learns its name');
 });
