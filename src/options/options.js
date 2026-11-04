@@ -742,7 +742,8 @@ function renderReasons() {
 }
 
 // Channels (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md call 13). Each button goes to the worker when pressed, not
-// through Save, like Your data. Adding to the allow list and unblocking wait for the reset (Q6).
+// through Save, like Your data. Adding to the allow list waits for the reset (Q6). Unblocking is at once (Jesse,
+// 2026-11-04), and its tile shows "Unblocked · Undo" for a few seconds, like a stash row taken out on the home page.
 
 /** @type {HTMLElement | null} */
 let channelsEl = null;
@@ -751,6 +752,36 @@ let channelsKey = '';
 const channelsNote = { allow: '', block: '' };
 /** Which list the Channels tabs show (Jesse's pick, P, 2026-11-04). @type {'allow' | 'block'} */
 let channelTab = 'allow';
+/** The channel just unblocked, shown in its place with Undo until UNBLOCK_UNDO_MS pass. @type {{c: any, i: number} | null} */
+let justUnblocked = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let unblockTimer;
+/** As long as a stash row's Undo on the home page (swap.js UNDO_MS). */
+const UNBLOCK_UNDO_MS = 5000;
+
+/** Unblocks a channel at once, and leaves "Unblocked · Undo" where its tile was. @param {any} c @param {number} i */
+async function unblockWithUndo(c, i) {
+  const res = await channelSend({ type: 'unblockChannel', channel: c }, 'block');
+  if (!res || !res.ok) return;
+  clearTimeout(unblockTimer);
+  justUnblocked = { c, i };
+  unblockTimer = setTimeout(() => {
+    justUnblocked = null;
+    renderChannels();
+  }, UNBLOCK_UNDO_MS);
+  renderChannels();
+  /** @type {HTMLElement | null} */ (channelsEl?.querySelector('[data-k="block-undo"]'))?.focus();
+}
+
+/** Blocks the channel again, at once, as blocking always is. */
+async function undoUnblock() {
+  if (!justUnblocked) return;
+  const { c, i } = justUnblocked;
+  clearTimeout(unblockTimer);
+  justUnblocked = null;
+  await channelSend({ type: 'blockChannel', channel: c }, 'block');
+  /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="block-${i}"]`) || channelsEl?.querySelector('[data-k="block-input"]'))?.focus();
+}
 
 function channelsSection() {
   if (!channelsEl) {
@@ -836,7 +867,7 @@ function renderChannels(force = false) {
   if (!channelsEl || !state) return;
   const { h, icon } = DripPage;
   const firstDay = Drip.firstDayUntil(state, Date.now()) > 0;
-  const key = JSON.stringify([state.channels, state.channelsPending, state.settings.resetHour, firstDay, channelsNote, channelTab]);
+  const key = JSON.stringify([state.channels, state.channelsPending, state.settings.resetHour, firstDay, channelsNote, channelTab, justUnblocked]);
   if (!force && key === channelsKey) return;
   channelsKey = key;
   const p = state.channelsPending;
@@ -866,7 +897,6 @@ function renderChannels(force = false) {
     const extra = c.name && handle ? handle : '';
     const action = list === 'allow' ? { type: 'removeAllowed', label: waits ? 'Cancel' : 'Remove' }
       : waits ? { type: 'cancelChannelPending', label: 'Cancel' } : { type: 'unblockChannel', label: 'Unblock' };
-    const done = action.type === 'unblockChannel' && !firstDay ? `${name} is unblocked at ${resetLabel()}.` : '';
     const url = channelUrl(c);
     const when = waits ? h('span', { class: 'channel-when', title: channelWaitText(list, waits) }, icon('clock-line'), resetLabel()) : null;
     const body = [picture(c), h('span', { class: 'channel-who' }, h('span', { class: 'channel-name' }, name), extra && h('span', { class: 'channel-id' }, extra)), when];
@@ -878,7 +908,8 @@ function renderChannels(force = false) {
         // The next tile takes this one's place, and with it this button's data-k. Focus goes to the add field instead,
         // so a second Enter can't remove the next channel (code review, 2026-11-03).
         onclick: async () => {
-          await channelSend({ type: action.type, channel: c }, list, done);
+          if (action.type === 'unblockChannel') return unblockWithUndo(c, i);
+          await channelSend({ type: action.type, channel: c }, list);
           /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="${list}-input"]`))?.focus();
         } }, icon('x')));
   };
@@ -899,9 +930,24 @@ function renderChannels(force = false) {
       h('button', { type: 'button', 'data-k': `${list}-add`, disabled: full, onclick: () => addChannel(list) }, list === 'allow' ? 'Allow' : 'Block'));
   };
 
+  /** "Unblocked <name> · Undo", in the tile's place. */
+  const undoTile = () => {
+    const c = /** @type {{c: any, i: number}} */ (justUnblocked).c;
+    return h('li', { class: 'channel-tile is-undo', role: 'status' },
+      h('span', { class: 'channel-undo-text' }, `Unblocked ${c.name || c.ids[0] || 'the channel'}`),
+      h('span', { class: 'channel-undo-sep', 'aria-hidden': 'true' }, '·'),
+      h('button', { type: 'button', class: 'channel-undo', 'data-k': 'block-undo', onclick: undoUnblock }, 'Undo'));
+  };
+
   /** @param {'allow' | 'block'} list @param {{c: any, waits: boolean}[]} items */
-  const pane = (list, items) => h('div', { class: 'channel-pane', role: 'tabpanel', id: `channels-${list}`, 'aria-labelledby': `channels-tab-${list}`, hidden: channelTab !== list },
-    items.length ? h('ul', { class: 'channel-tiles' }, ...items.map((item, i) => tile(list, item, i)))
+  const pane = (list, items) => {
+    const tiles = items.map((item, i) => tile(list, item, i));
+    if (list === 'block' && justUnblocked) tiles.splice(Math.min(justUnblocked.i, tiles.length), 0, undoTile());
+    return paneOf(list, tiles);
+  };
+  /** @param {'allow' | 'block'} list @param {HTMLElement[]} tiles */
+  const paneOf = (list, tiles) => h('div', { class: 'channel-pane', role: 'tabpanel', id: `channels-${list}`, 'aria-labelledby': `channels-tab-${list}`, hidden: channelTab !== list },
+    tiles.length ? h('ul', { class: 'channel-tiles' }, ...tiles)
       : h('div', { class: 'channel-empty' }, h('span', { class: 'channel-ava' }), h('span', {}, list === 'allow' ? 'No channels allowed yet.' : 'No channels blocked yet.')),
     adder(list, list === 'allow' && Drip.allowCount(state) >= Drip.ALLOW_MAX),
     channelsNote[list] && h('p', { class: 'muted channel-said', role: 'status' }, channelsNote[list]));

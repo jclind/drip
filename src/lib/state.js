@@ -1101,8 +1101,7 @@
     const cleared = state.backlog.length;
     // One at a time through removeBacklog, so a saved card still showing stops counting as saved (Codex, 2026-11-02).
     for (const video of [...state.backlog]) removeBacklog(state, video.id);
-    // Emptying the allow list tightens, so it's at once, and waiting allows go too. Emptying the block list loosens,
-    // so it waits (CHANNEL-LISTS-PLAN.md, call 14).
+    // Both lists empty at once, and waiting allows go too. Unblocking applies at once since 2026-11-04 (Jesse).
     const allowing = [...state.channels.allow, ...(state.channelsPending ? state.channelsPending.allow : [])];
     for (const channel of allowing) removeAllowed(state, channel);
     let unblocked = 0;
@@ -1118,8 +1117,8 @@
   }
 
 
-  // Channel allow and block lists (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md). Allowing and unblocking loosen, so
-  // they wait for the reset (Q6). Removing an allowed channel and blocking one tighten, so they apply at once.
+  // Channel allow and block lists (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md). Allowing loosens, so it waits for the
+  // reset (Q6). Removing an allowed channel, blocking, and unblocking apply at once (unblocking since 2026-11-04).
 
   /** The most channels the allow list holds, waiting ones included (Jesse, 2026-11-02). */
   const ALLOW_MAX = 5;
@@ -1319,13 +1318,14 @@
     if (!channel) return { ok: false, error: 'bad-channel' };
     const have = findChannel(state.channels.block, channel);
     if (!have) return { ok: true, waits: false };
-    if (firstDayUntil(state, now) > 0) {
-      state.channels.block = state.channels.block.filter((entry) => entry !== have);
-      return { ok: true, waits: false };
+    // At once: a blocked channel only changes which videos a reveal deals, and every reveal still costs a card, so
+    // unblocking gives no more watching (Jesse, 2026-11-04). An unblock saved waiting before this still applies at the reset.
+    state.channels.block = state.channels.block.filter((entry) => entry !== have);
+    if (state.channelsPending) {
+      state.channelsPending.unblock = state.channelsPending.unblock.filter((entry) => !sameChannel(entry, have));
+      tidyChannelsPending(state);
     }
-    const pending = channelsPendingFor(state);
-    if (!findChannel(pending.unblock, have)) pending.unblock.push({ ids: [...have.ids], name: have.name });
-    return { ok: true, waits: true };
+    return { ok: true, waits: false };
   }
 
   /** Drops a waiting allow or unblock for a channel. @param {State} state @param {unknown} raw */

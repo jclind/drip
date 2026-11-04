@@ -67,12 +67,23 @@ test('removing a waiting allow cancels it', () => {
   assert.equal(state.channels.allow.length, 0);
 });
 
-test('blocking applies at once, and unblocking waits for the reset', () => {
+test('blocking and unblocking both apply at once (unblocking since 2026-11-04)', () => {
   const state = settled();
   assert.deepEqual(D.blockChannel(state, BLUE), { ok: true });
   assert.equal(state.channels.block.length, 1);
-  assert.deepEqual(D.unblockChannel(state, BLUE, NOW), { ok: true, waits: true });
-  assert.equal(state.channels.block.length, 1, 'still blocked today');
+  assert.deepEqual(D.unblockChannel(state, BLUE, NOW), { ok: true, waits: false });
+  assert.equal(state.channels.block.length, 0);
+  assert.equal(state.channelsPending, null);
+});
+
+test('an unblock saved waiting before 2026-11-04 still applies at the reset, and unblocking again applies it now', () => {
+  const state = settled();
+  D.blockChannel(state, BLUE);
+  D.blockChannel(state, VERI);
+  state.channelsPending = { effectiveDay: D.addDays(state.day, 1), allow: [], unblock: [{ ...BLUE }, { ...VERI }] };
+  D.unblockChannel(state, VERI, NOW);
+  assert.deepEqual(state.channels.block.map(c => c.name), ['3Blue1Brown']);
+  assert.deepEqual(state.channelsPending.unblock.map(c => c.name), ['3Blue1Brown']);
   nextDay(state);
   assert.equal(state.channels.block.length, 0);
 });
@@ -319,7 +330,7 @@ test('import adds the lists under the same rules, and an old file without them s
   assert.equal(old.channelsAdded, 0);
 });
 
-test('reset empties the allow list at once and the block list at the reset', () => {
+test('reset empties the allow list and the block list at once', () => {
   const state = settled();
   state.channels.allow.push({ ...VERI });
   D.allowChannel(state, BLUE, NOW);
@@ -329,10 +340,7 @@ test('reset empties the allow list at once and the block list at the reset', () 
   assert.equal(state.channels.allow.length, 0);
   assert.equal(D.isFree(state, 'vid1'), false);
   assert.equal(state.channelsPending?.allow.length ?? 0, 0, 'a waiting allow is cancelled');
-  assert.equal(state.channels.block.length, 1);
-  nextDay(state);
   assert.equal(state.channels.block.length, 0);
-  assert.equal(state.channels.allow.length, 0);
 });
 
 test('a handle in another script works, and a broken % escape is refused without throwing (Codex)', () => {
