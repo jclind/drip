@@ -408,7 +408,7 @@ function pickMode(name) {
   /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
 }
 
-/** Dry hours' From and To pickers, shown while the switch is on (syncParts). */
+/** Dry hours' From and To pickers, under the row's hint while the switch is on (syncParts). */
 function dryRange() {
   const { h } = DripPage;
   const hours = Array.from({ length: 24 }, (_, hour) => /** @type {[string, string]} */ ([String(hour), DripPage.hourLabel(hour)]));
@@ -427,12 +427,14 @@ function fieldRow(f) {
   const label = f.kind === 'stepper'
     ? h('span', { class: 'setting-label', id: labelId }, f.label)
     : h('label', { class: 'setting-label', id: labelId, for: fieldId(f.key) }, f.label);
-  const input = f.key === 'dryHours' ? h('div', { class: 'controls' }, dryRange(), control(f, labelId)) : control(f, labelId);
+  const input = control(f, labelId);
   return h('div', { class: 'setting', 'data-field': f.key },
     h('div', { class: 'setting-text' },
       h('div', { class: 'setting-line' }, label, chip(f)),
       f.hint && h('div', { class: 'hint' }, f.hint),
-      f.idle && h('div', { class: 'hint idle-note' })),
+      f.idle && h('div', { class: 'hint idle-note' }),
+      // Under the hint, so the switch lines up with every other one on the right.
+      f.key === 'dryHours' && dryRange()),
     f.key === 'recTokensPerDay' ? h('div', { class: 'controls' }, input, cardsKindPicker()) : input);
 }
 

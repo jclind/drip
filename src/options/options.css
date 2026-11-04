@@ -146,11 +146,13 @@
   gap: 8px;
 }
 
-/* Dry hours' From and To, before the switch. */
+/* Dry hours' From and To, under the row's hint. */
 .dry-range {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  margin-top: 10px;
 }
 
 .dry-range[hidden] {
