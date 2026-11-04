@@ -700,6 +700,22 @@ button.col.is-selected .letter {
   gap: 14px;
 }
 
+.reasons-count {
+  margin: -8px 0 16px;
+}
+
+.reasons-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.reasons-more:empty {
+  display: none;
+}
+
 .reason {
   display: flex;
   align-items: center;

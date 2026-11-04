@@ -679,12 +679,33 @@ function renderHistory() {
   ].filter(Boolean));
 }
 
+/** The reasons shown at first, and how many more each "Show more" adds. A heavy user has hundreds (Jesse, 2026-11-03). */
+const REASONS_FIRST = 5;
+const REASONS_STEP = 20;
+let reasonsShown = REASONS_FIRST;
+
 function renderReasons() {
   const { h } = DripPage;
   const uses = Object.keys(state.log).sort().reverse().flatMap((day) =>
     state.log[day].needThis.slice().reverse().map((/** @type {any} */ use) => ({ day, ...use })));
   $('reasons-section').hidden = uses.length === 0;
-  $('reasons').replaceChildren(...uses.map((use) => h('li', { class: 'reason' },
+  // The count says how often, so the list can stay short.
+  const weekStart = Drip.addDays(state.day, -6);
+  const week = uses.filter((use) => use.day >= weekStart).length;
+  $('reasons-count').textContent = uses.length === 1 ? 'Once.'
+    : `${plural(uses.length, 'time', 'times')} in all, ${week} in the last 7 days.`;
+  const left = uses.length - reasonsShown;
+  $('reasons-more').replaceChildren(...[
+    left > 0 && h('button', { type: 'button', onclick: () => { reasonsShown += REASONS_STEP; renderReasons(); } },
+      `Show ${Math.min(left, REASONS_STEP)} more`),
+    left > 0 && h('span', { class: 'muted' }, `${left} not shown`),
+    reasonsShown > REASONS_FIRST && h('button', { type: 'button', class: 'link', onclick: () => {
+      reasonsShown = REASONS_FIRST;
+      renderReasons();
+      $('reasons-section').scrollIntoView({ block: 'start' });
+    } }, 'Show fewer'),
+  ].filter(Boolean));
+  $('reasons').replaceChildren(...uses.slice(0, reasonsShown).map((use) => h('li', { class: 'reason' },
     h('div', { class: 'date', 'aria-label': dayText(use.day, { month: 'long', day: 'numeric' }) },
       h('span', { class: 'date-month', 'aria-hidden': 'true' }, dayText(use.day, { month: 'short' })),
       h('span', { class: 'date-day', 'aria-hidden': 'true' }, dayText(use.day, { day: 'numeric' }))),
