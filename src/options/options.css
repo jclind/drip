@@ -146,6 +146,22 @@
   gap: 8px;
 }
 
+/* Dry hours' From and To, before the switch. */
+.dry-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dry-range[hidden] {
+  display: none;
+}
+
+.dry-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .setting {
   display: flex;
   align-items: center;
