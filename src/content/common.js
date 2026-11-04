@@ -111,20 +111,63 @@
    * @param {{channel: string, open: boolean, armed: boolean, disabled?: boolean, onToggle: () => void, onPick: () => void}} o
    */
   function cardMenu(o) {
-    return h('div', { class: 'drip-card-menu' },
+    const el = h('div', { class: 'drip-card-menu' },
       h('button', {
         class: 'drip-card-more', type: 'button', 'data-k': 'more', 'aria-label': 'More', title: 'More',
         'aria-haspopup': 'menu', 'aria-expanded': String(o.open), disabled: o.disabled, onclick: o.onToggle,
-      }, icon('ellipsis-vertical')),
-      o.open && h('div', { class: 'drip-menu', role: 'menu' },
+      }, icon('ellipsis-vertical')));
+    updateCardMenu(el, o);
+    return el;
+  }
+
+  /**
+   * Updates the menu without replacing the card or replaying the menu animation when Block arms or disarms.
+   * @param {Element | null} el
+   * @param {{open: boolean, channel?: string, armed?: boolean, onPick?: () => void}} o
+   */
+  function updateCardMenu(el, o) {
+    if (!el) return;
+    el.querySelector('[data-k="more"]')?.setAttribute('aria-expanded', String(o.open));
+    if (!o.open) {
+      el.querySelector('.drip-menu')?.remove();
+      return;
+    }
+    let item = el.querySelector('[data-k="block"]');
+    if (!item) {
+      const menu = h('div', { class: 'drip-menu', role: 'menu' },
         h('button', {
-          class: `drip-menu-item${o.armed ? ' is-armed' : ''}`, type: 'button', role: 'menuitem', 'data-k': 'block',
-          'aria-label': o.armed ? `Click again to block ${o.channel}` : `Block ${o.channel}`, onclick: o.onPick,
+          class: 'drip-menu-item', type: 'button', role: 'menuitem', 'data-k': 'block', onclick: o.onPick,
         },
         icon('ban'),
         h('span', { class: 'drip-menu-words', 'aria-hidden': 'true' },
           h('span', { class: 'drip-menu-say is-ask' }, h('span', {}, `Block ${o.channel}`), h('small', {}, 'Reveals never deal this channel again')),
-          h('span', { class: 'drip-menu-say is-sure' }, h('span', {}, 'Click again to block'), h('small', {}, 'Unblocking waits for the reset'))))));
+          h('span', { class: 'drip-menu-say is-sure' }, h('span', {}, 'Click again to block'), h('small', {}, 'Unblocking waits for the reset')))));
+      el.append(menu);
+      item = menu.querySelector('[data-k="block"]');
+    }
+    item?.classList.toggle('is-armed', !!o.armed);
+    item?.setAttribute('aria-label', o.armed ? `Click again to block ${o.channel}` : `Block ${o.channel}`);
+  }
+
+  /**
+   * The video left on screen after a successful block, shared by home and the welcome tour.
+   * @param {{title: string, channel: string}} video
+   * @param {HTMLElement} thumb
+   * @param {{counted: boolean, disabled: boolean, onReveal: () => void}} o
+   */
+  function blockedCardView(video, thumb, o) {
+    thumb.removeAttribute('href');
+    if (!thumb.querySelector('.drip-blocked-chip')) {
+      thumb.append(h('span', { class: 'drip-blocked-chip' }, icon('ban'), 'Blocked'));
+    }
+    return h('div', { class: 'drip-card is-blocked' }, thumb,
+      h('div', { class: 'drip-card-title', title: video.title }, video.title),
+      h('div', { class: 'drip-card-meta-row' },
+        h('span', { class: 'drip-meta' }, `${video.channel} is blocked. Unblock it in Settings.`)),
+      h('div', { class: 'drip-card-actions' },
+        h('button', {
+          class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: o.disabled, onclick: o.onReveal,
+        }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), o.counted && price('card'))));
   }
 
   // When YouTube changes its markup, drip fails open (Q25): nothing locks, and a banner says what broke. Each line has
@@ -205,5 +248,5 @@
   // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
   const KEPT_KEY = 'drip-kept';
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, KEPT_KEY, pausePlayer, reportBroken, watchFor };
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
 })();

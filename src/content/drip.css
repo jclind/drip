@@ -1405,6 +1405,42 @@ html[dark] #drip-home .drip-menu {
   }
 }
 
+/* A blocked video stays in place until the next reveal. The chip stays clear above the dimmed picture. */
+#drip-home .drip-card.is-blocked .drip-deal-front {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+#drip-home .drip-card.is-blocked .drip-card-title {
+  color: var(--drip-muted);
+}
+
+#drip-home .drip-card.is-blocked .drip-meta {
+  white-space: normal;
+}
+
+#drip-home .drip-blocked-chip {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: var(--drip-bg);
+  color: var(--drip-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#drip-home .drip-blocked-chip .drip-i {
+  width: 16px;
+  height: 16px;
+}
+
 /* Loading: the reserved box shimmers, and Reveal next dims the card it's replacing. */
 #drip-home .drip-card.is-loading .drip-thumb,
 #drip-home .drip-card.is-next .drip-thumb,
@@ -2415,11 +2451,12 @@ html[dark] #drip-menu {
 .drip-allow .drip-allow-undo,
 .drip-allow .drip-allow-undo-icon { visibility: hidden; }
 .drip-allow .drip-allow-undo-icon { display: none; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-label { visibility: hidden; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo { visibility: visible; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-icon:not(.drip-allow-undo-icon) { display: none; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo-icon { display: inline-block; visibility: visible; color: var(--drip-text); }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh):is(.is-waiting, .is-allowed) { color: var(--drip-text); }
+/* Only Allowed and Waiting have an undo label. Scoped to them, so plain "Allow in drip" keeps its label on hover. */
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-label { visibility: hidden; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo { visibility: visible; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-icon:not(.drip-allow-undo-icon) { display: none; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo-icon { display: inline-block; visibility: visible; color: var(--drip-text); }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) { color: var(--drip-text); }
 
 /* A click that changed it: the button gives a small pop, a blue ring spreads from its edge, and the new icon drops in. */
 .drip-allow.is-changed {

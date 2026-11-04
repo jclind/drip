@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, KEPT_KEY, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
@@ -254,6 +254,12 @@
   let armTimer;
   /** When Block was armed. A second click sooner than DOUBLE_MS is one double-click, not two choices. */
   let armedAt = 0;
+  /** The blocked video kept on this page until another reveal or navigation. @type {any} */
+  let blockedCard = null;
+  /** Changes when this page is left, so a pending Block cannot bring its card back afterwards. */
+  let homeVisit = 0;
+  /** Holds redraws while Block waits for the worker, so the card stays in place until the result arrives. */
+  let blocking = false;
   /** How long Block waits for its second click (design K, 2026-11-04). */
   const ARM_MS = 3000;
   const DOUBLE_MS = 250;
@@ -292,7 +298,7 @@
   /** The reveal animations morph Full drip's +15m, card counter, and Stash, so other mixes change without them. */
   const deals = () => animates() && clockOn() && cardsMode() === 'limited' && stashOn();
   /** The card up now. With cards off it stays stored for when they're back on, but the page doesn't show it (Codex, 2026-10-15). */
-  const shownCard = () => (cardsMode() === 'off' ? null : state.current);
+  const shownCard = () => (cardsMode() === 'off' ? null : state.current || blockedCard);
 
   /**
    * Reads the feed, then sends `msg` with the videos it found. Resolves with the worker's reply when it worked, or
@@ -342,7 +348,7 @@
    * @param {Record<string, unknown>} msg
    */
   async function revealWith(kind, msg) {
-    if (busy || moving) return;
+    if (busy || moving || blocking) return;
     busy = kind;
     message = '';
     if (deals()) {
@@ -414,6 +420,13 @@
   }
 
   function onReveal() {
+    if (busy || moving || blocking) return;
+    const had = !!document.getElementById('drip-home')?.contains(document.activeElement);
+    blockedCard = null;
+    closeMenu();
+    // The reveal animation starts from the empty page's buttons.
+    render();
+    if (had) focusIn('reveal');
     return revealWith('reveal', { type: 'reveal' });
   }
 
@@ -478,7 +491,7 @@
    */
   async function onResolve(action, videoId, keyboard = false) {
     // While a reveal is in flight the card's buttons are disabled, but its picture still links to Watch (Codex, 2026-10-16).
-    if (moving || busy) return;
+    if (moving || busy || blocking || blockedCard?.id === videoId) return;
     // Watch is on its way, or its page is loading. Asking the worker again would get no-current and draw an error over the
     // page as it leaves. Once the trip has started, another Watch repeats it, which also restarts a load the user stopped.
     if (leaving) {
@@ -486,6 +499,8 @@
       return;
     }
     message = '';
+    // Closing the menu removes its focused Block item before the worker answers.
+    const had = !!document.getElementById('drip-home')?.contains(document.activeElement);
     closeMenu();
     if (action === 'pass' && deals() && document.querySelector('#drip-home .drip-card .drip-deal')) {
       // Redraws wait while the worker answers, so the card is still there to animate.
@@ -508,9 +523,12 @@
     // The worker's save redraws the page through the storage listener, which would show the empty page while the
     // watch page loads.
     if (action === 'watch') leaving = true;
-    // Taken before asking: the worker's save redraws the page, and with it the pressed button can go.
-    const had = !!document.getElementById('drip-home')?.contains(document.activeElement);
+    const video = state.current;
+    const visit = homeVisit;
+    blocking = action === 'block';
     const res = absorb(await send({ type: 'resolve', action, videoId }));
+    blocking = false;
+    if (action === 'block' && res?.ok && !state.current && visit === homeVisit) blockedCard = video;
     // A full stash asks which video to swap out instead (Q28).
     if (res && !res.ok && res.error === 'stash-full') {
       leaving = false;
@@ -529,7 +547,10 @@
     leaving = false;
     render();
     // Pass without the animation takes its button away too. Focus goes where the animated Pass sends it.
-    if (had && (action === 'pass' || action === 'block') && res && res.ok) focusOn(outForDay() ? 'saved-head' : 'reveal');
+    if (had && res?.ok) {
+      if (action === 'block') focusOn('next');
+      else if (action === 'pass') focusOn(outForDay() ? 'saved-head' : 'reveal');
+    }
   }
 
   /**
@@ -776,7 +797,13 @@
    */
   function thumbnail(video) {
     const id = video.id;
-    if (thumbCache && thumbCache.id === id) return thumbCache.el;
+    if (thumbCache && thumbCache.id === id) {
+      if (blockedCard?.id !== id) {
+        thumbCache.el.setAttribute('href', watchUrl(id));
+        thumbCache.el.querySelector('.drip-blocked-chip')?.remove();
+      }
+      return thumbCache.el;
+    }
     const img = /** @type {HTMLImageElement} */ (h('img', { alt: '', decoding: 'async' }));
     /** @type {() => void} */
     let loaded = () => {};
@@ -799,7 +826,7 @@
     img.src = `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hq720.jpg`;
     const el = h('a', {
       class: 'drip-thumb is-dealt', href: watchUrl(id), tabindex: '-1', 'aria-hidden': 'true',
-      onclick: (/** @type {Event} */ e) => { e.preventDefault(); onResolve('watch', id); },
+      onclick: (/** @type {Event} */ e) => { e.preventDefault(); if (blockedCard?.id !== id) onResolve('watch', id); },
     }, DripReveal.dealCard(img, true));
     // The length sits on the picture, as on YouTube's grid, so it turns over with the card.
     if (video.length) el.querySelector('.drip-deal-front')?.append(h('span', { class: 'drip-length' }, video.length));
@@ -1011,6 +1038,16 @@
     clearTimeout(armTimer);
     menuFor = '';
     armedFor = '';
+    updateCardMenu(document.querySelector('#drip-home .drip-card-menu'), { open: false });
+  }
+
+  /** Applies the current menu state without redrawing the card. */
+  function syncMenu() {
+    const video = state?.current;
+    updateCardMenu(document.querySelector('#drip-home .drip-card-menu'), {
+      open: !!video && menuFor === video.id, channel: video?.channel, armed: armedFor === video?.id,
+      onPick: () => pickBlock(video.id),
+    });
   }
 
   /** @param {string} id */
@@ -1018,7 +1055,7 @@
     const opening = menuFor !== id;
     closeMenu();
     if (opening) menuFor = id;
-    render();
+    syncMenu();
     focusIn(opening ? 'block' : 'more');
   }
 
@@ -1028,8 +1065,6 @@
    */
   function dropMenu() {
     closeMenu();
-    document.querySelector('#drip-home .drip-menu')?.remove();
-    document.querySelector('#drip-home [data-k="more"]')?.setAttribute('aria-expanded', 'false');
   }
 
   /** @param {string} id */
@@ -1043,9 +1078,9 @@
     clearTimeout(armTimer);
     armTimer = setTimeout(() => {
       armedFor = '';
-      render();
+      syncMenu();
     }, ARM_MS);
-    render();
+    syncMenu();
     focusIn('block');
   }
 
@@ -1056,6 +1091,10 @@
 
   /** @param {any} video */
   function card(video) {
+    if (blockedCard?.id === video.id) return blockedCardView(video, thumbnail(video), {
+      counted: cardsMode() === 'limited', disabled: cardsMode() === 'limited' && state.tokens.rec < 1,
+      onReveal,
+    });
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === video.id);
     // At 0 minutes Watch buys a drop's minutes and plays (Q18). With no drops either, it goes to the lock screen.
     const buys = costsDrop(video.id);
@@ -1286,8 +1325,9 @@
 
   /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
+    if (state?.current) blockedCard = null;
     const root = document.getElementById('drip-home');
-    if (!root || moving || leaving) return;
+    if (!root || moving || leaving || blocking) return;
     takeRefill();
     // The glass level and a stashed video's progress change on every tick, so they're left out here and freshen()
     // sets them in place. The minutes and each row's "12m left" change once a minute.
@@ -1299,7 +1339,7 @@
       state.settings.clock, state.settings.cards, state.settings.stash,
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
-    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, menuFor, armedFor]);
+    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, blockedCard]);
     if (root.firstChild && key === rendered) {
       placeSearch(root);
       return freshen(root);
@@ -1520,7 +1560,12 @@
   });
   watchFor('home', SEL.homeBrowse, (/** @type {string} */ path) => path === '/');
   document.addEventListener('yt-navigate-finish', () => mount(true));
-  document.addEventListener('yt-navigate-start', restoreSearch);
+  document.addEventListener('yt-navigate-start', () => {
+    restoreSearch();
+    homeVisit++;
+    blockedCard = null;
+    closeMenu();
+  });
   for (const ev of ['resize', 'scroll']) window.addEventListener(ev, fitSuggestions, { passive: true });
   document.addEventListener('focusin', fitSuggestions);
   // A click anywhere but the card's ⋯ menu closes it.
