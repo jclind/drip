@@ -482,7 +482,7 @@ test("a failed unlock says the week's unlocks are used", async () => {
   await tab.press('unlock');
   assert.match(tab.lockText(), /You've used this week's unlocks\./);
   assert.doesNotMatch(tab.lockText(), /left this week|Unlock this video/, 'the lock stops offering one');
-  assert.match(tab.lockText(), /Next unlock back Tuesday at 11:57am\./);
+  assert.match(tab.lockText(), /Next unlock back next Tuesday at 11:57am\./);
 });
 
 test("time played before a navigation is charged to the video it played on (finding 12)", async () => {

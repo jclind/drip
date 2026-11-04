@@ -77,7 +77,7 @@
   }
 
   /**
-   * "today at 9:14pm", "tomorrow at 9:14pm", or "Friday at 9:14pm", for a time up to a week ahead.
+   * "today at 9:14pm", "tomorrow at 9:14pm", "Friday at 9:14pm", or "next Wednesday at 9:14pm" a week out.
    * @param {number} ms @param {number} now
    */
   function dayTimeLabel(ms, now) {
@@ -87,7 +87,9 @@
     const today = new Date(now);
     const days = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
       - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000);
-    const day = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : date.toLocaleDateString('en-US', { weekday: 'long' });
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    // A week out lands on today's weekday, where a bare "Wednesday" would read as today.
+    const day = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : days >= 7 ? `next ${weekday}` : weekday;
     return `${day} at ${time}`;
   }
 

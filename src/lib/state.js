@@ -941,7 +941,12 @@
         state.settings.graceMode = !state.settings.graceMode;
         cancelPending(state, 'graceMode');
         break;
-      case 'clear-unlocks': state.unlocked = []; state.allowedToday = []; break;
+      case 'clear-unlocks':
+        state.unlocked = [];
+        state.allowedToday = [];
+        // The week's count comes from the log (Q20), so its uses go too, or the lock would still say 0 left.
+        for (const entry of Object.values(state.log)) entry.needThis = entry.needThis.filter((use) => !(use.at > 0 && now - Math.min(use.at, now) < WEEK_MS));
+        break;
       case 'first-day-off': state.firstDayOff = true; break;
       case 'first-day-on': state.firstDayOff = false; break;
       case 'clear-backlog': state.backlog = []; break;
