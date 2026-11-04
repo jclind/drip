@@ -645,6 +645,29 @@ for (const reduced of [true, false]) {
     assert.equal(tab.message(), '');
   });
 
+  test(`Block on the card asks once, then blocks the channel and passes the card with no card back (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    const channel = world.state.current.channel;
+    assert.ok(channel);
+    await tab.click('block');
+    assert.ok(tab.root().querySelector('.drip-block-text').textContent.startsWith(`Block ${channel}?`));
+    assert.equal(world.state.channels.block.length, 0, 'nothing happens before the answer');
+    await tab.click('block-no');
+    assert.ok(tab.button('block'), 'Cancel brings the buttons back');
+    await tab.click('block');
+    await tab.click('block-yes');
+    await tab.advance(100);
+    assert.deepEqual(world.state.channels.block, [{ ids: [], name: channel }]);
+    assert.equal(world.state.current, null);
+    assert.equal(world.state.tokens.rec, 9);
+    assert.equal(world.state.log[world.state.day].passed, 1);
+    assert.equal(tab.message(), '');
+  });
+
   test(`nothing new in the grid spends nothing and says so (${how})`, async () => {
     const world = makeWorld();
     world.state.seen = ['v1', 'v2', 'v3'];
