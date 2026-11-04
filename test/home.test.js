@@ -13,7 +13,7 @@ const vm = require('node:vm');
 const SRC = path.join(__dirname, '..', 'src');
 const EPOCH = new Date(2026, 9, 16, 12).getTime();
 
-// A selector engine for what home.js asks: tags, #id, .class, [attr], [attr="v"], [attr*="v"], :is(), :scope,
+// A selector engine for what home.js asks: tags, #id, .class, [attr], [attr="v"], [attr*="v"], [attr^="v"], :is(), :scope,
 // descendant and child combinators, and comma lists.
 
 /** @param {string} s @param {string} sep @returns {string[]} Parts of `s` split on `sep` outside brackets and quotes. */
@@ -57,7 +57,7 @@ function parseCompound(s) {
     else if (ch === '.') c.classes.push(name());
     else if (ch === '[') {
       const end = s.indexOf(']', i);
-      const m = /^([\w-]+)(?:([*]?=)"([^"]*)")?$/.exec(s.slice(i, end));
+      const m = /^([\w-]+)(?:([*^]?=)"([^"]*)")?$/.exec(s.slice(i, end));
       if (!m) throw new Error(`fake DOM can't parse [${s.slice(i, end)}]`);
       c.attrs.push({ name: m[1], op: m[2] || '', value: m[3] || '' });
       i = end + 1;
@@ -109,6 +109,7 @@ function matchCompound(el, c, scope) {
     if (v === null) return false;
     if (a.op === '=' && v !== a.value) return false;
     if (a.op === '*=' && !v.includes(a.value)) return false;
+    if (a.op === '^=' && !v.startsWith(a.value)) return false;
   }
   return c.is.every((list) => list.some((cx) => matchComplex(el, cx, scope)));
 }

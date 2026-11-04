@@ -29,6 +29,9 @@
     title: '#video-title, h3 a, h3',
     // Late 2026 markup uses camelCase classes (checked 2026-10-05); the kebab-case ones are the older markup.
     channel: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, ytd-channel-name a, ytd-channel-name #text',
+    // A link to the channel. Late 2026 lockups have none, only /watch links (checked on air, 2026-11-03), so a card
+    // usually has just the channel's name. The older markup's channel name was a link.
+    channelLink: 'ytd-channel-name a[href^="/@"], ytd-channel-name a[href^="/channel/"]',
     length: '.ytBadgeShapeText, .yt-badge-shape__text, .badge-shape-wiz__text, ytd-thumbnail-overlay-time-status-renderer #text',
     // The line after the title: channel, views, and age. Late 2026 writes "184K" and "3d ago", the older markup
     // "184K views" and "3 days ago". The parts are told apart by VIEWS and AGE, so the age is English only (checked 2026-10-14).
@@ -54,7 +57,7 @@
   const SCHEDULED = /^(scheduled for|premieres)\b/i;
   const DURATION = /^\d+(:\d\d)+$/;
 
-  /** @typedef {{id: string, title: string, channel: string, length: string, views: string, age: string, kind: string}} Candidate */
+  /** @typedef {{id: string, title: string, channel: string, length: string, views: string, age: string, kind: string, channelIds?: string[]}} Candidate */
 
   /** @type {any} */
   let state = null;
@@ -134,7 +137,8 @@
       const channel = firstText(item, SEL.channel);
       const length = firstText(item, SEL.length);
       const { views, age } = viewsAndAge(item, channel);
-      pool.push({ id, title, channel, length, views, age, kind: kindOf(item, channel, length, age) });
+      const channelId = Drip.channelId(item.querySelector(SEL.channelLink)?.getAttribute('href') || '');
+      pool.push({ id, title, channel, length, views, age, kind: kindOf(item, channel, length, age), ...(channelId ? { channelIds: [channelId] } : {}) });
     }
     return pool;
   }
@@ -604,7 +608,7 @@
    * @param {string} id
    */
   function costsDrop(id) {
-    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !state.unlocked.includes(id);
+    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !Drip.freeToStart(state, id);
   }
 
   /**
@@ -1216,7 +1220,7 @@
     // sets them in place. The minutes and each row's "12m left" change once a minute.
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0,
-      state.tokens, state.current, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
+      state.tokens, state.current, state.unlocked, state.channels, state.allowedToday, state.settings.feedSource, state.settings.minutesPerToken,
       // The sea's "N cards carry over" follows the allowance, the rollover cap, and pending settings (Codex, 2026-10-14).
       state.settings.resetHour, state.settings.stashMax, cardsCarried(),
       state.settings.clock, state.settings.cards, state.settings.stash,
