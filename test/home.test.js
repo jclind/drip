@@ -633,7 +633,7 @@ async function blockCard(tab) {
   await tab.click('reveal');
   await loadPicture(tab);
   await tab.advance(100);
-  await tab.click('more');
+  await tab.click('card-more');
   await tab.click('block');
   await tab.advance(300);
   await tab.click('block');
@@ -671,7 +671,7 @@ for (const reduced of [true, false]) {
     const channel = world.state.current.channel;
     assert.ok(channel);
     assert.equal(tab.button('block'), null, 'Block is in the menu, not on the card');
-    await tab.click('more');
+    await tab.click('card-more');
     assert.equal(tab.button('block').getAttribute('aria-label'), `Block ${channel}`);
     await tab.click('block');
     assert.match(tab.button('block').getAttribute('class'), /is-armed/);
@@ -694,7 +694,7 @@ for (const reduced of [true, false]) {
     assert.equal(tab.cardTitle(), 'Video v1');
     assert.match(tab.card().textContent, /is blocked/);
     assert.equal(tab.button('watch'), null);
-    assert.equal(tab.button('more'), null);
+    assert.equal(tab.button('card-more'), null);
     assert.equal(tab.button('save'), null);
     assert.equal(tab.button('pass'), null);
     assert.ok(tab.button('next'));
@@ -708,6 +708,21 @@ for (const reduced of [true, false]) {
     if (!reduced) assert.equal(tab.reveals.at(-1), 'reveal', 'starts the empty page reveal');
   });
 
+  test(`× on a blocked card puts it away with nothing spent, and Reveal video is back (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    await blockCard(tab);
+    await tab.advance(100);
+    assert.ok(tab.card().classList.contains('is-blocked'));
+    const rec = world.state.tokens.rec;
+    await tab.click('close');
+    await tab.advance(100);
+    assert.equal(tab.root().querySelector('.drip-card'), null, 'the card is gone');
+    assert.ok(tab.button('reveal'), 'the empty page is back');
+    assert.equal(world.state.tokens.rec, rec, 'nothing spent');
+    assert.ok(tab.document.activeElement === tab.button('reveal'), 'focus goes to Reveal video');
+  });
+
   for (const close of ['Escape', 'outside']) {
     test(`the card menu opens again after ${close} (${how})`, async () => {
       const tab = await makeTab(makeWorld(), { reduced });
@@ -715,15 +730,15 @@ for (const reduced of [true, false]) {
       await loadPicture(tab);
       await tab.advance(100);
       const card = tab.card();
-      await tab.click('more');
+      await tab.click('card-more');
       assert.equal(tab.document.activeElement, tab.button('block'));
       if (close === 'Escape') {
         tab.button('block').dispatchEvent({ type: 'keydown', key: 'Escape' });
-        assert.equal(tab.document.activeElement, tab.button('more'));
+        assert.equal(tab.document.activeElement, tab.button('card-more'));
       } else tab.document.dispatchEvent({ type: 'pointerdown', target: tab.document.body });
       assert.equal(tab.button('block'), null);
-      assert.equal(tab.button('more').getAttribute('aria-expanded'), 'false');
-      await tab.click('more');
+      assert.equal(tab.button('card-more').getAttribute('aria-expanded'), 'false');
+      await tab.click('card-more');
       assert.ok(tab.button('block'));
       assert.ok(!tab.button('block').classList.contains('is-armed'));
       assert.ok(tab.card() === card, 'opening and closing keep the card');
@@ -735,7 +750,7 @@ for (const reduced of [true, false]) {
     await tab.click('reveal');
     await loadPicture(tab);
     await tab.advance(100);
-    await tab.click('more');
+    await tab.click('card-more');
     const card = tab.card();
     const thumb = card.querySelector('.drip-thumb');
     const menu = card.querySelector('.drip-menu');
@@ -800,7 +815,7 @@ for (const reduced of [true, false]) {
     await tab.click('reveal');
     await loadPicture(tab);
     await tab.advance(100);
-    await tab.click('more');
+    await tab.click('card-more');
     await tab.click('block');
     await tab.advance(300);
     world.failNext = 'write';
@@ -818,7 +833,7 @@ for (const reduced of [true, false]) {
     await tab.click('reveal');
     await loadPicture(tab);
     await tab.advance(100);
-    await tab.click('more');
+    await tab.click('card-more');
     await tab.click('block');
     await tab.advance(300);
     let release = () => {};
@@ -839,12 +854,12 @@ for (const reduced of [true, false]) {
     await tab.click('reveal');
     await loadPicture(tab);
     await tab.advance(100);
-    await tab.click('more');
+    await tab.click('card-more');
     await tab.click('block');
     world.state.tokens.watch--;
     for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
     assert.ok(tab.button('block').classList.contains('is-armed'));
-    assert.equal(tab.button('more').getAttribute('aria-expanded'), 'true');
+    assert.equal(tab.button('card-more').getAttribute('aria-expanded'), 'true');
     assert.ok(tab.document.activeElement === tab.button('block'));
     await tab.advance(3000);
     assert.ok(!tab.button('block').classList.contains('is-armed'));
@@ -861,6 +876,33 @@ for (const reduced of [true, false]) {
       assert.equal(!!tab.button('next').querySelector('.drip-price'), cards === 'limited');
     });
   }
+
+  test(`a block that leaves no cards puts focus on ×, not the disabled Reveal next (${how})`, async () => {
+    const world = makeWorld();
+    world.state.tokens.rec = 1;
+    const tab = await makeTab(world, { reduced });
+    await blockCard(tab);
+    await tab.advance(100);
+    assert.ok(tab.button('next').hasAttribute('disabled'));
+    assert.ok(tab.document.activeElement === tab.button('close'));
+  });
+
+  test(`with no minutes or drops, a blocked card's Reveal next is disabled (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    world.state.tokens.watch = 0;
+    world.state.watchSecondsLeft = 0;
+    await tab.click('card-more');
+    await tab.click('block');
+    await tab.advance(300);
+    await tab.click('block');
+    await tab.advance(100);
+    assert.ok(tab.card().classList.contains('is-blocked'));
+    assert.ok(tab.button('next').hasAttribute('disabled'), 'nothing to reveal into: the page behind is out for the day');
+  });
 
   test(`nothing new in the grid spends nothing and says so (${how})`, async () => {
     const world = makeWorld();
