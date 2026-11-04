@@ -704,6 +704,7 @@ function focusReasonsButton(which) {
 }
 
 function renderReasons() {
+  if (!state) return;
   const { h } = DripPage;
   const uses = Object.keys(state.log).sort().reverse().flatMap((day) =>
     state.log[day].needThis.slice().reverse().map((/** @type {any} */ use) => ({ day, ...use })));
@@ -741,6 +742,8 @@ function renderReasons() {
       h('a', { href: `https://www.youtube.com/watch?v=${encodeURIComponent(use.videoId)}`, target: '_blank', rel: 'noopener' }, use.title || use.videoId),
       h('div', { class: 'muted' }, `"${use.reason}"`)))));
 }
+// A use leaving the 7 days changes nothing stored, so the count rechecks every minute (Codex, 2026-11-04).
+setInterval(renderReasons, 60000);
 
 // Channels (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md call 13). Each button goes to the worker when pressed, not
 // through Save, like Your data. Adding to the allow list waits for the reset (Q6). Unblocking is at once (Jesse,

@@ -893,10 +893,12 @@
     const needLeft = Drip.needThisLeft(state, now);
     // When the next unlock comes back, once the week's are used (Q20).
     const needBack = Drip.needThisBack(state, now);
+    // The label, not the time, goes in the view key, so "tomorrow" turns into "today" at midnight (Codex, 2026-11-04).
+    const backLabel = needBack > 0 ? dayTimeLabel(needBack, now) : '';
     const canBuy = state.tokens.watch > 0;
     const line = watchedLine();
     const existing = liveLock();
-    const view = JSON.stringify([videoId(), canBuy, needLeft, needBack, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
+    const view = JSON.stringify([videoId(), canBuy, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
     if (existing && lockView === view) return;
     lockView = view;
     lockVideoId = videoId();
@@ -920,7 +922,7 @@
             h('button', { class: 'drip-b drip-b-gray', 'data-k': 'unlock', onclick: () => onNeedThis(reason.value) }, icon('unlock'), h('span', {}, 'Unlock this video'))))
         : h('div', {},
           h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`),
-          needBack > 0 && h('div', { class: 'drip-lock-note' }, `Next unlock back ${dayTimeLabel(needBack, now)}.`));
+          backLabel && h('div', { class: 'drip-lock-note' }, `Next unlock back ${backLabel}.`));
     const panel = h(
       'div',
       { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },

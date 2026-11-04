@@ -472,6 +472,20 @@ test('the lock screen says what can still happen: buy minutes, unlock, or nothin
   assert.match(tab.lockText(), /Next unlock back Friday at 9:14pm\./);
 });
 
+test('a lock left open past midnight turns "tomorrow" into "today" (Codex, 2026-11-04)', async () => {
+  const { world, tab } = await setup(3);
+  world.state.tokens.watch = 0;
+  // The oldest use comes back at 9:14am on the 7th, tomorrow.
+  const at = new Date(2026, 8, 30, 9, 14).getTime();
+  world.state.log['2026-09-30'] = { ...structuredClone(world.D.logDay(world.state)), needThis: [{ videoId: 'x', title: '', reason: 'Class', at }] };
+  world.state.log[world.state.day] = { ...structuredClone(world.D.logDay(world.state)), needThis: [1, 2].map((n) => ({ videoId: `v${n}`, title: '', reason: 'Class', at: world.epoch - n * 60e3 })) };
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /Next unlock back tomorrow at 9:14am\./);
+  world.advance(12 * 3600 + 60);
+  for (let i = 0; i < 30; i++) await tab.second();
+  assert.match(tab.lockText(), /Next unlock back today at 9:14am\./);
+});
+
 test("a failed unlock says the week's unlocks are used", async () => {
   const { world, tab } = await setup(3);
   await play(world, tab, 5);
