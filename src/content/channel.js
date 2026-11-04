@@ -6,7 +6,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, hourLabel, icon } = /** @type {any} */ (globalThis).DripUI;
 
   // YouTube selectors. These break when YouTube changes its markup. Checked on air, 2026-11-03.
   const SEL = {
@@ -23,6 +23,8 @@
   let state = null;
   let busy = false;
   let view = '';
+  /** Set by a click, so the redraw that follows plays the change once (Jesse, 2026-11-03). */
+  let changed = false;
 
   /** The channel this page is, or null off a channel page or before the header has drawn. */
   function pageChannel() {
@@ -68,8 +70,11 @@
     try {
       const now = where(channel);
       const type = now === 'allowed' || now === 'waiting' ? 'removeAllowed' : now === 'full' || now === 'blocked' ? 'openSettings' : 'allowChannel';
+      // Set first: the storage event may redraw the button before this reply comes back.
+      changed = type !== 'openSettings';
       const res = await send(type === 'openSettings' ? { type, section: 'channels' } : { type, channel });
       if (res && res.ok && res.state) state = res.state;
+      else changed = false;
     } finally {
       busy = false;
       draw();
@@ -105,13 +110,18 @@
     // Redraw only on a change, so a click isn't lost to a rebuilt button.
     if (old && view === key && old.parentElement === actions) return;
     view = key;
+    // A drop to allow, a clock while it waits for the reset, and a check once it's allowed.
+    const glyph = { allowed: 'check', waiting: 'clock-line', full: 'drop', blocked: 'drop', none: 'drop' }[at];
     const button = h('button', {
-      id: BUTTON_ID, type: 'button', class: `drip-ui drip-allow is-${at}`, title,
+      id: BUTTON_ID, type: 'button', class: `drip-ui drip-allow is-${at}${changed ? ' is-changed' : ''}`, title,
       'aria-pressed': at === 'allowed' || at === 'waiting' ? 'true' : 'false',
       onclick: () => onClick(channel),
-    }, label);
+    }, icon(glyph, 'drip-allow-icon'), h('span', {}, label));
+    changed = false;
+    const hadFocus = !!old && old.contains(document.activeElement);
     old?.remove();
     actions.append(button);
+    if (hadFocus) button.focus();
     tellSeen(channel);
   }
 

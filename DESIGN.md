@@ -408,6 +408,7 @@ Each tab measures how long its video played and sends it as `seconds`, every 5 s
   channels: { allow: Channel[], block: Channel[] },  // Q31. Kept outside settings, so a waiting change can't undo a later list edit
   channelsPending: null | { effectiveDay, allow: Channel[], unblock: Channel[] },  // list changes waiting for the reset
   allowedToday: [{ id, ids }],  // videos a watch page showed are from an allowed channel, with its ids; cleared at the reset
+  firstDayOff: false,  // Developer mode: firstDayUntil reports no first day, so loosening waits even then (test tooling)
 }
 Channel = { ids, name }  // ids: '@handle' lowercased and 'UC...' ids, up to 4; either may be empty, not both
 Video  = { id, title, channel, length, views?, age?, resumeSec?, durationSec?, addedAt?, channelIds? }
@@ -470,7 +471,7 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, watched, needThis: [
   - `canDeal` skips a blocked channel. `resolveCurrent(state, 'block', videoId)` blocks the card's channel and ends it as Pass does.
   - `plannedChannels(state)` is the lists as they'll be after the reset, for Export. `exportData` adds them as `channels`, and `importData` adds a file's `channels` through `allowChannel` and `blockChannel`, returning `channelsAdded`.
   - `rollDay` and the dev panel's `apply-pending` apply `channelsPending`; "Run reset now" moves its day back too.
-- `devAction(state, action, now)` is test tooling, not a feature. It backs the dev panel (`src/devpanel/`), a floating box on YouTube pages that shows state and has buttons for minutes, tokens, "Run reset now" (moves `day` and any pending `effectiveDay` back one day, so the next message rolls over as a real reset would), applying pending settings, toggling grace now, clearing lists, and starting fresh. The panel shows while Developer mode is on in Settings (storage key `dripDev`, written by the worker on `setDevMode`) or the checkout has `dev/ENABLED`, and the worker refuses `devAction` otherwise. `bin/build-release` leaves the panel out, and a build without it hides the toggle and refuses `setDevMode`. Error `'unknown-dev-action'`.
+- `devAction(state, action, now)` is test tooling, not a feature. It backs the dev panel (`src/devpanel/`), a floating box on YouTube pages that shows state and has buttons for minutes, tokens, "Run reset now" (moves `day` and any pending `effectiveDay` back one day, so the next message rolls over as a real reset would), applying pending settings, toggling grace now, clearing lists, and starting fresh. `first-day-off` and `first-day-on` set `firstDayOff`, which Settings' Developer mode shows as "Loosening waits for the reset, even in the first day" (Jesse, 2026-11-03). The panel shows while Developer mode is on in Settings (storage key `dripDev`, written by the worker on `setDevMode`) or the checkout has `dev/ENABLED`, and the worker refuses `devAction` otherwise. `bin/build-release` leaves the panel out, and a build without it hides the toggle and refuses `setDevMode`. Error `'unknown-dev-action'`.
 
 ## Storage
 

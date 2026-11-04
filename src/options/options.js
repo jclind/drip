@@ -1084,7 +1084,31 @@ function renderDev(dev) {
   box.disabled = dev.file;
   if (dev.file) $('devHint').textContent = 'On because this checkout has dev/ENABLED. Delete that file to turn it off.';
   $('dev').hidden = false;
+  renderFirstDayOff(dev);
 }
+
+/**
+ * Developer mode's switch for Q6's first day: on, raising a limit waits for the reset even in the 24 hours after
+ * install, so that path can be tried on a new install (Jesse, 2026-11-03). It's in drip's state, so every rule sees it.
+ * @param {any} dev
+ */
+function renderFirstDayOff(dev) {
+  const on = !!(dev && dev.ok && dev.enabled) && !sample;
+  $('firstDayOffRow').hidden = !on;
+  if (on && state) /** @type {HTMLInputElement} */ ($('firstDayOff')).checked = state.firstDayOff === true;
+}
+
+$('firstDayOff').addEventListener('change', async () => {
+  const box = /** @type {HTMLInputElement} */ ($('firstDayOff'));
+  const res = await chrome.runtime.sendMessage({ type: 'devAction', action: box.checked ? 'first-day-off' : 'first-day-on' });
+  if (!res || !res.ok) {
+    box.checked = !box.checked;
+    return;
+  }
+  absorb(res);
+  renderFirstDay();
+  renderChannels(true);
+});
 
 /**
  * The sample profiles, loaded only when asked for, since the store build doesn't have the file.
@@ -1127,6 +1151,7 @@ $('devMode').addEventListener('change', async () => {
   const box = /** @type {HTMLInputElement} */ ($('devMode'));
   const dev = await chrome.runtime.sendMessage({ type: 'setDevMode', on: box.checked });
   renderDev(dev);
+  if (!(dev && dev.enabled)) $('firstDayOffRow').hidden = true;
   if (sample && !(dev && dev.enabled)) showSample('');
   else renderSamples(dev);
 });
@@ -1146,6 +1171,7 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
   }
   renderSamples(dev);
   if (!state) return;
+  renderFirstDayOff(dev);
   draft = Drip.planned(state);
   resetCardsKind();
   renderForm();

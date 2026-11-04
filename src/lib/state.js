@@ -20,6 +20,8 @@
  * @property {{allow: Channel[], block: Channel[]}} channels The channel lists (RELEASE-PLAN.md item 4). Kept outside
  *   Settings, since a waiting change there replaces a whole value and would undo a list edit made after it.
  * @property {ChannelsPending | null} channelsPending List changes that loosen, waiting for the reset (Q6).
+ * @property {boolean} firstDayOff Developer mode's "loosening waits, even in the first day": firstDayUntil reports no
+ *   first day, so every loosening waits for the reset (Jesse, 2026-11-03). Test tooling, off by default.
  * @property {{id: string, ids: string[]}[]} allowedToday Videos a watch page showed are from an allowed channel, with
  *   that channel's ids. Free only while the channel is still allowed, and cleared at the reset.
  */
@@ -159,6 +161,7 @@
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
       refill: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
+      firstDayOff: false,
     };
   }
 
@@ -225,6 +228,7 @@
     const refill = /** @type {Partial<Refill> | null | undefined} */ (stored.refill);
     if (refill && typeof refill.day === 'string') state.refill = { day: refill.day, watch: count(refill.watch, 0), rec: count(refill.rec, 0) };
     state.installedAt = count(stored.installedAt, 0);
+    state.firstDayOff = stored.firstDayOff === true;
     const lists = /** @type {any} */ (stored.channels);
     state.channels = { allow: cleanChannels(lists?.allow).filter((c) => c.ids.length), block: cleanChannels(lists?.block) };
     const waiting = /** @type {any} */ (stored.channelsPending);
@@ -631,6 +635,7 @@
    * @param {State} state @param {number} [now]
    */
   function firstDayUntil(state, now) {
+    if (state.firstDayOff) return 0;
     const until = state.installedAt ? state.installedAt + FIRST_DAY_MS : 0;
     return now && now < until ? until : 0;
   }
@@ -893,6 +898,8 @@
         cancelPending(state, 'graceMode');
         break;
       case 'clear-unlocks': state.unlocked = []; state.allowedToday = []; break;
+      case 'first-day-off': state.firstDayOff = true; break;
+      case 'first-day-on': state.firstDayOff = false; break;
       case 'clear-backlog': state.backlog = []; break;
       case 'clear-seen': state.seen = []; state.current = null; break;
       case 'clear-log': delete state.log[state.day]; break;

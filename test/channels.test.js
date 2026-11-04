@@ -362,3 +362,15 @@ test('import says how many allowed channels wait for the reset (code review)', (
   assert.equal(res.channelsWaiting, 2);
   assert.equal(D.allowCount(state), 2);
 });
+
+test('Developer mode can end the first day early, so loosening waits, and turn it back (Jesse, 2026-11-03)', () => {
+  const state = D.initialState(NOW);
+  assert.ok(D.firstDayUntil(state, NOW + 1000) > 0);
+  D.devAction(state, 'first-day-off', NOW);
+  assert.equal(D.firstDayUntil(state, NOW + 1000), 0);
+  assert.deepEqual(D.allowChannel(state, VERI, NOW + 1000), { ok: true, waits: true });
+  assert.deepEqual(Object.keys(D.updateSettings(state, { watchTokensPerDay: 8 }, NOW + 1000).pending), ['watchTokensPerDay']);
+  assert.equal(D.hydrate(JSON.parse(JSON.stringify(state)), NOW).firstDayOff, true, 'it survives storage');
+  D.devAction(state, 'first-day-on', NOW);
+  assert.ok(D.firstDayUntil(state, NOW + 1000) > 0);
+});

@@ -2253,18 +2253,68 @@ html[dark] #drip-menu {
   height: 16px;
 }
 
-/* The channel page's Allow button (channel.js), a chip beside Subscribe in YouTube's own shape. */
+/* The channel page's Allow button (channel.js), in YouTube's own button shape: 40px tall, a 24px icon 6px before the
+   label (measured on air, 2026-11-03). The action before it carries the 8px gap. */
 .drip-allow {
-  margin-left: 8px;
-  height: 36px;
+  --drip-blue: #42a5f6;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
   padding: 0 16px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 20px;
   background: var(--drip-chip);
+  font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
-  align-self: center;
+  position: relative;
 }
 .drip-allow:hover { background: var(--drip-chip-hover); }
 .drip-allow:focus-visible { outline: 2px solid var(--drip-text); outline-offset: 2px; }
+.drip-allow .drip-allow-icon {
+  display: inline-block;
+  flex: none;
+  width: 24px;
+  height: 20px;
+  margin-right: 6px;
+  background: currentColor;
+  -webkit-mask: var(--drip-icon) center / contain no-repeat;
+  mask: var(--drip-icon) center / contain no-repeat;
+}
+.drip-allow .drip-i-drop, .drip-allow.is-allowed .drip-allow-icon { color: var(--drip-blue); }
 .drip-allow.is-waiting, .drip-allow.is-full, .drip-allow.is-blocked { color: var(--drip-muted); }
+.drip-allow.is-full .drip-allow-icon, .drip-allow.is-blocked .drip-allow-icon { color: var(--drip-muted); opacity: 0.6; }
+
+/* A click that changed it: the button gives a small pop, a blue ring spreads from its edge, and the new icon drops in. */
+.drip-allow.is-changed {
+  animation: drip-allow-pop 320ms ease-out;
+}
+.drip-allow.is-changed::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: drip-allow-ring 650ms ease-out forwards;
+}
+.drip-allow.is-changed .drip-allow-icon {
+  animation: drip-allow-icon 320ms ease-out;
+}
+@keyframes drip-allow-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.94); }
+  70% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@keyframes drip-allow-ring {
+  0% { box-shadow: 0 0 0 0 rgba(66, 165, 246, 0.7); }
+  100% { box-shadow: 0 0 0 10px rgba(66, 165, 246, 0); }
+}
+@keyframes drip-allow-icon {
+  0% { transform: translateY(-6px); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drip-allow.is-changed, .drip-allow.is-changed .drip-allow-icon { animation: none; }
+}
