@@ -1256,6 +1256,32 @@ html[dark] #drip-home .drip-out-sea {
   height: 16px;
 }
 
+/* Block on the card, and the question that takes the buttons' place (CHANNEL-LISTS-PLAN.md, call 11). */
+#drip-home .drip-block {
+  flex: none;
+  padding: 0 14px;
+  color: var(--drip-muted);
+}
+
+#drip-home .drip-block-ask {
+  margin-top: 16px;
+}
+
+#drip-home .drip-block-text {
+  margin: 0 0 12px;
+  color: var(--drip-muted);
+}
+
+#drip-home .drip-block-text strong {
+  color: var(--drip-text);
+  font-weight: 500;
+}
+
+#drip-home .drip-block-buttons {
+  display: flex;
+  gap: 8px;
+}
+
 /* Loading: the reserved box shimmers, and Reveal next dims the card it's replacing. */
 #drip-home .drip-card.is-loading .drip-thumb,
 #drip-home .drip-card.is-next .drip-thumb,
