@@ -933,6 +933,10 @@ button.col.is-selected .letter {
   color: var(--blue);
 }
 
+.data-result.is-failed .done-title .drip-i {
+  color: var(--note);
+}
+
 .data-result ul {
   margin: 0;
   padding: 0 0 0 26px;

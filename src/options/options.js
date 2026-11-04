@@ -709,21 +709,22 @@ function words(parts) {
 
 /** A line under the buttons, for an export or a refusal. @param {string} text */
 function dataSays(text) {
-  $('dataResult').classList.remove('is-done');
+  $('dataResult').classList.remove('is-done', 'is-failed');
   $('dataResult').replaceChildren(text);
 }
 
 /**
  * A finished import or reset: a panel with a check, a title, and one line per thing that changed. A one-line note
  * under the buttons was too quiet for something this big (Jesse, 2026-11-03).
- * @param {string} title @param {string[]} lines
+ * @param {string} title @param {string[]} lines @param {boolean} [failed] An import that didn't happen: an x, not a check.
  */
-function dataDone(title, lines) {
+function dataDone(title, lines, failed = false) {
   const { h, icon } = DripPage;
   const box = $('dataResult');
   box.classList.add('is-done');
+  box.classList.toggle('is-failed', failed);
   box.replaceChildren(
-    h('div', { class: 'done-title' }, icon('check'), title),
+    h('div', { class: 'done-title' }, icon(failed ? 'x' : 'check'), title),
     h('ul', {}, ...lines.map((line) => h('li', {}, line))));
   box.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
@@ -767,13 +768,18 @@ async function importFile() {
   const file = input.files && input.files[0];
   input.value = '';
   if (!file) return;
-  if (file.size > IMPORT_MAX_BYTES) return dataSays("That file is too big to be a drip export.");
+  // A file that isn't an export says which file, what's wrong, and what drip wants instead (Jesse, 2026-11-03).
+  const which = `"${file.name}"`;
+  const wanted = "Use a file from Export above. Its name starts with drip- and ends with .json.";
+  /** @param {string[]} lines */
+  const refuse = (lines) => dataDone("Couldn't import", lines, true);
+  if (file.size > IMPORT_MAX_BYTES) return refuse([`${which} is too big to be a drip export.`, wanted, 'Nothing changed.']);
   /** @type {unknown} */
   let data;
   try {
     data = JSON.parse(await file.text());
   } catch {
-    return dataSays("That file isn't a drip export.");
+    return refuse([`${which} isn't a drip export.`, wanted, 'Nothing changed.']);
   }
   const kept = edits();
   /** @type {any} */
@@ -784,9 +790,9 @@ async function importFile() {
     // The worker didn't answer. Handled below.
   }
   if (!res || !res.ok || !res.state) {
-    const why = res && res.error === 'bad-format' ? 'That export is from a newer drip. Update drip and try again.'
-      : res && res.error === 'not-drip' ? "That file isn't a drip export." : "Couldn't import. Try again.";
-    return dataSays(why);
+    if (res && res.error === 'bad-format') return refuse([`${which} is from a newer version of drip.`, 'Update drip, then import it again.', 'Nothing changed.']);
+    if (res && res.error === 'not-drip') return refuse([`${which} isn't a drip export.`, wanted, 'Nothing changed.']);
+    return refuse(["drip didn't answer.", 'Try again in a moment.']);
   }
   afterData(res, kept);
   const added = [...counted(res.stashAdded, 'stashed video', 'stashed videos'), ...counted(res.daysAdded, 'day of history', 'days of history')];
