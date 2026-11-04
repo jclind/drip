@@ -630,6 +630,11 @@
     const picture = h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true));
     if (blockedCard?.id === video.id) return blockedCardView(video, picture, {
       counted: parts.cards === 'limited', disabled: parts.cards === 'limited' && sand.tokens.rec < 1, onReveal: reveal,
+      onClose: () => {
+        blockedCard = null;
+        drawHome();
+        /** @type {HTMLElement | null} */ (stage.querySelector('.drip-reveal'))?.focus();
+      },
     });
     return h('div', { class: `drip-card${isNew && !deals() ? ' is-new' : ''}` },
       picture,

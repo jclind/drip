@@ -153,7 +153,7 @@
    * The video left on screen after a successful block, shared by home and the welcome tour.
    * @param {{title: string, channel: string}} video
    * @param {HTMLElement} thumb
-   * @param {{counted: boolean, disabled: boolean, onReveal: () => void}} o
+   * @param {{counted: boolean, disabled: boolean, onReveal: () => void, onClose: () => void}} o
    */
   function blockedCardView(video, thumb, o) {
     thumb.removeAttribute('href');
@@ -167,7 +167,11 @@
       h('div', { class: 'drip-card-actions' },
         h('button', {
           class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: o.disabled, onclick: o.onReveal,
-        }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), o.counted && price('card'))));
+        }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), o.counted && price('card')),
+        // × puts the card away, back to the empty page. The block already passed it, so nothing else changes (Jesse, 2026-11-04).
+        h('button', {
+          class: 'drip-b drip-b-gray drip-pass', 'data-k': 'close', 'aria-label': 'Close', title: 'Close', onclick: o.onClose,
+        }, icon('x'))));
   }
 
   // When YouTube changes its markup, drip fails open (Q25): nothing locks, and a banner says what broke. Each line has

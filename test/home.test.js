@@ -708,6 +708,21 @@ for (const reduced of [true, false]) {
     if (!reduced) assert.equal(tab.reveals.at(-1), 'reveal', 'starts the empty page reveal');
   });
 
+  test(`× on a blocked card puts it away with nothing spent, and Reveal video is back (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    await blockCard(tab);
+    await tab.advance(100);
+    assert.ok(tab.card().classList.contains('is-blocked'));
+    const rec = world.state.tokens.rec;
+    await tab.click('close');
+    await tab.advance(100);
+    assert.equal(tab.root().querySelector('.drip-card'), null, 'the card is gone');
+    assert.ok(tab.button('reveal'), 'the empty page is back');
+    assert.equal(world.state.tokens.rec, rec, 'nothing spent');
+    assert.ok(tab.document.activeElement === tab.button('reveal'), 'focus goes to Reveal video');
+  });
+
   for (const close of ['Escape', 'outside']) {
     test(`the card menu opens again after ${close} (${how})`, async () => {
       const tab = await makeTab(makeWorld(), { reduced });

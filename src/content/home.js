@@ -1094,6 +1094,11 @@
     if (blockedCard?.id === video.id) return blockedCardView(video, thumbnail(video), {
       counted: cardsMode() === 'limited', disabled: cardsMode() === 'limited' && state.tokens.rec < 1,
       onReveal,
+      onClose: () => {
+        blockedCard = null;
+        render();
+        focusIn('reveal');
+      },
     });
     const saved = state.backlog.some((/** @type {any} */ v) => v.id === video.id);
     // At 0 minutes Watch buys a drop's minutes and plays (Q18). With no drops either, it goes to the lock screen.
