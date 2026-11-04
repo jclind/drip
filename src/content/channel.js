@@ -109,6 +109,8 @@
       blocked: 'Reveals never deal this channel. Open Settings to unblock it before allowing it.',
       none: `Videos from this channel would cost no minutes. ${firstDay ? 'Starts at once in your first day.' : 'Starts at the next reset.'}`,
     }[at];
+    // Before the early return below: the header's picture can load after the button is drawn (Codex, 2026-11-04).
+    tellSeen(channel);
     const key = JSON.stringify([channel.ids, at, label, title]);
     // Redraw only on a change, so a click isn't lost to a rebuilt button.
     if (old && view === key && old.parentElement === actions) return;
@@ -137,7 +139,6 @@
     old?.remove();
     actions.append(button);
     if (hadFocus) button.focus();
-    tellSeen(channel);
   }
 
   /** A list entry added by handle learns the channel's name here, for matching home cards. @param {any} channel */
