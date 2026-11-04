@@ -226,6 +226,8 @@
         return `No cards left. More at ${reset}.`;
       case 'no-watch-tokens':
         return `No drops left. More at ${reset}.`;
+      case 'dry-hours':
+        return `Dry until ${dryLabel()}.`;
       // Reveal with a card already up, or Reveal next and × on one that's gone: another tab got there first.
       case 'stale-card':
       case 'resolve-current':
@@ -651,7 +653,22 @@
    * @param {string} id
    */
   function costsDrop(id) {
-    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !Drip.freeToStart(state, id);
+    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !dryEnd() && !Drip.freeToStart(state, id);
+  }
+
+  /** When the Dry hours going on now end, or 0 (Q32). No drop can be spent until then. */
+  function dryEnd() {
+    return state && clockOn() ? Drip.dryUntil(state, Date.now()) : 0;
+  }
+
+  /** "6:00am" for the end of Dry hours. */
+  function dryLabel() {
+    return hourLabel(new Date(dryEnd()).getHours());
+  }
+
+  /** No drop to spend now: none left, or Dry hours. */
+  function noDropToSpend() {
+    return state.tokens.watch < 1 || dryEnd() > 0;
   }
 
   /**
@@ -929,13 +946,17 @@
       clock && cardsMode() === 'off' && !outForDay() && addButton());
   }
 
+  /** The end of the Dry hours the page last drew, or 0, so mount() can redraw an idle page when it changes. */
+  let drawnDry = 0;
+
   /** Set when Pass on the last card leaves the page out for the day, so the sea rises in where the card dropped. */
   let seaRises = false;
 
   /** No minutes or tokens left, and no card still to watch or stash. */
   function outForDay() {
     // Cards left don't count: with no minutes or drops, a reveal can't lead to watching anything (Jesse, 2026-10-14).
-    return clockOn() && !shownCard() && state.tokens.watch < 1 && state.watchSecondsLeft <= 0;
+    // Dry hours count as out, since no drop can be spent until they end (DRY-HOURS-PLAN.md B9).
+    return clockOn() && !shownCard() && noDropToSpend() && state.watchSecondsLeft <= 0;
   }
 
   /** How many of today's cards the reset keeps, under the rollover cap, by the settings tomorrow will use. */
@@ -955,6 +976,7 @@
     if (shownCard()) return noCards ? `No cards left. More at ${reset}.` : '';
     if (outForDay()) return `You're out for today. Drops and cards refill at ${reset}.`;
     if (noCards) return `No cards left. More at ${reset}.`;
+    if (clockOn() && dryEnd()) return `Dry until ${dryLabel()}.`;
     if (noDrops) return `No drops left. More at ${reset}.`;
     return '';
   }
@@ -967,8 +989,9 @@
       h('div', { class: 'drip-sea', 'aria-hidden': 'true' },
         animates() && h('span', { class: 'drip-fish' }, h('span', {}))),
       h('div', { class: 'drip-out-copy' },
-        h('h2', {}, "You're out for today."),
-        h('p', {}, `The glass refills at ${hourLabel(state.settings.resetHour)}.`),
+        ...(dryEnd()
+          ? [h('h2', {}, 'Dry hours.'), h('p', {}, `Drops work again at ${dryLabel()}.`)]
+          : [h('h2', {}, "You're out for today."), h('p', {}, `The glass refills at ${hourLabel(state.settings.resetHour)}.`)]),
         cardsCarried() > 0 && h('p', {}, `${cardsCarried()} ${cardsCarried() === 1 ? 'card carries' : 'cards carry'} over to tomorrow.`)));
   }
 
@@ -989,8 +1012,8 @@
   function addButton() {
     const s = state.settings;
     return h('button', {
-      class: 'drip-b drip-b-gray drip-add', 'data-k': 'add', onclick: onAddTime, disabled: state.tokens.watch < 1,
-      title: `Add ${s.minutesPerToken} minutes for 1 drop`,
+      class: 'drip-b drip-b-gray drip-add', 'data-k': 'add', onclick: onAddTime, disabled: noDropToSpend(),
+      title: dryEnd() ? `Dry until ${dryLabel()}.` : `Add ${s.minutesPerToken} minutes for 1 drop`,
     }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop'));
   }
 
@@ -1111,7 +1134,7 @@
     if (blockedCard?.id === video.id) return blockedCardView(video, thumbnail(video), {
       counted: cardsMode() === 'limited',
       // Out of cards, or out of minutes and drops (the page behind it is out for the day), there's nothing to reveal.
-      disabled: (cardsMode() === 'limited' && state.tokens.rec < 1) || (clockOn() && state.tokens.watch < 1 && state.watchSecondsLeft <= 0),
+      disabled: (cardsMode() === 'limited' && state.tokens.rec < 1) || (clockOn() && noDropToSpend() && state.watchSecondsLeft <= 0),
       onReveal,
       onClose: () => {
         blockedCard = null;
@@ -1360,7 +1383,7 @@
       state.tokens, state.current, state.unlocked, state.channels, state.allowedToday, state.settings.feedSource, state.settings.minutesPerToken,
       // The sea's "N cards carry over" follows the allowance, the rollover cap, and pending settings (Codex, 2026-10-14).
       state.settings.resetHour, state.settings.stashMax, cardsCarried(),
-      state.settings.clock, state.settings.cards, state.settings.stash,
+      state.settings.clock, state.settings.cards, state.settings.stash, dryEnd(),
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
     ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, blockedCard]);
@@ -1369,6 +1392,7 @@
       return freshen(root);
     }
     rendered = key;
+    drawnDry = state ? dryEnd() : 0;
     // Keep keyboard focus on the same control across the rebuild.
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
     root.classList.add('drip-ui');
@@ -1538,6 +1562,8 @@
       }
       // Back home from a watch page after the reset.
       takeRefill();
+      // An idle page changes to its dry form at the start of Dry hours and back at the end (DRY-HOURS-PLAN.md B9).
+      if (state && dryEnd() !== drawnDry) render();
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;
