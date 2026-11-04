@@ -776,11 +776,14 @@ async function unblockWithUndo(c, i) {
 /** Blocks the channel again, at once, as blocking always is. */
 async function undoUnblock() {
   if (!justUnblocked) return;
-  const { c, i } = justUnblocked;
+  const { c } = justUnblocked;
   clearTimeout(unblockTimer);
   justUnblocked = null;
   await channelSend({ type: 'blockChannel', channel: c }, 'block');
-  /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="block-${i}"]`) || channelsEl?.querySelector('[data-k="block-input"]'))?.focus();
+  // Blocking adds it at the end of the list, so its old place may now be another channel's. Focus finds it by identity,
+  // or a second Enter would unblock that one (Codex, 2026-11-04).
+  const at = state ? state.channels.block.findIndex((/** @type {any} */ e) => Drip.sameChannel(e, c)) : -1;
+  /** @type {HTMLElement | null} */ (channelsEl?.querySelector(`[data-k="block-${at}"]`) || channelsEl?.querySelector('[data-k="block-input"]'))?.focus();
 }
 
 function channelsSection() {
