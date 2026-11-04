@@ -104,6 +104,76 @@
       h('span', { class: 'drip-sr' }, `, costs 1 ${token}`));
   }
 
+  /**
+   * The ⋯ beside a reveal card's title and its one-item menu: Block the channel, clicked twice (Jesse's picks, B and K,
+   * 2026-11-04). The first click turns the item red, "Click again to block". Both wordings sit in one grid cell, so the
+   * menu keeps its width when the words change. home.js and the welcome tour keep the open and armed state.
+   * @param {{channel: string, open: boolean, armed: boolean, disabled?: boolean, onToggle: () => void, onPick: () => void}} o
+   */
+  function cardMenu(o) {
+    const el = h('div', { class: 'drip-card-menu' },
+      h('button', {
+        class: 'drip-card-more', type: 'button', 'data-k': 'card-more', 'aria-label': 'More', title: 'More',
+        'aria-haspopup': 'menu', 'aria-expanded': String(o.open), disabled: o.disabled, onclick: o.onToggle,
+      }, icon('ellipsis-vertical')));
+    updateCardMenu(el, o);
+    return el;
+  }
+
+  /**
+   * Updates the menu without replacing the card or replaying the menu animation when Block arms or disarms.
+   * @param {Element | null} el
+   * @param {{open: boolean, channel?: string, armed?: boolean, onPick?: () => void}} o
+   */
+  function updateCardMenu(el, o) {
+    if (!el) return;
+    el.querySelector('[data-k="card-more"]')?.setAttribute('aria-expanded', String(o.open));
+    if (!o.open) {
+      el.querySelector('.drip-menu')?.remove();
+      return;
+    }
+    let item = el.querySelector('[data-k="block"]');
+    if (!item) {
+      const menu = h('div', { class: 'drip-menu', role: 'menu' },
+        h('button', {
+          class: 'drip-menu-item', type: 'button', role: 'menuitem', 'data-k': 'block', onclick: o.onPick,
+        },
+        icon('ban'),
+        h('span', { class: 'drip-menu-words', 'aria-hidden': 'true' },
+          h('span', { class: 'drip-menu-say is-ask' }, h('span', {}, `Block ${o.channel}`), h('small', {}, 'Reveals never deal this channel again')),
+          h('span', { class: 'drip-menu-say is-sure' }, h('span', {}, 'Click again to block'), h('small', {}, 'Unblocking waits for the reset')))));
+      el.append(menu);
+      item = menu.querySelector('[data-k="block"]');
+    }
+    item?.classList.toggle('is-armed', !!o.armed);
+    item?.setAttribute('aria-label', o.armed ? `Click again to block ${o.channel}` : `Block ${o.channel}`);
+  }
+
+  /**
+   * The video left on screen after a successful block, shared by home and the welcome tour.
+   * @param {{title: string, channel: string}} video
+   * @param {HTMLElement} thumb
+   * @param {{counted: boolean, disabled: boolean, onReveal: () => void, onClose: () => void}} o
+   */
+  function blockedCardView(video, thumb, o) {
+    thumb.removeAttribute('href');
+    if (!thumb.querySelector('.drip-blocked-chip')) {
+      thumb.append(h('span', { class: 'drip-blocked-chip' }, icon('ban'), 'Blocked'));
+    }
+    return h('div', { class: 'drip-card is-blocked' }, thumb,
+      h('div', { class: 'drip-card-title', title: video.title }, video.title),
+      h('div', { class: 'drip-card-meta-row' },
+        h('span', { class: 'drip-meta' }, `${video.channel} is blocked. Unblock it in Settings.`)),
+      h('div', { class: 'drip-card-actions' },
+        h('button', {
+          class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: o.disabled, onclick: o.onReveal,
+        }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), o.counted && price('card')),
+        // × puts the card away, back to the empty page. The block already passed it, so nothing else changes (Jesse, 2026-11-04).
+        h('button', {
+          class: 'drip-b drip-b-gray drip-pass', 'data-k': 'close', 'aria-label': 'Close', title: 'Close', onclick: o.onClose,
+        }, icon('x'))));
+  }
+
   // When YouTube changes its markup, drip fails open (Q25): nothing locks, and a banner says what broke. Each line has
   // to hold in every mode, so it names what drip can't reach, not a part that may be off (Codex, 2026-10-15).
   const BROKEN = {
@@ -182,5 +252,5 @@
   // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
   const KEPT_KEY = 'drip-kept';
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, icon, price, KEPT_KEY, pausePlayer, reportBroken, watchFor };
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
 })();

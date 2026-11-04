@@ -891,7 +891,7 @@ function renderChannels(force = false) {
       channelsNote.allow && h('p', { class: 'muted channel-said', role: 'status' }, channelsNote.allow)),
     h('div', { class: 'channel-list' },
       h('div', { class: 'setting-label' }, 'Blocked'),
-      h('div', { class: 'hint' }, `Reveals never deal their videos. ${firstDay ? 'Unblocking is at once in your first day.' : 'Unblocking waits for the reset.'} Block from a reveal card too.`),
+      h('div', { class: 'hint' }, `Reveals never deal their videos. ${firstDay ? 'Unblocking is at once in your first day.' : 'Unblocking waits for the reset.'} Block from a reveal card's ⋯ menu too.`),
       blocked.length > 0 && h('ul', { class: 'channels-ul' }, ...blocked.map((item, i) => row('block', item, i))),
       adder('block'),
       channelsNote.block && h('p', { class: 'muted channel-said', role: 'status' }, channelsNote.block)));

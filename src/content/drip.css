@@ -1256,30 +1256,189 @@ html[dark] #drip-home .drip-out-sea {
   height: 16px;
 }
 
-/* Block on the card, and the question that takes the buttons' place (CHANNEL-LISTS-PLAN.md, call 11). */
-#drip-home .drip-block {
+/* The title and the ⋯ beside it, and its menu with Block (common.js cardMenu; Jesse's picks B and K, 2026-11-04). */
+#drip-home .drip-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+#drip-home .drip-card-head .drip-card-title {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+
+#drip-home .drip-card-menu {
+  position: relative;
   flex: none;
-  padding: 0 14px;
-  color: var(--drip-muted);
+  margin: -6px -8px 0 0;
 }
 
-#drip-home .drip-block-ask {
-  margin-top: 16px;
-}
-
-#drip-home .drip-block-text {
-  margin: 0 0 12px;
-  color: var(--drip-muted);
-}
-
-#drip-home .drip-block-text strong {
+#drip-home .drip-card-more {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
   color: var(--drip-text);
+  cursor: pointer;
+}
+
+#drip-home .drip-card-more:hover:not(:disabled),
+#drip-home .drip-card-more[aria-expanded="true"] {
+  background: var(--drip-gray);
+}
+
+#drip-home .drip-card-more:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#drip-home .drip-card-more .drip-i {
+  width: 18px;
+  height: 18px;
+}
+
+#drip-home .drip-menu {
+  --drip-menu-bg: #fff;
+  --drip-menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --drip-red: #cc0000;
+  --drip-red-bg: rgba(204, 0, 0, 0.08);
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  padding: 6px 0;
+  border-radius: 12px;
+  background: var(--drip-menu-bg);
+  box-shadow: var(--drip-menu-shadow);
+  animation: drip-menu-in 140ms ease-out;
+}
+
+html[dark] #drip-home .drip-menu {
+  --drip-menu-bg: #282828;
+  --drip-menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --drip-red: #ff8a80;
+  --drip-red-bg: rgba(255, 78, 69, 0.14);
+}
+
+@keyframes drip-menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+#drip-home .drip-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  color: var(--drip-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+#drip-home .drip-menu-item:hover,
+#drip-home .drip-menu-item:focus-visible {
+  background: var(--drip-row-hover);
+  outline: none;
+}
+
+#drip-home .drip-menu-item .drip-i {
+  width: 20px;
+  height: 20px;
+}
+
+/* Both wordings share one cell, so the menu is as wide as the longer one and doesn't move on the first click. */
+#drip-home .drip-menu-words {
+  display: grid;
+}
+
+#drip-home .drip-menu-say {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#drip-home .drip-menu-say small {
+  color: var(--drip-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+#drip-home .drip-menu-say.is-sure,
+#drip-home .drip-menu-item.is-armed .drip-menu-say.is-ask {
+  visibility: hidden;
+}
+
+#drip-home .drip-menu-item.is-armed .drip-menu-say.is-sure {
+  visibility: visible;
+}
+
+#drip-home .drip-menu-item.is-armed,
+#drip-home .drip-menu-item.is-armed:hover,
+#drip-home .drip-menu-item.is-armed:focus-visible {
+  background: var(--drip-red-bg);
+  color: var(--drip-red);
+}
+
+#drip-home .drip-menu-item.is-armed small {
+  color: var(--drip-red);
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #drip-home .drip-menu {
+    animation: none;
+  }
+}
+
+/* A blocked video stays in place until the next reveal. The chip stays clear above the dimmed picture. */
+#drip-home .drip-card.is-blocked .drip-deal-front {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+#drip-home .drip-card.is-blocked .drip-card-title {
+  color: var(--drip-muted);
+}
+
+#drip-home .drip-card.is-blocked .drip-meta {
+  white-space: normal;
+}
+
+#drip-home .drip-blocked-chip {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: var(--drip-bg);
+  color: var(--drip-muted);
+  font-size: 13px;
   font-weight: 500;
 }
 
-#drip-home .drip-block-buttons {
-  display: flex;
-  gap: 8px;
+#drip-home .drip-blocked-chip .drip-i {
+  width: 16px;
+  height: 16px;
 }
 
 /* Loading: the reserved box shimmers, and Reveal next dims the card it's replacing. */
@@ -2292,11 +2451,12 @@ html[dark] #drip-menu {
 .drip-allow .drip-allow-undo,
 .drip-allow .drip-allow-undo-icon { visibility: hidden; }
 .drip-allow .drip-allow-undo-icon { display: none; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-label { visibility: hidden; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo { visibility: visible; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-icon:not(.drip-allow-undo-icon) { display: none; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo-icon { display: inline-block; visibility: visible; color: var(--drip-text); }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh):is(.is-waiting, .is-allowed) { color: var(--drip-text); }
+/* Only Allowed and Waiting have an undo label. Scoped to them, so plain "Allow in drip" keeps its label on hover. */
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-label { visibility: hidden; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo { visibility: visible; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-icon:not(.drip-allow-undo-icon) { display: none; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo-icon { display: inline-block; visibility: visible; color: var(--drip-text); }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) { color: var(--drip-text); }
 
 /* A click that changed it: the button gives a small pop, a blue ring spreads from its edge, and the new icon drops in. */
 .drip-allow.is-changed {

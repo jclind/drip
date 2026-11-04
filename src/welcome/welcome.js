@@ -12,7 +12,7 @@
   /** @type {any} */
   const DripStash = /** @type {any} */ (globalThis).DripStash;
   /** @type {any} */
-  const { h, icon, price, hourLabel } = /** @type {any} */ (globalThis).DripUI;
+  const { h, icon, price, hourLabel, cardMenu, updateCardMenu, blockedCardView } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
   /** @type {any} */
@@ -348,6 +348,8 @@
     motion++;
     moving = false;
     stopStep?.();
+    closeMenu();
+    blockedCard = null;
     bringLock = null;
     for (const t of timers) clearTimeout(t);
     timers.clear();
@@ -528,7 +530,7 @@
    */
   function homePage(top, rest) {
     const search = parts.cards === 'off';
-    return h('div', { class: `drip-page${sand.current ? ' is-open' : ''}${search ? ' is-search' : ''}` }, top, search ? searchPicture() : rest);
+    return h('div', { class: `drip-page${sand.current || blockedCard ? ' is-open' : ''}${search ? ' is-search' : ''}` }, top, search ? searchPicture() : rest);
   }
 
   function searchPicture() {
@@ -557,14 +559,72 @@
       }, h('span', {}, 'Reveal video'), counted && price('card')));
   }
 
-  /** The tour card whose Block is asking to be sure, as on the real card (home.js). */
-  let blockAsk = '';
+  /** The tour card's ⋯ menu, and its Block waiting for the second click, as on the real card (home.js). */
+  let menuOpen = false;
+  let armed = false;
+  let armedAt = 0;
+  /** The blocked sample kept on this step until another reveal. @type {any} */
+  let blockedCard = null;
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let armTimer;
+  function closeMenu() {
+    clearTimeout(armTimer);
+    menuOpen = false;
+    armed = false;
+    updateCardMenu(stage.querySelector('.drip-card-menu'), { open: false });
+  }
+  /** Updates the tour's menu in place, like home.js. */
+  function syncMenu() {
+    const video = sand.current;
+    updateCardMenu(stage.querySelector('.drip-card-menu'), {
+      open: menuOpen && !!video, channel: video?.channel, armed, onPick: () => pickBlock(video),
+    });
+  }
+  /** @param {any} video */
+  function pickBlock(video) {
+    if (armed) {
+      if (Date.now() - armedAt < 250) return;
+      closeMenu();
+      if (Drip.resolveCurrent(sand, 'block', video.id).ok) blockedCard = video;
+      drawHome();
+      /** @type {HTMLElement | null} */ ([...stage.querySelectorAll('[data-k="next"], [data-k="close"]')].find((b) => !b.hasAttribute('disabled')))?.focus();
+      return;
+    }
+    armed = true;
+    armedAt = Date.now();
+    armTimer = setTimeout(() => {
+      armed = false;
+      syncMenu();
+    }, 3000);
+    syncMenu();
+    /** @type {HTMLElement | null} */ (stage.querySelector('[data-k="block"]'))?.focus();
+  }
+  /** Closes it without a redraw, which would replace the button being pressed (home.js dropMenu). */
+  function dropMenu() {
+    closeMenu();
+  }
+  // Holding Enter repeats a button's click. On the menu that would open it, arm Block, and block, with one press (Codex,
+  // 2026-11-04). home.js has the same guard.
+  stage.addEventListener('keydown', (e) => {
+    if (e.repeat && e.key === 'Enter') e.preventDefault();
+  }, true);
+  // A click elsewhere, or Escape, closes it.
+  document.addEventListener('pointerdown', (e) => {
+    if (menuOpen && !/** @type {Element} */ (e.target)?.closest?.('.drip-card-menu')) dropMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && menuOpen) {
+      dropMenu();
+      /** @type {HTMLElement | null} */ (stage.querySelector('[data-k="card-more"]'))?.focus();
+    }
+  });
 
   /** @param {any} video */
   function card(video) {
     const saved = sand.backlog.some((/** @type {any} */ v) => v.id === video.id);
     const isNew = video.id !== lastCardId;
     lastCardId = video.id;
+    if (isNew) closeMenu();
     const fills = stashDrawn.id === video.id && stashDrawn.stashed !== saved;
     stashDrawn = { id: video.id, stashed: saved };
     const stash = DripStash.parts(fills ? !saved : saved, { labelClass: 'drip-save-label' });
@@ -572,19 +632,35 @@
     const thumb = h('div', { class: 'tour-thumb' }, icon('play-line'), h('span', { class: 'drip-length' }, video.length));
     thumb.style.setProperty('--thumb', sample(video.id).thumb);
     // The reveal animation deals the card itself, so the card doesn't also rise in.
+    const picture = h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true));
+    if (blockedCard?.id === video.id) return blockedCardView(video, picture, {
+      counted: parts.cards === 'limited', disabled: parts.cards === 'limited' && sand.tokens.rec < 1, onReveal: reveal,
+      onClose: () => {
+        blockedCard = null;
+        drawHome();
+        /** @type {HTMLElement | null} */ ([...stage.querySelectorAll('.drip-reveal')].find((b) => !b.hasAttribute('disabled')))?.focus();
+      },
+    });
     return h('div', { class: `drip-card${isNew && !deals() ? ' is-new' : ''}` },
-      h('div', { class: 'drip-thumb is-dealt', 'aria-hidden': 'true' }, DripReveal.dealCard(thumb, true)),
-      h('div', { class: 'drip-card-title', title: video.title }, video.title),
+      picture,
+      h('div', { class: 'drip-card-head' },
+        h('div', { class: 'drip-card-title', title: video.title }, video.title),
+        cardMenu({
+          channel: video.channel, open: menuOpen, armed,
+          onToggle: () => {
+            const opening = !menuOpen;
+            closeMenu();
+            menuOpen = opening;
+            syncMenu();
+            /** @type {HTMLElement | null} */ (stage.querySelector(`[data-k="${opening ? 'block' : 'card-more'}"]`))?.focus();
+          },
+          onPick: () => pickBlock(video),
+        })),
       h('div', { class: 'drip-card-meta-row' },
         h('span', { class: 'drip-meta drip-meta-split' }, h('span', { class: 'drip-meta-channel' }, video.channel), h('span', { class: 'drip-meta-rest' }, ` · ${video.views} · ${video.age}`), h('span', { class: 'drip-sr' }, `, length ${video.length}`)),
         h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(at('player')); } },
           icon('play'), h('span', {}, 'Watch'), parts.clock && sand.watchSecondsLeft <= 0 && price('drop'))),
-      blockAsk === video.id ? h('div', { class: 'drip-block-ask', role: 'group', 'aria-label': `Block ${video.channel}` },
-        h('p', { class: 'drip-block-text' }, h('strong', {}, `Block ${video.channel}?`), " drip won't deal their videos again. Unblocking waits for the reset."),
-        h('div', { class: 'drip-block-buttons' },
-          h('button', { class: 'drip-b drip-b-primary', onclick: () => { blockAsk = ''; Drip.resolveCurrent(sand, 'block', video.id); drawHome(); } }, 'Block'),
-          h('button', { class: 'drip-b drip-b-gray', onclick: () => { blockAsk = ''; drawHome(); } }, 'Cancel')))
-      : h('div', { class: 'drip-card-actions' },
+      h('div', { class: 'drip-card-actions' },
         parts.stash && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
           onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); coach.did(saved ? 'unstash' : 'stash'); },
@@ -604,10 +680,6 @@
             }
           },
         }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), parts.cards === 'limited' && price('card')),
-        h('button', {
-          class: 'drip-b drip-b-gray drip-block', title: `Never deal ${video.channel} again`,
-          onclick: () => { blockAsk = video.id; drawHome(); },
-        }, 'Block'),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'aria-label': 'Pass', title: "Pass. It's free, and this video won't come back.",
           onclick: () => {
@@ -630,7 +702,6 @@
       h('div', { class: 'drip-card-actions' },
         h('button', { class: 'drip-b drip-b-gray drip-card-save drip-stash', tabindex: '-1' }, ...DripStash.parts(false, { labelClass: 'drip-save-label' }).nodes),
         h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
-        h('button', { class: 'drip-b drip-b-gray drip-block', tabindex: '-1' }, 'Block'),
         h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
   }
 
@@ -695,6 +766,12 @@
   }
 
   function reveal() {
+    if (moving) return;
+    const had = stage.contains(document.activeElement);
+    blockedCard = null;
+    closeMenu();
+    drawHome();
+    if (had) /** @type {HTMLElement | null} */ (stage.querySelector('.drip-reveal'))?.focus();
     const find = () => (!sand.current && Drip.reveal(sand, pool()).ok ? sand.current : null);
     if (deals() && !sand.current) animate(DripReveal.reveal, find, 'watch', 'reveal');
     else {
@@ -706,10 +783,11 @@
 
   function drawHome() {
     if (moving) return;
+    if (sand.current) blockedCard = null;
     const focused = document.activeElement && stage.contains(document.activeElement) ? [...stage.querySelectorAll('button')].indexOf(/** @type {any} */ (document.activeElement)) : -1;
     // With a card up, the page is open: the stats sit a little higher, as the reveal animation leaves them.
     morph(() => stage.replaceChildren(h('div', { id: 'drip-home', class: 'drip-ui' },
-      homePage(stats(), sand.current ? card(sand.current) : actions()))));
+      homePage(stats(), sand.current ? card(sand.current) : blockedCard ? card(blockedCard) : actions()))));
     if (focused >= 0) /** @type {HTMLElement | undefined} */ (stage.querySelectorAll('button')[focused])?.focus();
   }
 
