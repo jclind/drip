@@ -16,6 +16,7 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - Charts and streaks built from the 90-day log.
 - Search results have their own "Ask YouTube" chip in the filter row, which design C left alone (2026-10-15).
 - "Your videos" in drip's menu could open Studio's videos list instead of its dashboard, if the channel id can be read from the page.
+- The lock's "Next unlock back Friday at 9:14pm." sits right under "The glass refills at 4:00am." and reads as cluttered (Jesse, 2026-11-04). Give the two lines more room or a different weight, or fold them into one sentence. Polish, not urgent; the welcome tour's lock has the same pair.
 
 ## Welcome tour
 
