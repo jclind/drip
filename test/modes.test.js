@@ -209,10 +209,10 @@ test('with the clock off watching is logged and costs nothing', () => {
   const state = withParts(settled(), { clock: false });
   const clock = { lastChargeEnd: 0, ticks: [] };
   const status = D.chargeTick(state, clock, time(1, 13), 30, 'v', 0, 'k1');
-  assert.deepEqual(status, { secondsLeft: 0, unlocked: false, locked: false });
+  assert.deepEqual(status, { secondsLeft: 0, unlocked: false, allowed: false, locked: false });
   assert.equal(D.logDay(state).watchedSec, 30);
   assert.equal(clock.lastChargeEnd, 0);
-  assert.deepEqual(D.watchStatus(state, 'v'), { secondsLeft: 0, unlocked: false, locked: false });
+  assert.deepEqual(D.watchStatus(state, 'v'), { secondsLeft: 0, unlocked: false, allowed: false, locked: false });
   refusesUnchanged(state, () => D.spendWatch(state), 'clock-off');
   assert.deepEqual(D.buyIfOut(state, 'v'), { ok: true, bought: false });
   assert.equal(state.tokens.watch, 4);

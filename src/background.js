@@ -219,6 +219,21 @@ function handle(msg, state, now, clock) {
       return Drip.importData(state, msg.data, now);
     case 'resetData':
       return Drip.resetData(state, now);
+    // Channel lists (RELEASE-PLAN.md item 4). Each takes a channel as { ids, name }.
+    case 'allowChannel':
+      return Drip.allowChannel(state, msg.channel, now);
+    case 'removeAllowed':
+      return Drip.removeAllowed(state, msg.channel);
+    case 'blockChannel':
+      return Drip.blockChannel(state, msg.channel);
+    case 'unblockChannel':
+      return Drip.unblockChannel(state, msg.channel, now);
+    case 'cancelChannelPending':
+      return Drip.cancelChannelPending(state, msg.channel);
+    case 'allowedVideo':
+      return { ...Drip.allowedVideo(state, msg.videoId, msg.channel), ...Drip.watchStatus(state, String(msg.videoId)) };
+    case 'seenChannel':
+      return Drip.seenChannel(state, msg.channel);
     default:
       return { ok: false, error: 'unknown-message' };
   }
@@ -297,7 +312,7 @@ async function devStatus() {
 }
 
 // The Settings sections the popup's counts may open (RELEASE-PLAN.md, item 2).
-const SETTINGS_SECTIONS = ['watch', 'cards', 'stash', 'search', 'day'];
+const SETTINGS_SECTIONS = ['watch', 'cards', 'stash', 'search', 'channels', 'day'];
 
 /**
  * Opens Settings at a section, which flashes on arrival. A Settings tab that's already open comes forward and goes

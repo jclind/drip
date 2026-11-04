@@ -17,6 +17,24 @@
  * @property {Refill | null} refill What the last reset added, until a home page has shown it.
  * @property {number} installedAt When drip was installed, in ms. Every settings change applies at once for a day after
  * (Q6). 0 for state saved before this was kept, which counts as installed long ago.
+ * @property {{allow: Channel[], block: Channel[]}} channels The channel lists (RELEASE-PLAN.md item 4). Kept outside
+ *   Settings, since a waiting change there replaces a whole value and would undo a list edit made after it.
+ * @property {ChannelsPending | null} channelsPending List changes that loosen, waiting for the reset (Q6).
+ * @property {{id: string, ids: string[]}[]} allowedToday Videos a watch page showed are from an allowed channel, with
+ *   that channel's ids. Free only while the channel is still allowed, and cleared at the reset.
+ */
+/**
+ * A YouTube channel as drip saw it. `ids` are its `@handle` in lowercase and, when a page showed one, its `UC...` id.
+ * A home card shows only the name, so an entry may have no ids, and then it matches by name (CHANNEL-LISTS-PLAN.md).
+ * @typedef {Object} Channel
+ * @property {string[]} ids
+ * @property {string} name
+ */
+/**
+ * @typedef {Object} ChannelsPending
+ * @property {string} effectiveDay
+ * @property {Channel[]} allow Channels to add to the allow list at the reset.
+ * @property {Channel[]} unblock Channels to take off the block list at the reset.
  */
 /**
  * @typedef {Object} Refill
@@ -55,6 +73,8 @@
  * @property {number} [resumeSec] How far in the video got, for the stash's progress bar and resuming there.
  * @property {number} [durationSec] The player's length in seconds, for the same bar.
  * @property {number} [addedAt] When it went into the stash, in ms, for the full stash's "6 days ago".
+ * @property {string[]} [channelIds] The channel's ids, where the page that made the record had a channel link. Home
+ *   cards don't (CHANNEL-LISTS-PLAN.md, step 1).
  */
 /**
  * @typedef {Object} LogDay
@@ -138,7 +158,7 @@
       day: dayKey(now, DEFAULT_SETTINGS.resetHour),
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
-      refill: null, installedAt: now,
+      refill: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
     };
   }
 
@@ -165,6 +185,8 @@
     if (seconds(v.durationSec)) video.durationSec = seconds(v.durationSec);
     if (seconds(v.resumeSec)) video.resumeSec = video.durationSec ? Math.min(seconds(v.resumeSec), video.durationSec) : seconds(v.resumeSec);
     if (seconds(v.addedAt)) video.addedAt = seconds(v.addedAt);
+    const ids = cleanIds(v.channelIds);
+    if (ids.length) video.channelIds = ids;
     return video;
   }
 
@@ -203,6 +225,16 @@
     const refill = /** @type {Partial<Refill> | null | undefined} */ (stored.refill);
     if (refill && typeof refill.day === 'string') state.refill = { day: refill.day, watch: count(refill.watch, 0), rec: count(refill.rec, 0) };
     state.installedAt = count(stored.installedAt, 0);
+    const lists = /** @type {any} */ (stored.channels);
+    state.channels = { allow: cleanChannels(lists?.allow).filter((c) => c.ids.length), block: cleanChannels(lists?.block) };
+    const waiting = /** @type {any} */ (stored.channelsPending);
+    if (waiting && typeof waiting.effectiveDay === 'string') {
+      const pending = { effectiveDay: waiting.effectiveDay, allow: cleanChannels(waiting.allow).filter((c) => c.ids.length), unblock: cleanChannels(waiting.unblock) };
+      if (pending.allow.length || pending.unblock.length) state.channelsPending = pending;
+    }
+    state.allowedToday = Array.isArray(stored.allowedToday) ? stored.allowedToday
+      .filter((e) => e && typeof e.id === 'string' && VIDEO_ID.test(e.id))
+      .map((e) => ({ id: e.id, ids: cleanIds(e.ids) })).filter((e) => e.ids.length).slice(-ALLOWED_TODAY_MAX) : [];
     if (stored.log && typeof stored.log === 'object') {
       for (const [day, entry] of Object.entries(stored.log)) {
         state.log[day] = { ...emptyLog(), ...entry, needThis: Array.isArray(entry?.needThis) ? entry.needThis.map(use => ({ ...use })) : [] };
@@ -228,6 +260,7 @@
       Object.assign(state.settings, state.pending.changes);
       state.pending = null;
     }
+    if (state.channelsPending && state.channelsPending.effectiveDay <= nextDay) applyChannelsPending(state);
     const settings = state.settings;
     const before = { ...state.tokens };
     const cap = caps(settings);
@@ -239,6 +272,7 @@
     state.watchSecondsLeft = 0;
     state.watchSecondsBought = 0;
     state.unlocked = [];
+    state.allowedToday = [];
     state.day = nextDay;
     const oldest = addDays(nextDay, -89);
     for (const day of Object.keys(state.log)) {
@@ -307,17 +341,18 @@
   function canDeal(state, candidate) {
     const video = cleanVideo(candidate);
     return !!video && mayReveal(candidate, state.settings) && !state.seen.includes(video.id)
-      && !state.backlog.some(saved => saved.id === video.id);
+      && !state.backlog.some(saved => saved.id === video.id) && !isBlocked(state, video);
   }
 
   /**
    * Buys one drop's minutes when none are left, so Watch can start the video (Q18). With no drops left it buys
-   * nothing, and the watch page's lock takes over. An unlocked video needs no minutes.
+   * nothing, and the watch page's lock takes over. An unlocked video needs no minutes, and neither does a card or stash
+   * row from an allowed channel (CHANNEL-LISTS-PLAN.md, call 10).
    * @param {State} state
    * @param {string} videoId
    */
   function buyIfOut(state, videoId) {
-    const bought = state.settings.clock && state.watchSecondsLeft <= 0 && !state.unlocked.includes(videoId) && spendWatch(state).ok;
+    const bought = state.settings.clock && state.watchSecondsLeft <= 0 && !freeToStart(state, videoId) && spendWatch(state).ok;
     return { ok: true, bought };
   }
 
@@ -348,13 +383,13 @@
    * The reveal card's buttons (Q13). Save and unsave keep the card up. Watch and pass end it. Watch at 0 minutes buys
    * a drop's minutes first (Q18).
    * @param {State} state
-   * @param {'watch' | 'save' | 'unsave' | 'pass'} action
+   * @param {'watch' | 'save' | 'unsave' | 'pass' | 'block'} action
    * @param {string} [videoId] The card the action was shown for. Another tab may have moved on since.
    * @param {number} [now] When, for a save's addedAt.
    */
   function resolveCurrent(state, action, videoId, now) {
     if (!state.current) return { ok: false, error: 'no-current' };
-    if (!['watch', 'save', 'unsave', 'pass'].includes(action)) return { ok: false, error: 'bad-action' };
+    if (!['watch', 'save', 'unsave', 'pass', 'block'].includes(action)) return { ok: false, error: 'bad-action' };
     if (videoId !== undefined && videoId !== state.current.id) return { ok: false, error: 'stale-card' };
     const video = state.current;
     // addBacklog and removeBacklog keep the card's saved count, whichever button moved it.
@@ -364,6 +399,13 @@
     }
     if (action === 'unsave') {
       removeBacklog(state, video.id);
+      return { ok: true, video };
+    }
+    // Block ends the card as Pass does, with no card back, or it would be a free re-deal (CHANNEL-LISTS-PLAN.md, call 11).
+    if (action === 'block') {
+      const blocked = blockChannel(state, { ids: video.channelIds || [], name: video.channel });
+      if (!blocked.ok) return blocked;
+      endCard(state, 'pass');
       return { ok: true, video };
     }
     const bought = action === 'watch' && buyIfOut(state, video.id).bought;
@@ -479,7 +521,7 @@
   /** @param {State} state @param {number} seconds @param {string} videoId */
   function charge(state, seconds, videoId) {
     logDay(state).watchedSec += seconds;
-    if (!state.unlocked.includes(videoId)) state.watchSecondsLeft = Math.max(0, state.watchSecondsLeft - seconds);
+    if (!isFree(state, videoId)) state.watchSecondsLeft = Math.max(0, state.watchSecondsLeft - seconds);
     return watchStatus(state, videoId);
   }
 
@@ -512,7 +554,7 @@
     }
     if (seconds === 0) return watchStatus(state, videoId);
     // With the clock off, watching is logged for History and costs nothing, the same as an unlocked video (Q29).
-    if (!state.settings.clock || state.unlocked.includes(videoId)) {
+    if (!state.settings.clock || isFree(state, videoId)) {
       logDay(state).watchedSec += seconds;
       return watchStatus(state, videoId);
     }
@@ -528,8 +570,9 @@
   /** @param {State} state @param {string} videoId */
   function watchStatus(state, videoId) {
     const unlocked = state.unlocked.includes(videoId);
+    const allowed = !unlocked && allowedNow(state.channels.allow, state.allowedToday, videoId);
     // With the clock off nothing locks (Q29).
-    return { secondsLeft: state.watchSecondsLeft, unlocked, locked: state.settings.clock && state.watchSecondsLeft === 0 && !unlocked };
+    return { secondsLeft: state.watchSecondsLeft, unlocked, allowed, locked: state.settings.clock && state.watchSecondsLeft === 0 && !unlocked && !allowed };
   }
 
   /** @param {State} state @param {string} videoId @param {string} title @param {string} reason @param {number} now */
@@ -807,6 +850,9 @@
     if ((pending.clock ?? settings.clock) === false) return false;
     if (typeof stored.day !== 'string' || stored.day < today) return true;
     if (Array.isArray(stored.unlocked) && stored.unlocked.includes(videoId)) return false;
+    const lists = /** @type {any} */ (stored.channels);
+    const allowed = Array.isArray(stored.allowedToday) ? stored.allowedToday.map((e) => ({ id: e?.id, ids: cleanIds(e?.ids) })) : [];
+    if (allowedNow(cleanChannels(lists?.allow), allowed, videoId)) return false;
     return count(stored.watchSecondsLeft, 0) <= 0;
   }
 
@@ -835,16 +881,18 @@
         // does, and an open token page notices on its own 1-second check. A pending change moves back with it.
         state.day = addDays(state.day, -1);
         if (state.pending) state.pending.effectiveDay = addDays(state.pending.effectiveDay, -1);
+        if (state.channelsPending) state.channelsPending.effectiveDay = addDays(state.channelsPending.effectiveDay, -1);
         break;
       case 'apply-pending':
         if (state.pending) Object.assign(state.settings, state.pending.changes);
         state.pending = null;
+        applyChannelsPending(state);
         break;
       case 'grace-toggle':
         state.settings.graceMode = !state.settings.graceMode;
         cancelPending(state, 'graceMode');
         break;
-      case 'clear-unlocks': state.unlocked = []; break;
+      case 'clear-unlocks': state.unlocked = []; state.allowedToday = []; break;
       case 'clear-backlog': state.backlog = []; break;
       case 'clear-seen': state.seen = []; state.current = null; break;
       case 'clear-log': delete state.log[state.day]; break;
@@ -939,6 +987,7 @@
     return {
       app: 'drip', format: EXPORT_FORMAT, exportedAt: new Date(now).toISOString(),
       settings: planned(state), backlog: state.backlog.map((v) => ({ ...v })), log: structuredClone(state.log),
+      channels: plannedChannels(state),
     };
   }
 
@@ -1016,7 +1065,18 @@
         days++;
       }
     }
-    return { ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days };
+    // The lists go through the same rules as a click: an allow waits, a block applies now, and nothing is removed.
+    let channelsAdded = 0;
+    const lists = file.channels && typeof file.channels === 'object' ? file.channels : {};
+    for (const raw of Array.isArray(lists.allow) ? lists.allow : []) {
+      const channel = cleanChannel(raw);
+      if (channel && !isAllowedOrWaiting(state, channel) && allowChannel(state, channel, now).ok) channelsAdded++;
+    }
+    for (const raw of Array.isArray(lists.block) ? lists.block : []) {
+      const channel = cleanChannel(raw);
+      if (channel && !findChannel(state.channels.block, channel) && blockChannel(state, channel).ok) channelsAdded++;
+    }
+    return { ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days, channelsAdded };
   }
 
   /**
@@ -1029,7 +1089,292 @@
     const cleared = state.backlog.length;
     // One at a time through removeBacklog, so a saved card still showing stops counting as saved (Codex, 2026-11-02).
     for (const video of [...state.backlog]) removeBacklog(state, video.id);
+    // Emptying the allow list tightens, so it's at once, and waiting allows go too. Emptying the block list loosens,
+    // so it waits (CHANNEL-LISTS-PLAN.md, call 14).
+    for (const channel of [...state.channels.allow, ...(state.channelsPending ? state.channelsPending.allow : [])]) removeAllowed(state, channel);
+    for (const channel of [...state.channels.block]) unblockChannel(state, channel, now);
     return { ok: true, applied: settings.applied, pending: settings.pending, stashCleared: cleared };
+  }
+
+
+  // Channel allow and block lists (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md). Allowing and unblocking loosen, so
+  // they wait for the reset (Q6). Removing an allowed channel and blocking one tighten, so they apply at once.
+
+  /** The most channels the allow list holds, waiting ones included (Jesse, 2026-11-02). */
+  const ALLOW_MAX = 5;
+  /** The most the block list holds, for storage. */
+  const BLOCK_MAX = 100;
+  /** The most ids one channel keeps: its handle, its UC id, and room for a handle it changed to. */
+  const IDS_MAX = 4;
+  const ALLOWED_TODAY_MAX = 500;
+  const VIDEO_ID = /^[\w-]{1,64}$/;
+  const HANDLE = /^@[\w.-]{1,100}$/;
+  const UC_ID = /^UC[\w-]{22}$/;
+
+  /**
+   * A channel's id from what a person or a page gives: `@handle`, `UC...`, or a URL or path with either. Handles are
+   * lowercased, since YouTube treats them without case. '' for anything else.
+   * @param {unknown} input
+   */
+  function channelId(input) {
+    if (typeof input !== 'string') return '';
+    const text = input.trim();
+    if (HANDLE.test(text)) return text.toLowerCase();
+    if (UC_ID.test(text)) return text;
+    const path = text.replace(/^(https?:\/\/)?((www|m)\.)?youtube\.com/i, '').split(/[?#]/)[0];
+    const handle = /^\/(@[^/]+)/.exec(path);
+    if (handle && HANDLE.test(decodeURIComponent(handle[1]))) return decodeURIComponent(handle[1]).toLowerCase();
+    const uc = /^\/channel\/([^/]+)/.exec(path);
+    if (uc && UC_ID.test(uc[1])) return uc[1];
+    return '';
+  }
+
+  /** @param {unknown} raw @returns {string[]} */
+  function cleanIds(raw) {
+    if (!Array.isArray(raw)) return [];
+    /** @type {string[]} */
+    const ids = [];
+    for (const item of raw) {
+      const id = typeof item === 'string' && (HANDLE.test(item) || UC_ID.test(item)) ? (item.startsWith('@') ? item.toLowerCase() : item) : '';
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    return ids.slice(0, IDS_MAX);
+  }
+
+  /** A channel with clean ids and a trimmed name, or null with neither. @param {unknown} raw @returns {Channel | null} */
+  function cleanChannel(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const c = /** @type {Record<string, unknown>} */ (raw);
+    const ids = cleanIds(c.ids);
+    const name = typeof c.name === 'string' ? c.name.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    return ids.length || name ? { ids, name } : null;
+  }
+
+  /** @param {unknown} raw @returns {Channel[]} */
+  function cleanChannels(raw) {
+    return Array.isArray(raw) ? /** @type {Channel[]} */ (raw.map(cleanChannel).filter(Boolean)) : [];
+  }
+
+  /** @param {string[]} a @param {string[]} b */
+  function shareId(a, b) {
+    return a.some((id) => b.includes(id));
+  }
+
+  /**
+   * Two sightings are one channel when they share an id. When either has no ids, an exact name decides, since a home
+   * card shows only the name. A wrong name match only hides a video or skips buying a drop the watch page then asks for.
+   * @param {Channel} a @param {Channel} b
+   */
+  function sameChannel(a, b) {
+    if (a.ids.length && b.ids.length) return shareId(a.ids, b.ids);
+    return !!a.name && a.name === b.name;
+  }
+
+  /** @param {Channel[]} list @param {Channel} channel */
+  function findChannel(list, channel) {
+    return list.find((entry) => sameChannel(entry, channel));
+  }
+
+  /** Adds what a sighting knows to an entry: ids it lacks, and the name. @param {Channel} entry @param {Channel} seen */
+  function mergeChannel(entry, seen) {
+    let changed = false;
+    for (const id of seen.ids) {
+      if (!entry.ids.includes(id) && entry.ids.length < IDS_MAX) { entry.ids.push(id); changed = true; }
+    }
+    // A name from a page with ids is current. A name-only sighting never renames an entry it matched by name.
+    if (seen.name && seen.ids.length && entry.name !== seen.name) { entry.name = seen.name; changed = true; }
+    return changed;
+  }
+
+  /** @param {State} state */
+  function channelsPendingFor(state) {
+    const day = addDays(state.day, 1);
+    if (!state.channelsPending) state.channelsPending = { effectiveDay: day, allow: [], unblock: [] };
+    state.channelsPending.effectiveDay = day;
+    return state.channelsPending;
+  }
+
+  /** @param {State} state */
+  function tidyChannelsPending(state) {
+    const p = state.channelsPending;
+    if (p && !p.allow.length && !p.unblock.length) state.channelsPending = null;
+  }
+
+  /** @param {State} state */
+  function applyChannelsPending(state) {
+    const p = state.channelsPending;
+    if (!p) return;
+    for (const channel of p.allow) {
+      const have = findChannel(state.channels.allow, channel);
+      if (have) mergeChannel(have, channel);
+      else if (state.channels.allow.length < ALLOW_MAX) state.channels.allow.push(channel);
+    }
+    state.channels.block = state.channels.block.filter((entry) => !findChannel(p.unblock, entry));
+    state.channelsPending = null;
+  }
+
+  /** @param {State} state @param {Channel} channel */
+  function isAllowedOrWaiting(state, channel) {
+    return !!findChannel(state.channels.allow, channel) || !!(state.channelsPending && findChannel(state.channelsPending.allow, channel));
+  }
+
+  /**
+   * Adds a channel to the allow list: at once on the first day, otherwise at the reset (Q6). It needs an id, since a
+   * watch page proves its channel by id. Allowed and waiting ones count toward the 5.
+   * @param {State} state @param {unknown} raw @param {number} [now]
+   */
+  function allowChannel(state, raw, now) {
+    const channel = cleanChannel(raw);
+    if (!channel || !channel.ids.length) return { ok: false, error: 'bad-channel' };
+    const have = findChannel(state.channels.allow, channel);
+    if (have) { mergeChannel(have, channel); return { ok: true, waits: false }; }
+    const waiting = state.channelsPending && findChannel(state.channelsPending.allow, channel);
+    if (waiting) { mergeChannel(waiting, channel); return { ok: true, waits: true }; }
+    const count = state.channels.allow.length + (state.channelsPending ? state.channelsPending.allow.length : 0);
+    if (count >= ALLOW_MAX) return { ok: false, error: 'allow-full' };
+    if (firstDayUntil(state, now) > 0) {
+      state.channels.allow.push(channel);
+      return { ok: true, waits: false };
+    }
+    channelsPendingFor(state).allow.push(channel);
+    return { ok: true, waits: true };
+  }
+
+  /** Takes a channel off the allow list, or cancels its waiting allow, at once. @param {State} state @param {unknown} raw */
+  function removeAllowed(state, raw) {
+    const channel = cleanChannel(raw);
+    if (!channel) return { ok: false, error: 'bad-channel' };
+    state.channels.allow = state.channels.allow.filter((entry) => !sameChannel(entry, channel));
+    if (state.channelsPending) state.channelsPending.allow = state.channelsPending.allow.filter((entry) => !sameChannel(entry, channel));
+    tidyChannelsPending(state);
+    return { ok: true };
+  }
+
+  /**
+   * Blocks a channel at once, and cancels an unblock waiting for it. A home card gives only a name, which is enough.
+   * @param {State} state @param {unknown} raw
+   */
+  function blockChannel(state, raw) {
+    const channel = cleanChannel(raw);
+    if (!channel) return { ok: false, error: 'bad-channel' };
+    if (state.channelsPending) state.channelsPending.unblock = state.channelsPending.unblock.filter((entry) => !sameChannel(entry, channel));
+    tidyChannelsPending(state);
+    const have = findChannel(state.channels.block, channel);
+    if (have) { mergeChannel(have, channel); return { ok: true }; }
+    if (state.channels.block.length >= BLOCK_MAX) return { ok: false, error: 'block-full' };
+    state.channels.block.push(channel);
+    return { ok: true };
+  }
+
+  /**
+   * Takes a channel off the block list: at once on the first day, otherwise at the reset (Q6).
+   * @param {State} state @param {unknown} raw @param {number} [now]
+   */
+  function unblockChannel(state, raw, now) {
+    const channel = cleanChannel(raw);
+    if (!channel) return { ok: false, error: 'bad-channel' };
+    const have = findChannel(state.channels.block, channel);
+    if (!have) return { ok: true, waits: false };
+    if (firstDayUntil(state, now) > 0) {
+      state.channels.block = state.channels.block.filter((entry) => entry !== have);
+      return { ok: true, waits: false };
+    }
+    const pending = channelsPendingFor(state);
+    if (!findChannel(pending.unblock, have)) pending.unblock.push({ ids: [...have.ids], name: have.name });
+    return { ok: true, waits: true };
+  }
+
+  /** Drops a waiting allow or unblock for a channel. @param {State} state @param {unknown} raw */
+  function cancelChannelPending(state, raw) {
+    const channel = cleanChannel(raw);
+    if (!channel || !state.channelsPending) return { ok: true };
+    state.channelsPending.allow = state.channelsPending.allow.filter((entry) => !sameChannel(entry, channel));
+    state.channelsPending.unblock = state.channelsPending.unblock.filter((entry) => !sameChannel(entry, channel));
+    tidyChannelsPending(state);
+    return { ok: true };
+  }
+
+  /**
+   * A page saw a channel with its ids and name: fill them into any list entry it matches, so a block added by handle
+   * learns the name a home card shows. Returns whether anything changed.
+   * @param {State} state @param {unknown} raw
+   */
+  function seenChannel(state, raw) {
+    const channel = cleanChannel(raw);
+    if (!channel || !channel.ids.length) return { ok: true, changed: false };
+    let changed = false;
+    const p = state.channelsPending;
+    for (const list of [state.channels.allow, state.channels.block, ...(p ? [p.allow, p.unblock] : [])]) {
+      for (const entry of list) {
+        if (sameChannel(entry, channel) && mergeChannel(entry, channel)) changed = true;
+      }
+    }
+    return { ok: true, changed };
+  }
+
+  /**
+   * Whether a video a watch page showed is free through the allow list now. Checked at use, so removing the channel
+   * ends it at once (Codex 7). Only an id counts here: a name isn't proof.
+   * @param {Channel[]} allow @param {{id: unknown, ids: string[]}[]} today @param {string} videoId
+   */
+  function allowedNow(allow, today, videoId) {
+    return today.some((e) => e.id === videoId && allow.some((c) => shareId(c.ids, e.ids)));
+  }
+
+  /**
+   * A watch page read its channel. When the channel is allowed, by id, the video is free for the rest of the day.
+   * @param {State} state @param {unknown} videoId @param {unknown} raw
+   */
+  function allowedVideo(state, videoId, raw) {
+    if (typeof videoId !== 'string' || !VIDEO_ID.test(videoId)) return { ok: false, error: 'bad-video' };
+    const channel = cleanChannel(raw);
+    if (!channel || !channel.ids.length) return { ok: true, allowed: false };
+    seenChannel(state, channel);
+    if (!state.channels.allow.some((c) => shareId(c.ids, channel.ids))) return { ok: true, allowed: false };
+    state.allowedToday = [...state.allowedToday.filter((e) => e.id !== videoId), { id: videoId, ids: channel.ids }].slice(-ALLOWED_TODAY_MAX);
+    return { ok: true, allowed: true };
+  }
+
+  /**
+   * Whether watching this video costs nothing today: "I need this one" unlocked it, or a watch page showed it's from an
+   * allowed channel. Every cost and lock check goes through here.
+   * @param {State} state @param {string} videoId
+   */
+  function isFree(state, videoId) {
+    return state.unlocked.includes(videoId) || allowedNow(state.channels.allow, state.allowedToday, videoId);
+  }
+
+  /** @param {State} state @param {Video} video */
+  function fromAllowed(state, video) {
+    const channel = { ids: video.channelIds || [], name: video.channel };
+    return !!findChannel(state.channels.allow, channel);
+  }
+
+  /**
+   * isFree, or a card or stash row from an allowed channel, before its watch page has said so. The home page's prices
+   * and buyIfOut use this.
+   * @param {State} state @param {string} videoId
+   */
+  function freeToStart(state, videoId) {
+    if (isFree(state, videoId)) return true;
+    const video = state.current && state.current.id === videoId ? state.current : state.backlog.find((v) => v.id === videoId);
+    return !!video && fromAllowed(state, video);
+  }
+
+  /** Whether a reveal must skip this video's channel. @param {State} state @param {Video} video */
+  function isBlocked(state, video) {
+    if (!state.channels.block.length) return false;
+    return !!findChannel(state.channels.block, { ids: video.channelIds || [], name: video.channel });
+  }
+
+  /** The lists as they'll be after the reset, for Export. @param {State} state */
+  function plannedChannels(state) {
+    const p = state.channelsPending;
+    const copy = (/** @type {Channel} */ c) => ({ ids: [...c.ids], name: c.name });
+    return {
+      allow: [...state.channels.allow, ...(p ? p.allow : [])].map(copy),
+      block: state.channels.block.filter((c) => !(p && findChannel(p.unblock, c))).map(copy),
+    };
   }
 
   /** @type {any} */ (globalThis).Drip = {
@@ -1039,5 +1384,7 @@
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,
+    ALLOW_MAX, channelId, cleanChannel, sameChannel, allowChannel, removeAllowed, blockChannel, unblockChannel,
+    cancelChannelPending, seenChannel, allowedVideo, isFree, freeToStart, plannedChannels,
   };
 })();
