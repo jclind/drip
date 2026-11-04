@@ -942,6 +942,13 @@
     };
   }
 
+  /** Whether a log key is a real date written as YYYY-MM-DD. @param {string} day */
+  function realDay(day) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+    const date = new Date(`${day}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
+  }
+
   /**
    * One day of an imported log, with only the fields drip keeps and only numbers where it counts.
    * @param {unknown} raw @returns {LogDay | null}
@@ -1000,7 +1007,9 @@
     let days = 0;
     if (file.log && typeof file.log === 'object' && !Array.isArray(file.log)) {
       for (const [day, entry] of Object.entries(file.log)) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day >= state.day || state.log[day]) continue;
+        // A real calendar date, since History's week math throws on one like 2026-00-01, and within the 90 days the
+        // log keeps, as rollDay would prune it (Codex, 2026-11-03).
+        if (!realDay(day) || day >= state.day || day < addDays(state.day, -89) || state.log[day]) continue;
         const cleaned = cleanLogDay(entry);
         if (!cleaned) continue;
         state.log[day] = cleaned;

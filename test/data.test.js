@@ -161,3 +161,16 @@ test('the card showing counts as saved when import stashes it, and stops when re
   D.resolveCurrent(reset, 'pass', 'a', NOW);
   assert.equal(D.cardsLine(D.logDay(reset)), 'Of 1 card, 1 passed.');
 });
+
+test('import skips log days that are not real dates or older than the 90 days kept (Codex)', () => {
+  const state = settled();
+  const old = D.addDays(state.day, -90);
+  const kept = D.addDays(state.day, -89);
+  const res = D.importData(state, {
+    app: 'drip', format: 1,
+    log: { '2026-00-01': { watchedSec: 1 }, '2026-02-30': { watchedSec: 1 }, [old]: { watchedSec: 1 }, [kept]: { watchedSec: 1 } },
+  }, NOW);
+  assert.deepEqual(Object.keys(state.log), [kept]);
+  assert.equal(res.daysAdded, 1);
+  assert.doesNotThrow(() => D.weekView(state, 0));
+});
