@@ -799,7 +799,9 @@ async function addChannel(list) {
   const res = await send({ type: list === 'allow' ? 'allowChannel' : 'blockChannel', channel: { ids: [id], name: '' } });
   absorb(res);
   if (res && res.ok) {
-    if (input) input.value = '';
+    // The storage event may have redrawn the list while the worker answered, so clear the field that's there now.
+    const live = /** @type {HTMLInputElement | null} */ (channelsEl?.querySelector(`[data-k="${list}-input"]`));
+    if (live) live.value = '';
     const when = res.waits ? ` from ${resetLabel()}` : '';
     channelsNote[list] = list === 'allow' ? `Allowed${when}. Its name shows once you open the channel or one of its videos.`
       : 'Blocked. Its name shows once you open the channel or one of its videos, and only then does it catch home cards, which show just the name.';

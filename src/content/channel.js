@@ -14,7 +14,7 @@
     name: 'yt-page-header-view-model h1',
     // The header writes the handle as text ("@veritasium"), on /@handle and /channel/UC... pages alike.
     handleText: 'yt-page-header-view-model yt-content-metadata-view-model span',
-    // Subscribe and Join sit in this row. The button goes after it.
+    // Subscribe and Join sit in this row. The button goes at its end.
     actions: 'yt-page-header-view-model yt-flexible-actions-view-model',
   };
   const BUTTON_ID = 'drip-allow';
@@ -95,7 +95,7 @@
     }[at];
     const key = JSON.stringify([channel.ids, at, label]);
     // Redraw only on a change, so a click isn't lost to a rebuilt button.
-    if (old && view === key && old.previousElementSibling === actions) return;
+    if (old && view === key && old.parentElement === actions) return;
     view = key;
     const button = h('button', {
       id: BUTTON_ID, type: 'button', class: `drip-ui drip-allow is-${at}`, title,
@@ -103,7 +103,7 @@
       onclick: () => onClick(channel),
     }, label);
     old?.remove();
-    actions.after(button);
+    actions.append(button);
     tellSeen(channel);
   }
 
