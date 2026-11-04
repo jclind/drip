@@ -2226,3 +2226,19 @@ html[dark] #drip-menu {
   width: 16px;
   height: 16px;
 }
+
+/* The channel page's Allow button (channel.js), a chip beside Subscribe in YouTube's own shape. */
+.drip-allow {
+  margin-left: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--drip-chip);
+  font-weight: 500;
+  cursor: pointer;
+  align-self: center;
+}
+.drip-allow:hover { background: var(--drip-chip-hover); }
+.drip-allow:focus-visible { outline: 2px solid var(--drip-text); outline-offset: 2px; }
+.drip-allow.is-waiting, .drip-allow.is-full { color: var(--drip-muted); }
