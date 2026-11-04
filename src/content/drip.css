@@ -2451,11 +2451,12 @@ html[dark] #drip-menu {
 .drip-allow .drip-allow-undo,
 .drip-allow .drip-allow-undo-icon { visibility: hidden; }
 .drip-allow .drip-allow-undo-icon { display: none; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-label { visibility: hidden; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo { visibility: visible; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-icon:not(.drip-allow-undo-icon) { display: none; }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo-icon { display: inline-block; visibility: visible; color: var(--drip-text); }
-.drip-allow:is(:hover, :focus-visible):not(.is-fresh):is(.is-waiting, .is-allowed) { color: var(--drip-text); }
+/* Only Allowed and Waiting have an undo label. Scoped to them, so plain "Allow in drip" keeps its label on hover. */
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-label { visibility: hidden; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo { visibility: visible; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-icon:not(.drip-allow-undo-icon) { display: none; }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) .drip-allow-undo-icon { display: inline-block; visibility: visible; color: var(--drip-text); }
+.drip-allow:is(.is-waiting, .is-allowed):is(:hover, :focus-visible):not(.is-fresh) { color: var(--drip-text); }
 
 /* A click that changed it: the button gives a small pop, a blue ring spreads from its edge, and the new icon drops in. */
 .drip-allow.is-changed {
