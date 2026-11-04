@@ -31,6 +31,12 @@
   let decisionId = '';
   /** @type {{video: HTMLVideoElement, id: string} | null} */
   let pausedWhileUnknown = null;
+  /**
+   * The video held because no minutes were left. When a watch page then shows it's from an allowed channel, it starts
+   * on its own (CHANNEL-LISTS-PLAN.md, call 8). Set when the hold goes up, not on a play event, since guard.js refuses
+   * YouTube's play() before one fires (Codex, 2026-11-03).
+   */
+  let heldId = '';
 
   function videoId() {
     return location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
@@ -48,7 +54,10 @@
    */
   function decide(fromStorage = false) {
     const id = videoId();
-    if (id !== decisionId) pausedWhileUnknown = null;
+    if (id !== decisionId) {
+      pausedWhileUnknown = null;
+      heldId = '';
+    }
     decisionId = id;
     if (!storageKnown) {
       locked = null;
@@ -63,9 +72,13 @@
     pausedWhileUnknown = null;
     if (!id) return;
     const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
+    const held = heldId;
+    heldId = locked ? id : '';
     if (locked && !(fromStorage && state?.settings?.graceMode)) pausePlayer(video);
     else if (!locked && pending && pending.id === id && pending.video === video) {
       // Only undo our temporary pause, once. Autoplay can still reject playback.
+      video.play().catch(() => {});
+    } else if (!locked && held === id && video && video.paused && allowedToday(id)) {
       video.play().catch(() => {});
     }
   }
@@ -80,6 +93,12 @@
       pausePlayer(target);
     } else if (locked) pausePlayer(target);
   }, true);
+
+  /** Whether the worker has marked this video free through the allow list. @param {string} id */
+  function allowedToday(id) {
+    const list = state && Array.isArray(state.allowedToday) ? state.allowedToday : [];
+    return list.some((/** @type {any} */ e) => e && e.id === id);
+  }
 
   document.addEventListener('yt-navigate-finish', () => decide());
   chrome.storage.onChanged.addListener((changes, area) => {

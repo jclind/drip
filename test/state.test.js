@@ -28,6 +28,8 @@ test('API contains every contract name, and defaults are frozen', () => {
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData',
+    'ALLOW_MAX', 'channelId', 'cleanChannel', 'sameChannel', 'allowChannel', 'removeAllowed', 'blockChannel', 'unblockChannel',
+    'cancelChannelPending', 'seenChannel', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels', 'allowCount', 'isAllowedOrWaiting',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
@@ -128,6 +130,7 @@ test('initialState has the specified shape and independent mutable values', () =
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
     current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, installedAt: time(5),
+    channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false,
   });
   state.settings.recTokensPerDay = 1;
   state.backlog.push(video('a'));
@@ -622,10 +625,10 @@ test('cleanVideo keeps valid optional fields and drops bad ones', () => {
 
 test('charge drains seconds, floors at zero, logs actual watched time, and reports lock status', () => {
   const state = fresh();
-  assert.deepEqual(D.watchStatus(state, 'a'), { secondsLeft: 0, unlocked: false, locked: true });
+  assert.deepEqual(D.watchStatus(state, 'a'), { secondsLeft: 0, unlocked: false, allowed: false, locked: true });
   state.watchSecondsLeft = 10;
-  assert.deepEqual(D.charge(state, 2.5, 'a'), { secondsLeft: 7.5, unlocked: false, locked: false });
-  assert.deepEqual(D.charge(state, 20, 'a'), { secondsLeft: 0, unlocked: false, locked: true });
+  assert.deepEqual(D.charge(state, 2.5, 'a'), { secondsLeft: 7.5, unlocked: false, allowed: false, locked: false });
+  assert.deepEqual(D.charge(state, 20, 'a'), { secondsLeft: 0, unlocked: false, allowed: false, locked: true });
   assert.equal(D.logDay(state).watchedSec, 22.5);
 });
 
@@ -633,11 +636,11 @@ test('unlocked videos still log watched seconds without draining the balance', (
   const state = fresh();
   D.needThis(state, 'a', 'Title', 'For work', time(5));
   state.watchSecondsLeft = 40;
-  assert.deepEqual(D.charge(state, 60, 'a'), { secondsLeft: 40, unlocked: true, locked: false });
+  assert.deepEqual(D.charge(state, 60, 'a'), { secondsLeft: 40, unlocked: true, allowed: false, locked: false });
   assert.equal(D.logDay(state).watchedSec, 60);
   D.charge(state, 40, 'b');
-  assert.deepEqual(D.watchStatus(state, 'a'), { secondsLeft: 0, unlocked: true, locked: false });
-  assert.deepEqual(D.watchStatus(state, 'b'), { secondsLeft: 0, unlocked: false, locked: true });
+  assert.deepEqual(D.watchStatus(state, 'a'), { secondsLeft: 0, unlocked: true, allowed: false, locked: false });
+  assert.deepEqual(D.watchStatus(state, 'b'), { secondsLeft: 0, unlocked: false, allowed: false, locked: true });
   assert.equal(D.logDay(state).watchedSec, 100);
 });
 
@@ -913,7 +916,7 @@ test('chargeTick never reads or changes the clock for unlocked videos', () => {
     get lastChargeEnd() { throw new Error('Clock was read'); },
     set lastChargeEnd(value) { throw new Error('Clock was written'); },
   };
-  assert.deepEqual(D.chargeTick(state, clock, time(5), 10, 'free'), { secondsLeft: 0, unlocked: true, locked: false });
+  assert.deepEqual(D.chargeTick(state, clock, time(5), 10, 'free'), { secondsLeft: 0, unlocked: true, allowed: false, locked: false });
   assert.equal(D.logDay(state).watchedSec, 10);
 });
 
@@ -921,7 +924,7 @@ test('chargeTick charges a throttled 180-second tick in full', () => {
   const state = fresh();
   state.watchSecondsLeft = 900;
   const clock = { lastChargeEnd: 0 };
-  assert.deepEqual(D.chargeTick(state, clock, time(5), 180, 'a'), { secondsLeft: 720, unlocked: false, locked: false });
+  assert.deepEqual(D.chargeTick(state, clock, time(5), 180, 'a'), { secondsLeft: 720, unlocked: false, allowed: false, locked: false });
   assert.equal(D.logDay(state).watchedSec, 180);
 });
 
@@ -954,7 +957,7 @@ test('chargeTick zero tick between paid ticks does not suppress playback', () =>
   state.watchSecondsLeft = 100;
   const clock = { lastChargeEnd: 0 };
   D.chargeTick(state, clock, time(5), 10, 'paid');
-  assert.deepEqual(D.chargeTick(state, clock, time(5) + 5000, 0, 'paused'), { secondsLeft: 90, unlocked: false, locked: false });
+  assert.deepEqual(D.chargeTick(state, clock, time(5) + 5000, 0, 'paused'), { secondsLeft: 90, unlocked: false, allowed: false, locked: false });
   assert.equal(clock.lastChargeEnd, time(5));
   D.chargeTick(state, clock, time(5) + 10000, 10, 'paid');
   assert.equal(clock.lastChargeEnd, time(5) + 10000);

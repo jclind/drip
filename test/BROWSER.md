@@ -63,3 +63,10 @@ Start from a reloaded extension and refreshed YouTube tabs. With Developer mode 
 37. In Settings, turn off Watch time. Its rows fold away under the header, which reads "Off. Videos play with no clock.", and Tab skips them. A bar at the bottom says "1 change not saved" with Undo all and Save. Scroll the page: the bar stays in view. Try to close the tab, and Chrome asks first. Click Undo all: the rows come back and the bar goes.
 38. In Settings at a phone width (DevTools, 390px), Cards per day with Counted puts its two controls on a line under the label, and nothing runs off the right edge. With Unlimited, the picker sits beside the label.
 39. A week after install, in Settings on Full drip, pick Quiet and save. The four switches stay off and their sections stay folded, each header has "On until 4:00am · Undo" (Cards: "Counted until 4:00am"), the mode row says "Quiet from 4:00am. Until then, Full drip.", and the save bar says "Saved. Quiet starts at 4:00am." YouTube still runs Full drip until the reset. Undo on Watch time turns its switch back on and the mode row reads "Your own mix from 4:00am". Pick Curated and save: Search and Stash come back on at once, and the line reads "Curated from 4:00am."
+
+## Channel lists (Q31)
+
+40. On a channel page, Allow in drip sits beside Subscribe. Click it: it reads "Allowed from 4:00am". After Run reset now it reads "Allowed in drip".
+41. With 0 minutes, click a link to that channel's video. It starts on its own (air can't show this: Chrome refuses autoplay there with no click on the page), plays, the pill says Allowed channel, and the minutes stay at 0. Click to another channel's video in the same tab: the lock rises within about 2 seconds.
+42. With the allowed video playing, click Allowed in drip on the channel page in another tab. The video locks within a second or two.
+43. On a reveal card, click Block, then Block again. The card goes, no card comes back, and that channel isn't dealt again. Settings' Channels lists it, and Unblock there waits for the reset.

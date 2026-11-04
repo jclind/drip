@@ -6,6 +6,7 @@
 
 (function () {
   /** @type {any} */
+  const Drip = /** @type {any} */ (globalThis).Drip;
   const { send, h, onState, watchFor } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripSwap = /** @type {any} */ (globalThis).DripSwap;
@@ -21,6 +22,8 @@
     link: 'a#video-title, a[href*="/watch?v="]',
     title: '#video-title',
     channel: 'ytd-channel-name a, #channel-name a, #channel-name',
+    // Its href is the channel's /@handle (checked on air, 2026-11-03).
+    channelLink: 'ytd-channel-name a[href]',
     length: 'ytd-thumbnail-overlay-time-status-renderer, .ytBadgeShapeText, .yt-badge-shape__text',
     saveSlot: '#meta, .text-wrapper',
     // "Did you mean" and "Showing results for" sit above results. On their own they mean nothing was found.
@@ -59,7 +62,11 @@
     const link = /** @type {HTMLAnchorElement | null} */ (row.querySelector(SEL.link));
     const id = link ? new URL(link.href, location.origin).searchParams.get('v') : null;
     const length = /\d+(?::\d\d)+/.exec(text(row, SEL.length));
-    return id ? { id, title: text(row, SEL.title) || link?.getAttribute('title') || '', channel: text(row, SEL.channel), length: length ? length[0] : '' } : null;
+    const channelId = Drip.channelId(row.querySelector(SEL.channelLink)?.getAttribute('href') || '');
+    return id ? {
+      id, title: text(row, SEL.title) || link?.getAttribute('title') || '', channel: text(row, SEL.channel), length: length ? length[0] : '',
+      ...(channelId ? { channelIds: [channelId] } : {}),
+    } : null;
   }
 
   /** @param {string} id */

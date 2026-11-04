@@ -557,6 +557,9 @@
       }, h('span', {}, 'Reveal video'), counted && price('card')));
   }
 
+  /** The tour card whose Block is asking to be sure, as on the real card (home.js). */
+  let blockAsk = '';
+
   /** @param {any} video */
   function card(video) {
     const saved = sand.backlog.some((/** @type {any} */ v) => v.id === video.id);
@@ -576,7 +579,12 @@
         h('span', { class: 'drip-meta drip-meta-split' }, h('span', { class: 'drip-meta-channel' }, video.channel), h('span', { class: 'drip-meta-rest' }, ` · ${video.views} · ${video.age}`), h('span', { class: 'drip-sr' }, `, length ${video.length}`)),
         h('button', { class: 'drip-b drip-b-primary drip-watch', onclick: () => { Drip.resolveCurrent(sand, 'watch', video.id); watchedId = video.id; go(at('player')); } },
           icon('play'), h('span', {}, 'Watch'), parts.clock && sand.watchSecondsLeft <= 0 && price('drop'))),
-      h('div', { class: 'drip-card-actions' },
+      blockAsk === video.id ? h('div', { class: 'drip-block-ask', role: 'group', 'aria-label': `Block ${video.channel}` },
+        h('p', { class: 'drip-block-text' }, h('strong', {}, `Block ${video.channel}?`), " drip won't deal their videos again. Unblocking waits for the reset."),
+        h('div', { class: 'drip-block-buttons' },
+          h('button', { class: 'drip-b drip-b-primary', onclick: () => { blockAsk = ''; Drip.resolveCurrent(sand, 'block', video.id); drawHome(); } }, 'Block'),
+          h('button', { class: 'drip-b drip-b-gray', onclick: () => { blockAsk = ''; drawHome(); } }, 'Cancel')))
+      : h('div', { class: 'drip-card-actions' },
         parts.stash && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'aria-pressed': String(saved),
           onclick: () => { Drip.resolveCurrent(sand, saved ? 'unsave' : 'save', video.id); drawHome(); coach.did(saved ? 'unstash' : 'stash'); },
@@ -596,6 +604,10 @@
             }
           },
         }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), parts.cards === 'limited' && price('card')),
+        h('button', {
+          class: 'drip-b drip-b-gray drip-block', title: `Never deal ${video.channel} again`,
+          onclick: () => { blockAsk = video.id; drawHome(); },
+        }, 'Block'),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'aria-label': 'Pass', title: "Pass. It's free, and this video won't come back.",
           onclick: () => {
@@ -618,6 +630,7 @@
       h('div', { class: 'drip-card-actions' },
         h('button', { class: 'drip-b drip-b-gray drip-card-save drip-stash', tabindex: '-1' }, ...DripStash.parts(false, { labelClass: 'drip-save-label' }).nodes),
         h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
+        h('button', { class: 'drip-b drip-b-gray drip-block', tabindex: '-1' }, 'Block'),
         h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
   }
 
@@ -666,12 +679,18 @@
   /** Samples not revealed yet, starting over once the tour has shown them all. */
   function pool() {
     if (SAMPLES.every((v) => sand.seen.includes(v.id))) sand.seen = [];
+    // Blocking every sample channel would leave the tour with nothing to deal (code review, 2026-11-03).
+    if (!SAMPLES.some((v) => Drip.canDeal(sand, v))) {
+      sand.seen = [];
+      sand.channels.block = [];
+    }
     return SAMPLES;
   }
 
   /** Reveal next found nothing new: start the samples over and try once more. */
   function refill() {
     sand.seen = sand.current ? [sand.current.id] : [];
+    if (!SAMPLES.some((v) => Drip.canDeal(sand, v))) sand.channels.block = [];
     if (sand.current) Drip.revealNext(sand, sand.current.id, SAMPLES);
   }
 

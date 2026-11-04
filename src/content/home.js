@@ -29,6 +29,9 @@
     title: '#video-title, h3 a, h3',
     // Late 2026 markup uses camelCase classes (checked 2026-10-05); the kebab-case ones are the older markup.
     channel: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, ytd-channel-name a, ytd-channel-name #text',
+    // A link to the channel. Late 2026 lockups have none, only /watch links (checked on air, 2026-11-03), so a card
+    // usually has just the channel's name. The older markup's channel name was a link.
+    channelLink: 'ytd-channel-name a[href^="/@"], ytd-channel-name a[href^="/channel/"]',
     length: '.ytBadgeShapeText, .yt-badge-shape__text, .badge-shape-wiz__text, ytd-thumbnail-overlay-time-status-renderer #text',
     // The line after the title: channel, views, and age. Late 2026 writes "184K" and "3d ago", the older markup
     // "184K views" and "3 days ago". The parts are told apart by VIEWS and AGE, so the age is English only (checked 2026-10-14).
@@ -54,7 +57,7 @@
   const SCHEDULED = /^(scheduled for|premieres)\b/i;
   const DURATION = /^\d+(:\d\d)+$/;
 
-  /** @typedef {{id: string, title: string, channel: string, length: string, views: string, age: string, kind: string}} Candidate */
+  /** @typedef {{id: string, title: string, channel: string, length: string, views: string, age: string, kind: string, channelIds?: string[]}} Candidate */
 
   /** @type {any} */
   let state = null;
@@ -134,7 +137,8 @@
       const channel = firstText(item, SEL.channel);
       const length = firstText(item, SEL.length);
       const { views, age } = viewsAndAge(item, channel);
-      pool.push({ id, title, channel, length, views, age, kind: kindOf(item, channel, length, age) });
+      const channelId = Drip.channelId(item.querySelector(SEL.channelLink)?.getAttribute('href') || '');
+      pool.push({ id, title, channel, length, views, age, kind: kindOf(item, channel, length, age), ...(channelId ? { channelIds: [channelId] } : {}) });
     }
     return pool;
   }
@@ -229,6 +233,10 @@
         return 'That card changed in another tab.';
       case 'not-stashed':
         return 'That video already left your stash, maybe in another tab.';
+      case 'block-full':
+        return 'Your block list is full. Remove a channel in Settings first.';
+      case 'bad-channel':
+        return "drip couldn't tell which channel this is.";
       case 'pool-empty':
         return state && state.settings.feedSource === 'subscriptions'
           ? 'Nothing new from your subscriptions. No card spent.'
@@ -237,6 +245,9 @@
         return 'Something went wrong. Refresh and try again.';
     }
   }
+
+  /** The card whose Block is asking to be sure, or ''. */
+  let blockAsk = '';
 
   /** What's in flight: a reveal from the empty page, or Reveal next on a card. The page shows a placeholder for it. */
   /** @type {'' | 'reveal' | 'next'} */
@@ -453,7 +464,7 @@
   }
 
   /**
-   * @param {'watch' | 'save' | 'unsave' | 'pass'} action @param {string} videoId The card the button was on.
+   * @param {'watch' | 'save' | 'unsave' | 'pass' | 'block'} action @param {string} videoId The card the button was on.
    * @param {boolean} [keyboard] Pressed from the keyboard, so a full stash's list takes focus.
    */
   async function onResolve(action, videoId, keyboard = false) {
@@ -466,6 +477,7 @@
       return;
     }
     message = '';
+    blockAsk = '';
     if (action === 'pass' && deals() && document.querySelector('#drip-home .drip-card .drip-deal')) {
       // Redraws wait while the worker answers, so the card is still there to animate.
       moving = true;
@@ -508,7 +520,7 @@
     leaving = false;
     render();
     // Pass without the animation takes its button away too. Focus goes where the animated Pass sends it.
-    if (had && action === 'pass' && res && res.ok) focusOn(outForDay() ? 'saved-head' : 'reveal');
+    if (had && (action === 'pass' || action === 'block') && res && res.ok) focusOn(outForDay() ? 'saved-head' : 'reveal');
   }
 
   /**
@@ -604,7 +616,7 @@
    * @param {string} id
    */
   function costsDrop(id) {
-    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !state.unlocked.includes(id);
+    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !Drip.freeToStart(state, id);
   }
 
   /**
@@ -965,6 +977,7 @@
     el.append(h('div', { class: 'drip-card-actions' },
       h('button', { class: 'drip-b drip-b-gray drip-card-save drip-stash', tabindex: '-1' }, ...DripStash.parts(false, { labelClass: 'drip-save-label' }).nodes),
       h('button', { class: 'drip-b drip-b-gray drip-next', tabindex: '-1' }, icon('arrow'), h('span', { class: 'drip-next-label' }, 'Reveal next'), price('card')),
+      h('button', { class: 'drip-b drip-b-gray drip-block', tabindex: '-1' }, 'Block'),
       h('button', { class: 'drip-b drip-b-gray drip-pass', tabindex: '-1', 'aria-label': 'Pass' }, icon('x'))));
     return el;
   }
@@ -980,6 +993,34 @@
       h('span', { class: 'drip-meta-channel' }, video.channel),
       rest && h('span', { class: 'drip-meta-rest' }, video.channel ? ` · ${rest}` : rest),
       video.length && h('span', { class: 'drip-sr' }, `, length ${video.length}`));
+  }
+
+  /**
+   * Block on the card (CHANNEL-LISTS-PLAN.md, call 11) asks once, in place of the card's buttons. Blocking passes the
+   * card, with no card back.
+   * @param {string} id
+   */
+  function askBlock(id) {
+    blockAsk = id;
+    render();
+    /** @type {HTMLElement | null} */ (document.querySelector('#drip-home [data-k="block-yes"]'))?.focus();
+  }
+
+  function cancelBlock() {
+    blockAsk = '';
+    render();
+    /** @type {HTMLElement | null} */ (document.querySelector('#drip-home [data-k="block"]'))?.focus();
+  }
+
+  /** @param {any} video */
+  function blockConfirm(video) {
+    return h('div', { class: 'drip-block-ask', role: 'group', 'aria-label': `Block ${video.channel}` },
+      h('p', { class: 'drip-block-text' },
+        h('strong', {}, `Block ${video.channel}?`),
+        ` drip won't deal their videos again. Unblocking waits for the reset.`),
+      h('div', { class: 'drip-block-buttons' },
+        h('button', { class: 'drip-b drip-b-primary', 'data-k': 'block-yes', onclick: () => onResolve('block', video.id) }, 'Block'),
+        h('button', { class: 'drip-b drip-b-gray', 'data-k': 'block-no', onclick: cancelBlock }, 'Cancel')));
   }
 
   /** @param {any} video */
@@ -1005,7 +1046,7 @@
         metaLine(video),
         h('button', { class: 'drip-b drip-b-primary drip-watch', 'data-k': 'watch', disabled: next, onclick: () => onResolve('watch', video.id) },
           icon('play'), h('span', {}, 'Watch'), buys && price('drop'))),
-      h('div', { class: 'drip-card-actions' },
+      blockAsk === video.id && !next ? blockConfirm(video) : h('div', { class: 'drip-card-actions' },
         stashOn() && h('button', {
           class: `drip-b drip-b-gray drip-card-save drip-stash${saved ? ' is-saved' : ''}`, 'data-k': 'save', 'aria-pressed': String(saved), disabled: next,
           'data-swap-anchor': true, 'aria-expanded': swapping ? 'true' : undefined,
@@ -1017,6 +1058,10 @@
           class: 'drip-b drip-b-gray drip-next', 'data-k': 'next', disabled: next || (cardsMode() === 'limited' && state.tokens.rec < 1),
           onclick: () => onRevealNext(video.id),
         }, icon('arrow'), h('span', { class: 'drip-next-label' }, next ? 'Revealing…' : 'Reveal next'), !next && cardsMode() === 'limited' && price('card')),
+        video.channel && h('button', {
+          class: 'drip-b drip-b-gray drip-block', 'data-k': 'block', disabled: next, onclick: () => askBlock(video.id),
+          title: `Never deal ${video.channel} again`,
+        }, 'Block'),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'data-k': 'pass', disabled: next, onclick: () => onResolve('pass', video.id),
           title: "Pass. It's free, and this video won't come back.", 'aria-label': 'Pass',
@@ -1216,13 +1261,13 @@
     // sets them in place. The minutes and each row's "12m left" change once a minute.
     const key = JSON.stringify([state && [
       Drip.formatMinutes(state.watchSecondsLeft), state.watchSecondsLeft > 0,
-      state.tokens, state.current, state.unlocked, state.settings.feedSource, state.settings.minutesPerToken,
+      state.tokens, state.current, state.unlocked, state.channels, state.allowedToday, state.settings.feedSource, state.settings.minutesPerToken,
       // The sea's "N cards carry over" follows the allowance, the rollover cap, and pending settings (Codex, 2026-10-14).
       state.settings.resetHour, state.settings.stashMax, cardsCarried(),
       state.settings.clock, state.settings.cards, state.settings.stash,
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
-    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId]);
+    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, blockAsk]);
     if (root.firstChild && key === rendered) {
       placeSearch(root);
       return freshen(root);

@@ -29,12 +29,17 @@
     app: 'ytd-app',
     miniplayerAttr: 'miniplayer-is-active',
     title: 'ytd-watch-metadata h1, h1.ytd-watch-metadata',
+    // The owner link's href is the channel's /@handle (checked on air, 2026-11-03). On a move between videos it and the
+    // flexy's video-id change in the same frame, so the link is this video's once video-id matches the URL.
     channel: 'ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a',
+    videoIdAttr: 'video-id',
     // The YouTube logo. "Done for now" clicks it, so YouTube goes home in the page instead of loading a new one.
     homeLink: 'ytd-topbar-logo-renderer a#logo',
   };
 
   const GRACE_ATTR = 'data-drip-grace';
+  /** How long the lock waits for the channel to be read, so an allowed channel's video doesn't flash it. */
+  const CHANNEL_WAIT_MS = 2000;
 
   /** @type {any} */
   let state = null;
@@ -169,6 +174,69 @@
 
   function inGrace() {
     return !!graceId && graceId === videoId();
+  }
+
+  // Channel lists (CHANNEL-LISTS-PLAN.md, calls 7 and 8). The page tells the worker which channel this video is from,
+  // when a list has that channel, and an allowed channel's video is free.
+
+  /**
+   * The video whose channel was read and, if a list had it, sent, with the day and allow list it was checked against.
+   * A reset clears allowedToday and a new allow can free a video already open, so either one checks again (Codex).
+   */
+  let channelDone = '';
+  /** @param {string} id */
+  function channelCheckKey(id) {
+    const allow = state && state.channels ? state.channels.allow.map((/** @type {any} */ c) => c.ids) : [];
+    return JSON.stringify([id, state ? state.day : '', allow]);
+  }
+  /** @type {{id: string, until: number} | null} */
+  let channelWait = null;
+
+  /** This video's channel from the owner row, or null while the row is still the last video's. @param {string} id */
+  function pageChannel(id) {
+    const flexy = document.querySelector(SEL.watchPage);
+    if (!id || !flexy || flexy.getAttribute(SEL.videoIdAttr) !== id) return null;
+    const link = document.querySelector(SEL.channel);
+    const channelId = Drip.channelId(link?.getAttribute('href') || '');
+    return channelId ? { ids: [channelId], name: link?.textContent?.trim() || '' } : null;
+  }
+
+  /** @param {any} channel */
+  function onAList(channel) {
+    const lists = state && state.channels ? [...state.channels.allow, ...state.channels.block] : [];
+    return lists.some((/** @type {any} */ entry) => Drip.sameChannel(entry, channel));
+  }
+
+  /** Whether a locked video should wait for its channel before the lock shows. @param {string} id */
+  function waitingForChannel(id) {
+    if (!id || channelDone === channelCheckKey(id) || !state || !state.channels || !state.channels.allow.length) return false;
+    if (!channelWait || channelWait.id !== id) channelWait = { id, until: performance.now() + CHANNEL_WAIT_MS };
+    return performance.now() < channelWait.until;
+  }
+
+  async function checkChannel() {
+    const id = location.pathname === '/watch' ? videoId() : '';
+    if (!id || channelDone === channelCheckKey(id) || !state || !state.channels) return;
+    const channel = pageChannel(id);
+    if (!channel) {
+      // Not readable in time: the lock rises as it would without lists.
+      if (channelWait && channelWait.id === id && performance.now() >= channelWait.until) {
+        channelDone = channelCheckKey(id);
+        applyStatus(Drip.watchStatus(state, id));
+      }
+      return;
+    }
+    channelDone = channelCheckKey(id);
+    if (!onAList(channel)) {
+      if (locked) applyStatus(Drip.watchStatus(state, id));
+      return;
+    }
+    const res = await send({ type: 'allowedVideo', videoId: id, channel });
+    if (res && res.ok && !disconnected) {
+      state = res.state;
+      if (id === videoId()) applyStatus(Drip.watchStatus(state, id));
+      renderPill();
+    }
   }
 
   /** @param {object} msg */
@@ -332,6 +400,8 @@
     // Storage may arrive before our tick response. Only that response can grant grace.
     if (deferLock && state.settings.graceMode) return;
     pausePlayer(video);
+    // The channel may be on the allow list. Held, not locked, until checkChannel knows.
+    if (waitingForChannel(id)) return;
     // Not over the miniplayer, which drip hides: the lock would cover whatever page YouTube moved to.
     if (location.pathname === '/watch' && id) showLock();
     // A locked video skips theater mode, so let fade.js show the page now.
@@ -347,7 +417,7 @@
     // With the clock off nothing runs out, so time waits for the usual send (Q29).
     if (state.settings.clock === false) return false;
     const status = Drip.watchStatus(state, first.id);
-    return !status.unlocked && status.secondsLeft - first.seconds <= 1;
+    return !status.unlocked && !status.allowed && status.secondsLeft - first.seconds <= 1;
   }
 
   async function tick() {
@@ -367,6 +437,7 @@
     if (location.pathname !== '/watch' && video) pausePlayer(video);
     if (clockActive()) bank();
     else takePlayed();
+    await checkChannel();
     if (state && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) await refreshStatus();
     if (sendDue()) await sendTick();
     else toolbarHeartbeat();
@@ -415,7 +486,7 @@
     const playing = id === videoId() && !!video && !video.paused;
     toolbarSaid = playing;
     toolbarSaidAt = performance.now();
-    const request = { id, paid: !!(before && !before.locked && !before.unlocked && before.secondsLeft > 0 && playing), startedAt: performance.now() };
+    const request = { id, paid: !!(before && !before.locked && !before.unlocked && !before.allowed && before.secondsLeft > 0 && playing), startedAt: performance.now() };
     pendingTick = request;
     try {
       const res = await send({ type: 'tick', seconds, videoId: id, key: entry.key, ago: Math.round(performance.now() - entry.endedAt), playing, ...position(id) });
@@ -899,10 +970,11 @@
   function thisVideo(id) {
     const title = document.querySelector(SEL.title)?.textContent?.trim() || document.title.replace(/ - YouTube$/, '');
     const channel = document.querySelector(SEL.channel)?.textContent?.trim() || '';
+    const read = pageChannel(id);
     const secs = video && Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
     const length = secs ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '';
     const at = position(id);
-    return { id, title, channel, length, resumeSec: at.position, durationSec: at.duration };
+    return { id, title, channel, length, resumeSec: at.position, durationSec: at.duration, channelIds: read ? read.ids : undefined };
   }
 
   // A full stash (Q28): the list under the pill that asks which video to swap out, and the note after a swap. They sit
@@ -1098,13 +1170,15 @@
       pillGraceFade = null;
     }
     const wasFinishing = !!pill?.classList.contains('is-grace');
-    const unlocked = !grace && state.unlocked.includes(id);
+    const status = Drip.watchStatus(state, id);
+    const allowed = !grace && status.allowed;
+    const unlocked = !grace && (status.unlocked || allowed);
     // Count down between ticks, which only go out every few seconds. During an ad, the time not banked yet is all ad
     // (syncAd banked what came before it), and ads aren't charged (Q27).
     const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
     const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
     const left = Math.max(0, state.watchSecondsLeft - pending);
-    const time = finishing ? 'Finishing this one' : unlocked ? 'Unlocked' : Drip.formatMinutes(left);
+    const time = finishing ? 'Finishing this one' : allowed ? 'Allowed channel' : unlocked ? 'Unlocked' : Drip.formatMinutes(left);
     // Paused, the minutes aren't draining, and the pill says so.
     const paused = !grace && !unlocked && !adShowing && !!video && video.paused && left > 0;
     // With grace on, the pill stays up through 0 too, until grace takes over, so it never blinks out at the switch.
