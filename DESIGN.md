@@ -465,6 +465,7 @@ LogDay = { watchedSec, watchSpent, recSpent, saved, passed, watched, needThis: [
   - `unblockChannel(state, channel, now)` waits in `channelsPending.unblock`, except on the first day. `{ ok, waits }`.
   - `cancelChannelPending(state, channel)` drops a waiting allow or unblock.
   - `seenChannel(state, channel)` fills ids and a name from a page into list entries it matches. `{ ok, changed }`.
+  - `channelFromPage(html, handle)` reads a channel page's og:title, og:url, and og:image into a channel (name, UC id, and a 160px picture from YouTube's image hosts), or null. The worker fetches the page, with no cookies, after Settings adds a channel by handle, then calls `seenChannel` (Jesse, 2026-11-04). This needs `host_permissions` for www.youtube.com.
   - `allowedVideo(state, videoId, channel)` records the video in `allowedToday` when one of the channel's ids is on the allow list. A name isn't enough. `{ ok, allowed }`, or `'bad-video'`.
   - `isFree(state, videoId)`: in `unlocked`, or in `allowedToday` with its channel still allowed. `charge`, `chargeTick`, `watchStatus` (which returns `allowed` too), and `earlyLocked` use it, so removing a channel ends a free video at once.
   - `freeToStart(state, videoId)`: `isFree`, or the card or a stash row is from an allowed channel by `channelIds` or name. `buyIfOut` and the home page's prices use it.

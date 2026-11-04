@@ -390,3 +390,20 @@ test('a channel keeps a picture only from YouTube\'s image hosts, and a channel 
   assert.equal(D.seenChannel(state, { ids: [], name: 'Veritasium', avatar: pic.replace('A=', 'B=') }).changed, false, 'a name-only sighting never sets a picture');
   assert.equal(D.hydrate(JSON.parse(JSON.stringify(state)), NOW).channels.block[0].avatar, pic, 'it survives storage');
 });
+
+test('a channel page\'s og tags give its name, UC id, and a 160px picture', () => {
+  const html = '<head><meta property="og:title" content="Tom &amp; Jerry&#39;s"><meta property="og:url" content="https://www.youtube.com/channel/UCHnyfMqiRRG1u-2MsSQLbXA">'
+    + '<meta property="og:image" content="https://yt3.googleusercontent.com/7vCbvtCq-1GoA=s900-c-k-c0x00ffffff-no-rj"></head>';
+  assert.deepEqual(D.channelFromPage(html, '@Veritasium'), {
+    ids: ['@veritasium', 'UCHnyfMqiRRG1u-2MsSQLbXA'], name: "Tom & Jerry's",
+    avatar: 'https://yt3.googleusercontent.com/7vCbvtCq-1GoA=s160-c-k-c0x00ffffff-no-rj',
+  });
+  assert.equal(D.channelFromPage('<html>no tags</html>', '@veritasium'), null, 'no title, nothing to fill in');
+  assert.equal(D.channelFromPage(html, 'not a handle'), null);
+  const bad = html.replace('https://yt3.googleusercontent.com', 'https://evil.example');
+  assert.equal(D.channelFromPage(bad, '@veritasium').avatar, undefined, 'a picture from anywhere else is dropped');
+  const state = settled();
+  D.blockChannel(state, { ids: ['@veritasium'], name: '' });
+  D.seenChannel(state, D.channelFromPage(html, '@veritasium'));
+  assert.equal(state.channels.block[0].name, "Tom & Jerry's", 'a block added by handle learns its name');
+});

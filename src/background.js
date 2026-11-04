@@ -297,6 +297,26 @@ function runDevAction(msg, sendResponse) {
     .catch((err) => sendResponse({ ok: false, error: String(err) }));
 }
 
+/**
+ * A channel added in Settings by its handle has no name or picture until drip sees its channel page. This fetches that
+ * page and fills them in, so the list shows the picture and home cards, which show only a name, match it at once
+ * (Jesse, 2026-11-04). No cookies go with it. A failure leaves the entry as it was, to be filled in on a visit.
+ * @param {any} raw
+ */
+async function lookUpChannel(raw) {
+  const channel = Drip.cleanChannel(raw);
+  const handle = channel && channel.ids.find((/** @type {string} */ id) => id.startsWith('@'));
+  if (!handle || (channel.name && channel.avatar)) return;
+  try {
+    const res = await fetch(`https://www.youtube.com/${encodeURIComponent(handle).replace(/^%40/, '@')}`, { credentials: 'omit' });
+    if (!res.ok) return;
+    const found = Drip.channelFromPage(await res.text(), handle);
+    if (found) await withState((state) => Drip.seenChannel(state, found));
+  } catch {
+    // Offline, or YouTube said no. The channel page fills it in on the next visit.
+  }
+}
+
 // Developer mode, the Settings toggle for the dev panel. It's its own storage key, not part of drip's state. A store
 // build has no panel (bin/build-release strips it), so there the toggle hides itself and the worker refuses it.
 // The localhost route above stays tied to dev/ENABLED, since any localhost page can reach it.
@@ -362,7 +382,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   withState((state, now, clock) => ({ result: handle(msg, state, now, clock), state }),
     msg.type === 'tick' ? { tabId: /** @type {chrome.tabs.Tab} */ (sender.tab).id, playing: msg.playing } : undefined)
-    .then(({ result, state }) => sendResponse({ ...result, state }))
+    .then(({ result, state }) => {
+      sendResponse({ ...result, state });
+      if ((msg.type === 'allowChannel' || msg.type === 'blockChannel') && result && result.ok) lookUpChannel(msg.channel);
+    })
     .catch((err) => sendResponse({ ok: false, error: String(err) }));
   return true;
 });

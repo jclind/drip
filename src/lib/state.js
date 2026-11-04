@@ -1357,6 +1357,27 @@
   }
 
   /**
+   * A channel from its channel page's HTML, which the worker fetches for an entry added in Settings by handle, so the
+   * list shows its picture and home cards (which show only a name) match it at once (Jesse, 2026-11-04). It reads the
+   * page's og:title, og:image, and og:url tags (checked 2026-11-04). The picture is asked for at 160px, as the header
+   * shows it. Null when the page doesn't have them.
+   * @param {unknown} html @param {string} handle @returns {Channel | null}
+   */
+  function channelFromPage(html, handle) {
+    if (typeof html !== 'string' || !HANDLE.test(handle)) return null;
+    /** @param {string} prop */
+    const meta = (prop) => {
+      const m = new RegExp(`<meta property="og:${prop}" content="([^"]*)"`).exec(html);
+      return m ? m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') : '';
+    };
+    const name = meta('title');
+    if (!name) return null;
+    const uc = /\/channel\/(UC[\w-]{22})$/.exec(meta('url'));
+    const avatar = meta('image').replace(/=s\d+-/, '=s160-');
+    return cleanChannel({ ids: [handle.toLowerCase(), ...(uc ? [uc[1]] : [])], name, avatar });
+  }
+
+  /**
    * Whether a video a watch page showed is free through the allow list now. Checked at use, so removing the channel
    * ends it at once (Codex 7). Only an id counts here: a name isn't proof.
    * @param {Channel[]} allow @param {{id: unknown, ids: string[]}[]} today @param {string} videoId
@@ -1429,6 +1450,6 @@
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,
     ALLOW_MAX, channelId, cleanChannel, sameChannel, allowChannel, removeAllowed, blockChannel, unblockChannel,
-    cancelChannelPending, seenChannel, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
+    cancelChannelPending, seenChannel, channelFromPage, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
   };
 })();

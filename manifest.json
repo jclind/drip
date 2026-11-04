@@ -5,6 +5,7 @@
   "description": "One recommendation at a time, paid for with tokens.",
   "minimum_chrome_version": "121",
   "permissions": ["storage"],
+  "host_permissions": ["https://www.youtube.com/*"],
   "background": {
     "service_worker": "src/background.js"
   },
