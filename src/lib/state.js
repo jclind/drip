@@ -506,6 +506,31 @@
   }
 
   /**
+   * The edits made to a draft since a snapshot of it, so a save's reply can keep what changed while it was out (Codex,
+   * 2026-11-05).
+   * @param {Record<string, unknown>} before @param {Record<string, unknown>} now
+   * @returns {Record<string, unknown>}
+   */
+  function editsSince(before, now) {
+    return Object.fromEntries(Object.keys(now).filter((k) => now[k] !== before[k]).map((k) => [k, now[k]]));
+  }
+
+  /**
+   * What an open full-stash list does when the stash changes under it, say in another tab: 'close' when the video it
+   * was for got stashed, the stash has room now, or the stash is off; 'redraw' when its videos changed; else 'keep'
+   * (Codex, 2026-11-05).
+   * @param {string[]} shownIds The stashed videos the list shows, in order.
+   * @param {State} state
+   * @param {string} videoId The video the list is for.
+   * @returns {'close' | 'redraw' | 'keep'}
+   */
+  function swapFollow(shownIds, state, videoId) {
+    if (state.settings.stash === false || state.backlog.some((v) => v.id === videoId)) return 'close';
+    if (state.backlog.length < state.settings.stashMax) return 'close';
+    return shownIds.join('\n') === state.backlog.map((v) => v.id).join('\n') ? 'keep' : 'redraw';
+  }
+
+  /**
    * Swaps a stashed video out for a new one in one step, for a full stash (Q28). The new one goes at the end, the
    * newest place, or at `index`, which is how Undo puts the swapped-out one back. A swap never grows the stash, so it
    * works over a lowered cap too. Undo still puts the video back when `dropId` has already left the stash, finished or
@@ -1705,7 +1730,7 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
+    firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,

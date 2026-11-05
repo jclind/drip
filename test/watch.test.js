@@ -153,6 +153,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   /** @param {string} sel */
   page.querySelector = (sel) => (sel === '.ytp-size-button' ? theaterButton : null);
   const document = {
+    title: 'Test video - YouTube',
     documentElement: root,
     body,
     activeElement: null,
@@ -283,6 +284,9 @@ function makeWorld() {
       } else if (msg.type === 'status') result = { ok: true, ...D.watchStatus(world.state, msg.videoId) };
       else if (msg.type === 'spendWatch') result = D.spendWatch(world.state, now);
       else if (msg.type === 'needThis') result = D.needThis(world.state, msg.videoId, msg.title || '', msg.reason || '', now);
+      else if (msg.type === 'addBacklog') result = D.addBacklog(world.state, msg.video, msg.index, now);
+      else if (msg.type === 'removeBacklog') result = D.removeBacklog(world.state, msg.id);
+      else if (msg.type === 'swapBacklog') result = D.swapBacklog(world.state, msg.video, String(msg.dropId), msg.index, now);
       else result = { ok: true };
       D.enterDry(world.state, now);
       const saved = structuredClone(world.state);
@@ -857,6 +861,149 @@ test('the locked page brings +15m back when Dry hours end', async () => {
   for (let i = 0; i < 30; i++) await tab.second();
   assert.match(tab.lockText(), /\+15m/);
   assert.doesNotMatch(tab.lockText(), /Dry until/);
+});
+
+test('a lock left open as Dry hours end shows +15m within a second, not at the next 30-second check (Codex, 2026-11-05)', async () => {
+  const world = dryWorld(5, 59, 40);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  // 6:00:01, and only the 1-second tick runs.
+  world.advance(16);
+  await tab.tick();
+  assert.match(tab.lockText(), /\+15m/);
+  assert.doesNotMatch(tab.lockText(), /Dry until/);
+});
+
+test('a lock left open into the 5 minutes before Dry hours drops +15m within a second (Codex, 2026-11-05)', async () => {
+  const world = dryWorld(22, 54, 40);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /\+15m/);
+  // 22:55:01.
+  world.advance(16);
+  await tab.tick();
+  assert.doesNotMatch(tab.lockText(), /\+15m/);
+  assert.match(tab.lockText(), /Dry hours start at 11:00pm\./);
+});
+
+test('the lock is not rebuilt each second while nothing on it changes', async () => {
+  const { world, tab } = await setup(3);
+  await play(world, tab, 5);
+  assert.ok(tab.locked());
+  const before = tab.lockRemovals();
+  const lock = tab.body.all().find((/** @type {any} */ el) => el.id === 'drip-lock') || tab.root.all().find((/** @type {any} */ el) => el.id === 'drip-lock');
+  for (let i = 0; i < 10; i++) {
+    world.advance(1);
+    await tab.tick();
+  }
+  assert.equal(tab.lockRemovals(), before);
+  const after = tab.body.all().find((/** @type {any} */ el) => el.id === 'drip-lock') || tab.root.all().find((/** @type {any} */ el) => el.id === 'drip-lock');
+  assert.equal(after, lock, 'the same lock element');
+});
+
+/** A full stash of one, with the pill's Stash pressed so its list is open. */
+async function fullStashOpen() {
+  const { world, tab } = await setup(900);
+  world.state.settings.stashMax = 1;
+  world.state.backlog = [{ id: 'old', title: 'Old stashed video', channel: 'Channel', length: '1:00' }];
+  saved(world);
+  await settle();
+  await pressStash(tab);
+  assert.match(swapText(tab), /Old stashed video/, 'the list is open');
+  return { world, tab };
+}
+
+/** Tells every tab the state changed, as another tab's save does. @param {any} world */
+function saved(world) {
+  for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+}
+
+/** @param {any} tab */
+async function pressStash(tab) {
+  const button = tab.pill().all().find((/** @type {any} */ el) => el.getAttribute('data-k') === 'pill-save');
+  assert.ok(button, 'no Stash on the pill');
+  await button.listeners.click({ detail: 1 });
+  await settle();
+}
+
+/** The full-stash list's text, or '' when it's closed. @param {any} tab */
+function swapText(tab) {
+  const layer = tab.pill()?.parentElement?.all().find((/** @type {any} */ el) => el.classList.contains('drip-swap-layer'));
+  return layer ? layer.textContent : '';
+}
+
+test('an open full-stash list closes when another tab makes room (Codex, 2026-11-05)', async () => {
+  const { world, tab } = await fullStashOpen();
+  world.state.backlog = [];
+  saved(world);
+  await settle();
+  assert.equal(swapText(tab), '');
+});
+
+test('an open full-stash list shows what another tab swapped in (Codex, 2026-11-05)', async () => {
+  const { world, tab } = await fullStashOpen();
+  world.state.backlog = [{ id: 'new', title: 'Swapped in elsewhere', channel: 'Channel', length: '2:00' }];
+  saved(world);
+  await settle();
+  assert.doesNotMatch(swapText(tab), /Old stashed video/);
+  assert.match(swapText(tab), /Swapped in elsewhere/);
+});
+
+test('swapping out a video another tab already took out brings the list back with what is there now (Codex, 2026-11-05)', async () => {
+  const { world, tab } = await fullStashOpen();
+  // Another tab swapped it, and this tab hasn't heard yet.
+  world.state.backlog = [{ id: 'new', title: 'Swapped in elsewhere', channel: 'Channel', length: '2:00' }];
+  const layer = tab.pill().parentElement.all().find((/** @type {any} */ el) => el.classList.contains('drip-swap-layer'));
+  const swapOut = layer.all().find((/** @type {any} */ el) => el.tagName === 'BUTTON' && /Swap out/.test(el.textContent));
+  assert.ok(swapOut, 'no Swap out button');
+  await swapOut.listeners.click({ detail: 1 });
+  await settle();
+  assert.match(swapText(tab), /Swapped in elsewhere/);
+  assert.doesNotMatch(swapText(tab), /Old stashed video/);
+});
+
+test('swapping out a video another tab already took out, leaving room, closes the list (Codex, 2026-11-05)', async () => {
+  const { world, tab } = await fullStashOpen();
+  // Another tab took it out, and this tab hasn't heard yet.
+  world.state.backlog = [];
+  const layer = tab.pill().parentElement.all().find((/** @type {any} */ el) => el.classList.contains('drip-swap-layer'));
+  const swapOut = layer.all().find((/** @type {any} */ el) => el.tagName === 'BUTTON' && /Swap out/.test(el.textContent));
+  await swapOut.listeners.click({ detail: 1 });
+  await settle();
+  assert.equal(swapText(tab), '');
+});
+
+test("a Stash answered after moving to the next video doesn't open the list over it (Codex, 2026-11-05)", async () => {
+  const { world, tab } = await setup(900);
+  world.state.settings.stashMax = 1;
+  world.state.backlog = [{ id: 'old', title: 'Old stashed video', channel: 'Channel', length: '1:00' }];
+  saved(world);
+  await settle();
+  const handle = world.handle;
+  /** @type {() => void} */
+  let release = () => {};
+  const gate = new Promise((r) => { release = () => r(undefined); });
+  world.handle = async (/** @type {any} */ msg) => {
+    if (msg.type === 'addBacklog') {
+      await gate;
+      return { ok: false, error: 'stash-full', state: structuredClone(world.state) };
+    }
+    return handle(msg);
+  };
+  const button = tab.pill().all().find((/** @type {any} */ el) => el.getAttribute('data-k') === 'pill-save');
+  const pending = button.listeners.click({ detail: 1 });
+  await tab.navigate('bbb');
+  release();
+  await pending;
+  await settle();
+  assert.equal(swapText(tab), '', 'no list over the next video');
 });
 
 test('a watch page with no player for 10 seconds says drip is broken and locks nothing (Q25)', async () => {
