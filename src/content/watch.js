@@ -176,6 +176,15 @@
     return !!graceId && graceId === videoId();
   }
 
+  /**
+   * Whether a video that runs out of minutes now may finish: grace mode, but never in Dry hours, which stop every paid
+   * video when they start (Jesse, 2026-11-04).
+   * @param {string} _id
+   */
+  function graceAllowed(_id) {
+    return !!state && state.settings.graceMode === true && !Drip.dryUntil(state, Date.now());
+  }
+
   // Channel lists (CHANNEL-LISTS-PLAN.md, calls 7 and 8). The page tells the worker which channel this video is from,
   // when a list has that channel, and an allowed channel's video is free.
 
@@ -222,19 +231,19 @@
       // Not readable in time: the lock rises as it would without lists.
       if (channelWait && channelWait.id === id && performance.now() >= channelWait.until) {
         channelDone = channelCheckKey(id);
-        applyStatus(Drip.watchStatus(state, id));
+        applyStatus(Drip.watchStatus(state, id, Date.now()));
       }
       return;
     }
     channelDone = channelCheckKey(id);
     if (!onAList(channel)) {
-      if (locked) applyStatus(Drip.watchStatus(state, id));
+      if (locked) applyStatus(Drip.watchStatus(state, id, Date.now()));
       return;
     }
     const res = await send({ type: 'allowedVideo', videoId: id, channel });
     if (res && res.ok && !disconnected) {
       state = res.state;
-      if (id === videoId()) applyStatus(Drip.watchStatus(state, id));
+      if (id === videoId()) applyStatus(Drip.watchStatus(state, id, Date.now()));
       renderPill();
     }
   }
@@ -385,7 +394,7 @@
   function applyStatus(status, deferLock = false) {
     if (disconnected) return;
     const id = videoId();
-    if (state && state.settings.graceMode === false) setGrace('');
+    if (state && !graceAllowed(id)) setGrace('');
     locked = !!status.locked;
     if (!locked) {
       setGrace('');
@@ -398,7 +407,7 @@
       return;
     }
     // Storage may arrive before our tick response. Only that response can grant grace.
-    if (deferLock && state.settings.graceMode) return;
+    if (deferLock && graceAllowed(id)) return;
     pausePlayer(video);
     // The channel may be on the allow list. Held, not locked, until checkChannel knows.
     if (waitingForChannel(id)) return;
@@ -416,7 +425,7 @@
     if (first.seconds >= SEND_EVERY || !state) return true;
     // With the clock off nothing runs out, so time waits for the usual send (Q29).
     if (state.settings.clock === false) return false;
-    const status = Drip.watchStatus(state, first.id);
+    const status = Drip.watchStatus(state, first.id, Date.now());
     return !status.unlocked && !status.allowed && status.secondsLeft - first.seconds <= 1;
   }
 
@@ -445,6 +454,11 @@
       hideLock();
       renderPill();
       return;
+    }
+    // Dry hours start on the hour, between ticks to the worker: the page stops a paid video itself, within a second.
+    if (state && Drip.dryUntil(state, Date.now())) {
+      const status = Drip.watchStatus(state, videoId(), Date.now());
+      if (status.locked && (!locked || inGrace())) applyStatus(status);
     }
     if (locked && !inGrace()) pausePlayer(video);
     renderPill();
@@ -482,7 +496,7 @@
     const entry = unsent[0];
     const seconds = entry.seconds;
     const id = entry.id;
-    const before = state && Drip.watchStatus(state, id);
+    const before = state && Drip.watchStatus(state, id, Date.now());
     const playing = id === videoId() && !!video && !video.paused;
     toolbarSaid = playing;
     toolbarSaidAt = performance.now();
@@ -497,10 +511,13 @@
         if (entry.seconds <= 0.001 && unsent[0] === entry) unsent.shift();
         state = res.state;
         if (id === videoId()) {
-          if (request.paid && res.locked && state.settings.graceMode && video && !video.paused) setGrace(id);
-          applyStatus(res);
-        } else applyStatus(Drip.watchStatus(state, videoId()));
-      } else if (state) applyStatus(Drip.watchStatus(state, videoId()));
+          // From the reply's state at the time it arrives, not the worker's lock: a tick answered just before Dry hours
+          // can land after the page locked for them, and its "not locked" would drop the lock (Codex, 2026-11-04).
+          const status = Drip.watchStatus(state, id, Date.now());
+          if (request.paid && status.locked && graceAllowed(id) && video && !video.paused) setGrace(id);
+          applyStatus(status);
+        } else applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
+      } else if (state) applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
     } finally {
       pendingTick = null;
     }
@@ -512,7 +529,7 @@
     const res = await send({ type: 'status', videoId: id });
     if (res && res.ok && !disconnected) {
       state = res.state;
-      applyStatus(Drip.watchStatus(state, videoId()));
+      applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
     }
     renderPill();
   }
@@ -676,14 +693,18 @@
     if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
-      applyStatus(Drip.watchStatus(state, videoId()));
+      applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
       drainNext = false;
       // The draining water clears the pill near the top of the window about this long in.
       if (pours && pillGlass?.isConnected) DripPour.refill(pillGlass, PILL_GLASS_PX, DripGlass.fraction(state), 180);
       video?.play();
     } else {
       drainNext = false;
-      lockMessage = 'No drops left.';
+      // Dry hours, or the 5 minutes before them, began between the draw and the click: the lock redraws without +15m.
+      if (res && (res.error === 'dry-hours' || res.error === 'dry-soon')) {
+        if (res.state) state = res.state;
+        lockMessage = '';
+      } else lockMessage = 'No drops left.';
       showLock();
     }
   }
@@ -853,7 +874,7 @@
     if (disconnected) return;
     if (res && res.ok) {
       state = res.state;
-      applyStatus(Drip.watchStatus(state, videoId()));
+      applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
       drainNext = false;
       video?.play();
       return;
@@ -895,10 +916,16 @@
     const needBack = Drip.needThisBack(state, now);
     // The label, not the time, goes in the view key, so "tomorrow" turns into "today" at midnight (Codex, 2026-11-04).
     const backLabel = needBack > 0 ? dayTimeLabel(needBack, now) : '';
-    const canBuy = state.tokens.watch > 0;
-    const line = watchedLine();
+    // In Dry hours no drop can be bought, and the line under the title says when they end (Q32).
+    const dryEnd = Drip.dryUntil(state, now);
+    // Drops stop selling 5 minutes before, since the minutes would stop at the start.
+    const drySoon = Drip.drySoon(state, now);
+    const hasDrops = state.tokens.watch > 0;
+    const canBuy = hasDrops && !dryEnd && !drySoon;
+    const line = dryEnd ? `Dry until ${hourLabel(new Date(dryEnd).getHours())}.`
+      : drySoon ? `Dry hours start at ${hourLabel(new Date(drySoon).getHours())}.` : watchedLine();
     const existing = liveLock();
-    const view = JSON.stringify([videoId(), canBuy, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
+    const view = JSON.stringify([videoId(), canBuy, hasDrops, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
     if (existing && lockView === view) return;
     lockView = view;
     lockVideoId = videoId();
@@ -926,7 +953,7 @@
     const panel = h(
       'div',
       { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },
-      h('h2', { class: 'drip-lock-title', id: 'drip-lock-title' }, canBuy ? 'Time for a breather.' : "You've had your fill."),
+      h('h2', { class: 'drip-lock-title', id: 'drip-lock-title' }, hasDrops ? 'Time for a breather.' : "You've had your fill."),
       h('div', { class: 'drip-lock-sub' }, line),
       h('div', { class: `drip-lock-actions${canBuy ? '' : ' is-alone'}` },
         canBuy && h('button', { class: 'drip-b drip-b-gray drip-lock-add', 'data-k': 'add', onclick: onAddTime, title: `Add ${s.minutesPerToken} minutes for 1 drop` },
@@ -970,7 +997,7 @@
   function took(res) {
     if (res && res.ok && !disconnected) {
       state = res.state;
-      applyStatus(Drip.watchStatus(state, videoId()));
+      applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
     }
     renderPill();
   }
@@ -1099,6 +1126,15 @@
   let pillLow = false;
 
   /**
+   * Dry hours' warning gets noticed: at 5 minutes and again at 1, the pill spells it out with the grace rings for this
+   * long, then shrinks back to the countdown (Jesse, 2026-11-04).
+   */
+  const DRY_NOTICE_MS = 5000;
+  /** Which notices this page has shown, as "video:start:stage", so each shows once per video. */
+  const dryNoticed = new Set();
+  let dryNoticeAt = -Infinity;
+
+  /**
    * The pill hides along with YouTube's controls a few seconds into playback, except in the last minutes, when it stays
    * up and shimmers, and for three seconds after the grace label appears. Checked every tick and whenever the
    * player's class changes.
@@ -1112,15 +1148,19 @@
     // From grace starting until 3 seconds after its label shows, the pill stays up, so it changes in place instead of
     // vanishing while the last water drains. The rings play only once the label is there.
     const holding = inGrace() && (!pillGrace.ready || performance.now() - pillGrace.attentionAt < GRACE_ATTENTION_MS);
-    const attention = holding && pillGrace.ready;
+    const dryNotice = performance.now() - dryNoticeAt < DRY_NOTICE_MS;
+    const attention = (holding && pillGrace.ready) || dryNotice;
     if (attention && !pill.classList.contains('is-grace-attention')) {
       // A replacement pill joins the same two rings where they are, rather than starting them again.
-      pill.style.setProperty('--drip-grace-ring-delay', `${-Math.max(0, performance.now() - pillGrace.attentionAt)}ms`);
+      const since = dryNotice ? dryNoticeAt : pillGrace.attentionAt;
+      pill.style.setProperty('--drip-grace-ring-delay', `${-Math.max(0, performance.now() - since)}ms`);
     }
     pill.classList.toggle('is-grace-attention', attention);
+    // The notice's sentence is longer than the countdown, so the pill may widen while it shows.
+    pill.classList.toggle('is-dry-notice', dryNotice);
     // Never hidden while it has keyboard focus, or Enter would act on a button nobody can see.
     const focused = pill.contains(document.activeElement);
-    pill.classList.toggle('is-idle', playing && !pillLow && !holding && !focused && !!document.querySelector(SEL.playerIdle));
+    pill.classList.toggle('is-idle', playing && !pillLow && !holding && !dryNotice && !focused && !!document.querySelector(SEL.playerIdle));
   }
 
   // DESIGN.md "Minutes and the watch page pill": the glass, minutes left, and Save. It never offers to buy minutes.
@@ -1179,7 +1219,7 @@
       pillGraceFade = null;
     }
     const wasFinishing = !!pill?.classList.contains('is-grace');
-    const status = Drip.watchStatus(state, id);
+    const status = Drip.watchStatus(state, id, Date.now());
     const allowed = !grace && status.allowed;
     const unlocked = !grace && (status.unlocked || allowed);
     // Count down between ticks, which only go out every few seconds. During an ad, the time not banked yet is all ad
@@ -1187,11 +1227,27 @@
     const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
     const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
     const left = Math.max(0, state.watchSecondsLeft - pending);
-    const time = finishing ? 'Finishing this one' : allowed ? 'Allowed channel' : unlocked ? 'Unlocked' : Drip.formatMinutes(left);
+    // The 5 minutes before Dry hours, the pill counts down to them instead, and shimmers (Jesse, 2026-11-04).
+    const soon = clockOn && !grace && !unlocked ? Drip.drySoon(state, Date.now()) : 0;
+    const soonSec = (soon - Date.now()) / 1000;
+    // At 5 minutes and at 1, once each for each video that plays, the pill says what happens, with rings.
+    const stage = soon ? (soonSec <= 60 ? 1 : 5) : 0;
+    const noticeKey = `${id}:${soon}:${stage}`;
+    if (stage && video && !video.paused && !dryNoticed.has(noticeKey)) {
+      dryNoticed.add(noticeKey);
+      dryNoticeAt = performance.now();
+      setTimeout(renderPill, DRY_NOTICE_MS + 50);
+    }
+    const noticing = !!soon && performance.now() - dryNoticeAt < DRY_NOTICE_MS;
+    // Rounded up, so it says "Dry in 5m" right at the start, then "<1m" for the last minute.
+    const soonText = !soon ? ''
+      : noticing ? `Dry hours · video stops at ${hourLabel(new Date(soon).getHours())}`
+        : `Dry in ${soonSec < 60 ? '<1m' : Drip.formatMinutes(Math.ceil(soonSec / 60) * 60)}`;
+    const time = finishing ? 'Finishing this one' : allowed ? 'Allowed channel' : unlocked ? 'Unlocked' : soonText || Drip.formatMinutes(left);
     // Paused, the minutes aren't draining, and the pill says so.
     const paused = !grace && !unlocked && !adShowing && !!video && video.paused && left > 0;
     // With grace on, the pill stays up through 0 too, until grace takes over, so it never blinks out at the switch.
-    pillLow = clockOn && !grace && !unlocked && !adShowing && (left > 0 || state.settings.graceMode) && left <= LOW_SECONDS;
+    pillLow = clockOn && !grace && !unlocked && !adShowing && (((left > 0 || state.settings.graceMode) && left <= LOW_SECONDS) || !!soon);
     if (clockOn && !unlocked) {
       const fraction = grace ? 0 : DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
       if (fraction === 0 && pillGlass && Number(pillGlass.dataset.level) > 0) pillDrainAt = performance.now();
@@ -1215,7 +1271,7 @@
         // One inline line, so the smaller note sits on the minutes' baseline instead of being centered as its own box.
         h('span', { class: 'drip-pill-label' },
           h('span', { class: 'drip-pill-minutes' }, time),
-          !unlocked && h('span', { class: 'drip-sr' }, finishing ? ', time is up' : ' left today'),
+          !unlocked && h('span', { class: 'drip-sr' }, finishing ? ', time is up' : noticing ? '' : soon ? ', then no watching until they end' : ' left today'),
           paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       stashOn && h('button', {
@@ -1249,7 +1305,7 @@
   onState((next) => {
     if (disconnected) return;
     const id = videoId();
-    const wasFunded = !!state && !!id && !Drip.watchStatus(state, id).locked;
+    const wasFunded = !!state && !!id && !Drip.watchStatus(state, id, Date.now()).locked;
     const clockWasOff = !!state && state.settings.clock === false;
     state = next;
     // Time played while the clock was off was free, so turning it on mid-video drops what hadn't gone to the worker
@@ -1258,9 +1314,9 @@
       bank();
       unsent.length = 0;
     }
-    const status = Drip.watchStatus(state, id);
+    const status = Drip.watchStatus(state, id, Date.now());
     // Another tab may have used up the minutes. A video playing here when that happened gets grace too (Q3).
-    if (wasFunded && status.locked && state.settings.graceMode && clockActive() && video && !video.paused) setGrace(id);
+    if (wasFunded && status.locked && graceAllowed(id) && clockActive() && video && !video.paused) setGrace(id);
     applyStatus(status, !!(pendingTick && pendingTick.id === id && pendingTick.paid));
     renderPill();
   });

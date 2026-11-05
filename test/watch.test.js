@@ -10,6 +10,9 @@ const vm = require('node:vm');
 
 const SRC = path.join(__dirname, '..', 'src');
 
+/** Every time a lock is taken off a page, for the test that checks it rises once. */
+let lockRemoved = 0;
+
 class FakeElement {
   /** @param {string} tag */
   constructor(tag) {
@@ -58,7 +61,7 @@ class FakeElement {
   append(...kids) { for (const k of kids) { if (k instanceof FakeElement) k.parent = this; this.children.push(k); } }
   /** @param {...any} kids */
   replaceChildren(...kids) { this.children = []; this.rebuilds++; this.append(...kids); }
-  remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
+  remove() { if (this.id === 'drip-lock' && this.parent) lockRemoved++; if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
   /** Only `.class` selectors, which is all watch.js asks of its own elements. @param {string} sel */
   querySelector(sel) {
     if (!sel.startsWith('.')) return null;
@@ -184,6 +187,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     Date: class extends Date { static now() { return world.epoch + world.now; } },
     CustomEvent: class { /** @param {string} type */ constructor(type) { this.type = type; } },
     setTimeout, matchMedia: () => ({ matches: false }),
+    // Reduced motion, so a lock button press skips the drop animation, which needs real layout.
+    window: { matchMedia: () => ({ matches: true }), innerHeight: 800 },
     setInterval: (/** @type {Function} */ fn) => { intervals.set(++nextInterval, fn); return nextInterval; },
     clearInterval: (/** @type {number} */ id) => { intervals.delete(id); },
     chrome: {
@@ -196,6 +201,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   for (const file of ['lib/state.js', 'lib/glass.js', 'content/common.js', 'content/stash.js', 'content/swap.js', 'content/watch.js']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
   }
+  const removedBefore = lockRemoved;
   const tab = {
     noPlayer: false,
     player, page, theaterButton,
@@ -208,6 +214,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     pill: () => document.getElementById('drip-pill'),
     locked: () => !!document.getElementById('drip-lock'),
     lockText: () => document.getElementById('drip-lock')?.textContent || '',
+    /** How many times the lock was taken off the page. */
+    lockRemovals: () => lockRemoved - removedBefore,
     /** Presses the lock button with this data-k. @param {string} k */
     press: async (k) => {
       const button = document.getElementById('drip-lock')?.all().find((/** @type {any} */ el) => el.getAttribute('data-k') === k);
@@ -259,25 +267,30 @@ function makeWorld() {
     async handle(msg) {
       world.sent.push(msg);
       const now = world.epoch + world.now;
+      // As the worker does before every message but a tick, whose seconds it charges first (Q32).
+      if (msg.type !== 'tick') D.enterDry(world.state, now);
       let result;
       if (msg.type === 'tick') {
         if (world.failTicks > 0) {
           world.failTicks--;
           return { ok: false, error: 'Error: write failed' };
         }
-        result = { ok: true, ...D.chargeTick(world.state, world.clock, now, msg.seconds, msg.videoId, msg.ago, msg.key) };
+        result = { ok: true, ...D.chargeTick(world.state, world.clock, now, msg.seconds, msg.videoId, msg.ago, msg.key), locked: world.lockedReply(msg.videoId, now) };
         if (world.loseReplies > 0) {
           world.loseReplies--;
           return undefined;
         }
       } else if (msg.type === 'status') result = { ok: true, ...D.watchStatus(world.state, msg.videoId) };
-      else if (msg.type === 'spendWatch') result = D.spendWatch(world.state);
+      else if (msg.type === 'spendWatch') result = D.spendWatch(world.state, now);
       else if (msg.type === 'needThis') result = D.needThis(world.state, msg.videoId, msg.title || '', msg.reason || '', now);
       else result = { ok: true };
+      D.enterDry(world.state, now);
       const saved = structuredClone(world.state);
       for (const fn of world.listeners) fn({ drip: { newValue: saved } }, 'local');
       return { ...result, state: saved };
     },
+    /** The tick reply's lock, as background.js computes it. @param {string} id @param {number} now */
+    lockedReply: (id, now) => D.watchStatus(world.state, id, now).locked,
     /** @param {number} seconds */
     advance(seconds) { world.now += seconds * 1000; },
     ticks: () => world.sent.filter((m) => m.type === 'tick'),
@@ -635,6 +648,174 @@ test('with grace off, every playing tab stops at zero', async () => {
   }
   assert.equal(a.video.paused, true);
   assert.equal(b.video.paused, true);
+});
+
+/** A world whose clock starts at this local time on Oct 6, with Dry hours on from 11pm to 6am. @param {number} hour @param {number} minute @param {number} [second] @param {number} [ms] */
+function dryWorld(hour, minute, second = 0, ms = 0) {
+  const world = makeWorld();
+  world.epoch = new Date(2026, 9, 6, hour, minute, second, ms).getTime();
+  world.state.day = world.D.dayKey(world.epoch, 4);
+  Object.assign(world.state.settings, { dryHours: true, dryFrom: 23, dryTo: 6 });
+  return world;
+}
+
+test('a paid video pauses when Dry hours start, with minutes left and grace mode on (Jesse, 2026-11-04)', async () => {
+  const world = dryWorld(22, 59, 57);
+  world.state.watchSecondsLeft = 600;
+  world.state.settings.graceMode = true;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 2);
+  assert.equal(tab.video.paused, false, 'before 11pm it plays');
+  await play(world, tab, 2);
+  assert.equal(tab.video.paused, true, 'it stops within a second of 11pm');
+  assert.ok(tab.locked());
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  assert.equal(tab.root.getAttribute('data-drip-grace'), null, 'no grace');
+});
+
+test('the lock rises once when Dry hours start, not up, down, and up again (Jesse, 2026-11-04)', async () => {
+  const world = dryWorld(22, 59, 50);
+  world.state.watchSecondsLeft = 600;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  let shown = 0;
+  let wasLocked = false;
+  for (let i = 0; i < 20; i++) {
+    world.advance(1);
+    await tab.tick();
+    if (tab.locked() && !wasLocked) shown++;
+    wasLocked = tab.locked();
+  }
+  assert.ok(wasLocked);
+  assert.equal(shown, 1, `the lock rose ${shown} times`);
+  assert.equal(tab.lockRemovals(), 0, 'and never came down');
+});
+
+test('a tick answered just before Dry hours but arriving after them leaves the lock up (Codex, 2026-11-04)', async () => {
+  const world = dryWorld(22, 59, 50);
+  world.state.watchSecondsLeft = 600;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  // Every reply says "not locked", as one the worker answered at 10:59:59pm would.
+  world.lockedReply = () => false;
+  for (let i = 0; i < 20; i++) {
+    world.advance(1);
+    await tab.tick();
+  }
+  assert.ok(tab.locked());
+  assert.equal(tab.lockRemovals(), 0);
+});
+
+test('an unlocked video plays on when Dry hours start', async () => {
+  const world = dryWorld(22, 59, 57);
+  world.state.watchSecondsLeft = 600;
+  world.state.unlocked = ['aaa'];
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 6);
+  assert.equal(tab.video.paused, false);
+  assert.equal(tab.locked(), false);
+});
+
+test('the pill counts down to Dry hours in the 5 minutes before, and shimmers', async () => {
+  const world = dryWorld(22, 54, 30);
+  world.state.watchSecondsLeft = 900;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 2);
+  assert.doesNotMatch(tab.pill().textContent, /Dry in/);
+  await play(world, tab, 30);
+  // The notice shows first (the next test), then the countdown.
+  await play(world, tab, 6);
+  assert.match(tab.pill().textContent, /Dry in 5m/);
+  assert.ok(tab.pill().classList.contains('is-low'));
+  world.advance(4 * 60);
+  await tab.tick();
+  await play(world, tab, 6);
+  assert.match(tab.pill().textContent, /Dry in <1m/);
+});
+
+test('a video started in Dry hours stops at zero like any other', async () => {
+  const world = dryWorld(23, 30);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.equal(tab.video.paused, true);
+  assert.ok(tab.locked());
+});
+
+test('the lock in Dry hours has no +15m, says when they end, and keeps "I need this one" (B8)', async () => {
+  const world = dryWorld(23, 30);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /^Time for a breather\./, 'the title still follows the drops');
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  assert.doesNotMatch(tab.lockText(), /\+15m/);
+  assert.match(tab.lockText(), /I need this one · 3 left this week/);
+});
+
+test('the warning spells itself out with rings at 5 minutes and again at 1, then shrinks to the countdown', async () => {
+  const world = dryWorld(22, 54, 58);
+  world.state.watchSecondsLeft = 900;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 1);
+  assert.doesNotMatch(tab.pill().textContent, /Dry/);
+  await play(world, tab, 3);
+  assert.match(tab.pill().textContent, /Dry hours · video stops at 11:00pm/);
+  assert.ok(tab.pill().classList.contains('is-grace-attention'), 'the rings');
+  await play(world, tab, 6);
+  assert.match(tab.pill().textContent, /Dry in 5m/);
+  assert.equal(tab.pill().classList.contains('is-grace-attention'), false);
+  world.advance(3 * 60 + 50);
+  await tab.tick();
+  assert.match(tab.pill().textContent, /Dry in 2m/);
+  await play(world, tab, 3);
+  assert.match(tab.pill().textContent, /Dry hours · video stops at 11:00pm/, 'again at 1 minute');
+  await play(world, tab, 6);
+  assert.match(tab.pill().textContent, /Dry in <1m/);
+});
+
+test('a +15m refused because the warning began redraws the lock without it', async () => {
+  const world = dryWorld(22, 54, 50);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /\+15m/);
+  world.advance(10);
+  await tab.press('add');
+  await settle();
+  assert.doesNotMatch(tab.lockText(), /No drops left|\+15m/);
+  assert.match(tab.lockText(), /Dry hours start at 11:00pm\./);
+  assert.equal(world.state.tokens.watch, 4, 'no drop spent');
+});
+
+test('the locked page brings +15m back when Dry hours end', async () => {
+  const world = dryWorld(5, 59, 40);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  world.advance(30);
+  for (let i = 0; i < 30; i++) await tab.second();
+  assert.match(tab.lockText(), /\+15m/);
+  assert.doesNotMatch(tab.lockText(), /Dry until/);
 });
 
 test('a watch page with no player for 10 seconds says drip is broken and locks nothing (Q25)', async () => {

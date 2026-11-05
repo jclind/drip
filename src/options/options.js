@@ -23,10 +23,17 @@ var DripPage = /** @type {any} */ (globalThis).DripPage;
  * @property {(n: number) => string} [spoken] The value for screen readers, when `say` is too short to read aloud.
  * @property {[string, string][]} [options]
  * @property {(d: Record<string, any>) => string} [idle] Why the setting does nothing in the form's mix, or ''.
+ * @property {boolean} [inRow] Drawn inside another setting's row, like Dry hours' From and To, not as a row of its own.
  */
 
 /** @param {number} n @param {string} one @param {string} many */
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/** "11pm" for 23. @param {number} hour */
+const shortHour = (hour) => `${hour % 12 || 12}${hour < 12 ? 'am' : 'pm'}`;
+
+/** "11pm to 6am", or "Off", for Dry hours (Q32). @param {Record<string, any>} d */
+const dryWords = (d) => (d.dryHours && d.dryFrom !== d.dryTo ? `${shortHour(d.dryFrom)} to ${shortHour(d.dryTo)}` : 'Off');
 
 /**
  * @typedef {Object} Part
@@ -46,13 +53,19 @@ const PARTS = [
   {
     id: 'watch', title: 'Watch time', icon: 'drop', iconClass: 'drip-token-drop',
     toggle: { key: 'clock', label: 'Watch time', kind: 'toggle' },
-    summary: (d) => (d.clock ? `${plural(d.watchTokensPerDay, 'drop', 'drops')} a day, ${d.minutesPerToken}m each` : 'Off. Videos play with no clock.'),
+    summary: (d) => (d.clock
+      ? `${plural(d.watchTokensPerDay, 'drop', 'drops')} a day, ${d.minutesPerToken}m each${dryWords(d) === 'Off' ? '' : `, dry ${dryWords(d)}`}`
+      : 'Off. Videos play with no clock.'),
     fields: [
       { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48,
         unit: () => [DripPage.icon('drop', 'drip-token-drop')], say: (n) => plural(n, 'drop', 'drops') },
       { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
       { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', hint: 'When time runs out partway through.' },
+      // Q32. The three keys wait for the reset as one range, so the row has one chip for all of them.
+      { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'Videos on minutes stop. Whole unspent drops come back.' },
+      { key: 'dryFrom', label: 'From', kind: 'hour', inRow: true },
+      { key: 'dryTo', label: 'To', kind: 'hour', inRow: true },
       { key: 'needThisPerWeek', label: '"I need this one" per week', kind: 'stepper', min: 0, max: 20,
         say: (n) => String(n), hint: 'Each one needs a typed reason. Counted over the last 7 days.' },
     ],
@@ -303,11 +316,12 @@ function resetCardsKind() {
  * @param {Field} f @param {boolean} [named]
  */
 function chip(f, named) {
-  if (!state.pending || !(f.key in state.pending.changes)) return null;
+  if (f.inRow || !state.pending || !(f.key in state.pending.changes)) return null;
   const { h } = DripPage;
-  // "4:00am until 4:00am" says nothing, so a new reset hour names the end of today instead.
+  // "4:00am until 4:00am" says nothing, so a new reset hour names the end of today instead. Dry hours name the range.
+  const now = f.key === 'dryHours' ? dryWords(state.settings) : valueWords(f, state.settings[f.key]);
   const text = f.key === 'resetHour' ? `Today ends at ${resetLabel()}`
-    : `${named ? `${f.label} ` : ''}${valueWords(f, state.settings[f.key])} until ${resetLabel()}`;
+    : `${named ? `${f.label} ` : ''}${now} until ${resetLabel()}`;
   return h('span', { class: 'chip', title: `Your change starts ${effectiveLabel()}` },
     h('span', {}, text),
     h('span', { 'aria-hidden': 'true' }, '·'),
@@ -394,6 +408,18 @@ function pickMode(name) {
   /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
 }
 
+/** Dry hours' From and To pickers, under the row's hint while the switch is on (syncParts). */
+function dryRange() {
+  const { h } = DripPage;
+  const hours = Array.from({ length: 24 }, (_, hour) => /** @type {[string, string]} */ ([String(hour), DripPage.hourLabel(hour)]));
+  /** @param {'dryFrom' | 'dryTo'} key @param {string} label */
+  const one = (key, label) => [
+    h('span', { class: 'dry-label', id: `label-${key}` }, label),
+    picker(fieldId(key), hours, String(draft[key]), (v) => { draft[key] = Number(v); draftChanged(); }, `label-${key}`),
+  ];
+  return h('div', { class: 'dry-range' }, ...one('dryFrom', 'From'), ...one('dryTo', 'To'));
+}
+
 /** One setting's row: label, waiting chip, hint, and control. @param {Field} f */
 function fieldRow(f) {
   const { h } = DripPage;
@@ -406,7 +432,9 @@ function fieldRow(f) {
     h('div', { class: 'setting-text' },
       h('div', { class: 'setting-line' }, label, chip(f)),
       f.hint && h('div', { class: 'hint' }, f.hint),
-      f.idle && h('div', { class: 'hint idle-note' })),
+      f.idle && h('div', { class: 'hint idle-note' }),
+      // Under the hint, so the switch lines up with every other one on the right.
+      f.key === 'dryHours' && dryRange()),
     f.key === 'recTokensPerDay' ? h('div', { class: 'controls' }, input, cardsKindPicker()) : input);
 }
 
@@ -425,7 +453,7 @@ function partSection(p) {
         h('div', { class: 'setting-line folded-chips' }, ...p.fields.map((f) => chip(f, true)))),
       t && (t.key === 'cards' ? cardsSwitch() : control(t, ''))),
     p.fields.length > 0 && h('div', { class: 'rows' },
-      h('div', { class: 'rows-inner' }, h('div', { class: 'rows-pad' }, ...p.fields.map(fieldRow)))));
+      h('div', { class: 'rows-inner' }, h('div', { class: 'rows-pad' }, ...p.fields.filter((f) => !f.inRow).map(fieldRow)))));
 }
 
 function renderForm() {
@@ -452,6 +480,8 @@ function syncParts() {
     const sum = section.querySelector('.part-sum');
     if (sum) sum.textContent = p.summary(draft);
   }
+  const range = /** @type {HTMLElement | null} */ (document.querySelector('.dry-range'));
+  if (range) range.hidden = !draft.dryHours;
   const counted = document.querySelector('[data-field="recTokensPerDay"]');
   counted?.classList.toggle('is-unlimited', draft.cards === 'unlimited');
   const stepper = counted?.querySelector('.stepper');

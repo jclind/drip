@@ -24,7 +24,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'planned', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
-    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUsed', 'needThisLeft', 'needThisBack', 'cleanSettings',
+    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData',
@@ -34,7 +34,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
     watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10,
-    rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerWeek: 3, feedSource: 'home', stashMax: 10,
+    rolloverDays: 2, resetHour: 4, graceMode: false, dryHours: false, dryFrom: 23, dryTo: 6, needThisPerWeek: 3, feedSource: 'home', stashMax: 10,
     searchCap: true, cards: 'limited', clock: true, stash: true, hideBell: true, hideShorts: true, streams: false,
   });
   assert.ok(Object.isFrozen(D.MODES));
@@ -129,7 +129,7 @@ test('initialState has the specified shape and independent mutable values', () =
   assert.deepEqual(state, {
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
-    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, installedAt: time(5),
+    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dryBack: null, installedAt: time(5),
     channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false,
   });
   state.settings.recTokensPerDay = 1;

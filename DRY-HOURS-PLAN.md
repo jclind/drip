@@ -2,6 +2,8 @@
 
 RELEASE-PLAN.md item 3, plus a change to Q20 that Jesse made while answering its questions. Written 2026-11-04 on air, against `main` at `a5067a1`. 310 tests pass (`node --test`, Node v26.3.0). Draft for Jesse to approve. Codex reviewed the first draft (then called quiet hours) on 2026-11-04, and this draft on the same day. The calls below include the fixes from both, marked "(Codex N)" for the first review and "(Codex 2nd N)" for the second.
 
+**Changed 2026-11-04, after the first build ran (Jesse):** B1 to B3 no longer hold. Carried-over minutes let anyone buy ahead and watch all night, so Dry hours now stop every paid video at the start, grace mode or not, and the minutes left stop. Each whole drop of them goes back to the counter, and what's under a drop is lost. In the 5 minutes before, the pill counts down and shimmers, the home page says when they start, and drops stop selling. DESIGN.md Q32 has the rule as built.
+
 Two PRs, in this order: A, weekly unlocks, then B, Dry hours. B leans on A: "I need this one" works during Dry hours because a weekly count makes each one scarce.
 
 ## What's settled

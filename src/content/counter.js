@@ -277,7 +277,7 @@
    * 2026-10-13). The drops fall in, then a tag says how many. A new day's cards spin up after, with a tag of their own.
    * The tags stay 3 seconds and slide back in. If the page goes away partway, what's left comes in at once, with no
    * tags.
-   * @param {{kind: 'kept' | 'new', drops: Arrival, cards?: Arrival}} o
+   * @param {{kind: 'kept' | 'new' | 'back', drops: Arrival, cards?: Arrival}} o
    */
   async function land({ kind, drops, cards }) {
     const still = reduced();
@@ -291,7 +291,8 @@
         return;
       }
       const n = drops.add;
-      const said = kind === 'kept' ? `Kept ${plural(n, 'drop', 'drops')}.` : `${plural(n, 'new drop', 'new drops')}.`;
+      const said = kind === 'kept' ? `Kept ${plural(n, 'drop', 'drops')}.`
+        : kind === 'back' ? `${plural(n, 'drop', 'drops')} back for Dry hours.` : `${plural(n, 'new drop', 'new drops')}.`;
       tags.push([await showTag(drops, `${n} ${kind}`, said, still), drops]);
     }
     if (cards && cards.add > 0) {

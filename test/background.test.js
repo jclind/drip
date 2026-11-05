@@ -85,7 +85,9 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
           writes++;
           Object.assign(store, structuredClone(items));
         },
+        remove: async (/** @type {string} */ key) => { delete store[key]; },
       },
+      onChanged: { addListener() {} },
       session: {
         get: async (/** @type {string} */ key) => (key in session ? { [key]: structuredClone(session[key]) } : {}),
         set: async (/** @type {Record<string, any>} */ items) => {
@@ -665,4 +667,55 @@ test('openSettings brings an open Settings tab forward and tells it where to go,
     ['window', 4, { focused: true }],
     ['broadcast', { type: 'settingsGoto', section: 'cards' }],
   ]);
+});
+
+test('a tick at the start of Dry hours is charged before the minutes come back as drops (Codex, 2026-11-04)', async () => {
+  require('../src/lib/state.js');
+  const D = /** @type {any} */ (globalThis).Drip;
+  const now = Date.now();
+  const hour = new Date(now).getHours();
+  const state = D.initialState(now);
+  // Dry hours over the current hour, not yet handled, with 30 minutes and 2 seconds left and no drops.
+  Object.assign(state.settings, { dryHours: true, dryFrom: hour, dryTo: (hour + 1) % 24 });
+  state.watchSecondsLeft = 30 * 60 + 2;
+  state.watchSecondsBought = state.watchSecondsLeft;
+  state.tokens.watch = 0;
+  const w = worker(state);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true, key: 'k1' });
+  await w.idle();
+  const saved = w.store.drip;
+  assert.equal(saved.watchSecondsLeft, 0);
+  assert.equal(saved.tokens.watch, 1, '29m57s is one whole drop, not two');
+});
+
+test('the dev clock jumps to 6 minutes before Dry hours and back to real time', async () => {
+  require('../src/lib/state.js');
+  const D = /** @type {any} */ (globalThis).Drip;
+  const state = D.initialState(Date.now());
+  // Dry hours from 3 hours on, so the jump is ahead whatever the hour is now.
+  const from = (new Date().getHours() + 3) % 24;
+  Object.assign(state.settings, { dryHours: true, dryFrom: from, dryTo: (from + 2) % 24 });
+  const w = worker(state, { dev: true });
+  const res = await w.send({ type: 'devAction', action: 'clock-dry-6m' });
+  assert.equal(res.ok, true);
+  const offset = w.store.dripDevClock.offset;
+  const d = new Date();
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 3).getTime();
+  assert.ok(Math.abs(Date.now() + offset - (start - 6 * 60e3)) < 2000, `offset ${offset}`);
+  // 6 minutes before, drops still sell; a minute on, the warning has begun.
+  assert.equal((await w.send({ type: 'spendWatch' })).ok, true);
+  await w.send({ type: 'devAction', action: 'clock+1m' });
+  assert.ok(Math.abs(w.store.dripDevClock.offset - offset - 60e3) < 1000);
+  assert.equal((await w.send({ type: 'spendWatch' })).error, 'dry-soon');
+  assert.equal((await w.send({ type: 'devAction', action: 'clock-real' })).ok, true);
+  assert.equal('dripDevClock' in w.store, false);
+  assert.equal((await w.send({ type: 'spendWatch' })).ok, true, 'real time again');
+});
+
+test('the dev clock refuses without developer mode, and without Dry hours to jump to', async () => {
+  const off = worker();
+  assert.equal((await off.send({ type: 'devAction', action: 'clock+1h' })).error, 'dev-off');
+  const w = worker(undefined, { dev: true });
+  assert.equal((await w.send({ type: 'devAction', action: 'clock-dry-6m' })).error, 'no-dry-hours');
+  assert.equal('dripDevClock' in w.store, false);
 });

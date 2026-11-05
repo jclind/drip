@@ -321,7 +321,10 @@ function makeWorld() {
       if (fail === 'throw') throw new Error('The message port closed before a response was received.');
       if (fail === 'disconnect') throw new Error('Extension context invalidated.');
       const draft = structuredClone(world.state);
+      // As the worker does before every message (Q32).
+      D.enterDry(draft, world.time());
       const result = world.run(draft, msg);
+      D.enterDry(draft, world.time());
       if (fail === 'write') return { ok: false, error: 'Error: write failed' };
       if (JSON.stringify(draft) !== JSON.stringify(world.state)) {
         world.state = draft;
@@ -335,16 +338,19 @@ function makeWorld() {
     run(state, msg) {
       switch (msg.type) {
         case 'get': return { ok: true };
-        case 'spendWatch': return D.spendWatch(state);
+        case 'spendWatch': return D.spendWatch(state, world.time());
         case 'reveal': return D.reveal(state, msg.candidates);
         case 'revealNext': return D.revealNext(state, msg.videoId, msg.candidates);
         case 'resolve': return D.resolveCurrent(state, msg.action, msg.videoId, EPOCH);
-        case 'buyIfOut': return D.buyIfOut(state, msg.videoId);
+        case 'buyIfOut': return D.buyIfOut(state, msg.videoId, world.time());
+        case 'dryBackSeen': return D.dryBackSeen(state);
         default: return { ok: false, error: 'unknown-message' };
       }
     },
     /** @param {string} type */
     count: (type) => world.sent.filter((m) => m.type === type).length,
+    /** The worker's clock, which the newest tab sets to its own. */
+    time: () => EPOCH,
   };
   return world;
 }
@@ -420,6 +426,7 @@ function gridMarks(document, item, kind) {
  */
 async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}) {
   let now = 0;
+  world.time = () => EPOCH + now;
   /** @type {Map<number, {fn: Function, at: number, every: number}>} */
   const timers = new Map();
   let nextTimer = 0;
@@ -598,6 +605,11 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
   const button = (key) => root()?.querySelector(`[data-k="${key}"]`) ?? null;
   Object.assign(tab, {
     advance,
+    /** Moves the clock on without running the timers in between, as a tab left alone does. @param {number} ms */
+    skip(ms) {
+      now += ms;
+      for (const t of timers.values()) t.at = Math.max(t.at, now);
+    },
     root,
     button,
     /** Clicks a control by its data-k, as a mouse would, and waits for what it started. @param {string} key */
@@ -1208,4 +1220,98 @@ test('Watch that fails leaves the card up and redrawing', async () => {
   await tab.advance(100);
   const counts = tab.root().querySelectorAll('.drip-num').map((/** @type {any} */ el) => el.textContent);
   assert.ok(counts.includes('7'), `counts ${counts}`);
+});
+
+/** Dry hours on around EPOCH (noon): from 11am to 2pm. @param {any} world */
+function dryAtNoon(world) {
+  Object.assign(world.state.settings, { dryHours: true, dryFrom: 11, dryTo: 14 });
+}
+
+test('in Dry hours with no minutes, the home page is out: "Dry hours." and when drops work again (B9)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  const tab = await makeTab(world);
+  const text = tab.root().textContent;
+  assert.match(text, /Dry hours\./);
+  assert.match(text, /Drops work again at 2:00pm\./);
+  assert.doesNotMatch(text, /You're out for today/);
+  assert.equal(tab.button('add'), null, 'the out page has no +15m');
+});
+
+test('in Dry hours the home page is out even with minutes left, and they come back as drops (Jesse, 2026-11-04)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 40 * 60;
+  world.state.tokens.watch = 2;
+  const tab = await makeTab(world);
+  await tab.advance(2000);
+  assert.match(tab.root().textContent, /Dry hours\./);
+  assert.equal(world.state.watchSecondsLeft, 0);
+  assert.equal(world.state.tokens.watch, 4, '40 minutes is 2 whole drops back');
+  // The fake page has no layout, so the drops never land here: the "2 back" tag is a browser check.
+  assert.deepEqual(world.state.dryBack, { until: world.D.dryUntil(world.state, world.time()), watch: 2 });
+});
+
+test('in the 5 minutes before Dry hours, +15m is off and the gray line says when they start', async () => {
+  const world = makeWorld();
+  Object.assign(world.state.settings, { dryHours: true, dryFrom: 13, dryTo: 15 });
+  world.state.watchSecondsLeft = 600;
+  const tab = await makeTab(world);
+  assert.equal(tab.button('add').hasAttribute('disabled'), false);
+  tab.skip(56 * 60e3);
+  await tab.advance(1000);
+  const add = tab.button('add');
+  assert.equal(add.hasAttribute('disabled'), true);
+  assert.equal(add.getAttribute('title'), 'Dry hours start at 1:00pm.');
+  assert.match(tab.root().textContent, /Dry hours start at 1:00pm\./);
+});
+
+test('card Watch at 0 minutes in Dry hours shows no price and spends nothing', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 0;
+  world.state.current = { id: 'v1', title: 'Title v1', channel: 'Channel', length: '1:00' };
+  const tab = await makeTab(world);
+  const watch = tab.button('watch');
+  assert.ok(watch);
+  assert.doesNotMatch(watch.textContent, /-1/);
+  await tab.click('watch');
+  await tab.advance(100);
+  assert.equal(world.state.tokens.watch, 4);
+});
+
+test('a +15m that reaches the worker in Dry hours says when they end', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world);
+  assert.equal(tab.button('add').hasAttribute('disabled'), false);
+  // Dry hours turned on in another tab, and this page hasn't heard yet.
+  world.state.settings = { ...world.state.settings, dryHours: true, dryFrom: 11, dryTo: 14 };
+  await tab.click('add');
+  await tab.advance(100);
+  assert.equal(world.state.tokens.watch, 4);
+  assert.match(tab.message(), /Dry until 2:00pm\./);
+});
+
+test('an idle home page changes to its dry form when Dry hours end, with no reload', async () => {
+  const world = makeWorld();
+  Object.assign(world.state.settings, { dryHours: true, dryFrom: 11, dryTo: 13 });
+  const tab = await makeTab(world);
+  assert.match(tab.root().textContent, /Dry hours\./);
+  tab.skip(3600e3);
+  await tab.advance(1000);
+  assert.doesNotMatch(tab.root().textContent, /Dry hours\./);
+  assert.ok(tab.button('add'), '+15m is back');
+  assert.equal(tab.button('add').hasAttribute('disabled'), false);
+});
+
+test('with no minutes in the 5 minutes before Dry hours, the out page says when they start, not "out for today"', async () => {
+  const world = makeWorld();
+  Object.assign(world.state.settings, { dryHours: true, dryFrom: 13, dryTo: 15 });
+  const tab = await makeTab(world);
+  tab.skip(56 * 60e3);
+  await tab.advance(1000);
+  const text = tab.root().textContent;
+  assert.match(text, /Dry hours at 1:00pm\./);
+  assert.match(text, /Drops work again at 3:00pm\./);
+  assert.doesNotMatch(text, /out for today/);
 });

@@ -1,6 +1,12 @@
 // @ts-check
 // The only writer of drip's state. Pages and content scripts send messages here.
 
+// The dev clock (src/devpanel/clock.js), which a store build doesn't have.
+try {
+  importScripts('devpanel/clock.js');
+} catch {
+  // Store build: real time.
+}
 importScripts('lib/state.js');
 importScripts('lib/glass.js');
 
@@ -153,6 +159,10 @@ function withState(fn, toolbarTick) {
     const now = Date.now();
     const [stored, session] = await Promise.all([chrome.storage.local.get(KEY), chrome.storage.session.get(CLOCK_KEY)]);
     const state = Drip.hydrate(stored[KEY], now);
+    // Dry hours starting take the minutes back as drops, once (Q32), and before the reset clears them. A tick goes
+    // first, so the seconds played before the start are charged before the drops are counted (Codex, 2026-11-04),
+    // unless the reset is due, which would clear the minutes first.
+    if (!toolbarTick || Drip.dayKey(now, state.settings.resetHour) > state.day) Drip.enterDry(state, now);
     Drip.rollDay(state, now);
     const before = stableJson(stored[KEY]);
     /** @type {any} */
@@ -160,6 +170,8 @@ function withState(fn, toolbarTick) {
     const clock = { lastChargeEnd: Number(saved?.lastChargeEnd) || 0, ticks: Array.isArray(saved?.ticks) ? saved.ticks : [] };
     const clockBefore = stableJson(clock);
     const result = fn(state, now, clock);
+    // And after, so the change that turns Dry hours on over the current hour takes the minutes back at once.
+    Drip.enterDry(state, now);
     // A failed state write throws before the clock is saved, so the tab's resent time is charged again.
     const stateChanged = stableJson(state) !== before;
     if (stateChanged) await chrome.storage.local.set({ [KEY]: state });
@@ -186,7 +198,7 @@ function handle(msg, state, now, clock) {
     case 'get':
       return { ok: true };
     case 'spendWatch':
-      return Drip.spendWatch(state);
+      return Drip.spendWatch(state, now);
     case 'reveal':
       return Drip.reveal(state, Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'resolve':
@@ -194,7 +206,7 @@ function handle(msg, state, now, clock) {
     case 'revealNext':
       return Drip.revealNext(state, String(msg.videoId), Array.isArray(msg.candidates) ? msg.candidates : []);
     case 'buyIfOut':
-      return Drip.buyIfOut(state, String(msg.videoId));
+      return Drip.buyIfOut(state, String(msg.videoId), now);
     case 'addBacklog':
       return Drip.addBacklog(state, msg.video, msg.index, now);
     case 'removeBacklog':
@@ -204,9 +216,11 @@ function handle(msg, state, now, clock) {
     case 'tick':
       // The tab sends where the player is with each tick, so a stashed video's bar keeps up (Q28).
       if (msg.position !== undefined) Drip.markProgress(state, String(msg.videoId), msg.position, msg.duration);
-      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, String(msg.videoId), msg.ago, msg.key) };
+      // The status counts Dry hours, which the minutes left don't show yet: the worker takes them back only after this
+      // tick is charged, and a reply saying "not locked" would drop the page's lock for a moment (Jesse saw it jolt).
+      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, String(msg.videoId), msg.ago, msg.key), locked: Drip.watchStatus(state, String(msg.videoId), now).locked };
     case 'status':
-      return { ok: true, ...Drip.watchStatus(state, msg.videoId) };
+      return { ok: true, ...Drip.watchStatus(state, msg.videoId, now) };
     case 'needThis':
       return Drip.needThis(state, msg.videoId, msg.title || '', msg.reason || '', now);
     case 'updateSettings':
@@ -215,6 +229,8 @@ function handle(msg, state, now, clock) {
       return Drip.cancelPending(state, msg.key);
     case 'refillSeen':
       return Drip.refillSeen(state);
+    case 'dryBackSeen':
+      return Drip.dryBackSeen(state);
     case 'importData':
       return Drip.importData(state, msg.data, now);
     case 'resetData':
@@ -231,7 +247,7 @@ function handle(msg, state, now, clock) {
     case 'cancelChannelPending':
       return Drip.cancelChannelPending(state, msg.channel);
     case 'allowedVideo':
-      return { ...Drip.allowedVideo(state, msg.videoId, msg.channel), ...Drip.watchStatus(state, String(msg.videoId)) };
+      return { ...Drip.allowedVideo(state, msg.videoId, msg.channel), ...Drip.watchStatus(state, String(msg.videoId), now) };
     case 'seenChannel':
       return Drip.seenChannel(state, msg.channel);
     default:
@@ -292,6 +308,7 @@ function handleDev(msg, sendResponse) {
  * @param {(res: any) => void} sendResponse
  */
 function runDevAction(msg, sendResponse) {
+  if (String(msg.action).startsWith('clock')) return runClock(String(msg.action), sendResponse);
   withState((state, now) => ({ result: Drip.devAction(state, String(msg.action), now), state }))
     .then(({ result, state }) => sendResponse({ ...result, state }))
     .catch((err) => sendResponse({ ok: false, error: String(err) }));
@@ -321,6 +338,60 @@ async function lookUpChannel(raw) {
 // build has no panel (bin/build-release strips it), so there the toggle hides itself and the worker refuses it.
 // The localhost route above stays tied to dev/ENABLED, since any localhost page can reach it.
 const DEV_KEY = 'dripDev';
+
+/** The first hour Dry hours start after `now`, within 2 days, or 0. @param {any} state @param {number} now */
+function nextDryStart(state, now) {
+  let t = now;
+  for (let i = 0; i < 48; i++) {
+    const d = new Date(t);
+    t = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime();
+    if (Drip.dryUntil(state, t) && !Drip.dryUntil(state, t - 1)) return t;
+  }
+  return 0;
+}
+
+/**
+ * The dev clock's buttons: jump drip's time forward, to just before Dry hours start or end, or back to real time.
+ * Jumping past the reset rolls the day, and going back to real time doesn't undo that.
+ * @param {string} action @param {(res: any) => void} sendResponse
+ */
+function runClock(action, sendResponse) {
+  const C = /** @type {any} */ (globalThis).DripDevClock;
+  if (!C) return sendResponse({ ok: false, error: 'no-dev-clock' });
+  withState((state, now, clock) => {
+    const step = /^clock\+(\d+)(m|h)$/.exec(action);
+    let target = 0;
+    if (action === 'clock-real') target = C.realNow();
+    else if (step) target = now + Number(step[1]) * (step[2] === 'h' ? 3600e3 : 60e3);
+    else if (action === 'clock-dry-6m') target = nextDryStart(state, now) - 6 * 60e3;
+    else if (action === 'clock-dry-end-1m') target = (Drip.dryUntil(state, now) || Drip.dryUntil(state, nextDryStart(state, now))) - 60e3;
+    else return { result: { ok: false, error: 'unknown-dev-action' }, state };
+    if (target <= 0) return { result: { ok: false, error: 'no-dry-hours' }, state };
+    // Charges count from the last one, so a jump back would make playback free until real time caught up.
+    clock.lastChargeEnd = 0;
+    clock.ticks = [];
+    // Real is exactly 0: working it out from the two clocks can leave a millisecond, which keeps the clock shifted.
+    C.set(action === 'clock-real' ? 0 : C.offset() + target - now);
+    return { result: { ok: true, offset: C.offset() }, state };
+  })
+    .then(async ({ result, state }) => {
+      if (result.ok) await (C.offset() ? chrome.storage.local.set({ [C.KEY]: { offset: C.offset() } }) : chrome.storage.local.remove(C.KEY));
+      sendResponse({ ...result, state });
+    })
+    .catch((err) => sendResponse({ ok: false, error: String(err) }));
+}
+
+/** Developer mode off puts drip back on real time. */
+async function clearDevClockIfOff() {
+  const C = /** @type {any} */ (globalThis).DripDevClock;
+  if (!C || (await devStatus()).enabled) return;
+  C.set(0);
+  if ((await chrome.storage.local.get(C.KEY))[C.KEY]) await chrome.storage.local.remove(C.KEY);
+}
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes[DEV_KEY]) clearDevClockIfOff().catch(() => {});
+});
+clearDevClockIfOff().catch(() => {});
 const shipsPanel = (chrome.runtime.getManifest().content_scripts || []).some((c) => (c.js || []).some((f) => f.startsWith('src/devpanel/')));
 
 /** @returns {Promise<{toggle: boolean, file: boolean, enabled: boolean}>} */

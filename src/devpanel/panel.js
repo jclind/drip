@@ -97,6 +97,10 @@
     row('Settings', button('apply-pending', 'apply pending', 'Apply pending'), graceButton),
     row('Clear', button('clear-unlocks', 'clear unlocks', 'Unlocks'), button('clear-backlog', 'clear backlog', 'Backlog'),
       button('clear-seen', 'clear reveal history', 'Reveal history'), button('clear-log', "clear today's log", "Today's log")),
+    // The dev clock (clock.js): drip's own time only, so the 5-minute warning and Dry hours can be tried any time.
+    row('Clock', button('clock-dry-6m', 'clock to 6 min before Dry hours', 'Dry −6m'),
+      button('clock-dry-end-1m', 'clock to 1 min before Dry hours end', 'Dry end −1m'),
+      button('clock+1m', 'clock +1 min', '+1m'), button('clock+1h', 'clock +1 hour', '+1h'), button('clock-real', 'real time', 'Real')),
     h('div', { class: 'drip-dev-row' }, freshButton),
     messageLine,
   );
@@ -113,7 +117,20 @@
       `Watch tokens ${state.tokens.watch} · rec tokens ${state.tokens.rec}`,
       `Unlocks ${Drip.needThisUsed(state, Date.now())} used this week, ${Drip.needThisLeft(state, Date.now())} left · grace ${s.graceMode ? 'on' : 'off'}`,
       `Pending: ${pending}`,
+      clockLine(),
     ];
+  }
+
+  /** "Clock: real", or "Clock: Wed 10:54pm (+3h 20m)" while the dev clock is shifted. */
+  function clockLine() {
+    const C = /** @type {any} */ (globalThis).DripDevClock;
+    const off = C ? C.offset() : 0;
+    if (!off) return 'Clock: real';
+    const d = new Date(Date.now());
+    const time = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'am' : 'pm'}`;
+    const mins = Math.round(Math.abs(off) / 60000);
+    const span = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+    return `Clock: ${d.toLocaleDateString('en-US', { weekday: 'short' })} ${time} (${off > 0 ? '+' : '−'}${span})`;
   }
 
   /** @param {HTMLElement} el @param {string} text */

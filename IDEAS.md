@@ -16,6 +16,7 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - Charts and streaks built from the 90-day log.
 - Search results have their own "Ask YouTube" chip in the filter row, which design C left alone (2026-10-15).
 - "Your videos" in drip's menu could open Studio's videos list instead of its dashboard, if the channel id can be read from the page.
+- The lock's "Next unlock back Friday at 9:14pm." sits right under "The glass refills at 4:00am." and reads as cluttered (Jesse, 2026-11-04). Give the two lines more room or a different weight, or fold them into one sentence. Polish, not urgent; the welcome tour's lock has the same pair.
 
 ## Welcome tour
 
@@ -92,6 +93,10 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 - A "Reduce motion" switch that overrides the system setting.
 - A page Chrome opens on uninstall (`chrome.runtime.setUninstallURL`) with one question, "Why are you leaving?". It needs a small hosted page (Claude's suggestion, 2026-10-16, with the Settings feedback link).
 - Not worth it yet: syncing across devices, and notifications like "5 minutes left".
+
+## Known races
+
+- An older worker reply can overwrite newer saved state on a page (Codex, 2026-11-04). Tab A's status request is answered from a snapshot with 0 minutes, tab B buys minutes, A hears B's storage change and drops its lock, then A's older reply lands and `state = res.state` puts the 0-minute snapshot back, so the lock rises again. Every `state = res.state` in watch.js has it, and it predates Dry hours. The fix is a revision number the worker bumps on each save, and pages keep whichever state is newest.
 
 ## Efficiency
 

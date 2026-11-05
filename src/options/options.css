@@ -146,6 +146,24 @@
   gap: 8px;
 }
 
+/* Dry hours' From and To, under the row's hint. */
+.dry-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dry-range[hidden] {
+  display: none;
+}
+
+.dry-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .setting {
   display: flex;
   align-items: center;
