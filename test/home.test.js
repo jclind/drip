@@ -282,7 +282,8 @@ class FakeElement {
     return null;
   }
   getBoundingClientRect() { return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
-  getClientRects() { return []; }
+  /** No layout, except a page a test puts in view (makeTab's inView), where drip's home page has a box. */
+  getClientRects() { return this.ownerDocument.inView && this.attrs.get('id') === 'drip-home' ? [{}] : []; }
   getAnimations() { return []; }
   animate() { return { finished: Promise.resolve(), cancel() {}, currentTime: 0 }; }
 }
@@ -344,6 +345,7 @@ function makeWorld() {
         case 'resolve': return D.resolveCurrent(state, msg.action, msg.videoId, EPOCH);
         case 'buyIfOut': return D.buyIfOut(state, msg.videoId, world.time());
         case 'dryBackSeen': return D.dryBackSeen(state);
+        case 'refillSeen': return D.refillSeen(state);
         default: return { ok: false, error: 'unknown-message' };
       }
     },
@@ -351,6 +353,8 @@ function makeWorld() {
     count: (type) => world.sent.filter((m) => m.type === type).length,
     /** The worker's clock, which the newest tab sets to its own. */
     time: () => EPOCH,
+    /** Runs while a landing plays, before its drops come in. @type {((o: any) => Promise<void>) | null} */
+    duringLand: null,
   };
   return world;
 }
@@ -421,10 +425,12 @@ function gridMarks(document, item, kind) {
 /**
  * One YouTube tab on the home page, running home.js.
  * @param {ReturnType<typeof makeWorld>} world
- * @param {{reduced?: boolean, grid?: string[]}} [opts] reduced: the browser asks for reduced motion, so nothing
- *   animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that kind's markup (gridMarks).
+ * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string}} [opts] reduced: the browser asks for
+ *   reduced motion, so nothing animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that
+ *   kind's markup (gridMarks). inView: drip's home page is on screen, so drops land in the counter, and tab.landings
+ *   records each landing. kept: what "Done for now" left in sessionStorage, "N" or "N:dryUntil" (watch.js onDone).
  */
-async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}) {
+async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '' } = {}) {
   let now = 0;
   world.time = () => EPOCH + now;
   /** @type {Map<number, {fn: Function, at: number, every: number}>} */
@@ -438,6 +444,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
   /** @type {any} */
   const document = {
     hidden: false,
+    inView,
     activeElement: null,
     /** @param {string} tag */
     createElement: (tag) => new FakeElement(document, tag),
@@ -456,7 +463,10 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     dispatchEvent: (event) => { for (const fn of document.listeners[event.type] || []) fn(event); return true; },
   };
   document.documentElement = new FakeElement(document, 'html');
+  if (inView) document.documentElement.setAttribute('data-drip-shown', '');
   document.body = new FakeElement(document, 'body');
+  /** @type {Map<string, string>} */
+  const session = new Map(kept ? [['drip-kept', kept]] : []);
   document.documentElement.append(document.body);
   document.activeElement = document.body;
 
@@ -515,6 +525,12 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     reveals: [],
     /** The card the animation stub dealt, which home.js draws for real once the animation is done. @type {any} */
     dealt: null,
+    /** Each landing the counter played, with the drop count shown just before it. @type {any[]} */
+    landings: [],
+    /** Every number the drop count was set to, in order. @type {number[]} */
+    dropsShown: [],
+    /** The drop count on the page. */
+    drops: () => Number(document.querySelector('.drip-count .drip-num')?.textContent ?? NaN),
   };
 
   /** @type {any} */
@@ -525,7 +541,11 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     innerHeight: 900,
     performance: { now: () => now },
     Date: class extends Date { static now() { return EPOCH + now; } },
-    sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    sessionStorage: {
+      getItem: (/** @type {string} */ k) => session.get(k) ?? null,
+      setItem: (/** @type {string} */ k, /** @type {string} */ v) => { session.set(k, String(v)); },
+      removeItem: (/** @type {string} */ k) => { session.delete(k); },
+    },
     setTimeout: (/** @type {Function} */ fn, /** @type {number} */ ms) => addTimer(fn, ms, 0),
     clearTimeout: (/** @type {number} */ id) => { timers.delete(id); },
     setInterval: (/** @type {Function} */ fn, /** @type {number} */ ms) => addTimer(fn, ms, ms),
@@ -543,8 +563,18 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     DripCounter: {
       num: (/** @type {number} */ n) => h('span', { class: 'drip-num' }, String(n)),
       value: (/** @type {any} */ el) => Number(el.textContent),
-      to: (/** @type {any} */ el, /** @type {number} */ n) => { el.textContent = String(n); },
-      land: async () => {},
+      to: (/** @type {any} */ el, /** @type {number} */ n) => {
+        if (el === document.querySelector('.drip-count .drip-num')) tab.dropsShown.push(n);
+        el.textContent = String(n);
+      },
+      // Records what lands and lets it all in at once, as the real one does by the end.
+      land: async (/** @type {any} */ o) => {
+        tab.landings.push({ kind: o.kind, drops: o.drops.add, cards: o.cards ? o.cards.add : 0, shownBefore: tab.drops() });
+        const hook = world.duringLand;
+        if (hook) await hook(o);
+        await o.drops.release(o.drops.add);
+        if (o.cards) await o.cards.release(o.cards.add);
+      },
     },
     // reveal.js's contract, without its animation: find and pay, then wait for the picture, then done.
     DripReveal: {
@@ -1250,6 +1280,82 @@ test('in Dry hours the home page is out even with minutes left, and they come ba
   assert.equal(world.state.tokens.watch, 4, '40 minutes is 2 whole drops back');
   // The fake page has no layout, so the drops never land here: the "2 back" tag is a browser check.
   assert.deepEqual(world.state.dryBack, { until: world.D.dryUntil(world.state, world.time()), watch: 2 });
+});
+
+/** Whether a list of numbers never goes down. @param {number[]} list */
+const neverDown = (list) => list.every((n, i) => i === 0 || n >= list[i - 1]);
+
+test('"Done for now" into Dry hours lands the kept drops, then "2 back", and the count ends right (Codex, 2026-11-05)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 40 * 60;
+  world.state.tokens.watch = 2;
+  // The lock saw 4 drops when "Done for now" was clicked: 2 kept, and 2 back from the 40 minutes.
+  const until = world.D.dryUntil(world.state, world.time());
+  const tab = await makeTab(world, { inView: true, kept: `4:${until}` });
+  await tab.advance(3000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 2], ['back', 2]]);
+  assert.equal(tab.drops(), 4);
+  assert.equal(world.state.dryBack, null, 'the drops back were marked seen');
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('kept drops the lock saved before the drops came back land in full, then "2 back" (Codex, 2026-11-05)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 40 * 60;
+  world.state.tokens.watch = 2;
+  // A paused page locks on its own at the start, before any message has handed the drops back.
+  const tab = await makeTab(world, { inView: true, kept: '2:0' });
+  await tab.advance(3000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 2], ['back', 2]]);
+  assert.equal(tab.drops(), 4);
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('drops back the page hears of only once the kept drops are falling are in them: one landing, marked seen', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  const until = world.D.dryUntil(world.state, world.time());
+  // The worker handed 1 drop back and the lock counted it, but this page's state hasn't heard yet.
+  world.state.tokens.watch = 7;
+  world.state.drySeen = until;
+  /** @type {any} */ (world).duringLand = async () => {
+    /** @type {any} */ (world).duringLand = null;
+    world.state.dryBack = { until, watch: 1 };
+    for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+    await settle();
+  };
+  const tab = await makeTab(world, { inView: true, kept: `7:${until}` });
+  await tab.advance(4000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 7]]);
+  assert.equal(tab.drops(), 7);
+  assert.equal(world.state.dryBack, null, 'marked seen');
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('drops back and the day\'s refill both land, one after the other, and neither gets stuck (Codex, 2026-11-05)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 40 * 60;
+  world.state.tokens.watch = 2;
+  world.state.refill = { day: world.state.day, watch: 2, rec: 10 };
+  const tab = await makeTab(world, { inView: true });
+  await tab.advance(4000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['back', 2], ['new', 2]]);
+  assert.equal(tab.drops(), 4);
+  assert.equal(world.state.dryBack, null);
+  assert.equal(world.state.refill, null);
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('kept drops with nothing back land once, as before', async () => {
+  const world = makeWorld();
+  world.state.tokens.watch = 3;
+  const tab = await makeTab(world, { inView: true, kept: '3:0' });
+  await tab.advance(3000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 3]]);
+  assert.equal(tab.drops(), 3);
 });
 
 test('in the 5 minutes before Dry hours, +15m is off and the gray line says when they start', async () => {

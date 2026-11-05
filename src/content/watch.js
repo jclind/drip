@@ -818,7 +818,9 @@
     stopRings();
     const kept = state ? state.tokens.watch : 0;
     try {
-      if (kept > 0) sessionStorage.setItem(KEPT_KEY, String(kept));
+      // With the Dry hours whose drops back the count holds, if any, so home lands those second without counting them
+      // twice. A lock that went up before the drops came back saved a count without them (Codex, 2026-11-05).
+      if (kept > 0) sessionStorage.setItem(KEPT_KEY, `${kept}:${state?.dryBack?.until || 0}`);
     } catch {
       // Storage blocked: the home page just won't mention the drops.
     }

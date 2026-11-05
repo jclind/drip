@@ -920,7 +920,7 @@
    * @param {'watch' | 'rec'} kind
    */
   function shownCount(kind) {
-    const held = arriving ? Math.min(arriving[kind], state.tokens[kind]) : 0;
+    const held = Math.min((arriving ? arriving[kind] : 0) + (queued ? queued[kind] : 0), state.tokens[kind]);
     return Math.max(0, state.tokens[kind] - held);
   }
 
@@ -1479,6 +1479,12 @@
    * @type {{kind: 'kept' | 'new' | 'back', watch: number, rec: number} | null}
    */
   let arriving = null;
+  /**
+   * The landing after this one, held back too. "Done for now" into Dry hours lands the kept drops, then the drops back
+   * with their own tag (Jesse, 2026-11-05).
+   * @type {{kind: 'kept' | 'new' | 'back', watch: number, rec: number} | null}
+   */
+  let queued = null;
   /** The landing is running. */
   let landing = false;
   /** The landing is waiting for the page to show. */
@@ -1487,6 +1493,8 @@
   let refillTaken = '';
   /** The Dry hours whose drops back this page has shown. */
   let dryBackTaken = 0;
+  /** The Dry hours whose drops back the kept drops count, or 0 when the lock saved them before the drops came back. */
+  let keptBack = 0;
   /** When the lock's water last started falling away (watch.js onDone). */
   let lockFellAt = 0;
   document.addEventListener('drip-lock-falling', () => { lockFellAt = Date.now(); });
@@ -1501,7 +1509,10 @@
   function takeKept() {
     let kept = 0;
     try {
-      kept = Number(sessionStorage.getItem(KEPT_KEY));
+      // "7:1730845200000": 7 drops, counting the drops back from the Dry hours that end then (watch.js onDone).
+      const [n, back] = String(sessionStorage.getItem(KEPT_KEY) || '').split(':');
+      kept = Number(n);
+      keptBack = Number(back) || 0;
       sessionStorage.removeItem(KEPT_KEY);
     } catch {
       // Storage blocked: the drops are just there.
@@ -1519,8 +1530,27 @@
   /** The drops handed back when Dry hours began fall into the counter with "2 back", once (Q32). */
   function takeDryBack() {
     const b = state && state.dryBack;
-    if (!b || b.until === dryBackTaken || arriving || !homeInView()) return;
+    // Behind the kept drops, they land second with their own tag (Jesse, 2026-11-05).
+    // The kept landing is already waiting for the page, so this doesn't wait for it too.
+    const behind = !!arriving && arriving.kind === 'kept' && !queued;
+    if (!b || b.until === dryBackTaken || (arriving && !behind) || (!behind && !homeInView())) return;
     dryBackTaken = b.until;
+    const counted = keptBack === b.until;
+    // Seen only once the kept drops were already falling, and they hold these: no second landing, or the "Kept" tag
+    // would count them too.
+    if (behind && counted && landing) {
+      send({ type: 'dryBackSeen' }).then(absorb);
+      return;
+    }
+    if (behind && clockOn()) {
+      // Kept drops the lock counted after the drops came back hold them already, so they're taken out here. Both stay
+      // held back, so the count only rises (Codex, 2026-11-05).
+      const back = counted ? Math.min(b.watch, arriving.watch) : b.watch;
+      if (counted) arriving.watch -= back;
+      queued = { kind: 'back', watch: back, rec: 0 };
+      rendered = '';
+      return;
+    }
     if (!clockOn()) {
       send({ type: 'dryBackSeen' }).then(absorb);
       return;
@@ -1533,14 +1563,19 @@
   function takeRefill() {
     takeDryBack();
     const r = state && state.refill;
-    if (!r || r.day !== state.day || r.day === refillTaken || arriving || !homeInView()) return;
+    // Behind drops back that haven't started landing, the refill waits its turn but is held back from now, so the count
+    // doesn't rise with the first landing and fall when the second comes up (Codex, 2026-11-05).
+    const behind = !!arriving && arriving.kind === 'back' && !landing && !queued;
+    if (!r || r.day !== state.day || r.day === refillTaken || (arriving && !behind) || !homeInView()) return;
     refillTaken = r.day;
     // Without both counters on the page there's nowhere for the refill to land, so it's only marked seen (Q29).
     if (!clockOn() || cardsMode() !== 'limited') {
       send({ type: 'refillSeen' }).then(absorb);
       return;
     }
-    arriving = { kind: 'new', watch: r.watch, rec: r.rec };
+    const refill = /** @type {const} */ ({ kind: 'new', watch: r.watch, rec: r.rec });
+    if (behind) queued = refill;
+    else arriving = refill;
     rendered = '';
     landWhenShown();
   }
@@ -1557,12 +1592,20 @@
     try {
       while (arriving) {
         // Another tab showed the refill first, or the page never came into view: the counts just show the balance.
-        if ((arriving.kind === 'new' && state && !state.refill) || (arriving.kind === 'back' && state && !state.dryBack)
-          || Date.now() - started > 10000) {
+        if (Date.now() - started > 10000) {
           arriving = null;
+          queued = null;
           rendered = '';
           render();
           return;
+        }
+        // Another tab showed it first: the next one, if any, waits its turn.
+        if ((arriving.kind === 'new' && state && !state.refill) || (arriving.kind === 'back' && state && !state.dryBack)) {
+          arriving = queued;
+          queued = null;
+          rendered = '';
+          render();
+          continue;
         }
         const fell = lockFellAt >= started;
         // watch.js lets the water fall within 4 seconds of home showing. Past 6, the drops come in anyway.
@@ -1572,11 +1615,16 @@
       }
       if (!arriving) return;
       await sleep(lockFellAt >= started ? 250 : 400);
+      // State that came in during the wait may hold drops back to go after the kept drops.
+      takeDryBack();
       await land();
     } finally {
       waiting = false;
     }
+    // A landing that came up while this one ran (the drops back, or the day's refill) goes next.
+    if (arriving && !landing) landWhenShown();
   }
+
 
   async function land() {
     const a = arriving;
@@ -1600,7 +1648,8 @@
         cards: a.kind === 'new' ? { ...counts.rec, add: Math.min(a.rec, state.tokens.rec), release: release('rec') } : undefined,
       });
     } finally {
-      arriving = null;
+      arriving = queued;
+      queued = null;
       landing = false;
       rendered = '';
       render();
