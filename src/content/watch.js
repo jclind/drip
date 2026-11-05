@@ -1252,7 +1252,10 @@
     // Count down between ticks, which only go out every few seconds. During an ad, the time not banked yet is all ad
     // (syncAd banked what came before it), and ads aren't charged (Q27).
     const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
-    const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
+    // The worker saves before it replies, so the state can already count a tick still waiting here. Those seconds
+    // aren't taken off twice (Codex, 2026-11-05).
+    const counted = (/** @type {string} */ key) => state.ticksIn.find((/** @type {[string, number]} */ t) => t[0] === key)?.[1] || 0;
+    const pending = unsent.reduce((sum, entry) => sum + Math.max(0, entry.seconds - counted(entry.key)), 0) + live;
     const left = Math.max(0, state.watchSecondsLeft - pending);
     // The 5 minutes before Dry hours, the pill counts down to them instead, and shimmers (Jesse, 2026-11-04).
     const soon = clockOn && !grace && !unlocked ? Drip.drySoon(state, Date.now()) : 0;
