@@ -350,6 +350,8 @@
       else showLock();
       return;
     }
+    // Playing now, before Dry hours, counts even if the first tick lands after they begin (Codex, 2026-11-04).
+    if (state && !Drip.dryUntil(state, Date.now())) playedBeforeDry = videoId();
     watchAds();
     startRun();
   }

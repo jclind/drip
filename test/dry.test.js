@@ -225,3 +225,18 @@ test('export, import, and reset carry Dry hours through the range rule', () => {
   assert.deepEqual(res.pending.dryHours, false);
   assert.equal(D.hydrate(structuredClone(to), now).settings.dryFrom, 22);
 });
+
+test('a waiting range joined onto today\'s is followed to its real end, past 25 hours (Codex, 2026-11-04)', () => {
+  const now = time(5, 23);
+  const state = dry(23, 6, now);
+  // 3am to 2am waits for 4am: dry from 11pm through 2am the day after tomorrow, 27 hours.
+  state.pending = { effectiveDay: D.addDays(state.day, 1), changes: { dryHours: true, dryFrom: 3, dryTo: 2 } };
+  assert.equal(D.dryUntil(state, now), time(7, 2));
+});
+
+test('Watch time turning off at the reset ends Dry hours there (Codex, 2026-11-04)', () => {
+  const now = time(5, 23);
+  const state = dry(23, 6, now);
+  state.pending = { effectiveDay: D.addDays(state.day, 1), changes: { clock: false } };
+  assert.equal(D.dryUntil(state, now), time(6, 4));
+});

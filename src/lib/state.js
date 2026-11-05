@@ -626,7 +626,8 @@
 
   /**
    * When the Dry hours going on now end, in ms, or 0 when it isn't dry now or the clock is off. It walks forward an
-   * hour at a time with the settings in force at each hour, so a change waiting for the reset counts from the reset.
+   * hour at a time with the settings in force at each hour, so a change waiting for the reset counts from the reset,
+ * Watch time turning off included.
    * Each step is the next hour on the clock, so DST's skipped and repeated hours count as the clock shows them.
    * @param {State} state @param {number} now
    */
@@ -638,11 +639,13 @@
     const dryAt = (t) => {
       const waiting = pending && dayKey(t, settings.resetHour) >= pending.effectiveDay;
       const s = waiting ? { ...settings, ...pending.changes } : settings;
-      return dryHourSet(s).has(new Date(t).getHours());
+      // Watch time turning off at the reset ends Dry hours there too (Codex, 2026-11-04).
+      return s.clock !== false && dryHourSet(s).has(new Date(t).getHours());
     };
     if (!dryAt(now)) return 0;
     let t = now;
-    for (let i = 0; i < 25; i++) {
+    // Up to a day of today's settings, then at most 23 dry hours of a waiting range joined on (Codex, 2026-11-04).
+    for (let i = 0; i < 49; i++) {
       const d = new Date(t);
       t = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime();
       if (!dryAt(t)) break;

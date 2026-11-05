@@ -639,10 +639,10 @@ test('with grace off, every playing tab stops at zero', async () => {
   assert.equal(b.video.paused, true);
 });
 
-/** A world whose clock starts at this local time on Oct 6, with Dry hours on from 11pm to 6am. @param {number} hour @param {number} minute @param {number} [second] */
-function dryWorld(hour, minute, second = 0) {
+/** A world whose clock starts at this local time on Oct 6, with Dry hours on from 11pm to 6am. @param {number} hour @param {number} minute @param {number} [second] @param {number} [ms] */
+function dryWorld(hour, minute, second = 0, ms = 0) {
   const world = makeWorld();
-  world.epoch = new Date(2026, 9, 6, hour, minute, second).getTime();
+  world.epoch = new Date(2026, 9, 6, hour, minute, second, ms).getTime();
   world.state.day = world.D.dayKey(world.epoch, 4);
   Object.assign(world.state.settings, { dryHours: true, dryFrom: 23, dryTo: 6 });
   return world;
@@ -662,6 +662,19 @@ test('a video playing when Dry hours begin finishes, with grace mode off (DRY-HO
   await tab.second();
   assert.equal(tab.video.paused, false);
   assert.equal(tab.locked(), false);
+});
+
+test('a video that starts in the last second before Dry hours still finishes (Codex, 2026-11-04)', async () => {
+  const world = dryWorld(22, 59, 59, 500);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  // A tick while paused attaches the player, so the play below is heard at 10:59:59.5pm, and the next tick is past 11pm.
+  await tab.tick();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.equal(tab.video.paused, false);
+  assert.equal(tab.root.getAttribute('data-drip-grace'), 'aaa');
 });
 
 test('a video started in Dry hours stops at zero like any other', async () => {
