@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>drip settings</title>
+    <base href="../src/options/" />
+    <script>
+      // drip's real Settings page on localhost, for checks the browser tools can't reach on chrome-extension:// pages.
+      // Serve the repo with python3 -m http.server 8077 and open http://localhost:8077/dev/options.html. A stand-in
+      // for the worker answers with two weeks of history; set window.__delay (ms) to make Save wait.
+      window.__listeners = [];
+      let st = null;
+      const world = () => {
+        if (st) return st;
+        const D = globalThis.Drip, now = Date.now();
+        st = D.initialState(now);
+        st.installedAt = now - 30 * 864e5;
+        for (let i = 0; i < 15; i++) { const day = D.addDays(st.day, -i); st.log[day] = { watchedSec: 600 + i * 300, watchSpent: 1, recSpent: 2, saved: 0, passed: 0, watched: 1, needThis: [] }; }
+        return st;
+      };
+      window.chrome = {
+        runtime: {
+          getURL: (p) => `${location.origin}/${p}`,
+          getManifest: () => ({ version: '0.0.0' }),
+          onMessage: { addListener() {} },
+          sendMessage: async (msg) => {
+            const s = world();
+            if (msg.type === 'updateSettings') {
+              await new Promise((r) => setTimeout(r, window.__delay || 0));
+              const result = globalThis.Drip.updateSettings(s, msg.changes || {}, Date.now());
+              return { ...result, state: structuredClone(s) };
+            }
+            return { ok: true, state: structuredClone(s) };
+          },
+        },
+        storage: { onChanged: { addListener: (fn) => window.__listeners.push(fn) }, local: { get: async () => ({}) }, session: { get: async () => ({}), set: async () => {} } },
+      };
+    </script>
+    <link rel="stylesheet" href="../pages.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body class="settings">
+    <main>
+      <h1>drip settings</h1>
+      <p class="sample-note" id="sampleNote" hidden>
+        Sample data: <strong id="sampleName"></strong>. Nothing on this page is saved.
+        <button class="link" id="sampleBack" type="button">Show my data</button>
+      </p>
+
+      <p class="first-day" id="firstDay" hidden></p>
+      <form id="settings" novalidate></form>
+      <!-- Where someone ends up after scrolling past every setting without finding theirs. Email, so nothing leaves the
+           browser unless they send it. -->
+      <p class="feedback">
+        <a href="mailto:apps@jesselind.com?subject=drip%3A%20a%20setting%20I%27d%20want">Missing a setting? Tell me what you'd want.</a>
+      </p>
+
+      <h1 class="history-title">History</h1>
+      <div class="card" id="history"></div>
+
+      <section id="reasons-section" hidden>
+        <h2 class="caps">Why you needed one</h2>
+        <p class="muted reasons-count" id="reasons-count"></p>
+        <ul class="reasons" id="reasons"></ul>
+        <div class="reasons-more" id="reasons-more"></div>
+      </section>
+
+      <section id="data">
+        <h2 class="caps">Your data</h2>
+        <p class="muted">
+          Export saves your settings, stash, history, and channel lists as a file. Import adds a file's stash, history,
+          and channels and uses its settings. Anything that loosens a limit starts at the next new day.
+        </p>
+        <div class="data-buttons" id="dataButtons">
+          <button type="button" id="exportData">Export</button>
+          <button type="button" id="importData">Import</button>
+          <input type="file" id="importFile" accept=".json,application/json" hidden />
+          <button type="button" id="resetData">Reset</button>
+        </div>
+        <div class="data-confirm" id="resetConfirm" hidden>
+          <p>
+            Put every setting back to how drip started, and empty your stash and channel lists? Your history and today's
+            drops and cards stay. Anything that loosens a limit starts at <span id="resetWhen"></span>.
+          </p>
+          <div class="data-buttons">
+            <button type="button" class="primary" id="resetYes">Reset</button>
+            <button type="button" id="resetNo">Cancel</button>
+          </div>
+        </div>
+        <p class="muted data-result" id="dataResult" role="status"></p>
+      </section>
+
+      <!-- Shown only in a build that has the dev panel, so never in the store build. -->
+      <section id="dev" hidden>
+        <h2 class="caps">Developer mode</h2>
+        <label class="dev-row">
+          <input type="checkbox" id="devMode" />
+          <span>Show the dev panel on YouTube pages</span>
+        </label>
+        <label class="dev-row" id="firstDayOffRow" hidden>
+          <input type="checkbox" id="firstDayOff" />
+          <span>Loosening waits for the reset, even in the first day</span>
+        </label>
+        <div class="dev-row sample-row" id="sampleRow" hidden>
+          <label for="sample">Show Settings with</label>
+          <div class="picker-wrap"><select class="picker" id="sample"></select></div>
+        </div>
+        <p class="muted" id="devHint">
+          For testing. The panel sets minutes and tokens and runs the daily reset now, so it undoes every limit while
+          it's on. Turn it off when you're done.
+        </p>
+      </section>
+    </main>
+
+    <!-- Stays in view while there are edits not saved. The live region sits outside it, since a hidden one can't speak. -->
+    <div class="savebar" id="savebar" hidden>
+      <span class="savebar-text" id="result"></span>
+      <button class="link" id="undoAll" type="button">Undo all</button>
+      <button class="primary" id="save" type="button">Save</button>
+    </div>
+    <span class="sr" id="status" role="status"></span>
+    <script src="../lib/state.js"></script>
+    <script src="../pages.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

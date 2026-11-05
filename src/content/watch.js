@@ -461,6 +461,9 @@
       const status = Drip.watchStatus(state, videoId(), Date.now());
       if (status.locked && (!locked || inGrace())) applyStatus(status);
     }
+    // The lock's lines follow the clock: +15m comes back when Dry hours end and goes 5 minutes before they start.
+    // showLock redraws only when its view changed (Codex, 2026-11-05).
+    if (locked && !inGrace() && liveLock()) showLock();
     if (locked && !inGrace()) pausePlayer(video);
     renderPill();
   }
@@ -990,7 +993,9 @@
     else res = await send({ type: 'addBacklog', video: thisVideo(id) });
     if (res && !res.ok && res.error === 'stash-full' && !disconnected) {
       state = res.state;
-      openSwap(keyboard);
+      // Moved on to another video while the worker answered: the list would be for this one (Codex, 2026-11-05).
+      if (videoId() === id) openSwap(keyboard);
+      else renderPill();
       return;
     }
     took(res);
@@ -1022,6 +1027,8 @@
   let swapLayer = null;
   /** The video whose list is up, or ''. */
   let swapOpen = '';
+  /** The stashed videos the open list shows, so a change from another tab can redraw or close it. @type {string[]} */
+  let swapIds = [];
   /** @type {{dropped: any, index: number, newId: string, timer: number} | null} */
   let swapped = null;
 
@@ -1032,6 +1039,7 @@
       swapped = null;
     }
     if (swapOpen && (!state || swapOpen !== id || state.backlog.some((/** @type {any} */ v) => v.id === id))) swapOpen = '';
+    swapIds = swapOpen ? state.backlog.map((/** @type {any} */ v) => v.id) : [];
     const parts = [
       swapOpen && DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap }),
       swapped && DripSwap.note(swapped.dropped, onSwapUndo),
@@ -1064,6 +1072,14 @@
     renderPill();
   }
 
+  /** The stash changed under the open list, say in another tab: it closes, or shows what's there now. */
+  function followSwap() {
+    if (!swapOpen || !state) return;
+    const what = Drip.swapFollow(swapIds, state, swapOpen);
+    if (what === 'close') closeSwap();
+    else if (what === 'redraw') openSwap(!!swapLayer?.contains(document.activeElement));
+  }
+
   function closeSwap() {
     const had = !!swapLayer?.contains(document.activeElement);
     swapOpen = '';
@@ -1079,6 +1095,17 @@
     const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
     swapOpen = '';
     const res = await send({ type: 'swapBacklog', video: thisVideo(id), dropId: drop.id });
+    // The video picked went from the stash in the meantime: the list comes back with what's there now.
+    if (res && !res.ok && res.error === 'not-stashed' && res.state && !disconnected) {
+      state = res.state;
+      if (videoId() === id && Drip.swapFollow([], state, id) !== 'close') openSwap(false);
+      else {
+        // Room now, or moved on: the list that was up goes (Codex, 2026-11-05).
+        drawSwap();
+        renderPill();
+      }
+      return;
+    }
     if (res && res.ok && res.dropped) {
       if (swapped) clearTimeout(swapped.timer);
       const timer = window.setTimeout(() => {
@@ -1327,6 +1354,7 @@
     // Another tab may have used up the minutes. A video playing here when that happened gets grace too (Q3).
     if (wasFunded && status.locked && graceAllowed(id) && clockActive() && video && !video.paused) setGrace(id);
     applyStatus(status, !!(pendingTick && pendingTick.id === id && pendingTick.paid));
+    followSwap();
     renderPill();
   });
   // Time played up to here belongs to the video being left, not the next one.
