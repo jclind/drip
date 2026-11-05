@@ -6,6 +6,7 @@
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
   const { send: sendMessage, h, onState, hourLabel, dayTimeLabel, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const DripMorph = /** @type {any} */ (globalThis).DripMorph;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
@@ -1319,7 +1320,9 @@
       for (const ev of ['focusin', 'focusout']) pill.addEventListener(ev, () => setTimeout(pillLook));
     }
     const focused = pill.contains(document.activeElement);
-    pill.replaceChildren(...content.filter(Boolean));
+    // In place (morph.js): the minutes changing every minute leave Stash the same button, so a press on it isn't lost
+    // (Codex, 2026-11-05).
+    DripMorph.morphChildren(pill, h('div', {}, ...content.filter(Boolean)));
     if (pill.parentElement !== parent) parent.append(pill);
     // No player found: pinned to the window instead, below YouTube's top bar, where it can still be seen and clicked.
     pill.classList.toggle('is-floating', parent === document.body);

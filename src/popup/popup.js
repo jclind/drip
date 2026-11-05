@@ -9,6 +9,8 @@ var Drip = /** @type {any} */ (globalThis).Drip;
 var DripGlass = /** @type {any} */ (globalThis).DripGlass;
 /** @type {any} */
 var DripPage = /** @type {any} */ (globalThis).DripPage;
+/** @type {any} */
+var DripMorph = /** @type {any} */ (globalThis).DripMorph;
 
 const GLASS_PX = 34;
 /** @type {SVGSVGElement | null} */
@@ -46,10 +48,14 @@ function draw(state, stats) {
   }, icon(token, `drip-token-${token}`), h('span', {}, String(n)), h('span', { class: 'sr' }, n === 1 ? ` ${token}` : ` ${token}s`));
   const clock = state.settings.clock !== false;
   const cards = state.settings.cards === 'limited';
+  // In place (morph.js), so a minute ticking down leaves the count buttons as they are: a press on one isn't lost
+  // (Codex, 2026-11-05).
+  /** @param {...any} kids */
+  const put = (...kids) => DripMorph.morphChildren(stats, h('div', {}, ...kids));
   // Without the clock the popup names the mix. Counted cards are a line under it, not a lone number (Jesse, 2026-10-15).
   if (!clock) {
     const name = { quiet: 'Quiet', curated: 'Curated', full: 'Full drip' }[/** @type {string} */ (Drip.modeOf(state.settings))] || 'Custom';
-    stats.replaceChildren(h('div', { class: 'top' }, h('div', { class: 'time-block' },
+    put(h('div', { class: 'top' }, h('div', { class: 'time-block' },
       h('div', { class: 'time' }, name),
       cards
         ? h('button', { type: 'button', class: `sub sub-count${rec ? '' : ' is-zero'}`, 'data-k': 'card', title: 'Cards settings', onclick: () => openSettings('cards') },
@@ -57,7 +63,7 @@ function draw(state, stats) {
         : h('div', { class: 'sub' }, "YouTube's feeds are hidden."))));
     return;
   }
-  stats.replaceChildren(...[
+  put(...[
     clock && h('div', { class: 'top' },
       h('div', { class: 'tile' }, glassEl),
       h('div', { class: 'time-block' },
