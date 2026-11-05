@@ -29,6 +29,8 @@
  *   first day, so every loosening waits for the reset (Jesse, 2026-11-03). Test tooling, off by default.
  * @property {{id: string, ids: string[]}[]} allowedToday Videos a watch page showed are from an allowed channel, with
  *   that channel's ids. Free only while the channel is still allowed, and cleared at the reset.
+ * @property {[string, number][]} ticksIn The last few tick keys, each with the seconds sent under it. A tab hears the
+ *   saved state before the tick's reply, and this tells it which of its unsent seconds the balance already counts.
  */
 /**
  * A YouTube channel as drip saw it. `ids` are its `@handle` in lowercase and, when a page showed one, its `UC...` id.
@@ -173,7 +175,7 @@
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
       refill: null, drySeen: 0, boughtAt: 0, dryBack: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
-      firstDayOff: false,
+      firstDayOff: false, ticksIn: [],
     };
   }
 
@@ -245,6 +247,7 @@
     if (back && count(back.until, 0) > 0 && count(back.watch, 0) > 0) state.dryBack = { until: back.until, watch: back.watch };
     state.installedAt = count(stored.installedAt, 0);
     state.firstDayOff = stored.firstDayOff === true;
+    state.ticksIn = cleanTicks(stored.ticksIn).slice(-TICKS_IN);
     const lists = /** @type {any} */ (stored.channels);
     state.channels = { allow: cleanChannels(lists?.allow).filter((c) => c.ids.length), block: cleanChannels(lists?.block) };
     const waiting = /** @type {any} */ (stored.channelsPending);
@@ -562,6 +565,15 @@
 
   /** How many recent tick keys the clock remembers, to spot a resent tick. */
   const TICK_KEYS = 20;
+  /** How many tick keys the saved state keeps for the pages. Each tab has at most a couple of ticks out at once. */
+  const TICKS_IN = 8;
+
+  /** Well-formed [key, seconds] pairs. @param {unknown} raw @returns {[string, number][]} */
+  function cleanTicks(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((t) => Array.isArray(t) && typeof t[0] === 'string' && t[0] && typeof t[1] === 'number' && Number.isFinite(t[1]) && t[1] >= 0)
+      .map((t) => /** @type {[string, number]} */ ([t[0], t[1]]));
+  }
 
   /**
    * Charges only paid playback not already covered by another tab.
@@ -585,6 +597,9 @@
       const charged = ticks.find((t) => t[0] === key);
       const before = charged ? Number(charged[1]) || 0 : 0;
       clock.ticks = [...ticks.filter((t) => t !== charged), /** @type {[string, number]} */ ([key, Math.max(before, seconds)])].slice(-TICK_KEYS);
+      // The same for the pages, in the state the tab hears before this tick's reply.
+      const seen = state.ticksIn.find((t) => t[0] === key);
+      state.ticksIn = [...state.ticksIn.filter((t) => t !== seen), /** @type {[string, number]} */ ([key, Math.max(seen ? seen[1] : 0, seconds)])].slice(-TICKS_IN);
       seconds = Math.max(0, seconds - before);
     }
     if (seconds === 0) return watchStatus(state, videoId);
