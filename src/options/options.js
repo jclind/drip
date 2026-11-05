@@ -571,6 +571,8 @@ function savedLine(waiting) {
 async function save() {
   const changes = toSave();
   if (!Object.keys(changes).length) return;
+  // The form stays open while the worker answers. An edit made meanwhile is kept, not replaced by the saved plan.
+  const sent = { ...draft };
   /** @type {any} */
   let res = null;
   try {
@@ -586,7 +588,7 @@ async function save() {
   }
   absorb(res);
   const hadFocus = $('savebar').contains(document.activeElement);
-  draft = Drip.planned(state);
+  draft = { ...Drip.planned(state), ...Drip.editsSince(sent, draft) };
   resetCardsKind();
   savedNote = savedLine(Object.keys(res.pending || {}));
   renderForm();

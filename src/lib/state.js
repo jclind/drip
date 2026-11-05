@@ -503,6 +503,16 @@
   }
 
   /**
+   * The edits made to a draft since a snapshot of it, so a save's reply can keep what changed while it was out (Codex,
+   * 2026-11-05).
+   * @param {Record<string, unknown>} before @param {Record<string, unknown>} now
+   * @returns {Record<string, unknown>}
+   */
+  function editsSince(before, now) {
+    return Object.fromEntries(Object.keys(now).filter((k) => now[k] !== before[k]).map((k) => [k, now[k]]));
+  }
+
+  /**
    * What an open full-stash list does when the stash changes under it, say in another tab: 'close' when the video it
    * was for got stashed, the stash has room now, or the stash is off; 'redraw' when its videos changed; else 'keep'
    * (Codex, 2026-11-05).
@@ -1705,7 +1715,7 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    firstDayUntil, removeBacklog, swapBacklog, swapFollow, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
+    firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,
