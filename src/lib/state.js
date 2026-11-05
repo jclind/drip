@@ -276,9 +276,36 @@
     return { watch: settings.watchTokensPerDay * settings.rolloverDays, rec: settings.recTokensPerDay * settings.rolloverDays };
   }
 
+  /** The local time a day's hour starts. @param {string} day @param {number} hour */
+  function atHour(day, hour) {
+    const [y, m, d] = day.split('-').map(Number);
+    return new Date(y, m - 1, d, hour).getTime();
+  }
+
+  const RESET_GAP_MS = 12 * 3600 * 1000;
+
+  /**
+   * After the reset hour changes from `oldHour`, the next reset is the first one at the new hour at least 12 hours
+   * after the last (Q12, Jesse, 2026-11-05). Before, 11pm to midnight refilled at 11pm and again at midnight. A later
+   * hour can make one long day instead, since a day is named for the date it starts and the name never goes back.
+   * `state.day` is the day that began at `oldHour`.
+   * @param {State} state @param {number} oldHour
+   */
+  function settleResetHour(state, oldHour) {
+    const hour = state.settings.resetHour;
+    if (hour === oldHour) return;
+    const start = atHour(state.day, oldHour);
+    let next = atHour(state.day, hour);
+    if (next <= start) next = atHour(addDays(state.day, 1), hour);
+    // A reset on the same date as this day starts this day's name again, so it isn't a reset.
+    if (dayKey(next, hour) <= state.day) next = atHour(addDays(state.day, 1), hour);
+    if (next - start < RESET_GAP_MS) state.day = dayKey(next, hour);
+  }
+
   /** @param {State} state @param {number} now */
   function rollDay(state, now) {
-    const nextDay = dayKey(now, state.settings.resetHour);
+    const oldHour = state.settings.resetHour;
+    const nextDay = dayKey(now, oldHour);
     if (nextDay <= state.day) return false;
     const elapsed = daysBetween(state.day, nextDay);
     if (state.pending && state.pending.effectiveDay <= nextDay) {
@@ -300,6 +327,7 @@
     state.unlocked = [];
     state.allowedToday = [];
     state.day = nextDay;
+    settleResetHour(state, oldHour);
     const oldest = addDays(nextDay, -89);
     for (const day of Object.keys(state.log)) {
       if (day < oldest) delete state.log[day];
@@ -909,6 +937,7 @@
       if (value === state.settings[key]) {
         cancelPending(state, key);
       } else if (firstDay) {
+        const before = state.settings[key];
         if (key === 'watchTokensPerDay') state.tokens.watch = Math.max(0, state.tokens.watch + Number(value) - state.settings.watchTokensPerDay);
         if (key === 'recTokensPerDay') state.tokens.rec = Math.max(0, state.tokens.rec + Number(value) - state.settings.recTokensPerDay);
         Object.assign(state.settings, { [key]: value });
@@ -916,6 +945,7 @@
         cancelPending(state, key);
         // An earlier hour would make the next message see a new day and refill. Today just ends at the new hour.
         if (key === 'resetHour' && now) {
+          settleResetHour(state, Number(before));
           const day = dayKey(now, state.settings.resetHour);
           if (day > state.day) state.day = day;
         }

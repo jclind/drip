@@ -855,6 +855,52 @@ test('an earlier reset hour on the first day ends today at the new hour, without
   assert.equal(D.rollDay(state, time(5, 7)), false);
 });
 
+// Q12, Jesse, 2026-11-05: after the reset hour changes, the next reset is the first one at the new hour at least 12
+// hours after the last. Before, 11pm to midnight refilled at 11pm and again at midnight.
+
+test('a reset hour moved from 11pm to midnight skips the midnight an hour later', () => {
+  const state = fresh();
+  state.settings.resetHour = 23;
+  state.day = D.dayKey(time(5, 12), 23);
+  D.updateSettings(state, { resetHour: 0 });
+  assert.deepEqual(state.pending?.changes, { resetHour: 0 });
+  state.tokens.watch = 0;
+  assert.equal(D.rollDay(state, time(5, 23, 1)), true, 'the change applies at the 11pm reset');
+  assert.equal(state.settings.resetHour, 0);
+  assert.equal(state.tokens.watch, 4);
+  state.tokens.watch = 0;
+  assert.equal(D.rollDay(state, time(6, 0, 1)), false, 'midnight is an hour after the last reset');
+  assert.equal(D.rollDay(state, time(6, 23, 59)), false);
+  assert.equal(state.tokens.watch, 0);
+  assert.equal(D.rollDay(state, time(7, 0, 1)), true, 'the next midnight, 25 hours after');
+  assert.equal(state.tokens.watch, 4);
+});
+
+test('on the first day, 11pm to midnight at 11:30pm does not refill at midnight either', () => {
+  const state = D.initialState(time(5, 23, 10));
+  state.settings.resetHour = 23;
+  state.day = D.dayKey(time(5, 23, 10), 23);
+  state.tokens.watch = 0;
+  assert.deepEqual(D.updateSettings(state, { resetHour: 0 }, time(5, 23, 30)).applied, { resetHour: 0 });
+  assert.equal(D.rollDay(state, time(6, 0, 30)), false);
+  assert.equal(state.tokens.watch, 0);
+  assert.equal(D.rollDay(state, time(7, 0, 30)), true);
+});
+
+test('an earlier reset hour 12 hours or more away keeps its first reset, and a later one makes a long day', () => {
+  const earlier = fresh();
+  D.updateSettings(earlier, { resetHour: 3 });
+  assert.equal(D.rollDay(earlier, time(6, 4)), true);
+  assert.equal(D.rollDay(earlier, time(7, 3, 1)), true, '4am to 3am the next day is 23 hours');
+  // A day is named for the date it starts at its reset hour, so 8pm on the 6th starts the 6th, the day that began at
+  // 4am. The day runs to 8pm on the 7th, 40 hours. Longer than 24, so it hands nothing back.
+  const later = fresh();
+  D.updateSettings(later, { resetHour: 20 });
+  assert.equal(D.rollDay(later, time(6, 4)), true);
+  assert.equal(D.rollDay(later, time(6, 20, 1)), false);
+  assert.equal(D.rollDay(later, time(7, 20, 1)), true);
+});
+
 test('settings result lists only this call, preserves other pending keys, and feeds apply now', () => {
   const state = fresh();
   D.updateSettings(state, { recTokensPerDay: 20 });
