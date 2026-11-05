@@ -754,6 +754,34 @@ test('the pill counts down to Dry hours in the 5 minutes before, and shimmers', 
   assert.match(tab.pill().textContent, /Dry in <1m/);
 });
 
+test('a video finishing on grace counts down to Dry hours too, since they stop it (Codex, 2026-11-05)', async () => {
+  // 22:54:30 with 10 seconds left and grace on: the video runs out and goes on to finish, then Dry hours come.
+  const world = dryWorld(22, 54, 30);
+  world.state.settings.graceMode = true;
+  world.state.watchSecondsLeft = 10;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 15);
+  assert.equal(tab.video.paused, false, 'grace lets it play on');
+  // The label waits for the glass to drain, on a real 700ms timer.
+  await new Promise((r) => setTimeout(r, 750));
+  await play(world, tab, 1);
+  assert.match(tab.pill().textContent, /Finishing this one/);
+  // At 22:55 the pill says Dry hours stop it, with the rings, then counts down, and shimmers.
+  await play(world, tab, 15);
+  assert.doesNotMatch(tab.pill().textContent, /Finishing this one/);
+  assert.match(tab.pill().textContent, /Dry hours · video stops at 11:00pm/);
+  await play(world, tab, 6);
+  assert.match(tab.pill().textContent, /Dry in 5m/);
+  assert.ok(tab.pill().classList.contains('is-low'));
+  world.advance(4 * 60);
+  await tab.tick();
+  await play(world, tab, 60);
+  assert.equal(tab.video.paused, true, 'Dry hours stop it');
+  assert.ok(tab.locked());
+});
+
 test('a video started in Dry hours stops at zero like any other', async () => {
   const world = dryWorld(23, 30);
   world.state.watchSecondsLeft = 3;
