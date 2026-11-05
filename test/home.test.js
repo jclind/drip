@@ -1303,3 +1303,15 @@ test('an idle home page changes to its dry form when Dry hours end, with no relo
   assert.ok(tab.button('add'), '+15m is back');
   assert.equal(tab.button('add').hasAttribute('disabled'), false);
 });
+
+test('with no minutes in the 5 minutes before Dry hours, the out page says when they start, not "out for today"', async () => {
+  const world = makeWorld();
+  Object.assign(world.state.settings, { dryHours: true, dryFrom: 13, dryTo: 15 });
+  const tab = await makeTab(world);
+  tab.skip(56 * 60e3);
+  await tab.advance(1000);
+  const text = tab.root().textContent;
+  assert.match(text, /Dry hours at 1:00pm\./);
+  assert.match(text, /Drops work again at 3:00pm\./);
+  assert.doesNotMatch(text, /out for today/);
+});

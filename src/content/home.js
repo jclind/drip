@@ -1028,6 +1028,10 @@
       h('div', { class: 'drip-out-copy' },
         ...(dryEnd()
           ? [h('h2', {}, 'Dry hours.'), h('p', {}, `Drops work again at ${dryLabel()}.`)]
+          // In the 5 minutes before, the drops are held back, not gone, so the page doesn't say "out for today".
+          : drySoonAt()
+            ? [h('h2', {}, `Dry hours at ${drySoonLabel()}.`),
+              h('p', {}, `Drops work again at ${hourLabel(new Date(Drip.dryUntil(state, drySoonAt())).getHours())}.`)]
           : [h('h2', {}, "You're out for today."), h('p', {}, `The glass refills at ${hourLabel(state.settings.resetHour)}.`)]),
         cardsCarried() > 0 && h('p', {}, `${cardsCarried()} ${cardsCarried() === 1 ? 'card carries' : 'cards carry'} over to tomorrow.`)));
   }
