@@ -423,12 +423,12 @@ function gridMarks(document, item, kind) {
 /**
  * One YouTube tab on the home page, running home.js.
  * @param {ReturnType<typeof makeWorld>} world
- * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: number}} [opts] reduced: the browser asks for
+ * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string}} [opts] reduced: the browser asks for
  *   reduced motion, so nothing animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that
  *   kind's markup (gridMarks). inView: drip's home page is on screen, so drops land in the counter, and tab.landings
- *   records each landing. kept: the drops "Done for now" left in sessionStorage (watch.js onDone).
+ *   records each landing. kept: what "Done for now" left in sessionStorage, "N" or "N:dryUntil" (watch.js onDone).
  */
-async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = 0 } = {}) {
+async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '' } = {}) {
   let now = 0;
   world.time = () => EPOCH + now;
   /** @type {Map<number, {fn: Function, at: number, every: number}>} */
@@ -464,7 +464,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
   if (inView) document.documentElement.setAttribute('data-drip-shown', '');
   document.body = new FakeElement(document, 'body');
   /** @type {Map<string, string>} */
-  const session = new Map(kept ? [['drip-kept', String(kept)]] : []);
+  const session = new Map(kept ? [['drip-kept', kept]] : []);
   document.documentElement.append(document.body);
   document.activeElement = document.body;
 
@@ -1287,11 +1287,25 @@ test('"Done for now" into Dry hours lands the kept drops, then "2 back", and the
   world.state.watchSecondsLeft = 40 * 60;
   world.state.tokens.watch = 2;
   // The lock saw 4 drops when "Done for now" was clicked: 2 kept, and 2 back from the 40 minutes.
-  const tab = await makeTab(world, { inView: true, kept: 4 });
+  const until = world.D.dryUntil(world.state, world.time());
+  const tab = await makeTab(world, { inView: true, kept: `4:${until}` });
   await tab.advance(3000);
   assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 2], ['back', 2]]);
   assert.equal(tab.drops(), 4);
   assert.equal(world.state.dryBack, null, 'the drops back were marked seen');
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('kept drops the lock saved before the drops came back land in full, then "2 back" (Codex, 2026-11-05)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 40 * 60;
+  world.state.tokens.watch = 2;
+  // A paused page locks on its own at the start, before any message has handed the drops back.
+  const tab = await makeTab(world, { inView: true, kept: '2:0' });
+  await tab.advance(3000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 2], ['back', 2]]);
+  assert.equal(tab.drops(), 4);
   assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
 });
 
@@ -1313,7 +1327,7 @@ test('drops back and the day\'s refill both land, one after the other, and neith
 test('kept drops with nothing back land once, as before', async () => {
   const world = makeWorld();
   world.state.tokens.watch = 3;
-  const tab = await makeTab(world, { inView: true, kept: 3 });
+  const tab = await makeTab(world, { inView: true, kept: '3:0' });
   await tab.advance(3000);
   assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 3]]);
   assert.equal(tab.drops(), 3);

@@ -1493,6 +1493,8 @@
   let refillTaken = '';
   /** The Dry hours whose drops back this page has shown. */
   let dryBackTaken = 0;
+  /** The Dry hours whose drops back the kept drops count, or 0 when the lock saved them before the drops came back. */
+  let keptBack = 0;
   /** When the lock's water last started falling away (watch.js onDone). */
   let lockFellAt = 0;
   document.addEventListener('drip-lock-falling', () => { lockFellAt = Date.now(); });
@@ -1507,7 +1509,10 @@
   function takeKept() {
     let kept = 0;
     try {
-      kept = Number(sessionStorage.getItem(KEPT_KEY));
+      // "7:1730845200000": 7 drops, counting the drops back from the Dry hours that end then (watch.js onDone).
+      const [n, back] = String(sessionStorage.getItem(KEPT_KEY) || '').split(':');
+      kept = Number(n);
+      keptBack = Number(back) || 0;
       sessionStorage.removeItem(KEPT_KEY);
     } catch {
       // Storage blocked: the drops are just there.
@@ -1525,8 +1530,19 @@
   /** The drops handed back when Dry hours began fall into the counter with "2 back", once (Q32). */
   function takeDryBack() {
     const b = state && state.dryBack;
-    if (!b || b.until === dryBackTaken || arriving || !homeInView()) return;
+    // Behind the kept drops, they land second with their own tag (Jesse, 2026-11-05).
+    const behind = !!arriving && arriving.kind === 'kept' && !queued;
+    if (!b || b.until === dryBackTaken || (arriving && !behind) || !homeInView()) return;
     dryBackTaken = b.until;
+    if (behind && clockOn()) {
+      // Kept drops the lock counted after the drops came back hold them already, so they're taken out here. Both stay
+      // held back, so the count only rises (Codex, 2026-11-05).
+      const back = keptBack === b.until ? Math.min(b.watch, arriving.watch) : b.watch;
+      if (keptBack === b.until) arriving.watch -= back;
+      queued = { kind: 'back', watch: back, rec: 0 };
+      rendered = '';
+      return;
+    }
     if (!clockOn()) {
       send({ type: 'dryBackSeen' }).then(absorb);
       return;
@@ -1591,7 +1607,8 @@
       }
       if (!arriving) return;
       await sleep(lockFellAt >= started ? 250 : 400);
-      splitBack();
+      // State that came in during the wait may hold drops back to go after the kept drops.
+      takeDryBack();
       await land();
     } finally {
       waiting = false;
@@ -1600,19 +1617,6 @@
     if (arriving && !landing) landWhenShown();
   }
 
-  /**
-   * The kept drops count the drops Dry hours handed back, since the lock saw them. Those land second, as "2 back", so
-   * the kept landing takes them out. Both stay held back, so the count doesn't move between the two.
-   */
-  function splitBack() {
-    const b = state && state.dryBack;
-    if (!arriving || arriving.kind !== 'kept' || !b || b.until === dryBackTaken) return;
-    const back = Math.min(b.watch, arriving.watch);
-    dryBackTaken = b.until;
-    if (!clockOn() || back <= 0) return;
-    arriving.watch -= back;
-    queued = { kind: 'back', watch: back, rec: 0 };
-  }
 
   async function land() {
     const a = arriving;
