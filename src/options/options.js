@@ -551,7 +551,11 @@ function absorb(res) {
   return res;
 }
 
-/** Save and Undo all hide the button pressed, so focus goes to the mode picker, the top of the form, not the page's. */
+/**
+ * Save and Undo all hide the button pressed, so focus goes to the mode picker, the top of the form, not the page's.
+ * Only after a key press: a mouse click leaves focus alone, since moving it scrolls the page to the top (air, 2026-11-05).
+ */
+const keyedSavebar = () => $('savebar').contains(document.activeElement) && !!document.activeElement?.matches(':focus-visible');
 const focusForm = () => /** @type {HTMLElement | null} */ (document.querySelector('.segmented [tabindex="0"]'))?.focus();
 
 /**
@@ -587,7 +591,7 @@ async function save() {
     return;
   }
   absorb(res);
-  const hadFocus = $('savebar').contains(document.activeElement);
+  const hadFocus = keyedSavebar();
   draft = { ...Drip.planned(state), ...Drip.editsSince(sent, draft) };
   resetCardsKind();
   savedNote = savedLine(Object.keys(res.pending || {}));
@@ -603,7 +607,7 @@ async function save() {
 
 /** Undo all: the form goes back to the saved settings, waiting changes included. */
 function undoAll() {
-  const hadFocus = $('savebar').contains(document.activeElement);
+  const hadFocus = keyedSavebar();
   draft = Drip.planned(state);
   resetCardsKind();
   savedNote = '';
