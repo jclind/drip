@@ -15,8 +15,6 @@ Jesse asked for these to be waiting for the session on upload day (2026-11-05). 
 5. Put `store/PRIVACY.md` at a public URL and give it to the listing. It was rewritten in PR 69 for the channel lists and the channel-page lookup.
 6. Upload the zip, fill the listing from `store/LISTING.md`, then tag the release as `bin/build-release` prints: `git tag v1.0.0 && git push origin v1.0.0`.
 
-Still open from PR 69: whether a short Dry hours range just before the reset may turn leftover minutes into drops (Q11 against Q32). It doesn't block the upload.
-
 ## Status, 2026-10-06 evening
 
 - Steps 1 to 6 are done in stacked PRs #10 (audit) → #11 (state rules) → #12 (watch clock) → #13 (welcome, live pages, release build) → #14 (broken-page banner, store drafts). Merge them in that order. Each one had a Codex review, and every finding was fixed. 86 tests pass.
