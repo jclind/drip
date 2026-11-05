@@ -666,3 +666,22 @@ test('openSettings brings an open Settings tab forward and tells it where to go,
     ['broadcast', { type: 'settingsGoto', section: 'cards' }],
   ]);
 });
+
+test('a tick at the start of Dry hours is charged before the minutes come back as drops (Codex, 2026-11-04)', async () => {
+  require('../src/lib/state.js');
+  const D = /** @type {any} */ (globalThis).Drip;
+  const now = Date.now();
+  const hour = new Date(now).getHours();
+  const state = D.initialState(now);
+  // Dry hours over the current hour, not yet handled, with 30 minutes and 2 seconds left and no drops.
+  Object.assign(state.settings, { dryHours: true, dryFrom: hour, dryTo: (hour + 1) % 24 });
+  state.watchSecondsLeft = 30 * 60 + 2;
+  state.watchSecondsBought = state.watchSecondsLeft;
+  state.tokens.watch = 0;
+  const w = worker(state);
+  await w.send({ type: 'tick', videoId: 'abc', seconds: 5, ago: 0, playing: true, key: 'k1' });
+  await w.idle();
+  const saved = w.store.drip;
+  assert.equal(saved.watchSecondsLeft, 0);
+  assert.equal(saved.tokens.watch, 1, '29m57s is one whole drop, not two');
+});

@@ -324,3 +324,35 @@ test('Dry hours turned off and on again in one night take the new minutes back t
   assert.equal(state.tokens.watch, 3);
   assert.equal(state.watchSecondsLeft, 0);
 });
+
+test('Dry hours that came and went with every tab closed still hand the minutes back (Codex, 2026-11-04)', () => {
+  const state = dry(13, 14);
+  state.tokens.watch = 2;
+  D.spendWatch(state, time(5, 12, 30));
+  D.spendWatch(state, time(5, 12, 30));
+  assert.equal(state.boughtAt, time(5, 12, 30));
+  assert.equal(D.enterDry(state, time(5, 15)), true);
+  assert.equal(state.watchSecondsLeft, 0);
+  assert.equal(state.tokens.watch, 2);
+  assert.deepEqual(state.dryBack, { until: time(5, 14), watch: 2 });
+  assert.equal(D.enterDry(state, time(5, 15, 1)), true, 'the mark then clears');
+  assert.equal(D.enterDry(state, time(5, 15, 2)), false);
+});
+
+test('overnight, the missed start hands the minutes back before the reset clears them', () => {
+  const state = dry(23, 6, time(5, 22));
+  state.tokens.watch = 1;
+  D.spendWatch(state, time(5, 22, 30));
+  // The next message is at 8am: enterDry runs first, then the reset.
+  D.enterDry(state, time(6, 8));
+  assert.equal(state.tokens.watch, 1);
+  D.rollDay(state, time(6, 8));
+  assert.equal(state.tokens.watch, 5, 'the drop back, then the day\'s 4');
+});
+
+test('minutes from a dev button, with no purchase time, are left to the current Dry hours', () => {
+  const state = dry(13, 14);
+  state.watchSecondsLeft = 900;
+  assert.equal(D.enterDry(state, time(5, 15)), false);
+  assert.equal(state.watchSecondsLeft, 900);
+});

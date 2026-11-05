@@ -153,9 +153,11 @@ function withState(fn, toolbarTick) {
     const now = Date.now();
     const [stored, session] = await Promise.all([chrome.storage.local.get(KEY), chrome.storage.session.get(CLOCK_KEY)]);
     const state = Drip.hydrate(stored[KEY], now);
+    // Dry hours starting take the minutes back as drops, once (Q32), and before the reset clears them. A tick goes
+    // first, so the seconds played before the start are charged before the drops are counted (Codex, 2026-11-04),
+    // unless the reset is due, which would clear the minutes first.
+    if (!toolbarTick || Drip.dayKey(now, state.settings.resetHour) > state.day) Drip.enterDry(state, now);
     Drip.rollDay(state, now);
-    // Dry hours starting take the minutes back as drops, once (Q32). Like rollDay, the next message saves it.
-    Drip.enterDry(state, now);
     const before = stableJson(stored[KEY]);
     /** @type {any} */
     const saved = session[CLOCK_KEY];

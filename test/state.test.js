@@ -129,7 +129,7 @@ test('initialState has the specified shape and independent mutable values', () =
   assert.deepEqual(state, {
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
-    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, dryBack: null, installedAt: time(5),
+    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dryBack: null, installedAt: time(5),
     channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false,
   });
   state.settings.recTokensPerDay = 1;

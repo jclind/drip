@@ -16,6 +16,8 @@
  * @property {Object<string, LogDay>} log
  * @property {Refill | null} refill What the last reset added, until a home page has shown it.
  * @property {number} drySeen The end of the Dry hours whose start enterDry handled, so it hands drops back once (Q32).
+ * @property {number} boughtAt When the last drop's minutes were bought, so a Dry hours start no message saw still
+ * hands them back.
  * @property {{until: number, watch: number} | null} dryBack Drops handed back when Dry hours began, until a home page
  * has shown them.
  * @property {number} installedAt When drip was installed, in ms. Every settings change applies at once for a day after
@@ -170,7 +172,7 @@
       day: dayKey(now, DEFAULT_SETTINGS.resetHour),
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
-      refill: null, drySeen: 0, dryBack: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
+      refill: null, drySeen: 0, boughtAt: 0, dryBack: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
       firstDayOff: false,
     };
   }
@@ -238,6 +240,7 @@
     const refill = /** @type {Partial<Refill> | null | undefined} */ (stored.refill);
     if (refill && typeof refill.day === 'string') state.refill = { day: refill.day, watch: count(refill.watch, 0), rec: count(refill.rec, 0) };
     state.drySeen = count(stored.drySeen, 0);
+    state.boughtAt = count(stored.boughtAt, 0);
     const back = /** @type {any} */ (stored.dryBack);
     if (back && count(back.until, 0) > 0 && count(back.watch, 0) > 0) state.dryBack = { until: back.until, watch: back.watch };
     state.installedAt = count(stored.installedAt, 0);
@@ -316,6 +319,7 @@
     const at = now === undefined ? 0 : drySoon(state, now);
     if (at) return { ok: false, error: 'dry-soon', at };
     if (state.tokens.watch <= 0) return { ok: false, error: 'no-watch-tokens' };
+    if (now !== undefined) state.boughtAt = now;
     state.tokens.watch--;
     state.watchSecondsLeft += state.settings.minutesPerToken * 60;
     state.watchSecondsBought += state.settings.minutesPerToken * 60;
@@ -690,13 +694,38 @@
    */
   function enterDry(state, now) {
     const until = dryUntil(state, now);
-    // Out of Dry hours the mark clears, so turning them off and on again in one night counts as a new start.
     if (!until) {
+      // Dry hours that started and ended with no message, every tab closed, still take back what was bought before.
+      const missed = state.watchSecondsLeft > 0 ? missedDry(state, now) : 0;
+      if (missed && state.drySeen !== missed) return giveBack(state, missed);
+      // Out of Dry hours the mark clears, so turning them off and on again in one night counts as a new start.
       if (!state.drySeen) return false;
       state.drySeen = 0;
       return true;
     }
     if (state.drySeen === until) return false;
+    return giveBack(state, until);
+  }
+
+  /**
+   * The end of the first Dry hours that started after the last purchase and before now, or 0. Looks 2 days back at most.
+   * @param {State} state @param {number} now
+   */
+  function missedDry(state, now) {
+    if (!state.boughtAt || state.boughtAt >= now) return 0;
+    let t = Math.max(state.boughtAt, now - 48 * 3600 * 1000);
+    for (let i = 0; i < 49; i++) {
+      const d = new Date(t);
+      t = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime();
+      if (t > now) return 0;
+      const end = dryUntil(state, t);
+      if (end) return end;
+    }
+    return 0;
+  }
+
+  /** Zeroes the minutes and puts each whole drop of them back, for the Dry hours ending `until`. @param {State} state @param {number} until */
+  function giveBack(state, until) {
     state.drySeen = until;
     const per = state.settings.minutesPerToken * 60;
     const back = per > 0 ? Math.floor(state.watchSecondsLeft / per + 1e-9) : 0;
