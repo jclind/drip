@@ -1531,14 +1531,22 @@
   function takeDryBack() {
     const b = state && state.dryBack;
     // Behind the kept drops, they land second with their own tag (Jesse, 2026-11-05).
+    // The kept landing is already waiting for the page, so this doesn't wait for it too.
     const behind = !!arriving && arriving.kind === 'kept' && !queued;
-    if (!b || b.until === dryBackTaken || (arriving && !behind) || !homeInView()) return;
+    if (!b || b.until === dryBackTaken || (arriving && !behind) || (!behind && !homeInView())) return;
     dryBackTaken = b.until;
+    const counted = keptBack === b.until;
+    // Seen only once the kept drops were already falling, and they hold these: no second landing, or the "Kept" tag
+    // would count them too.
+    if (behind && counted && landing) {
+      send({ type: 'dryBackSeen' }).then(absorb);
+      return;
+    }
     if (behind && clockOn()) {
       // Kept drops the lock counted after the drops came back hold them already, so they're taken out here. Both stay
       // held back, so the count only rises (Codex, 2026-11-05).
-      const back = keptBack === b.until ? Math.min(b.watch, arriving.watch) : b.watch;
-      if (keptBack === b.until) arriving.watch -= back;
+      const back = counted ? Math.min(b.watch, arriving.watch) : b.watch;
+      if (counted) arriving.watch -= back;
       queued = { kind: 'back', watch: back, rec: 0 };
       rendered = '';
       return;

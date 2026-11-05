@@ -353,6 +353,8 @@ function makeWorld() {
     count: (type) => world.sent.filter((m) => m.type === type).length,
     /** The worker's clock, which the newest tab sets to its own. */
     time: () => EPOCH,
+    /** Runs while a landing plays, before its drops come in. @type {((o: any) => Promise<void>) | null} */
+    duringLand: null,
   };
   return world;
 }
@@ -568,6 +570,8 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
       // Records what lands and lets it all in at once, as the real one does by the end.
       land: async (/** @type {any} */ o) => {
         tab.landings.push({ kind: o.kind, drops: o.drops.add, cards: o.cards ? o.cards.add : 0, shownBefore: tab.drops() });
+        const hook = world.duringLand;
+        if (hook) await hook(o);
         await o.drops.release(o.drops.add);
         if (o.cards) await o.cards.release(o.cards.add);
       },
@@ -1306,6 +1310,27 @@ test('kept drops the lock saved before the drops came back land in full, then "2
   await tab.advance(3000);
   assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 2], ['back', 2]]);
   assert.equal(tab.drops(), 4);
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('drops back the page hears of only once the kept drops are falling are in them: one landing, marked seen', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  const until = world.D.dryUntil(world.state, world.time());
+  // The worker handed 1 drop back and the lock counted it, but this page's state hasn't heard yet.
+  world.state.tokens.watch = 7;
+  world.state.drySeen = until;
+  /** @type {any} */ (world).duringLand = async () => {
+    /** @type {any} */ (world).duringLand = null;
+    world.state.dryBack = { until, watch: 1 };
+    for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+    await settle();
+  };
+  const tab = await makeTab(world, { inView: true, kept: `7:${until}` });
+  await tab.advance(4000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 7]]);
+  assert.equal(tab.drops(), 7);
+  assert.equal(world.state.dryBack, null, 'marked seen');
   assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
 });
 
