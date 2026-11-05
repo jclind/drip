@@ -13,7 +13,12 @@
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
       if (v === undefined || v === null || v === false) continue;
-      if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      // Through DripMorph when it's loaded, so a node morph keeps takes the new view's handler (morph.js).
+      if (k.startsWith('on')) {
+        const morph = /** @type {any} */ (globalThis).DripMorph;
+        if (morph) morph.listen(el, k.slice(2), v);
+        else el.addEventListener(k.slice(2), v);
+      }
       else if (k === 'class') el.className = v;
       else el.setAttribute(k, v === true ? '' : String(v));
     }
