@@ -599,6 +599,8 @@
     const built = JSON.stringify([swapFor, state.backlog.map((/** @type {any} */ v) => [v.id, v.resumeSec || 0])]);
     if (!swapEl || built !== swapBuilt) {
       swapEl = DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap });
+      // Placement targets this instance, so a rebuild must go in fresh instead of patching the old list.
+      swapEl.setAttribute('data-morph-new', '');
       swapBuilt = built;
       swapPlaced = false;
     }
