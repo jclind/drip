@@ -17,7 +17,10 @@
  * @property {Refill | null} refill What the last reset added, until a home page has shown it.
  * @property {number} drySeen The end of the Dry hours whose start enterDry handled, so it hands drops back once (Q32).
  * @property {number} boughtAt When the last drop's minutes were bought, so a Dry hours start no message saw still
- * hands them back.
+ * hands them back. A change to Dry hours or Watch time that applies at once moves it to then, since hours before it
+ * weren't dry under the new settings.
+ * @property {number} dropsBought Drops whose minutes are in watchSecondsBought, so Dry hours hand the minutes back at
+ * the price they were bought at, after minutes per drop changed (pre-publish bug hunt, 2026-11-05).
  * @property {{until: number, watch: number} | null} dryBack Drops handed back when Dry hours began, until a home page
  * has shown them.
  * @property {number} installedAt When drip was installed, in ms. Every settings change applies at once for a day after
@@ -172,7 +175,7 @@
       day: dayKey(now, DEFAULT_SETTINGS.resetHour),
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
-      refill: null, drySeen: 0, boughtAt: 0, dryBack: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
+      refill: null, drySeen: 0, boughtAt: 0, dropsBought: 0, dryBack: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
       firstDayOff: false,
     };
   }
@@ -241,6 +244,8 @@
     if (refill && typeof refill.day === 'string') state.refill = { day: refill.day, watch: count(refill.watch, 0), rec: count(refill.rec, 0) };
     state.drySeen = count(stored.drySeen, 0);
     state.boughtAt = count(stored.boughtAt, 0);
+    // State from before this field gives the minutes back at today's price, as it did then.
+    state.dropsBought = count(stored.dropsBought, 0);
     const back = /** @type {any} */ (stored.dryBack);
     if (back && count(back.until, 0) > 0 && count(back.watch, 0) > 0) state.dryBack = { until: back.until, watch: back.watch };
     state.installedAt = count(stored.installedAt, 0);
@@ -291,6 +296,7 @@
     state.refill = added.watch || added.rec ? { day: nextDay, ...added } : null;
     state.watchSecondsLeft = 0;
     state.watchSecondsBought = 0;
+    state.dropsBought = 0;
     state.unlocked = [];
     state.allowedToday = [];
     state.day = nextDay;
@@ -323,6 +329,7 @@
     state.tokens.watch--;
     state.watchSecondsLeft += state.settings.minutesPerToken * 60;
     state.watchSecondsBought += state.settings.minutesPerToken * 60;
+    state.dropsBought++;
     logDay(state).watchSpent++;
     return { ok: true };
   }
@@ -724,17 +731,26 @@
     return 0;
   }
 
-  /** Zeroes the minutes and puts each whole drop of them back, for the Dry hours ending `until`. @param {State} state @param {number} until */
+  /**
+   * Zeroes the minutes and puts each whole drop of them back, for the Dry hours ending `until`. A drop comes back at
+   * what it cost, the minutes bought over the drops bought, and never as more drops than were bought, so lowering
+   * minutes per drop before the start can't turn one drop into many (pre-publish bug hunt, 2026-11-05). Minutes with
+   * no purchase behind them, from a dev button or state saved before dropsBought, go at today's price.
+   * @param {State} state @param {number} until
+   */
   function giveBack(state, until) {
     state.drySeen = until;
-    const per = state.settings.minutesPerToken * 60;
-    const back = per > 0 ? Math.floor(state.watchSecondsLeft / per + 1e-9) : 0;
+    const drops = state.dropsBought;
+    const per = drops > 0 ? state.watchSecondsBought / drops : state.settings.minutesPerToken * 60;
+    const whole = per > 0 ? Math.floor(state.watchSecondsLeft / per + 1e-9) : 0;
+    const back = drops > 0 ? Math.min(whole, drops) : whole;
     const before = state.tokens.watch;
     // Back up to the cap, but a lowered cap never takes drops away here.
     state.tokens.watch = Math.max(before, Math.min(before + back, caps(state.settings).watch));
     const added = state.tokens.watch - before;
     state.watchSecondsLeft = 0;
     state.watchSecondsBought = 0;
+    state.dropsBought = 0;
     // Drops handed back weren't used, so History doesn't count them.
     const day = logDay(state);
     day.watchSpent = Math.max(0, day.watchSpent - added);
@@ -914,6 +930,11 @@
         cancelPending(state, key);
       }
     }
+    // Dry hours or Watch time that changed now judge the hours from now on. Without this, a range moved over an hour
+    // already past, since the minutes were bought, would hand them back for Dry hours that never were (pre-publish bug
+    // hunt, 2026-11-05). A range over the current hour still takes them back at once, from enterDry.
+    const dryChanged = [...DRY_KEYS, 'clock'].some((key) => key in applied);
+    if (dryChanged && now && state.watchSecondsLeft > 0) state.boughtAt = Math.max(state.boughtAt, now);
     // A lowered cap is a hard limit now, not at the next reset (Q6, Q11).
     const cap = caps(state.settings);
     state.tokens.watch = Math.min(state.tokens.watch, cap.watch);

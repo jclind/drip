@@ -129,7 +129,7 @@ test('initialState has the specified shape and independent mutable values', () =
   assert.deepEqual(state, {
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
-    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dryBack: null, installedAt: time(5),
+    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dropsBought: 0, dryBack: null, installedAt: time(5),
     channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false,
   });
   state.settings.recTokensPerDay = 1;
@@ -1175,4 +1175,39 @@ test('cardsLine says how the day\'s cards ended and drops the zero parts', () =>
   assert.equal(D.cardsLine(day({ recSpent: 1, saved: 1 })), 'Of 1 card, 1 saved.');
   assert.equal(D.cardsLine(day({ recSpent: 6, saved: 2, watched: 1, passed: 3 })), 'Of 6 cards, 2 saved, 1 watched, and 3 passed.');
   assert.equal(D.cardsLine(day({ recSpent: 1 })), '1 card revealed.');
+});
+
+test('state saved by the first version (2026-10-05) loads with what it had, and the new fields at their defaults', () => {
+  // initialState and its first changes as b0ca083 wrote them: no watchSecondsBought, refill, installedAt, channels,
+  // or Dry hours, and the old needThisPerDay setting. Pre-publish bug hunt, 2026-11-05.
+  const raw = {
+    version: 1,
+    settings: { watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10, rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home' },
+    pending: { effectiveDay: '2026-10-06', changes: { recTokensPerDay: 20, needThisPerDay: 3 } },
+    day: '2026-10-05', tokens: { watch: 3, rec: 9 }, watchSecondsLeft: 600,
+    current: { id: 'aaaaaaaaaaa', title: 'A', channel: 'C', length: '1:00' },
+    backlog: [{ id: 'bbbbbbbbbbb', title: 'B', channel: 'C', length: '2:00' }], seen: ['aaaaaaaaaaa'], unlocked: ['ccccccccccc'],
+    log: { '2026-10-05': { watchedSec: 300, watchSpent: 1, recSpent: 1, saved: 0, passed: 0, needThis: [{ videoId: 'ccccccccccc', title: 'C', reason: 'Study', at: time(5, 11) }] } },
+  };
+  const state = D.hydrate(structuredClone(raw), time(5, 13));
+  assert.equal(D.rollDay(state, time(5, 13)), false);
+  assert.deepEqual(state.tokens, { watch: 3, rec: 9 });
+  assert.equal(state.watchSecondsLeft, 600);
+  assert.equal(state.watchSecondsBought, 600, 'old state counts what is left as bought');
+  assert.equal(state.current?.id, 'aaaaaaaaaaa');
+  assert.deepEqual(state.backlog.map((v) => v.id), ['bbbbbbbbbbb']);
+  assert.deepEqual(state.pending, { effectiveDay: '2026-10-06', changes: { recTokensPerDay: 20 } });
+  assert.equal('needThisPerDay' in state.settings, false);
+  assert.equal(state.settings.dryHours, false);
+  assert.equal(state.installedAt, 0);
+  assert.equal(D.firstDayUntil(state, time(5, 13)), 0, 'no first day for an old install, so loosening waits');
+  assert.equal(D.needThisUsed(state, time(5, 13)), 1);
+  assert.equal(D.watchStatus(state, 'ccccccccccc', time(5, 13)).locked, false);
+  assert.equal(state.log['2026-10-05'].watched, 0);
+  assert.deepEqual(state.channels, { allow: [], block: [] });
+  assert.equal(state.dropsBought, 0);
+  // Its first reset applies the waiting change and refills as usual.
+  assert.equal(D.rollDay(state, time(6, 5)), true);
+  assert.equal(state.settings.recTokensPerDay, 20);
+  assert.deepEqual(state.tokens, { watch: 7, rec: 29 });
 });
