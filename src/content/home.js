@@ -228,6 +228,8 @@
         return `No drops left. More at ${reset}.`;
       case 'dry-hours':
         return `Dry until ${dryLabel()}.`;
+      case 'dry-soon':
+        return `Dry hours start at ${drySoonLabel()}.`;
       // Reveal with a card already up, or Reveal next and × on one that's gone: another tab got there first.
       case 'stale-card':
       case 'resolve-current':
@@ -653,7 +655,7 @@
    * @param {string} id
    */
   function costsDrop(id) {
-    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !dryEnd() && !Drip.freeToStart(state, id);
+    return clockOn() && state.watchSecondsLeft <= 0 && state.tokens.watch > 0 && !dryEnd() && !drySoonAt() && !Drip.freeToStart(state, id);
   }
 
   /** When the Dry hours going on now end, or 0 (Q32). No drop can be spent until then. */
@@ -661,14 +663,30 @@
     return state && clockOn() ? Drip.dryUntil(state, Date.now()) : 0;
   }
 
+  /** When Dry hours start, if that's in the next 5 minutes, or 0. Drops stop selling then (Jesse, 2026-11-04). */
+  function drySoonAt() {
+    return state && clockOn() ? Drip.drySoon(state, Date.now()) : 0;
+  }
+
   /** "6:00am" for the end of Dry hours. */
   function dryLabel() {
     return hourLabel(new Date(dryEnd()).getHours());
   }
 
-  /** No drop to spend now: none left, or Dry hours. */
+  /** "11:00pm" for the start of Dry hours, in the 5 minutes before. */
+  function drySoonLabel() {
+    return hourLabel(new Date(drySoonAt()).getHours());
+  }
+
+  /** What the page draws for Dry hours, which changes once a minute in the warning. */
+  function dryKey() {
+    const soon = drySoonAt();
+    return `${dryEnd()}:${soon ? Math.ceil((soon - Date.now()) / 60000) : 0}`;
+  }
+
+  /** No drop to spend now: none left, Dry hours, or the 5 minutes before them. */
   function noDropToSpend() {
-    return state.tokens.watch < 1 || dryEnd() > 0;
+    return state.tokens.watch < 1 || dryEnd() > 0 || drySoonAt() > 0;
   }
 
   /**
@@ -946,8 +964,8 @@
       clock && cardsMode() === 'off' && !outForDay() && addButton());
   }
 
-  /** The end of the Dry hours the page last drew, or 0, so mount() can redraw an idle page when it changes. */
-  let drawnDry = 0;
+  /** What the page last drew for Dry hours (dryKey), so mount() can redraw an idle page when it changes. */
+  let drawnDry = '';
 
   /** Set when Pass on the last card leaves the page out for the day, so the sea rises in where the card dropped. */
   let seaRises = false;
@@ -955,7 +973,8 @@
   /** No minutes or tokens left, and no card still to watch or stash. */
   function outForDay() {
     // Cards left don't count: with no minutes or drops, a reveal can't lead to watching anything (Jesse, 2026-10-14).
-    // Dry hours count as out, since no drop can be spent until they end (DRY-HOURS-PLAN.md B9).
+    // In Dry hours nothing paid plays, minutes or not (Jesse, 2026-11-04).
+    if (clockOn() && !shownCard() && dryEnd()) return true;
     return clockOn() && !shownCard() && noDropToSpend() && state.watchSecondsLeft <= 0;
   }
 
@@ -977,6 +996,7 @@
     if (outForDay()) return `You're out for today. Drops and cards refill at ${reset}.`;
     if (noCards) return `No cards left. More at ${reset}.`;
     if (clockOn() && dryEnd()) return `Dry until ${dryLabel()}.`;
+    if (drySoonAt()) return `Dry hours start at ${drySoonLabel()}.`;
     if (noDrops) return `No drops left. More at ${reset}.`;
     return '';
   }
@@ -1013,7 +1033,7 @@
     const s = state.settings;
     return h('button', {
       class: 'drip-b drip-b-gray drip-add', 'data-k': 'add', onclick: onAddTime, disabled: noDropToSpend(),
-      title: dryEnd() ? `Dry until ${dryLabel()}.` : `Add ${s.minutesPerToken} minutes for 1 drop`,
+      title: dryEnd() ? `Dry until ${dryLabel()}.` : drySoonAt() ? `Dry hours start at ${drySoonLabel()}.` : `Add ${s.minutesPerToken} minutes for 1 drop`,
     }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop'));
   }
 
@@ -1383,7 +1403,7 @@
       state.tokens, state.current, state.unlocked, state.channels, state.allowedToday, state.settings.feedSource, state.settings.minutesPerToken,
       // The sea's "N cards carry over" follows the allowance, the rollover cap, and pending settings (Codex, 2026-10-14).
       state.settings.resetHour, state.settings.stashMax, cardsCarried(),
-      state.settings.clock, state.settings.cards, state.settings.stash, dryEnd(),
+      state.settings.clock, state.settings.cards, state.settings.stash, dryKey(), state.dryBack,
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
     ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, blockedCard]);
@@ -1392,7 +1412,7 @@
       return freshen(root);
     }
     rendered = key;
-    drawnDry = state ? dryEnd() : 0;
+    drawnDry = state ? dryKey() : '';
     // Keep keyboard focus on the same control across the rebuild.
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
     root.classList.add('drip-ui');
@@ -1434,7 +1454,7 @@
   /**
    * Drops and cards on their way into the counters, which the counts hold back until they land (counter.js): the drops
    * "Done for now" kept, or what the day's reset added. Set until the landing is over.
-   * @type {{kind: 'kept' | 'new', watch: number, rec: number} | null}
+   * @type {{kind: 'kept' | 'new' | 'back', watch: number, rec: number} | null}
    */
   let arriving = null;
   /** The landing is running. */
@@ -1443,6 +1463,8 @@
   let waiting = false;
   /** The reset whose refill this page has taken, so it plays once. */
   let refillTaken = '';
+  /** The Dry hours whose drops back this page has shown. */
+  let dryBackTaken = 0;
   /** When the lock's water last started falling away (watch.js onDone). */
   let lockFellAt = 0;
   document.addEventListener('drip-lock-falling', () => { lockFellAt = Date.now(); });
@@ -1472,7 +1494,22 @@
    * What the day's reset added lands in the counters once, on the first home page that shows it. A home page kept
    * hidden behind a watch page leaves it for when it's back in view.
    */
+  /** The drops handed back when Dry hours began fall into the counter with "2 back", once (Q32). */
+  function takeDryBack() {
+    const b = state && state.dryBack;
+    if (!b || b.until === dryBackTaken || arriving || !homeInView()) return;
+    dryBackTaken = b.until;
+    if (!clockOn()) {
+      send({ type: 'dryBackSeen' }).then(absorb);
+      return;
+    }
+    arriving = { kind: 'back', watch: b.watch, rec: 0 };
+    rendered = '';
+    landWhenShown();
+  }
+
   function takeRefill() {
+    takeDryBack();
     const r = state && state.refill;
     if (!r || r.day !== state.day || r.day === refillTaken || arriving || !homeInView()) return;
     refillTaken = r.day;
@@ -1498,7 +1535,8 @@
     try {
       while (arriving) {
         // Another tab showed the refill first, or the page never came into view: the counts just show the balance.
-        if ((arriving.kind === 'new' && state && !state.refill) || Date.now() - started > 10000) {
+        if ((arriving.kind === 'new' && state && !state.refill) || (arriving.kind === 'back' && state && !state.dryBack)
+          || Date.now() - started > 10000) {
           arriving = null;
           rendered = '';
           render();
@@ -1523,8 +1561,9 @@
     try {
       if (!a || !state || !counts.watch || !counts.rec) return;
       landing = true;
+      if (a.kind === 'back') send({ type: 'dryBackSeen' }).then(absorb);
       // Kept drops after a reset carry the refill in them already.
-      if (state.refill) {
+      else if (state.refill) {
         refillTaken = state.refill.day;
         send({ type: 'refillSeen' }).then(absorb);
       }
@@ -1562,8 +1601,20 @@
       }
       // Back home from a watch page after the reset.
       takeRefill();
-      // An idle page changes to its dry form at the start of Dry hours and back at the end (DRY-HOURS-PLAN.md B9).
-      if (state && dryEnd() !== drawnDry) render();
+      // An idle page changes to its dry form at the start of Dry hours and back at the end (DRY-HOURS-PLAN.md B9). At the
+      // start it asks the worker, which takes the minutes back as drops, so they can land in the counter.
+      if (state && dryKey() !== drawnDry) {
+        const started = dryEnd() > 0 && !drawnDry.startsWith(String(dryEnd()));
+        render();
+        if (started && !refreshing) {
+          refreshing = true;
+          send({ type: 'get' }).then((res) => {
+            absorb(res);
+            refreshing = false;
+            render();
+          });
+        }
+      }
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;

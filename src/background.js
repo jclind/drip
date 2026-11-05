@@ -154,6 +154,8 @@ function withState(fn, toolbarTick) {
     const [stored, session] = await Promise.all([chrome.storage.local.get(KEY), chrome.storage.session.get(CLOCK_KEY)]);
     const state = Drip.hydrate(stored[KEY], now);
     Drip.rollDay(state, now);
+    // Dry hours starting take the minutes back as drops, once (Q32). Like rollDay, the next message saves it.
+    Drip.enterDry(state, now);
     const before = stableJson(stored[KEY]);
     /** @type {any} */
     const saved = session[CLOCK_KEY];
@@ -206,7 +208,7 @@ function handle(msg, state, now, clock) {
       if (msg.position !== undefined) Drip.markProgress(state, String(msg.videoId), msg.position, msg.duration);
       return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, String(msg.videoId), msg.ago, msg.key) };
     case 'status':
-      return { ok: true, ...Drip.watchStatus(state, msg.videoId) };
+      return { ok: true, ...Drip.watchStatus(state, msg.videoId, now) };
     case 'needThis':
       return Drip.needThis(state, msg.videoId, msg.title || '', msg.reason || '', now);
     case 'updateSettings':
@@ -215,6 +217,8 @@ function handle(msg, state, now, clock) {
       return Drip.cancelPending(state, msg.key);
     case 'refillSeen':
       return Drip.refillSeen(state);
+    case 'dryBackSeen':
+      return Drip.dryBackSeen(state);
     case 'importData':
       return Drip.importData(state, msg.data, now);
     case 'resetData':
@@ -231,7 +235,7 @@ function handle(msg, state, now, clock) {
     case 'cancelChannelPending':
       return Drip.cancelChannelPending(state, msg.channel);
     case 'allowedVideo':
-      return { ...Drip.allowedVideo(state, msg.videoId, msg.channel), ...Drip.watchStatus(state, String(msg.videoId)) };
+      return { ...Drip.allowedVideo(state, msg.videoId, msg.channel), ...Drip.watchStatus(state, String(msg.videoId), now) };
     case 'seenChannel':
       return Drip.seenChannel(state, msg.channel);
     default:

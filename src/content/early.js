@@ -74,8 +74,7 @@
     const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
     const held = heldId;
     heldId = locked ? id : '';
-    // In Dry hours watch.js may grant grace to a video that was already playing (Q32), so it decides, as with grace mode.
-    if (locked && !(fromStorage && (state?.settings?.graceMode || Drip.dryUntil(state, Date.now()) > 0))) pausePlayer(video);
+    if (locked && !(fromStorage && state?.settings?.graceMode)) pausePlayer(video);
     else if (!locked && pending && pending.id === id && pending.video === video) {
       // Only undo our temporary pause, once. Autoplay can still reject playback.
       video.play().catch(() => {});

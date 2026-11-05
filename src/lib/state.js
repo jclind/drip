@@ -15,6 +15,9 @@
  * @property {string[]} unlocked
  * @property {Object<string, LogDay>} log
  * @property {Refill | null} refill What the last reset added, until a home page has shown it.
+ * @property {number} drySeen The end of the Dry hours whose start enterDry handled, so it hands drops back once (Q32).
+ * @property {{until: number, watch: number} | null} dryBack Drops handed back when Dry hours began, until a home page
+ * has shown them.
  * @property {number} installedAt When drip was installed, in ms. Every settings change applies at once for a day after
  * (Q6). 0 for state saved before this was kept, which counts as installed long ago.
  * @property {{allow: Channel[], block: Channel[]}} channels The channel lists (RELEASE-PLAN.md item 4). Kept outside
@@ -167,7 +170,7 @@
       day: dayKey(now, DEFAULT_SETTINGS.resetHour),
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
-      refill: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
+      refill: null, drySeen: 0, dryBack: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
       firstDayOff: false,
     };
   }
@@ -234,6 +237,9 @@
     }
     const refill = /** @type {Partial<Refill> | null | undefined} */ (stored.refill);
     if (refill && typeof refill.day === 'string') state.refill = { day: refill.day, watch: count(refill.watch, 0), rec: count(refill.rec, 0) };
+    state.drySeen = count(stored.drySeen, 0);
+    const back = /** @type {any} */ (stored.dryBack);
+    if (back && count(back.until, 0) > 0 && count(back.watch, 0) > 0) state.dryBack = { until: back.until, watch: back.watch };
     state.installedAt = count(stored.installedAt, 0);
     state.firstDayOff = stored.firstDayOff === true;
     const lists = /** @type {any} */ (stored.channels);
@@ -298,14 +304,17 @@
   }
 
   /**
-   * Buys a drop's minutes. In Dry hours there are no new drops (Q32), and `until` says when they end.
+   * Buys a drop's minutes. In Dry hours there are no new drops (Q32), and `until` says when they end. In the 5 minutes
+   * before, there are none either, since the minutes would stop at the start: `at` says when that is.
    * @param {State} state @param {number} [now] Without it, Dry hours don't count.
-   * @returns {{ok: true} | {ok: false, error: string, until?: number}}
+   * @returns {{ok: true} | {ok: false, error: string, until?: number, at?: number}}
    */
   function spendWatch(state, now) {
     if (!state.settings.clock) return { ok: false, error: 'clock-off' };
     const until = now === undefined ? 0 : dryUntil(state, now);
     if (until) return { ok: false, error: 'dry-hours', until };
+    const at = now === undefined ? 0 : drySoon(state, now);
+    if (at) return { ok: false, error: 'dry-soon', at };
     if (state.tokens.watch <= 0) return { ok: false, error: 'no-watch-tokens' };
     state.tokens.watch--;
     state.watchSecondsLeft += state.settings.minutesPerToken * 60;
@@ -364,7 +373,8 @@
   /**
    * Buys one drop's minutes when none are left, so Watch can start the video (Q18). With no drops left it buys
    * nothing, and the watch page's lock takes over. An unlocked video needs no minutes, and neither does a card or stash
-   * row from an allowed channel (CHANNEL-LISTS-PLAN.md, call 10). In Dry hours it refuses with `dry-hours` (Q32).
+   * row from an allowed channel (CHANNEL-LISTS-PLAN.md, call 10). In Dry hours, and the 5 minutes before, it passes on
+   * spendWatch's refusal (Q32).
    * @param {State} state
    * @param {string} videoId
    * @param {number} [now]
@@ -372,7 +382,7 @@
   function buyIfOut(state, videoId, now) {
     if (!state.settings.clock || state.watchSecondsLeft > 0 || freeToStart(state, videoId)) return { ok: true, bought: false };
     const spent = spendWatch(state, now);
-    if (!spent.ok && spent.error === 'dry-hours') return spent;
+    if (!spent.ok && (spent.error === 'dry-hours' || spent.error === 'dry-soon')) return spent;
     return { ok: true, bought: spent.ok };
   }
 
@@ -588,12 +598,17 @@
     return charge(state, Math.max(0, (now - start) / 1000), videoId);
   }
 
-  /** @param {State} state @param {string} videoId */
-  function watchStatus(state, videoId) {
+  /**
+   * Whether this video may play. Dry hours lock it even with minutes left, so a page whose state predates their start
+   * locks on time (Q32); the worker has already taken the minutes back by then.
+   * @param {State} state @param {string} videoId @param {number} [now] Without it, Dry hours don't count.
+   */
+  function watchStatus(state, videoId, now) {
     const unlocked = state.unlocked.includes(videoId);
     const allowed = !unlocked && allowedNow(state.channels.allow, state.allowedToday, videoId);
+    const out = state.watchSecondsLeft === 0 || (now !== undefined && dryUntil(state, now) > 0);
     // With the clock off nothing locks (Q29).
-    return { secondsLeft: state.watchSecondsLeft, unlocked, allowed, locked: state.settings.clock && state.watchSecondsLeft === 0 && !unlocked && !allowed };
+    return { secondsLeft: state.watchSecondsLeft, unlocked, allowed, locked: state.settings.clock && out && !unlocked && !allowed };
   }
 
   /** @param {State} state @param {string} videoId @param {string} title @param {string} reason @param {number} now */
@@ -653,13 +668,49 @@
     return t;
   }
 
+  /** How long before Dry hours the warning shows and drops stop selling (Jesse, 2026-11-04). */
+  const DRY_WARN_MS = 5 * 60 * 1000;
+
   /**
-   * A video already playing when Dry hours began finishes, even with grace mode off (DRY-HOURS-PLAN.md B2). The watch
-   * page knows whether this video played on it at a moment that wasn't dry.
-   * @param {State} state @param {number} now @param {boolean} playedBeforeDry
+   * When Dry hours start, in ms, if that's within the next 5 minutes, or 0. They always start on the hour.
+   * @param {State} state @param {number} now
    */
-  function dryGrace(state, now, playedBeforeDry) {
-    return playedBeforeDry && dryUntil(state, now) > 0;
+  function drySoon(state, now) {
+    if (typeof now !== 'number' || dryUntil(state, now)) return 0;
+    const d = new Date(now);
+    const next = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime();
+    return next - now <= DRY_WARN_MS && dryUntil(state, next) ? next : 0;
+  }
+
+  /**
+   * The start of Dry hours (Jesse, 2026-11-04): the minutes left stop, and each whole drop of them goes back to the
+   * counter, so buying ahead gains nothing. What's under a drop is lost. Runs before every message, like rollDay, and
+   * acts once per stretch of Dry hours.
+   * @param {State} state @param {number} now @returns {boolean} Whether it changed anything.
+   */
+  function enterDry(state, now) {
+    const until = dryUntil(state, now);
+    if (!until || state.drySeen === until) return false;
+    state.drySeen = until;
+    const per = state.settings.minutesPerToken * 60;
+    const back = per > 0 ? Math.floor(state.watchSecondsLeft / per + 1e-9) : 0;
+    const before = state.tokens.watch;
+    // Back up to the cap, but a lowered cap never takes drops away here.
+    state.tokens.watch = Math.max(before, Math.min(before + back, caps(state.settings).watch));
+    const added = state.tokens.watch - before;
+    state.watchSecondsLeft = 0;
+    state.watchSecondsBought = 0;
+    // Drops handed back weren't used, so History doesn't count them.
+    const day = logDay(state);
+    day.watchSpent = Math.max(0, day.watchSpent - added);
+    if (added > 0) state.dryBack = { until, watch: added };
+    return true;
+  }
+
+  /** A home page has shown the drops handed back. @param {State} state */
+  function dryBackSeen(state) {
+    state.dryBack = null;
+    return { ok: true };
   }
 
   /**
@@ -1009,6 +1060,10 @@
     const lists = /** @type {any} */ (stored.channels);
     const allowed = Array.isArray(stored.allowedToday) ? stored.allowedToday.map((e) => ({ id: e?.id, ids: cleanIds(e?.ids) })) : [];
     if (allowedNow(cleanChannels(lists?.allow), allowed, videoId)) return false;
+    // Dry hours lock it even with minutes left (Q32).
+    const waiting = stored.pending && typeof stored.pending.effectiveDay === 'string'
+      ? { effectiveDay: stored.pending.effectiveDay, changes: cleanSettings(stored.pending.changes) } : null;
+    if (dryUntil(/** @type {State} */ (/** @type {unknown} */ ({ settings: { ...DEFAULT_SETTINGS, ...settings }, pending: waiting })), now)) return true;
     return count(stored.watchSecondsLeft, 0) <= 0;
   }
 
@@ -1600,7 +1655,7 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, dryUntil, dryGrace, cleanSettings,
+    firstDayUntil, removeBacklog, swapBacklog, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,

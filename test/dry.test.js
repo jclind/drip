@@ -88,25 +88,93 @@ test('dryUntil counts by the hour the clock shows across DST changes', () => {
   assert.equal(D.dryUntil(fall, firstOneThirty + 3600e3), new Date(2026, 10, 1, 2).getTime(), 'the second 1:30am');
 });
 
-test('dryGrace is for a video that played before Dry hours, and only during them', () => {
-  const state = dry(23, 6);
-  assert.equal(D.dryGrace(state, time(5, 23, 5), true), true);
-  assert.equal(D.dryGrace(state, time(5, 23, 5), false), false, 'started after they began');
-  assert.equal(D.dryGrace(state, time(5, 22, 55), true), false, 'not in Dry hours');
-});
-
-test('Dry hours refuse a new drop and nothing else', () => {
+test('Dry hours lock a paid video even with minutes left, and refuse a new drop', () => {
   const state = dry(23, 6);
   const now = time(5, 23, 30);
+  state.watchSecondsLeft = 600;
   const before = structuredClone(state);
   assert.deepEqual(D.spendWatch(state, now), { ok: false, error: 'dry-hours', until: time(6, 6) });
-  assert.deepEqual(D.buyIfOut(state, 'abc', now), { ok: false, error: 'dry-hours', until: time(6, 6) });
   assert.deepEqual(state, before);
-  assert.equal(D.spendWatch(state, time(5, 22)).ok, true, 'before 11pm');
-  // Minutes bought before keep working, for new videos too (Jesse, 2026-11-04).
-  assert.deepEqual(D.buyIfOut(state, 'abc', now), { ok: true, bought: false });
-  assert.equal(D.watchStatus(state, 'abc').locked, false);
-  assert.equal(D.earlyLocked(structuredClone(state), now, 'abc'), false);
+  assert.equal(D.watchStatus(state, 'abc', now).locked, true, 'the minutes stop (Jesse, 2026-11-04)');
+  assert.equal(D.watchStatus(state, 'abc').locked, false, 'without a time, only minutes count');
+  assert.equal(D.watchStatus(state, 'abc', time(5, 22)).locked, false, 'before 11pm');
+  assert.equal(D.earlyLocked(structuredClone(state), now, 'abc'), true);
+  assert.equal(D.earlyLocked(structuredClone(state), time(5, 22), 'abc'), false);
+  assert.equal(D.spendWatch(state, time(5, 22)).ok, true, 'drops sell before the warning');
+});
+
+test('an unlocked video and an allowed channel play on in Dry hours', () => {
+  const state = dry(23, 6);
+  const now = time(5, 23, 30);
+  D.needThis(state, 'a', 'A', 'Study', now);
+  state.channels.allow.push({ ids: ['@ok'], name: 'OK' });
+  state.allowedToday.push({ id: 'b', ids: ['@ok'] });
+  assert.equal(D.watchStatus(state, 'a', now).locked, false);
+  assert.equal(D.watchStatus(state, 'b', now).locked, false);
+  assert.equal(D.earlyLocked(structuredClone(state), now, 'a'), false);
+});
+
+test('drySoon is the start of Dry hours in the 5 minutes before, and drops stop selling then', () => {
+  const state = dry(23, 6);
+  assert.equal(D.drySoon(state, time(5, 22, 54)), 0);
+  assert.equal(D.drySoon(state, time(5, 22, 55)), time(5, 23));
+  assert.equal(D.drySoon(state, time(5, 22, 59)), time(5, 23));
+  assert.equal(D.drySoon(state, time(5, 23)), 0, 'in Dry hours, not before them');
+  assert.equal(D.drySoon(dry(23, 23), time(5, 22, 58)), 0, 'no Dry hours');
+  const before = structuredClone(state);
+  assert.deepEqual(D.spendWatch(state, time(5, 22, 56)), { ok: false, error: 'dry-soon', at: time(5, 23) });
+  state.watchSecondsLeft = 0;
+  assert.deepEqual(D.buyIfOut(state, 'abc', time(5, 22, 56)), { ok: false, error: 'dry-soon', at: time(5, 23) });
+  state.watchSecondsLeft = before.watchSecondsLeft;
+  assert.deepEqual(state, before);
+});
+
+test('the start of Dry hours hands whole unspent drops back, once, and the rest is lost', () => {
+  const state = dry(23, 6);
+  const now = time(5, 23);
+  D.spendWatch(state, time(5, 21));
+  D.spendWatch(state, time(5, 21));
+  D.spendWatch(state, time(5, 21));
+  // 45 minutes bought, 5 watched: 40 left is 2 whole drops.
+  D.charge(state, 5 * 60, 'abc');
+  assert.equal(state.tokens.watch, 1);
+  assert.equal(D.logDay(state).watchSpent, 3);
+  assert.equal(D.enterDry(state, time(5, 22, 59)), false, 'not yet');
+  assert.equal(D.enterDry(state, now), true);
+  assert.equal(state.tokens.watch, 3);
+  assert.equal(state.watchSecondsLeft, 0);
+  assert.equal(state.watchSecondsBought, 0);
+  assert.equal(D.logDay(state).watchSpent, 1, 'History counts only the drop used');
+  assert.deepEqual(state.dryBack, { until: time(6, 6), watch: 2 });
+  assert.equal(state.drySeen, time(6, 6));
+  const after = structuredClone(state);
+  assert.equal(D.enterDry(state, time(6, 1)), false, 'once per stretch');
+  assert.deepEqual(state, after);
+  assert.equal(D.hydrate(structuredClone(state), now).dryBack.watch, 2);
+  D.dryBackSeen(state);
+  assert.equal(state.dryBack, null);
+});
+
+test('drops handed back stop at the cap, and nothing happens outside Dry hours or with the clock off', () => {
+  const state = dry(23, 6);
+  state.tokens.watch = 7;
+  state.watchSecondsLeft = 45 * 60;
+  D.enterDry(state, time(5, 23, 30));
+  assert.equal(state.tokens.watch, 8, 'the cap is 4 a day for 2 days');
+  assert.deepEqual(state.dryBack, { until: time(6, 6), watch: 1 });
+  const none = dry(23, 6);
+  none.watchSecondsLeft = 10 * 60;
+  D.enterDry(none, time(5, 23, 30));
+  assert.equal(none.watchSecondsLeft, 0, 'under a drop is lost');
+  assert.equal(none.dryBack, null);
+  const outside = dry(23, 6);
+  outside.watchSecondsLeft = 600;
+  assert.equal(D.enterDry(outside, time(5, 22)), false);
+  const clockOff = dry(23, 6);
+  clockOff.settings.clock = false;
+  clockOff.watchSecondsLeft = 600;
+  assert.equal(D.enterDry(clockOff, time(5, 23, 30)), false);
+  assert.equal(clockOff.watchSecondsLeft, 600);
 });
 
 test('card Watch in Dry hours still opens the video, with no drop spent', () => {

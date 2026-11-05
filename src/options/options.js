@@ -63,7 +63,7 @@ const PARTS = [
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
       { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', hint: 'When time runs out partway through.' },
       // Q32. The three keys wait for the reset as one range, so the row has one chip for all of them.
-      { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'No new drops in these hours.' },
+      { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'Videos on minutes stop. Whole unspent drops come back.' },
       { key: 'dryFrom', label: 'From', kind: 'hour', inRow: true },
       { key: 'dryTo', label: 'To', kind: 'hour', inRow: true },
       { key: 'needThisPerWeek', label: '"I need this one" per week', kind: 'stepper', min: 0, max: 20,

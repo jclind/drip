@@ -261,6 +261,8 @@ function makeWorld() {
     async handle(msg) {
       world.sent.push(msg);
       const now = world.epoch + world.now;
+      // As the worker does before every message (Q32).
+      D.enterDry(world.state, now);
       let result;
       if (msg.type === 'tick') {
         if (world.failTicks > 0) {
@@ -648,33 +650,48 @@ function dryWorld(hour, minute, second = 0, ms = 0) {
   return world;
 }
 
-test('a video playing when Dry hours begin finishes, with grace mode off (DRY-HOURS-PLAN.md B2)', async () => {
+test('a paid video pauses when Dry hours start, with minutes left and grace mode on (Jesse, 2026-11-04)', async () => {
   const world = dryWorld(22, 59, 57);
-  world.state.watchSecondsLeft = 5;
+  world.state.watchSecondsLeft = 600;
+  world.state.settings.graceMode = true;
   const tab = makeTab(world, 'aaa');
   await settle();
   await tab.video.play();
-  await play(world, tab, 8);
-  assert.equal(world.state.watchSecondsLeft, 0);
-  assert.equal(tab.video.paused, false, 'it keeps playing');
-  assert.equal(tab.root.getAttribute('data-drip-grace'), 'aaa');
-  // A status from the worker doesn't take the grace back.
-  await tab.second();
+  await play(world, tab, 2);
+  assert.equal(tab.video.paused, false, 'before 11pm it plays');
+  await play(world, tab, 2);
+  assert.equal(tab.video.paused, true, 'it stops within a second of 11pm');
+  assert.ok(tab.locked());
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  assert.equal(tab.root.getAttribute('data-drip-grace'), null, 'no grace');
+});
+
+test('an unlocked video plays on when Dry hours start', async () => {
+  const world = dryWorld(22, 59, 57);
+  world.state.watchSecondsLeft = 600;
+  world.state.unlocked = ['aaa'];
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 6);
   assert.equal(tab.video.paused, false);
   assert.equal(tab.locked(), false);
 });
 
-test('a video that starts in the last second before Dry hours still finishes (Codex, 2026-11-04)', async () => {
-  const world = dryWorld(22, 59, 59, 500);
-  world.state.watchSecondsLeft = 3;
+test('the pill counts down to Dry hours in the 5 minutes before, and shimmers', async () => {
+  const world = dryWorld(22, 54, 30);
+  world.state.watchSecondsLeft = 900;
   const tab = makeTab(world, 'aaa');
   await settle();
-  // A tick while paused attaches the player, so the play below is heard at 10:59:59.5pm, and the next tick is past 11pm.
-  await tab.tick();
   await tab.video.play();
-  await play(world, tab, 5);
-  assert.equal(tab.video.paused, false);
-  assert.equal(tab.root.getAttribute('data-drip-grace'), 'aaa');
+  await play(world, tab, 2);
+  assert.doesNotMatch(tab.pill().textContent, /Dry in/);
+  await play(world, tab, 30);
+  assert.match(tab.pill().textContent, /Dry in 5m/);
+  assert.ok(tab.pill().classList.contains('is-low'));
+  world.advance(4 * 60);
+  await tab.tick();
+  assert.match(tab.pill().textContent, /Dry in <1m/);
 });
 
 test('a video started in Dry hours stops at zero like any other', async () => {
@@ -701,8 +718,8 @@ test('the lock in Dry hours has no +15m, says when they end, and keeps "I need t
   assert.match(tab.lockText(), /I need this one · 3 left this week/);
 });
 
-test('a +15m refused because Dry hours began redraws the lock in its dry form (B8)', async () => {
-  const world = dryWorld(22, 59, 50);
+test('a +15m refused because the warning began redraws the lock without it', async () => {
+  const world = dryWorld(22, 54, 50);
   world.state.watchSecondsLeft = 3;
   const tab = makeTab(world, 'aaa');
   await settle();
@@ -713,7 +730,7 @@ test('a +15m refused because Dry hours began redraws the lock in its dry form (B
   await tab.press('add');
   await settle();
   assert.doesNotMatch(tab.lockText(), /No drops left|\+15m/);
-  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  assert.match(tab.lockText(), /Dry hours start at 11:00pm\./);
   assert.equal(world.state.tokens.watch, 4, 'no drop spent');
 });
 
