@@ -42,11 +42,19 @@
    * @param {...(Node | string | null | undefined | false)} children
    * @returns {HTMLElement}
    */
+  /** @param {HTMLElement} el @param {string} type @param {any} fn */
+  function listen(el, type, fn) {
+    const morph = /** @type {any} */ (globalThis).DripMorph;
+    if (morph) morph.listen(el, type, fn);
+    else el.addEventListener(type, fn);
+  }
+
   function h(tag, attrs = {}, ...children) {
     const el = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {
       if (value === undefined || value === null || value === false) continue;
-      if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
+      // Through DripMorph when it's loaded, so a node morph keeps takes the new view's handler (morph.js).
+      if (key.startsWith('on')) listen(el, key.slice(2), value);
       else if (key === 'class') el.className = value;
       else el.setAttribute(key, value === true ? '' : String(value));
     }
@@ -177,7 +185,7 @@
     if (!thumb.querySelector('.drip-blocked-chip')) {
       thumb.append(h('span', { class: 'drip-blocked-chip' }, icon('ban'), 'Blocked'));
     }
-    return h('div', { class: 'drip-card is-blocked' }, thumb,
+    return h('div', { class: 'drip-card is-blocked', 'data-k': `blocked-${video.id}` }, thumb,
       h('div', { class: 'drip-card-title', title: video.title }, video.title),
       h('div', { class: 'drip-card-meta-row' },
         h('span', { class: 'drip-meta' }, `${video.channel} is blocked. Unblock it in Settings.`)),

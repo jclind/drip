@@ -6,6 +6,7 @@
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
   const { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const DripMorph = /** @type {any} */ (globalThis).DripMorph;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
@@ -598,6 +599,8 @@
     const built = JSON.stringify([swapFor, state.backlog.map((/** @type {any} */ v) => [v.id, v.resumeSec || 0])]);
     if (!swapEl || built !== swapBuilt) {
       swapEl = DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap });
+      // Placement targets this instance, so a rebuild must go in fresh instead of patching the old list.
+      swapEl.setAttribute('data-morph-new', '');
       swapBuilt = built;
       swapPlaced = false;
     }
@@ -1067,7 +1070,7 @@
 
   /** The reveal card while a reveal from the empty page reads the feed. Same size as the real one, so nothing jumps. */
   function placeholderCard() {
-    return h('div', { class: 'drip-card is-loading', 'aria-busy': 'true' },
+    return h('div', { class: 'drip-card is-loading', 'data-k': 'card-loading', 'aria-busy': 'true' },
       h('div', { class: 'drip-thumb' }),
       h('div', { class: 'drip-card-title' }, h('span', { class: 'drip-skel' }), h('span', { class: 'drip-skel drip-skel-short' })),
       h('div', { class: 'drip-card-meta-row' }, h('span', { class: 'drip-meta' }, loadingText())));
@@ -1197,7 +1200,7 @@
     const stash = DripStash.parts(fills ? !saved : saved, { labelClass: 'drip-save-label' });
     if (fills) stash.to(saved);
     const swapping = swapFor === video.id && !saved && !next;
-    return h('div', { class: `drip-card${next ? ' is-next' : ''}${isNew ? ' is-new' : ''}`, 'aria-busy': next ? 'true' : undefined },
+    return h('div', { class: `drip-card${next ? ' is-next' : ''}${isNew ? ' is-new' : ''}`, 'data-k': `card-${video.id}`, 'aria-busy': next ? 'true' : undefined },
       thumbnail(video),
       h('div', { class: 'drip-card-head' },
         h('div', { class: 'drip-card-title', title: video.title }, video.title),
@@ -1253,11 +1256,11 @@
       open && (rows.length === 0
         ? h('div', { class: 'drip-saved-empty' }, 'Videos you stash show up here.')
         : h('ul', { class: 'drip-saved-list' }, ...shown.map(({ video, removed: gone }) => gone
-          ? h('li', { class: 'drip-saved-row is-removed', style: removed.get(video.id)?.height ? `min-height: ${removed.get(video.id)?.height}px` : undefined },
+          ? h('li', { class: 'drip-saved-row is-removed', 'data-k': `row-${video.id}`, style: removed.get(video.id)?.height ? `min-height: ${removed.get(video.id)?.height}px` : undefined },
             h('span', {}, 'Removed'), h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, '·'),
             h('button', { class: 'drip-undo', 'data-k': `undo-${video.id}`, onclick: () => onUndo(video.id) }, 'Undo'))
           : h('li', {
-            class: `drip-saved-row${DripSwap.fraction(video) > 0 ? ' has-bar' : ''}`,
+            class: `drip-saved-row${DripSwap.fraction(video) > 0 ? ' has-bar' : ''}`, 'data-k': `row-${video.id}`,
             onclick: (/** @type {MouseEvent} */ e) => {
               if (/** @type {Element} */ (e.target).closest('.drip-saved-x, a')) return;
               onPlaySaved(video.id);
@@ -1297,7 +1300,8 @@
     const search = cardsMode() === 'off';
     return h('div', { class: `drip-page${showCard ? ' is-open' : out ? ' is-out' : ''}${search ? ' is-search' : ''}${search && !stashOn() && !clockOn() ? ' is-search-only' : ''}` },
       stats(),
-      search && h('div', { class: 'drip-search-slot' }),
+      // YouTube's search box goes in here (placeSearch), so a redraw keeps what's in it.
+      search && h('div', { class: 'drip-search-slot', 'data-k': 'search-slot', 'data-morph-keep': true }),
       !showCard && (out ? outSea() : actions()),
       current ? card(current) : busy === 'reveal' && placeholderCard(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
@@ -1347,24 +1351,17 @@
   }
 
   /**
-   * Puts the new view in the page. Quiet's search box never leaves the page on a redraw: YouTube's box rebuilds itself
-   * empty whenever it's moved, even with moveBefore, which loses what was typed and the focus (Chrome 154, 2026-10-15).
-   * So when the old and new pages both have the slot, the old page and its slot stay and the rest is swapped around them.
+   * Brings the page up to the new view in place (morph.js): a control that's still there stays the same node, so a
+   * press, focus, or an open menu on it survives a redraw (Codex, 2026-11-05). Quiet's search box never leaves the
+   * page: YouTube's box rebuilds itself empty whenever it's moved, even with moveBefore, which loses what was typed and
+   * the focus (Chrome 154, 2026-10-15). Its slot is marked data-morph-keep, so morph leaves what's in it.
    * @param {HTMLElement} root
    * @param {HTMLElement} next
    */
   function swapIn(root, next) {
     const page = root.childElementCount === 1 ? root.firstElementChild : null;
-    const slot = page?.classList.contains('drip-page') && page.querySelector(':scope > .drip-search-slot');
-    const nextSlot = next.classList.contains('drip-page') && next.querySelector(':scope > .drip-search-slot');
-    if (!page || !slot || !nextSlot) return root.replaceChildren(next);
-    page.className = next.className;
-    for (const node of [...page.childNodes]) if (node !== slot) node.remove();
-    // The new parts go on the same side of the kept slot as in the new view.
-    const kids = [...next.childNodes];
-    const at = kids.indexOf(nextSlot);
-    slot.before(...kids.slice(0, at));
-    page.append(...kids.slice(at + 1));
+    if (!page || page.localName !== next.localName) return root.replaceChildren(next);
+    DripMorph.morph(page, next);
   }
 
   /** drip's own search box: a form that goes to YouTube's results page. */
