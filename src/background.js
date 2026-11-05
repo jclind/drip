@@ -216,7 +216,9 @@ function handle(msg, state, now, clock) {
     case 'tick':
       // The tab sends where the player is with each tick, so a stashed video's bar keeps up (Q28).
       if (msg.position !== undefined) Drip.markProgress(state, String(msg.videoId), msg.position, msg.duration);
-      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, String(msg.videoId), msg.ago, msg.key) };
+      // The status counts Dry hours, which the minutes left don't show yet: the worker takes them back only after this
+      // tick is charged, and a reply saying "not locked" would drop the page's lock for a moment (Jesse saw it jolt).
+      return { ok: true, ...Drip.chargeTick(state, clock, now, msg.seconds, String(msg.videoId), msg.ago, msg.key), locked: Drip.watchStatus(state, String(msg.videoId), now).locked };
     case 'status':
       return { ok: true, ...Drip.watchStatus(state, msg.videoId, now) };
     case 'needThis':
@@ -368,7 +370,8 @@ function runClock(action, sendResponse) {
     // Charges count from the last one, so a jump back would make playback free until real time caught up.
     clock.lastChargeEnd = 0;
     clock.ticks = [];
-    C.set(C.offset() + target - now);
+    // Real is exactly 0: working it out from the two clocks can leave a millisecond, which keeps the clock shifted.
+    C.set(action === 'clock-real' ? 0 : C.offset() + target - now);
     return { result: { ok: true, offset: C.offset() }, state };
   })
     .then(async ({ result, state }) => {

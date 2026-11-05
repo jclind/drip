@@ -699,7 +699,9 @@ test('the dev clock jumps to 6 minutes before Dry hours and back to real time', 
   const res = await w.send({ type: 'devAction', action: 'clock-dry-6m' });
   assert.equal(res.ok, true);
   const offset = w.store.dripDevClock.offset;
-  assert.ok(offset > 2 * 3600e3 && offset < 3 * 3600e3, `offset ${offset}`);
+  const d = new Date();
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 3).getTime();
+  assert.ok(Math.abs(Date.now() + offset - (start - 6 * 60e3)) < 2000, `offset ${offset}`);
   // 6 minutes before, drops still sell; a minute on, the warning has begun.
   assert.equal((await w.send({ type: 'spendWatch' })).ok, true);
   await w.send({ type: 'devAction', action: 'clock+1m' });

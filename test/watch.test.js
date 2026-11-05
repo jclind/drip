@@ -10,6 +10,9 @@ const vm = require('node:vm');
 
 const SRC = path.join(__dirname, '..', 'src');
 
+/** Every time a lock is taken off a page, for the test that checks it rises once. */
+let lockRemoved = 0;
+
 class FakeElement {
   /** @param {string} tag */
   constructor(tag) {
@@ -58,7 +61,7 @@ class FakeElement {
   append(...kids) { for (const k of kids) { if (k instanceof FakeElement) k.parent = this; this.children.push(k); } }
   /** @param {...any} kids */
   replaceChildren(...kids) { this.children = []; this.rebuilds++; this.append(...kids); }
-  remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
+  remove() { if (this.id === 'drip-lock' && this.parent) lockRemoved++; if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
   /** Only `.class` selectors, which is all watch.js asks of its own elements. @param {string} sel */
   querySelector(sel) {
     if (!sel.startsWith('.')) return null;
@@ -198,6 +201,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   for (const file of ['lib/state.js', 'lib/glass.js', 'content/common.js', 'content/stash.js', 'content/swap.js', 'content/watch.js']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
   }
+  const removedBefore = lockRemoved;
   const tab = {
     noPlayer: false,
     player, page, theaterButton,
@@ -210,6 +214,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     pill: () => document.getElementById('drip-pill'),
     locked: () => !!document.getElementById('drip-lock'),
     lockText: () => document.getElementById('drip-lock')?.textContent || '',
+    /** How many times the lock was taken off the page. */
+    lockRemovals: () => lockRemoved - removedBefore,
     /** Presses the lock button with this data-k. @param {string} k */
     press: async (k) => {
       const button = document.getElementById('drip-lock')?.all().find((/** @type {any} */ el) => el.getAttribute('data-k') === k);
@@ -261,15 +267,15 @@ function makeWorld() {
     async handle(msg) {
       world.sent.push(msg);
       const now = world.epoch + world.now;
-      // As the worker does before every message (Q32).
-      D.enterDry(world.state, now);
+      // As the worker does before every message but a tick, whose seconds it charges first (Q32).
+      if (msg.type !== 'tick') D.enterDry(world.state, now);
       let result;
       if (msg.type === 'tick') {
         if (world.failTicks > 0) {
           world.failTicks--;
           return { ok: false, error: 'Error: write failed' };
         }
-        result = { ok: true, ...D.chargeTick(world.state, world.clock, now, msg.seconds, msg.videoId, msg.ago, msg.key) };
+        result = { ok: true, ...D.chargeTick(world.state, world.clock, now, msg.seconds, msg.videoId, msg.ago, msg.key), locked: world.lockedReply(msg.videoId, now) };
         if (world.loseReplies > 0) {
           world.loseReplies--;
           return undefined;
@@ -283,6 +289,8 @@ function makeWorld() {
       for (const fn of world.listeners) fn({ drip: { newValue: saved } }, 'local');
       return { ...result, state: saved };
     },
+    /** The tick reply's lock, as background.js computes it. @param {string} id @param {number} now */
+    lockedReply: (id, now) => D.watchStatus(world.state, id, now).locked,
     /** @param {number} seconds */
     advance(seconds) { world.now += seconds * 1000; },
     ticks: () => world.sent.filter((m) => m.type === 'tick'),
@@ -665,6 +673,25 @@ test('a paid video pauses when Dry hours start, with minutes left and grace mode
   assert.ok(tab.locked());
   assert.match(tab.lockText(), /Dry until 6:00am\./);
   assert.equal(tab.root.getAttribute('data-drip-grace'), null, 'no grace');
+});
+
+test('the lock rises once when Dry hours start, not up, down, and up again (Jesse, 2026-11-04)', async () => {
+  const world = dryWorld(22, 59, 50);
+  world.state.watchSecondsLeft = 600;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  let shown = 0;
+  let wasLocked = false;
+  for (let i = 0; i < 20; i++) {
+    world.advance(1);
+    await tab.tick();
+    if (tab.locked() && !wasLocked) shown++;
+    wasLocked = tab.locked();
+  }
+  assert.ok(wasLocked);
+  assert.equal(shown, 1, `the lock rose ${shown} times`);
+  assert.equal(tab.lockRemovals(), 0, 'and never came down');
 });
 
 test('an unlocked video plays on when Dry hours start', async () => {
