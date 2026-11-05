@@ -688,10 +688,13 @@ test('the pill counts down to Dry hours in the 5 minutes before, and shimmers', 
   await play(world, tab, 2);
   assert.doesNotMatch(tab.pill().textContent, /Dry in/);
   await play(world, tab, 30);
+  // The notice shows first (the next test), then the countdown.
+  await play(world, tab, 6);
   assert.match(tab.pill().textContent, /Dry in 5m/);
   assert.ok(tab.pill().classList.contains('is-low'));
   world.advance(4 * 60);
   await tab.tick();
+  await play(world, tab, 6);
   assert.match(tab.pill().textContent, /Dry in <1m/);
 });
 
@@ -717,6 +720,29 @@ test('the lock in Dry hours has no +15m, says when they end, and keeps "I need t
   assert.match(tab.lockText(), /Dry until 6:00am\./);
   assert.doesNotMatch(tab.lockText(), /\+15m/);
   assert.match(tab.lockText(), /I need this one · 3 left this week/);
+});
+
+test('the warning spells itself out with rings at 5 minutes and again at 1, then shrinks to the countdown', async () => {
+  const world = dryWorld(22, 54, 58);
+  world.state.watchSecondsLeft = 900;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 1);
+  assert.doesNotMatch(tab.pill().textContent, /Dry/);
+  await play(world, tab, 3);
+  assert.match(tab.pill().textContent, /Dry hours · video stops at 11:00pm/);
+  assert.ok(tab.pill().classList.contains('is-grace-attention'), 'the rings');
+  await play(world, tab, 6);
+  assert.match(tab.pill().textContent, /Dry in 5m/);
+  assert.equal(tab.pill().classList.contains('is-grace-attention'), false);
+  world.advance(3 * 60 + 50);
+  await tab.tick();
+  assert.match(tab.pill().textContent, /Dry in 2m/);
+  await play(world, tab, 3);
+  assert.match(tab.pill().textContent, /Dry hours · video stops at 11:00pm/, 'again at 1 minute');
+  await play(world, tab, 6);
+  assert.match(tab.pill().textContent, /Dry in <1m/);
 });
 
 test('a +15m refused because the warning began redraws the lock without it', async () => {

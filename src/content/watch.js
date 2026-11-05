@@ -1123,6 +1123,15 @@
   let pillLow = false;
 
   /**
+   * Dry hours' warning gets noticed: at 5 minutes and again at 1, the pill spells it out with the grace rings for this
+   * long, then shrinks back to the countdown (Jesse, 2026-11-04).
+   */
+  const DRY_NOTICE_MS = 5000;
+  /** Which notices this page has shown, as "video:start:stage", so each shows once per video. */
+  const dryNoticed = new Set();
+  let dryNoticeAt = -Infinity;
+
+  /**
    * The pill hides along with YouTube's controls a few seconds into playback, except in the last minutes, when it stays
    * up and shimmers, and for three seconds after the grace label appears. Checked every tick and whenever the
    * player's class changes.
@@ -1136,15 +1145,19 @@
     // From grace starting until 3 seconds after its label shows, the pill stays up, so it changes in place instead of
     // vanishing while the last water drains. The rings play only once the label is there.
     const holding = inGrace() && (!pillGrace.ready || performance.now() - pillGrace.attentionAt < GRACE_ATTENTION_MS);
-    const attention = holding && pillGrace.ready;
+    const dryNotice = performance.now() - dryNoticeAt < DRY_NOTICE_MS;
+    const attention = (holding && pillGrace.ready) || dryNotice;
     if (attention && !pill.classList.contains('is-grace-attention')) {
       // A replacement pill joins the same two rings where they are, rather than starting them again.
-      pill.style.setProperty('--drip-grace-ring-delay', `${-Math.max(0, performance.now() - pillGrace.attentionAt)}ms`);
+      const since = dryNotice ? dryNoticeAt : pillGrace.attentionAt;
+      pill.style.setProperty('--drip-grace-ring-delay', `${-Math.max(0, performance.now() - since)}ms`);
     }
     pill.classList.toggle('is-grace-attention', attention);
+    // The notice's sentence is longer than the countdown, so the pill may widen while it shows.
+    pill.classList.toggle('is-dry-notice', dryNotice);
     // Never hidden while it has keyboard focus, or Enter would act on a button nobody can see.
     const focused = pill.contains(document.activeElement);
-    pill.classList.toggle('is-idle', playing && !pillLow && !holding && !focused && !!document.querySelector(SEL.playerIdle));
+    pill.classList.toggle('is-idle', playing && !pillLow && !holding && !dryNotice && !focused && !!document.querySelector(SEL.playerIdle));
   }
 
   // DESIGN.md "Minutes and the watch page pill": the glass, minutes left, and Save. It never offers to buy minutes.
@@ -1214,8 +1227,19 @@
     // The 5 minutes before Dry hours, the pill counts down to them instead, and shimmers (Jesse, 2026-11-04).
     const soon = clockOn && !grace && !unlocked ? Drip.drySoon(state, Date.now()) : 0;
     const soonSec = (soon - Date.now()) / 1000;
+    // At 5 minutes and at 1, once each for each video that plays, the pill says what happens, with rings.
+    const stage = soon ? (soonSec <= 60 ? 1 : 5) : 0;
+    const noticeKey = `${id}:${soon}:${stage}`;
+    if (stage && video && !video.paused && !dryNoticed.has(noticeKey)) {
+      dryNoticed.add(noticeKey);
+      dryNoticeAt = performance.now();
+      setTimeout(renderPill, DRY_NOTICE_MS + 50);
+    }
+    const noticing = !!soon && performance.now() - dryNoticeAt < DRY_NOTICE_MS;
     // Rounded up, so it says "Dry in 5m" right at the start, then "<1m" for the last minute.
-    const soonText = soon ? `Dry in ${soonSec < 60 ? '<1m' : Drip.formatMinutes(Math.ceil(soonSec / 60) * 60)}` : '';
+    const soonText = !soon ? ''
+      : noticing ? `Dry hours · video stops at ${hourLabel(new Date(soon).getHours())}`
+        : `Dry in ${soonSec < 60 ? '<1m' : Drip.formatMinutes(Math.ceil(soonSec / 60) * 60)}`;
     const time = finishing ? 'Finishing this one' : allowed ? 'Allowed channel' : unlocked ? 'Unlocked' : soonText || Drip.formatMinutes(left);
     // Paused, the minutes aren't draining, and the pill says so.
     const paused = !grace && !unlocked && !adShowing && !!video && video.paused && left > 0;
@@ -1244,7 +1268,7 @@
         // One inline line, so the smaller note sits on the minutes' baseline instead of being centered as its own box.
         h('span', { class: 'drip-pill-label' },
           h('span', { class: 'drip-pill-minutes' }, time),
-          !unlocked && h('span', { class: 'drip-sr' }, finishing ? ', time is up' : soon ? ', then no watching until they end' : ' left today'),
+          !unlocked && h('span', { class: 'drip-sr' }, finishing ? ', time is up' : noticing ? '' : soon ? ', then no watching until they end' : ' left today'),
           paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       stashOn && h('button', {

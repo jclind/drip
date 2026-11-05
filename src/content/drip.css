@@ -417,6 +417,11 @@ html[dark] #drip-lock {
   animation: drip-pill-grace-ring 1400ms cubic-bezier(0.15, 0.6, 0.35, 1) var(--drip-grace-ring-delay, 0ms) 2 forwards;
 }
 
+/* Dry hours' notice spells the warning out (watch.js DRY_NOTICE_MS), so the pill may be wider for those seconds. */
+#drip-pill.is-dry-notice {
+  max-width: min(460px, calc(100% - 24px));
+}
+
 /* No player to sit in (watch.js renderPill): pinned to the window, below YouTube's 56px top bar and above it. */
 #drip-pill.is-floating {
   position: fixed;
