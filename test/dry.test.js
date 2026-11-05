@@ -308,3 +308,19 @@ test('Watch time turning off at the reset ends Dry hours there (Codex, 2026-11-0
   state.pending = { effectiveDay: D.addDays(state.day, 1), changes: { clock: false } };
   assert.equal(D.dryUntil(state, now), time(6, 4));
 });
+
+test('Dry hours turned off and on again in one night take the new minutes back too', () => {
+  const state = dry(23, 6);
+  state.watchSecondsLeft = 30 * 60;
+  state.tokens.watch = 0;
+  D.enterDry(state, time(5, 23, 10));
+  assert.equal(state.tokens.watch, 2);
+  state.settings.dryHours = false;
+  assert.equal(D.enterDry(state, time(5, 23, 20)), true, 'the mark clears');
+  assert.equal(state.drySeen, 0);
+  state.watchSecondsLeft = 15 * 60;
+  state.settings.dryHours = true;
+  D.enterDry(state, time(5, 23, 30));
+  assert.equal(state.tokens.watch, 3);
+  assert.equal(state.watchSecondsLeft, 0);
+});

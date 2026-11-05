@@ -690,7 +690,13 @@
    */
   function enterDry(state, now) {
     const until = dryUntil(state, now);
-    if (!until || state.drySeen === until) return false;
+    // Out of Dry hours the mark clears, so turning them off and on again in one night counts as a new start.
+    if (!until) {
+      if (!state.drySeen) return false;
+      state.drySeen = 0;
+      return true;
+    }
+    if (state.drySeen === until) return false;
     state.drySeen = until;
     const per = state.settings.minutesPerToken * 60;
     const back = per > 0 ? Math.floor(state.watchSecondsLeft / per + 1e-9) : 0;

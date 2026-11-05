@@ -162,6 +162,8 @@ function withState(fn, toolbarTick) {
     const clock = { lastChargeEnd: Number(saved?.lastChargeEnd) || 0, ticks: Array.isArray(saved?.ticks) ? saved.ticks : [] };
     const clockBefore = stableJson(clock);
     const result = fn(state, now, clock);
+    // And after, so the change that turns Dry hours on over the current hour takes the minutes back at once.
+    Drip.enterDry(state, now);
     // A failed state write throws before the clock is saved, so the tab's resent time is charged again.
     const stateChanged = stableJson(state) !== before;
     if (stateChanged) await chrome.storage.local.set({ [KEY]: state });

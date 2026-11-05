@@ -278,6 +278,7 @@ function makeWorld() {
       else if (msg.type === 'spendWatch') result = D.spendWatch(world.state, now);
       else if (msg.type === 'needThis') result = D.needThis(world.state, msg.videoId, msg.title || '', msg.reason || '', now);
       else result = { ok: true };
+      D.enterDry(world.state, now);
       const saved = structuredClone(world.state);
       for (const fn of world.listeners) fn({ drip: { newValue: saved } }, 'local');
       return { ...result, state: saved };

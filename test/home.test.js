@@ -324,6 +324,7 @@ function makeWorld() {
       // As the worker does before every message (Q32).
       D.enterDry(draft, world.time());
       const result = world.run(draft, msg);
+      D.enterDry(draft, world.time());
       if (fail === 'write') return { ok: false, error: 'Error: write failed' };
       if (JSON.stringify(draft) !== JSON.stringify(world.state)) {
         world.state = draft;

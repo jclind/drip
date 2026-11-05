@@ -678,6 +678,23 @@
     return hourLabel(new Date(drySoonAt()).getHours());
   }
 
+  /** The Dry hours this page asked the worker about, so it asks once. */
+  let askedDry = 0;
+
+  /**
+   * Dry hours the worker hasn't handled yet, at 11pm on an idle page: asking it takes the minutes back as drops, which
+   * then land in the counter (Q32).
+   */
+  function askDry() {
+    const end = dryEnd();
+    if (!end || state.drySeen === end || askedDry === end) return;
+    askedDry = end;
+    send({ type: 'get' }).then((res) => {
+      absorb(res);
+      render();
+    });
+  }
+
   /** What the page draws for Dry hours, which changes once a minute in the warning. */
   function dryKey() {
     const soon = drySoonAt();
@@ -1393,6 +1410,7 @@
   /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
     if (state?.current) blockedCard = null;
+    askDry();
     const root = document.getElementById('drip-home');
     if (!root || moving || leaving || blocking) return;
     takeRefill();
@@ -1601,20 +1619,8 @@
       }
       // Back home from a watch page after the reset.
       takeRefill();
-      // An idle page changes to its dry form at the start of Dry hours and back at the end (DRY-HOURS-PLAN.md B9). At the
-      // start it asks the worker, which takes the minutes back as drops, so they can land in the counter.
-      if (state && dryKey() !== drawnDry) {
-        const started = dryEnd() > 0 && !drawnDry.startsWith(String(dryEnd()));
-        render();
-        if (started && !refreshing) {
-          refreshing = true;
-          send({ type: 'get' }).then((res) => {
-            absorb(res);
-            refreshing = false;
-            render();
-          });
-        }
-      }
+      // An idle page changes to its dry form at the start of Dry hours and back at the end (DRY-HOURS-PLAN.md B9).
+      if (state && dryKey() !== drawnDry) render();
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;
