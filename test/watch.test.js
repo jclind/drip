@@ -928,6 +928,32 @@ test('swapping out a video another tab already took out brings the list back wit
   assert.doesNotMatch(swapText(tab), /Old stashed video/);
 });
 
+test("a Stash answered after moving to the next video doesn't open the list over it (Codex, 2026-11-05)", async () => {
+  const { world, tab } = await setup(900);
+  world.state.settings.stashMax = 1;
+  world.state.backlog = [{ id: 'old', title: 'Old stashed video', channel: 'Channel', length: '1:00' }];
+  saved(world);
+  await settle();
+  const handle = world.handle;
+  /** @type {() => void} */
+  let release = () => {};
+  const gate = new Promise((r) => { release = () => r(undefined); });
+  world.handle = async (/** @type {any} */ msg) => {
+    if (msg.type === 'addBacklog') {
+      await gate;
+      return { ok: false, error: 'stash-full', state: structuredClone(world.state) };
+    }
+    return handle(msg);
+  };
+  const button = tab.pill().all().find((/** @type {any} */ el) => el.getAttribute('data-k') === 'pill-save');
+  const pending = button.listeners.click({ detail: 1 });
+  await tab.navigate('bbb');
+  release();
+  await pending;
+  await settle();
+  assert.equal(swapText(tab), '', 'no list over the next video');
+});
+
 test('a watch page with no player for 10 seconds says drip is broken and locks nothing (Q25)', async () => {
   const world = makeWorld();
   const tab = makeTab(world, 'aaa');

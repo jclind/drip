@@ -990,7 +990,9 @@
     else res = await send({ type: 'addBacklog', video: thisVideo(id) });
     if (res && !res.ok && res.error === 'stash-full' && !disconnected) {
       state = res.state;
-      openSwap(keyboard);
+      // Moved on to another video while the worker answered: the list would be for this one (Codex, 2026-11-05).
+      if (videoId() === id) openSwap(keyboard);
+      else renderPill();
       return;
     }
     took(res);
