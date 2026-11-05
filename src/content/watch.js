@@ -1022,6 +1022,8 @@
   let swapLayer = null;
   /** The video whose list is up, or ''. */
   let swapOpen = '';
+  /** The stashed videos the open list shows, so a change from another tab can redraw or close it. @type {string[]} */
+  let swapIds = [];
   /** @type {{dropped: any, index: number, newId: string, timer: number} | null} */
   let swapped = null;
 
@@ -1032,6 +1034,7 @@
       swapped = null;
     }
     if (swapOpen && (!state || swapOpen !== id || state.backlog.some((/** @type {any} */ v) => v.id === id))) swapOpen = '';
+    swapIds = swapOpen ? state.backlog.map((/** @type {any} */ v) => v.id) : [];
     const parts = [
       swapOpen && DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap }),
       swapped && DripSwap.note(swapped.dropped, onSwapUndo),
@@ -1064,6 +1067,14 @@
     renderPill();
   }
 
+  /** The stash changed under the open list, say in another tab: it closes, or shows what's there now. */
+  function followSwap() {
+    if (!swapOpen || !state) return;
+    const what = Drip.swapFollow(swapIds, state, swapOpen);
+    if (what === 'close') closeSwap();
+    else if (what === 'redraw') openSwap(!!swapLayer?.contains(document.activeElement));
+  }
+
   function closeSwap() {
     const had = !!swapLayer?.contains(document.activeElement);
     swapOpen = '';
@@ -1079,6 +1090,13 @@
     const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
     swapOpen = '';
     const res = await send({ type: 'swapBacklog', video: thisVideo(id), dropId: drop.id });
+    // The video picked went from the stash in the meantime: the list comes back with what's there now.
+    if (res && !res.ok && res.error === 'not-stashed' && res.state && !disconnected) {
+      state = res.state;
+      if (videoId() === id && Drip.swapFollow([], state, id) !== 'close') openSwap(false);
+      else renderPill();
+      return;
+    }
     if (res && res.ok && res.dropped) {
       if (swapped) clearTimeout(swapped.timer);
       const timer = window.setTimeout(() => {
@@ -1321,6 +1339,7 @@
     // Another tab may have used up the minutes. A video playing here when that happened gets grace too (Q3).
     if (wasFunded && status.locked && graceAllowed(id) && clockActive() && video && !video.paused) setGrace(id);
     applyStatus(status, !!(pendingTick && pendingTick.id === id && pendingTick.paid));
+    followSwap();
     renderPill();
   });
   // Time played up to here belongs to the video being left, not the next one.

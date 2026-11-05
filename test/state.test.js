@@ -24,7 +24,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'planned', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
-    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
+    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'swapFollow', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData',
@@ -986,6 +986,22 @@ test('formatMinutes is compact: 0m, <1m, minutes rounded down, hours with no lea
   assert.equal(D.formatMinutes(6120), '1h 42m');
 });
 
+
+test('swapFollow closes an open full-stash list once there is room or the video is stashed, and redraws it when the videos change', () => {
+  const state = fresh();
+  state.settings.stashMax = 2;
+  state.backlog = [video('a'), video('b')];
+  assert.equal(D.swapFollow(['a', 'b'], state, 'x'), 'keep');
+  assert.equal(D.swapFollow(['b', 'a'], state, 'x'), 'redraw', 'same videos, new order');
+  assert.equal(D.swapFollow(['a', 'c'], state, 'x'), 'redraw');
+  state.backlog = [video('a')];
+  assert.equal(D.swapFollow(['a', 'b'], state, 'x'), 'close', 'room now');
+  state.backlog = [video('a'), video('x')];
+  assert.equal(D.swapFollow(['a', 'b'], state, 'x'), 'close', 'stashed in another tab');
+  state.backlog = [video('a'), video('b')];
+  state.settings.stash = false;
+  assert.equal(D.swapFollow(['a', 'b'], state, 'x'), 'close', 'stash turned off');
+});
 
 test('chargeTick merges paid tabs ticking half a second apart', () => {
   const state = fresh();
