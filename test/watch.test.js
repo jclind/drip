@@ -928,6 +928,17 @@ test('swapping out a video another tab already took out brings the list back wit
   assert.doesNotMatch(swapText(tab), /Old stashed video/);
 });
 
+test('swapping out a video another tab already took out, leaving room, closes the list (Codex, 2026-11-05)', async () => {
+  const { world, tab } = await fullStashOpen();
+  // Another tab took it out, and this tab hasn't heard yet.
+  world.state.backlog = [];
+  const layer = tab.pill().parentElement.all().find((/** @type {any} */ el) => el.classList.contains('drip-swap-layer'));
+  const swapOut = layer.all().find((/** @type {any} */ el) => el.tagName === 'BUTTON' && /Swap out/.test(el.textContent));
+  await swapOut.listeners.click({ detail: 1 });
+  await settle();
+  assert.equal(swapText(tab), '');
+});
+
 test("a Stash answered after moving to the next video doesn't open the list over it (Codex, 2026-11-05)", async () => {
   const { world, tab } = await setup(900);
   world.state.settings.stashMax = 1;

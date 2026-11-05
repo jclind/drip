@@ -1096,7 +1096,11 @@
     if (res && !res.ok && res.error === 'not-stashed' && res.state && !disconnected) {
       state = res.state;
       if (videoId() === id && Drip.swapFollow([], state, id) !== 'close') openSwap(false);
-      else renderPill();
+      else {
+        // Room now, or moved on: the list that was up goes (Codex, 2026-11-05).
+        drawSwap();
+        renderPill();
+      }
       return;
     }
     if (res && res.ok && res.dropped) {
