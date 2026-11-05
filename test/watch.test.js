@@ -13,9 +13,24 @@ const SRC = path.join(__dirname, '..', 'src');
 /** Every time a lock is taken off a page, for the test that checks it rises once. */
 let lockRemoved = 0;
 
+/** A text node, so morph.js can patch text in place. */
+class FakeText {
+  /** @param {string} data */
+  constructor(data) {
+    this.nodeType = 3;
+    this.data = data;
+    /** @type {any} */
+    this.parent = null;
+  }
+  remove() { if (this.parent) this.parent.children = this.parent.children.filter((/** @type {any} */ c) => c !== this); this.parent = null; }
+  toString() { return this.data; }
+}
+
 class FakeElement {
   /** @param {string} tag */
   constructor(tag) {
+    this.nodeType = 1;
+    this.localName = tag.toLowerCase();
     this.tagName = tag.toUpperCase();
     /** @type {Map<string, string>} */
     this.attrs = new Map();
@@ -23,7 +38,6 @@ class FakeElement {
     this.children = [];
     /** @type {FakeElement | null} */
     this.parent = null;
-    this.className = '';
     this.rebuilds = 0;
     /** @type {Record<string, string>} */
     this.dataset = {};
@@ -42,6 +56,12 @@ class FakeElement {
     };
   }
   get parentElement() { return this.parent; }
+  get parentNode() { return this.parent; }
+  get childNodes() { return this.children; }
+  get attributes() { return [...this.attrs].map(([name, value]) => ({ name, value })); }
+  // As in a browser, className is the class attribute.
+  get className() { return this.attrs.get('class') || ''; }
+  set className(v) { if (v) this.attrs.set('class', String(v)); else this.attrs.delete('class'); }
   /** @param {any} other */
   contains(other) { return this.all().includes(other); }
   get id() { return this.attrs.get('id') || ''; }
@@ -55,12 +75,24 @@ class FakeElement {
   removeAttribute(k) { this.attrs.delete(k); }
   /** @param {string} k @param {boolean} [on] */
   toggleAttribute(k, on) { if (on ?? !this.attrs.has(k)) this.attrs.set(k, ''); else this.attrs.delete(k); }
-  /** Kept so a test can press a lock button, never fired on its own. @param {string} type @param {Function} fn */
-  addEventListener(type, fn) { (this.listeners ||= {})[type] = fn; }
+  /** Kept so a test can press a lock button, never fired on its own. It runs with the element as this, as in a browser. @param {string} type @param {Function} fn */
+  addEventListener(type, fn) { (this.listeners ||= {})[type] = (/** @type {any} */ e = {}) => fn.call(this, Object.assign(e, { type: e.type || type })); }
+  /** Takes a node from wherever it was, as appending in a browser does. @param {any} k */
+  adopt(k) {
+    const node = typeof k === 'string' || typeof k === 'number' ? new FakeText(String(k)) : k;
+    if (node instanceof FakeElement || node instanceof FakeText) { node.remove(); node.parent = this; }
+    return node;
+  }
   /** @param {...any} kids */
-  append(...kids) { for (const k of kids) { if (k instanceof FakeElement) k.parent = this; this.children.push(k); } }
+  append(...kids) { for (const k of kids) this.children.push(this.adopt(k)); }
+  /** @param {any} node @param {any} ref */
+  insertBefore(node, ref) {
+    if (!ref) return this.append(node);
+    const n = this.adopt(node);
+    this.children.splice(this.children.indexOf(ref), 0, n);
+  }
   /** @param {...any} kids */
-  replaceChildren(...kids) { this.children = []; this.rebuilds++; this.append(...kids); }
+  replaceChildren(...kids) { for (const c of this.children) c.parent = null; this.children = []; this.rebuilds++; this.append(...kids); }
   remove() { if (this.id === 'drip-lock' && this.parent) lockRemoved++; if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
   /** Only `.class` selectors, which is all watch.js asks of its own elements. @param {string} sel */
   querySelector(sel) {
@@ -72,11 +104,13 @@ class FakeElement {
     const parent = this.parent;
     if (!parent) return;
     const i = parent.children.indexOf(this);
+    if (other.parent) other.remove();
     other.parent = parent;
     parent.children[i] = other;
     this.parent = null;
   }
   get textContent() { return this.children.map((c) => (c instanceof FakeElement ? c.textContent : String(c))).join(''); }
+  set textContent(v) { for (const c of this.children) c.parent = null; this.children = []; this.append(String(v)); }
   /** @returns {FakeElement[]} */
   all() { return [this, ...this.children.flatMap((c) => (c instanceof FakeElement ? c.all() : []))]; }
 }
@@ -153,6 +187,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   /** @param {string} sel */
   page.querySelector = (sel) => (sel === '.ytp-size-button' ? theaterButton : null);
   const document = {
+    title: 'Test video - YouTube',
     documentElement: root,
     body,
     activeElement: null,
@@ -198,7 +233,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   };
   context.globalThis = context;
   vm.createContext(context);
-  for (const file of ['lib/state.js', 'lib/glass.js', 'content/common.js', 'content/stash.js', 'content/swap.js', 'content/watch.js']) {
+  for (const file of ['lib/state.js', 'lib/glass.js', 'lib/morph.js', 'content/common.js', 'content/stash.js', 'content/swap.js', 'content/watch.js']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
   }
   const removedBefore = lockRemoved;
@@ -283,6 +318,9 @@ function makeWorld() {
       } else if (msg.type === 'status') result = { ok: true, ...D.watchStatus(world.state, msg.videoId) };
       else if (msg.type === 'spendWatch') result = D.spendWatch(world.state, now);
       else if (msg.type === 'needThis') result = D.needThis(world.state, msg.videoId, msg.title || '', msg.reason || '', now);
+      else if (msg.type === 'addBacklog') result = D.addBacklog(world.state, msg.video, msg.index, now);
+      else if (msg.type === 'removeBacklog') result = D.removeBacklog(world.state, msg.id);
+      else if (msg.type === 'swapBacklog') result = D.swapBacklog(world.state, msg.video, String(msg.dropId), msg.index, now);
       else result = { ok: true };
       D.enterDry(world.state, now);
       const saved = structuredClone(world.state);
@@ -608,6 +646,32 @@ test('the Save button is not rebuilt while nothing it shows changes (finding 4)'
     await tab.tick();
   }
   assert.equal(pill.rebuilds, before);
+});
+
+test('the pill keeps its Stash button while the minutes tick down, so a press on it is not lost (Codex, 2026-11-05)', async () => {
+  const { world, tab } = await setup(15 * 60);
+  const stashButton = () => tab.pill().all().find((/** @type {any} */ el) => el.getAttribute('data-k') === 'pill-save');
+  const before = stashButton();
+  assert.match(tab.pill().textContent, /^15m/);
+  // Two minutes of playing: the label goes 15m, 14m, 13m.
+  await play(world, tab, 120);
+  assert.match(tab.pill().textContent, /^13m/);
+  assert.equal(stashButton(), before, 'the same Stash button');
+});
+
+test('Stash on the pill still says Stashed, and back, when the pill redraws in place', async () => {
+  const { world, tab } = await setup(15 * 60);
+  const stashButton = () => tab.pill().all().find((/** @type {any} */ el) => el.getAttribute('data-k') === 'pill-save');
+  await stashButton().listeners.click({ detail: 1 });
+  await settle();
+  assert.equal(world.state.backlog.length, 1);
+  // The word beside the bookmark; the hidden ghost after it always says Stashed, to hold the width.
+  const word = () => stashButton().querySelector('.drip-stash-row')?.textContent;
+  assert.equal(word(), 'Stashed');
+  await stashButton().listeners.click({ detail: 1 });
+  await settle();
+  assert.equal(world.state.backlog.length, 0);
+  assert.equal(word(), 'Stash');
 });
 
 test('with grace on, a video playing in another tab when time runs out also gets to finish (finding 13, Q3)', async () => {
