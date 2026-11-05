@@ -1227,8 +1227,9 @@
     const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
     const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
     const left = Math.max(0, state.watchSecondsLeft - pending);
-    // The 5 minutes before Dry hours, the pill counts down to them instead, and shimmers (Jesse, 2026-11-04).
-    const soon = clockOn && !grace && !unlocked ? Drip.drySoon(state, Date.now()) : 0;
+    // The 5 minutes before Dry hours, the pill counts down to them instead, and shimmers (Jesse, 2026-11-04). A video
+    // finishing on grace too, since Dry hours stop it as well (Q32), and "Finishing this one" would promise otherwise.
+    const soon = clockOn && !unlocked && !allowed ? Drip.drySoon(state, Date.now()) : 0;
     const soonSec = (soon - Date.now()) / 1000;
     // At 5 minutes and at 1, once each for each video that plays, the pill says what happens, with rings.
     const stage = soon ? (soonSec <= 60 ? 1 : 5) : 0;
@@ -1243,11 +1244,11 @@
     const soonText = !soon ? ''
       : noticing ? `Dry hours · video stops at ${hourLabel(new Date(soon).getHours())}`
         : `Dry in ${soonSec < 60 ? '<1m' : Drip.formatMinutes(Math.ceil(soonSec / 60) * 60)}`;
-    const time = finishing ? 'Finishing this one' : allowed ? 'Allowed channel' : unlocked ? 'Unlocked' : soonText || Drip.formatMinutes(left);
+    const time = soonText || (finishing ? 'Finishing this one' : allowed ? 'Allowed channel' : unlocked ? 'Unlocked' : Drip.formatMinutes(left));
     // Paused, the minutes aren't draining, and the pill says so.
     const paused = !grace && !unlocked && !adShowing && !!video && video.paused && left > 0;
     // With grace on, the pill stays up through 0 too, until grace takes over, so it never blinks out at the switch.
-    pillLow = clockOn && !grace && !unlocked && !adShowing && (((left > 0 || state.settings.graceMode) && left <= LOW_SECONDS) || !!soon);
+    pillLow = clockOn && !unlocked && !adShowing && ((!grace && (left > 0 || state.settings.graceMode) && left <= LOW_SECONDS) || !!soon);
     if (clockOn && !unlocked) {
       const fraction = grace ? 0 : DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
       if (fraction === 0 && pillGlass && Number(pillGlass.dataset.level) > 0) pillDrainAt = performance.now();
@@ -1271,7 +1272,7 @@
         // One inline line, so the smaller note sits on the minutes' baseline instead of being centered as its own box.
         h('span', { class: 'drip-pill-label' },
           h('span', { class: 'drip-pill-minutes' }, time),
-          !unlocked && h('span', { class: 'drip-sr' }, finishing ? ', time is up' : noticing ? '' : soon ? ', then no watching until they end' : ' left today'),
+          !unlocked && h('span', { class: 'drip-sr' }, noticing ? '' : soon ? ', then no watching until they end' : finishing ? ', time is up' : ' left today'),
           paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       stashOn && h('button', {
