@@ -694,6 +694,22 @@ test('the lock rises once when Dry hours start, not up, down, and up again (Jess
   assert.equal(tab.lockRemovals(), 0, 'and never came down');
 });
 
+test('a tick answered just before Dry hours but arriving after them leaves the lock up (Codex, 2026-11-04)', async () => {
+  const world = dryWorld(22, 59, 50);
+  world.state.watchSecondsLeft = 600;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  // Every reply says "not locked", as one the worker answered at 10:59:59pm would.
+  world.lockedReply = () => false;
+  for (let i = 0; i < 20; i++) {
+    world.advance(1);
+    await tab.tick();
+  }
+  assert.ok(tab.locked());
+  assert.equal(tab.lockRemovals(), 0);
+});
+
 test('an unlocked video plays on when Dry hours start', async () => {
   const world = dryWorld(22, 59, 57);
   world.state.watchSecondsLeft = 600;

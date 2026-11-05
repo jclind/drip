@@ -16,11 +16,16 @@
   };
   Date.now = () => realNow() + offset;
   /** @type {any} */ (globalThis).DripDevClock = { KEY, offset: () => offset, set: (/** @type {number} */ n) => apply({ offset: n }), realNow };
+  // A change that lands before the first read finishes is newer, so the read doesn't undo it (Codex, 2026-11-04).
+  let changed = false;
   try {
-    chrome.storage.local.get(KEY).then((r) => apply(r[KEY]), () => {});
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes[KEY]) apply(changes[KEY].newValue);
+      if (area === 'local' && changes[KEY]) {
+        changed = true;
+        apply(changes[KEY].newValue);
+      }
     });
+    chrome.storage.local.get(KEY).then((r) => { if (!changed) apply(r[KEY]); }, () => {});
   } catch {
     // No storage in this context: real time.
   }

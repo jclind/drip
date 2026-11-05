@@ -511,8 +511,11 @@
         if (entry.seconds <= 0.001 && unsent[0] === entry) unsent.shift();
         state = res.state;
         if (id === videoId()) {
-          if (request.paid && res.locked && graceAllowed(id) && video && !video.paused) setGrace(id);
-          applyStatus(res);
+          // From the reply's state at the time it arrives, not the worker's lock: a tick answered just before Dry hours
+          // can land after the page locked for them, and its "not locked" would drop the lock (Codex, 2026-11-04).
+          const status = Drip.watchStatus(state, id, Date.now());
+          if (request.paid && status.locked && graceAllowed(id) && video && !video.paused) setGrace(id);
+          applyStatus(status);
         } else applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
       } else if (state) applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
     } finally {

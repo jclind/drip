@@ -94,6 +94,10 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 - A page Chrome opens on uninstall (`chrome.runtime.setUninstallURL`) with one question, "Why are you leaving?". It needs a small hosted page (Claude's suggestion, 2026-10-16, with the Settings feedback link).
 - Not worth it yet: syncing across devices, and notifications like "5 minutes left".
 
+## Known races
+
+- An older worker reply can overwrite newer saved state on a page (Codex, 2026-11-04). Tab A's status request is answered from a snapshot with 0 minutes, tab B buys minutes, A hears B's storage change and drops its lock, then A's older reply lands and `state = res.state` puts the 0-minute snapshot back, so the lock rises again. Every `state = res.state` in watch.js has it, and it predates Dry hours. The fix is a revision number the worker bumps on each save, and pages keep whichever state is newest.
+
 ## Efficiency
 
 - An efficiency pass over the whole extension, which Jesse wants later, not now (2026-10-13). One known lead: the lock's water rise hitches every so often on the MacBook while the motion keeps its timing. On air it runs at 60fps (80 frames, the slowest 29ms, no long tasks). The rise animates `--drip-water`, a registered property, which moves `#drip-lock`'s mask and clip every frame. That repaints a full-window `backdrop-filter: blur(20px)` on the main thread, so any of YouTube's scripts can delay a frame. Running out mid-video also grows an ellipse clip (pour.js `riseFrom`), which costs more than the flat edge. Compare a watch page opened at 0 minutes, which rises flat, with minutes running out: if only the second hitches, the ellipse is the cause. Otherwise move the rise onto the compositor, with the water sliding up as a transform instead of being repainted.
