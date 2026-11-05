@@ -674,6 +674,19 @@ test('Stash on the pill still says Stashed, and back, when the pill redraws in p
   assert.equal(word(), 'Stash');
 });
 
+test("the pill doesn't count a tick twice when the saved state arrives before the tick's reply (Codex, 2026-11-05)", async () => {
+  // 2m 5s left. The first tick charges 5 seconds, leaving exactly 2m. The worker saves before it replies, so the
+  // tab hears the new balance while those 5 seconds still wait in unsent, and used to show 1m for a moment.
+  const { world, tab } = await setup(125);
+  /** @type {string[]} */
+  const drawn = [];
+  world.listeners.push(() => drawn.push(tab.pill().textContent));
+  await play(world, tab, 5);
+  assert.ok(world.ticks().length >= 1, 'a tick went out');
+  assert.ok(drawn.length >= 1, 'the tab heard the save');
+  for (const text of drawn) assert.match(text, /^2m/, `pill drawn as "${text}" with 2m left`);
+});
+
 test('with grace on, a video playing in another tab when time runs out also gets to finish (finding 13, Q3)', async () => {
   const world = makeWorld();
   world.state.watchSecondsLeft = 2;
