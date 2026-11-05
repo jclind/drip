@@ -818,6 +818,51 @@ test('the locked page brings +15m back when Dry hours end', async () => {
   assert.doesNotMatch(tab.lockText(), /Dry until/);
 });
 
+test('a lock left open as Dry hours end shows +15m within a second, not at the next 30-second check (Codex, 2026-11-05)', async () => {
+  const world = dryWorld(5, 59, 40);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /Dry until 6:00am\./);
+  // 6:00:01, and only the 1-second tick runs.
+  world.advance(16);
+  await tab.tick();
+  assert.match(tab.lockText(), /\+15m/);
+  assert.doesNotMatch(tab.lockText(), /Dry until/);
+});
+
+test('a lock left open into the 5 minutes before Dry hours drops +15m within a second (Codex, 2026-11-05)', async () => {
+  const world = dryWorld(22, 54, 40);
+  world.state.watchSecondsLeft = 3;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await play(world, tab, 5);
+  assert.match(tab.lockText(), /\+15m/);
+  // 22:55:01.
+  world.advance(16);
+  await tab.tick();
+  assert.doesNotMatch(tab.lockText(), /\+15m/);
+  assert.match(tab.lockText(), /Dry hours start at 11:00pm\./);
+});
+
+test('the lock is not rebuilt each second while nothing on it changes', async () => {
+  const { world, tab } = await setup(3);
+  await play(world, tab, 5);
+  assert.ok(tab.locked());
+  const before = tab.lockRemovals();
+  const lock = tab.body.all().find((/** @type {any} */ el) => el.id === 'drip-lock') || tab.root.all().find((/** @type {any} */ el) => el.id === 'drip-lock');
+  for (let i = 0; i < 10; i++) {
+    world.advance(1);
+    await tab.tick();
+  }
+  assert.equal(tab.lockRemovals(), before);
+  const after = tab.body.all().find((/** @type {any} */ el) => el.id === 'drip-lock') || tab.root.all().find((/** @type {any} */ el) => el.id === 'drip-lock');
+  assert.equal(after, lock, 'the same lock element');
+});
+
 test('a watch page with no player for 10 seconds says drip is broken and locks nothing (Q25)', async () => {
   const world = makeWorld();
   const tab = makeTab(world, 'aaa');

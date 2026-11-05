@@ -460,6 +460,9 @@
       const status = Drip.watchStatus(state, videoId(), Date.now());
       if (status.locked && (!locked || inGrace())) applyStatus(status);
     }
+    // The lock's lines follow the clock: +15m comes back when Dry hours end and goes 5 minutes before they start.
+    // showLock redraws only when its view changed (Codex, 2026-11-05).
+    if (locked && !inGrace() && liveLock()) showLock();
     if (locked && !inGrace()) pausePlayer(video);
     renderPill();
   }
