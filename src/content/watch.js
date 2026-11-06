@@ -66,6 +66,11 @@
     document.documentElement.toggleAttribute('data-drip-broken', broken);
     if (broken) hideLock();
   }
+
+  /** Q25: even YouTube's play button must be left alone until attach() finds the video again. */
+  function pauseVideo() {
+    if (!playerBroken) pausePlayer(video);
+  }
   /** @type {{id: string, paid: boolean, startedAt: number} | null} */
   let pendingTick = null;
   /** The video the running stretch of playback belongs to. */
@@ -229,9 +234,8 @@
     if (!id || channelDone === channelCheckKey(id) || !state || !state.channels) return;
     const channel = pageChannel(id);
     if (!channel) {
-      // Not readable in time: the lock rises as it would without lists.
+      // Not readable in time: show the lock, but keep looking on later ticks for an allowed channel.
       if (channelWait && channelWait.id === id && performance.now() >= channelWait.until) {
-        channelDone = channelCheckKey(id);
         applyStatus(Drip.watchStatus(state, id, Date.now()));
       }
       return;
@@ -257,7 +261,7 @@
       disconnected = true;
       setGrace('');
       stopRun();
-      pausePlayer(video);
+      pauseVideo();
       clearInterval(tickTimer);
       clearInterval(statusTimer);
       showDisconnected();
@@ -346,7 +350,7 @@
 
   function onPlay() {
     if (disconnected || (locked && !inGrace())) {
-      pausePlayer(video);
+      pauseVideo();
       if (disconnected) showDisconnected();
       else showLock();
       return;
@@ -409,7 +413,7 @@
     }
     // Storage may arrive before our tick response. Only that response can grant grace.
     if (deferLock && graceAllowed(id)) return;
-    pausePlayer(video);
+    pauseVideo();
     // The channel may be on the allow list. Held, not locked, until checkChannel knows.
     if (waitingForChannel(id)) return;
     // Not over the miniplayer, which drip hides: the lock would cover whatever page YouTube moved to.
@@ -435,7 +439,7 @@
     if (pendingTick) {
       if (performance.now() - pendingTick.startedAt >= 5000) {
         attach();
-        pausePlayer(video);
+        pauseVideo();
       }
       return;
     }
@@ -444,7 +448,7 @@
     autoplayOff();
     // drip hides the miniplayer (early.css), so a video that drops into it gets paused rather than playing unseen.
     // The main player playing off /watch means the miniplayer, however YouTube marks it.
-    if (location.pathname !== '/watch' && video) pausePlayer(video);
+    if (location.pathname !== '/watch' && video) pauseVideo();
     if (clockActive()) bank();
     else takePlayed();
     await checkChannel();
@@ -464,7 +468,7 @@
     // The lock's lines follow the clock: +15m comes back when Dry hours end and goes 5 minutes before they start.
     // showLock redraws only when its view changed (Codex, 2026-11-05).
     if (locked && !inGrace() && liveLock()) showLock();
-    if (locked && !inGrace()) pausePlayer(video);
+    if (locked && !inGrace()) pauseVideo();
     renderPill();
   }
 

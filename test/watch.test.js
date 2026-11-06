@@ -168,7 +168,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   page.toggleAttribute('theater', theater);
   // #movie_player, and the observers watching its class for ads.
   const playerEl = new FakeElement('div');
-  /** @type {any} */ (playerEl).classList = { contains: () => false };
+  /** @type {any} */ (playerEl).classList = { contains: (/** @type {string} */ c) => c === 'playing-mode' && !video.paused };
+  const playButton = { clicks: 0, click() { this.clicks++; video.pause(); } };
   /** @type {Function[]} */
   const classWatchers = [];
   class FakeMutationObserver {
@@ -198,10 +199,12 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     createElementNS: (_ns, tag) => new FakeElement(tag),
     /** @param {string} sel */
     querySelector: (sel) => {
-      if (sel === '#movie_player video.html5-main-video') return tab.noPlayer ? null : video;
+      if (sel === '#movie_player video.html5-main-video') return tab.noPlayer || tab.noVideo ? null : video;
       if (sel === 'ytd-watch-flexy') return player.hasPage ? page : null;
       if (sel === '#movie_player.ad-showing, #movie_player.ad-interrupting') return player.ad ? playerEl : null;
       if (sel === '#movie_player') return tab.noPlayer ? null : playerEl;
+      if (sel === '#movie_player .ytp-play-button') return tab.noPlayer ? null : playButton;
+      if (sel === 'ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a') return tab.owner;
       return null;
     },
     /** @param {string} id */
@@ -239,7 +242,10 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   const removedBefore = lockRemoved;
   const tab = {
     noPlayer: false,
-    player, page, theaterButton,
+    noVideo: false,
+    /** @type {FakeElement | null} */
+    owner: null,
+    player, page, theaterButton, playButton,
     /** Starts or ends an ad, the way YouTube flips the player's class. @param {boolean} on */
     setAd: (on) => { player.ad = on; for (const fn of [...classWatchers]) fn(); },
     /** Runs every timer once, as one second passing would. */
@@ -321,6 +327,7 @@ function makeWorld() {
       else if (msg.type === 'addBacklog') result = D.addBacklog(world.state, msg.video, msg.index, now);
       else if (msg.type === 'removeBacklog') result = D.removeBacklog(world.state, msg.id);
       else if (msg.type === 'swapBacklog') result = D.swapBacklog(world.state, msg.video, String(msg.dropId), msg.index, now);
+      else if (msg.type === 'allowedVideo') result = D.allowedVideo(world.state, msg.videoId, msg.channel);
       else result = { ok: true };
       D.enterDry(world.state, now);
       const saved = structuredClone(world.state);
@@ -1084,6 +1091,65 @@ test('a watch page with no player for 10 seconds says drip is broken and locks n
   assert.match(tab.broken().textContent, /video player/);
   assert.equal(tab.locked(), false);
   assert.ok(tab.root.hasAttribute('data-drip-broken'), 'guard.js lets play() through');
+});
+
+test('a missed video selector fails open without pausing through YouTube controls on later ticks (Q25, A18)', async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, 'aaa');
+  // The video selector broke, but common.js can still reach YouTube's play button.
+  tab.noVideo = true;
+  await settle();
+  for (let i = 0; i < 11; i++) { world.advance(1); await tab.second(); }
+  assert.ok(tab.broken());
+  assert.match(tab.broken().textContent, /video player/);
+  assert.equal(tab.locked(), false);
+  assert.ok(tab.root.hasAttribute('data-drip-broken'));
+  const clicks = tab.playButton.clicks;
+  await tab.video.play();
+  for (let i = 0; i < 3; i++) {
+    world.advance(1);
+    await tab.second();
+    assert.equal(tab.video.paused, false, 'later ticks and status replies leave playback running');
+    assert.equal(tab.locked(), false);
+  }
+  assert.equal(tab.playButton.clicks, clicks, 'no pause through YouTube controls');
+  assert.equal(world.ticks().filter((t) => t.seconds > 0).length, 0, 'broken playback is unmetered');
+  tab.noVideo = false;
+  await tab.second();
+  assert.equal(tab.root.hasAttribute('data-drip-broken'), false);
+  assert.equal(tab.video.paused, true, 'finding the player restores enforcement');
+  assert.ok(tab.locked());
+});
+
+test('an allowed owner row arriving after four seconds removes the lock and makes playback free (Q31, A19)', async () => {
+  const world = makeWorld();
+  world.state.channels.allow = [{ ids: ['@allowed'], name: 'Allowed' }];
+  const tab = makeTab(world, 'aaa', { hasPage: true });
+  tab.page.setAttribute('video-id', 'aaa');
+  saved(world);
+  await settle();
+  assert.equal(tab.locked(), false, 'the lock waits briefly for identity');
+  await play(world, tab, 3);
+  assert.ok(tab.locked(), 'the lock rises after the two-second wait');
+  assert.equal(world.sent.filter((m) => m.type === 'allowedVideo').length, 0);
+  world.advance(1);
+  tab.owner = new FakeElement('a');
+  tab.owner.setAttribute('href', '/@allowed');
+  tab.owner.textContent = 'Allowed';
+  await tab.tick();
+  assert.equal(world.sent.filter((m) => m.type === 'allowedVideo').length, 1);
+  assert.equal(world.D.watchStatus(world.state, 'aaa', world.epoch + world.now).allowed, true);
+  assert.equal(tab.locked(), false);
+  // A positive balance proves free playback doesn't drain minutes.
+  world.state.watchSecondsLeft = 60;
+  saved(world);
+  await tab.video.play();
+  await play(world, tab, 6);
+  assert.equal(tab.video.paused, false);
+  assert.equal(tab.locked(), false);
+  assert.equal(world.state.watchSecondsLeft, 60);
+  assert.equal(world.D.logDay(world.state).watchedSec, 5, 'free time still reaches the worker');
+  assert.equal(world.sent.filter((m) => m.type === 'allowedVideo').length, 1, 'a read identity is checked once');
 });
 
 test('a player that comes back and then goes missing again drops the lock again (Codex)', async () => {
