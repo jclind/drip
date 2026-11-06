@@ -2,6 +2,16 @@
 
 Draft, 2026-10-06, updated 2026-11-05. Published at https://jesselind.com/projects/drip/privacy, from jesselind's `src/pages/projects/drip/privacy.astro`. Change both together.
 
+In short:
+
+- drip has no server. Nothing it reads is sent to its developer, sold, or shared, and it has no analytics or tracking.
+- Everything it keeps stays in your browser: your settings, your stash, your channel lists, and a 90-day log of your watch time, including the reasons you type for "I need this one".
+- It only talks to YouTube. It loads thumbnails and channel pictures, and may open your YouTube home or Subscriptions page in a hidden frame to pick the next video.
+- Nothing leaves your computer unless you send it yourself, like a bug report email or an exported file.
+- Removing drip from Chrome deletes what it stored.
+
+The details:
+
 drip processes browsing activity and YouTube page content locally in your browser. It sends none of that information to drip's developer or anyone else. There is no drip server, no account, no analytics, and no tracking. The YouTube requests and reports you can choose to send are described below.
 
 What it stores in your browser's extension storage (`chrome.storage.local`), all on your computer:
