@@ -960,9 +960,11 @@
           h('div', { class: 'drip-reason-row' },
             h('button', { class: 'drip-lock-link', 'data-k': 'cancel', onclick: closeReason }, 'Cancel'),
             h('button', { class: 'drip-b drip-b-gray', 'data-k': 'unlock', onclick: () => onNeedThis(reason.value) }, icon('unlock'), h('span', {}, 'Unlock this video'))))
-        : h('div', {},
-          h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`),
-          backLabel && h('div', { class: 'drip-lock-note' }, `Next unlock back ${backLabel}.`));
+        : !hasDrops || backLabel
+          ? h('div', {},
+            !hasDrops && h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`),
+            backLabel && h('div', { class: 'drip-lock-note' }, `Next unlock back ${backLabel}.`))
+          : null;
     const panel = h(
       'div',
       { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },
