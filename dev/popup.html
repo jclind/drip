@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>drip</title>
+    <base href="../src/popup/" />
+    <script>
+      // drip's real popup on localhost, for checks the browser tools can't reach on chrome-extension:// pages. Serve
+      // the repo with python3 -m http.server 8077 and open http://localhost:8077/dev/popup.html. A stand-in for the
+      // worker starts with 15 minutes; window.__tick(seconds) plays that much and tells the page, as a save does.
+      const listeners = [];
+      let st = null;
+      const world = () => {
+        if (st) return st;
+        st = globalThis.Drip.initialState(Date.now());
+        st.watchSecondsLeft = 15 * 60;
+        st.watchSecondsBought = 15 * 60;
+        return st;
+      };
+      window.__tick = (seconds) => {
+        const s = world();
+        s.watchSecondsLeft = Math.max(0, s.watchSecondsLeft - seconds);
+        for (const fn of listeners) fn({ drip: { newValue: structuredClone(s) } }, 'local');
+      };
+      window.chrome = {
+        runtime: {
+          getURL: (p) => `${location.origin}/${p}`,
+          getManifest: () => ({ version: '0.0.0' }),
+          onMessage: { addListener() {} },
+          sendMessage: async (msg) => (msg.type === 'get' ? { ok: true, state: structuredClone(world()) } : { ok: false }),
+          openOptionsPage() {},
+        },
+        storage: { onChanged: { addListener: (fn) => listeners.push(fn) } },
+        tabs: { query: async () => [], create: async () => {}, update: async () => {} },
+        windows: { getCurrent: async () => ({ id: 1 }), update: async () => {} },
+      };
+    </script>
+    <link rel="stylesheet" href="../pages.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="stats" id="stats" aria-live="polite"></div>
+    <nav class="links">
+      <button class="plain" id="settings" type="button"></button>
+      <button class="plain" id="youtube" type="button"></button>
+    </nav>
+    <script src="../lib/state.js"></script>
+    <script src="../lib/glass.js"></script>
+    <script src="../lib/morph.js"></script>
+    <script src="../pages.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

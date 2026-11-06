@@ -24,7 +24,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'planned', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
-    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
+    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'swapFollow', 'editsSince', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData',
@@ -130,7 +130,7 @@ test('initialState has the specified shape and independent mutable values', () =
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
     current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dropsBought: 0, dryBack: null, installedAt: time(5),
-    channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false,
+    channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false, ticksIn: [],
   });
   state.settings.recTokensPerDay = 1;
   state.backlog.push(video('a'));
@@ -1032,6 +1032,47 @@ test('formatMinutes is compact: 0m, <1m, minutes rounded down, hours with no lea
   assert.equal(D.formatMinutes(6120), '1h 42m');
 });
 
+
+test('chargeTick keeps the last 8 tick keys in the saved state, for the pages, and hydrate keeps them', () => {
+  const state = fresh();
+  state.watchSecondsLeft = 600;
+  const clock = { lastChargeEnd: 0 };
+  for (let i = 1; i <= 10; i++) D.chargeTick(state, clock, time(5) + i * 5000, 5, 'a', 0, `k${i}`);
+  assert.deepEqual(state.ticksIn.map((t) => t[0]), ['k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9', 'k10']);
+  // A resend under the same key keeps the larger count, once.
+  D.chargeTick(state, clock, time(5) + 51000, 7, 'a', 0, 'k10');
+  assert.deepEqual(state.ticksIn.at(-1), ['k10', 7]);
+  assert.equal(state.ticksIn.length, 8);
+  // No key, nothing kept.
+  D.chargeTick(state, clock, time(5) + 60000, 5, 'a');
+  assert.equal(state.ticksIn.length, 8);
+  const back = D.hydrate(JSON.parse(JSON.stringify(state)), time(5));
+  assert.deepEqual(back.ticksIn, state.ticksIn);
+  assert.deepEqual(D.hydrate({ ...state, ticksIn: [['ok', 3], ['bad', -1], [5, 2], 'x', ['', 1], ['nan', NaN]] }, time(5)).ticksIn, [['ok', 3]]);
+});
+
+test('swapFollow closes an open full-stash list once there is room or the video is stashed, and redraws it when the videos change', () => {
+  const state = fresh();
+  state.settings.stashMax = 2;
+  state.backlog = [video('a'), video('b')];
+  assert.equal(D.swapFollow(['a', 'b'], state, 'x'), 'keep');
+  assert.equal(D.swapFollow(['b', 'a'], state, 'x'), 'redraw', 'same videos, new order');
+  assert.equal(D.swapFollow(['a', 'c'], state, 'x'), 'redraw');
+  state.backlog = [video('a')];
+  assert.equal(D.swapFollow(['a', 'b'], state, 'x'), 'close', 'room now');
+  state.backlog = [video('a'), video('x')];
+  assert.equal(D.swapFollow(['a', 'b'], state, 'x'), 'close', 'stashed in another tab');
+  state.backlog = [video('a'), video('b')];
+  state.settings.stash = false;
+  assert.equal(D.swapFollow(['a', 'b'], state, 'x'), 'close', 'stash turned off');
+});
+
+test('editsSince gives the draft keys changed after a snapshot, and nothing when none did', () => {
+  const sent = { stashMax: 10, clock: true, dryFrom: 23 };
+  assert.deepEqual(D.editsSince(sent, { ...sent }), {});
+  assert.deepEqual(D.editsSince(sent, { ...sent, stashMax: 9, dryFrom: 22 }), { stashMax: 9, dryFrom: 22 });
+  assert.deepEqual(D.editsSince(sent, { ...sent, clock: false }), { clock: false });
+});
 
 test('chargeTick merges paid tabs ticking half a second apart', () => {
   const state = fresh();

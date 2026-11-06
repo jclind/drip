@@ -123,9 +123,29 @@ function matchComplex(el, cx, scope, k = cx.compounds.length - 1) {
   return false;
 }
 
+/** A text node, so morph.js can patch text in place. */
+class FakeText {
+  /** @param {string} data */
+  constructor(data) {
+    this.nodeType = 3;
+    this.data = data;
+    /** @type {any} */
+    this.parent = null;
+    Object.defineProperty(this, 'parent', { enumerable: false });
+  }
+  get parentNode() { return this.parent; }
+  get textContent() { return this.data; }
+  remove() {
+    if (this.parent) this.parent.childNodes = this.parent.childNodes.filter((/** @type {any} */ c) => c !== this);
+    this.parent = null;
+  }
+  toString() { return this.data; }
+}
+
 class FakeElement {
   /** @param {any} doc @param {string} tag */
   constructor(doc, tag) {
+    this.nodeType = 1;
     this.ownerDocument = doc;
     this.localName = tag.toLowerCase();
     this.tagName = tag.toUpperCase();
@@ -135,6 +155,9 @@ class FakeElement {
     this.childNodes = [];
     /** @type {FakeElement | null} */
     this.parent = null;
+    // Browser nodes don't expose their document and parent as own enumerable fields. Keep these back references
+    // out of assertion diffs too: expanding them walks the whole fake page repeatedly and can stall a failed test.
+    Object.defineProperties(this, { ownerDocument: { enumerable: false }, parent: { enumerable: false } });
     /** @type {{type: string, fn: Function, capture: boolean, once: boolean}[]} */
     this.listeners = [];
     this.inert = false;
@@ -156,6 +179,7 @@ class FakeElement {
       toggle: (c, on) => { if (on ?? !el.classList.contains(c)) el.classList.add(c); else el.classList.remove(c); },
     };
   }
+  get attributes() { return [...this.attrs].map(([name, value]) => ({ name, value })); }
   get className() { return this.attrs.get('class') || ''; }
   set className(v) { this.attrs.set('class', String(v)); }
   get id() { return this.attrs.get('id') || ''; }
@@ -178,7 +202,7 @@ class FakeElement {
     return el === this.ownerDocument.documentElement;
   }
   get textContent() { return this.childNodes.map((c) => (c instanceof FakeElement ? c.textContent : String(c))).join(''); }
-  set textContent(v) { this.detachAll(); this.childNodes = [String(v)]; }
+  set textContent(v) { this.detachAll(); this.childNodes = [this.adopt(String(v))]; }
   /** @param {string} k @param {any} v */
   setAttribute(k, v) { this.attrs.set(k, String(v)); }
   /** @param {string} k */
@@ -208,7 +232,9 @@ class FakeElement {
         if (event.stopped) return;
         if (l.type !== event.type || (l.capture !== capture && el !== this)) continue;
         if (l.once) el.listeners = el.listeners.filter((x) => x !== l);
-        l.fn(event);
+        // As in a browser, a listener runs with the element it's on as this and currentTarget.
+        event.currentTarget = el;
+        l.fn.call(el, event);
       }
     };
     for (const el of [...chain].reverse().slice(0, -1)) fire(el, true);
@@ -227,10 +253,11 @@ class FakeElement {
   focus() { this.ownerDocument.activeElement = this; }
   /** @param {any} node */
   adopt(node) {
-    if (node instanceof FakeElement) { node.remove(); node.parent = this; }
+    if (typeof node === 'string' || typeof node === 'number') node = new FakeText(String(node));
+    if (node instanceof FakeElement || node instanceof FakeText) { node.remove(); node.parent = this; }
     return node;
   }
-  detachAll() { for (const c of this.childNodes) if (c instanceof FakeElement) c.parent = null; }
+  detachAll() { for (const c of this.childNodes) c.parent = null; }
   /** @param {...any} kids */
   append(...kids) { for (const k of kids) this.childNodes.push(this.adopt(k)); }
   /** @param {...any} kids */
@@ -241,20 +268,20 @@ class FakeElement {
   before(...nodes) {
     const p = this.parent;
     if (!p) return;
-    for (const n of nodes) { p.adopt(n); p.childNodes.splice(p.childNodes.indexOf(this), 0, n); }
+    for (const node of nodes) { const n = p.adopt(node); p.childNodes.splice(p.childNodes.indexOf(this), 0, n); }
   }
   /** @param {any} node @param {any} ref */
   insertBefore(node, ref) {
     if (!ref) return this.append(node);
-    this.adopt(node);
-    this.childNodes.splice(this.childNodes.indexOf(ref), 0, node);
+    const n = this.adopt(node);
+    this.childNodes.splice(this.childNodes.indexOf(ref), 0, n);
   }
   /** @param {any} other */
   replaceWith(other) {
     const p = this.parent;
     if (!p) return;
-    p.adopt(other);
-    p.childNodes[p.childNodes.indexOf(this)] = other;
+    const n = p.adopt(other);
+    p.childNodes[p.childNodes.indexOf(this)] = n;
     this.parent = null;
   }
   remove() {
@@ -282,7 +309,8 @@ class FakeElement {
     return null;
   }
   getBoundingClientRect() { return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
-  getClientRects() { return []; }
+  /** No layout, except a page a test puts in view (makeTab's inView), where drip's home page has a box. */
+  getClientRects() { return this.ownerDocument.inView && this.attrs.get('id') === 'drip-home' ? [{}] : []; }
   getAnimations() { return []; }
   animate() { return { finished: Promise.resolve(), cancel() {}, currentTime: 0 }; }
 }
@@ -344,6 +372,7 @@ function makeWorld() {
         case 'resolve': return D.resolveCurrent(state, msg.action, msg.videoId, EPOCH);
         case 'buyIfOut': return D.buyIfOut(state, msg.videoId, world.time());
         case 'dryBackSeen': return D.dryBackSeen(state);
+        case 'refillSeen': return D.refillSeen(state);
         default: return { ok: false, error: 'unknown-message' };
       }
     },
@@ -351,6 +380,8 @@ function makeWorld() {
     count: (type) => world.sent.filter((m) => m.type === type).length,
     /** The worker's clock, which the newest tab sets to its own. */
     time: () => EPOCH,
+    /** Runs while a landing plays, before its drops come in. @type {((o: any) => Promise<void>) | null} */
+    duringLand: null,
   };
   return world;
 }
@@ -421,10 +452,12 @@ function gridMarks(document, item, kind) {
 /**
  * One YouTube tab on the home page, running home.js.
  * @param {ReturnType<typeof makeWorld>} world
- * @param {{reduced?: boolean, grid?: string[]}} [opts] reduced: the browser asks for reduced motion, so nothing
- *   animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that kind's markup (gridMarks).
+ * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string}} [opts] reduced: the browser asks for
+ *   reduced motion, so nothing animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that
+ *   kind's markup (gridMarks). inView: drip's home page is on screen, so drops land in the counter, and tab.landings
+ *   records each landing. kept: what "Done for now" left in sessionStorage, "N" or "N:dryUntil" (watch.js onDone).
  */
-async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}) {
+async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '' } = {}) {
   let now = 0;
   world.time = () => EPOCH + now;
   /** @type {Map<number, {fn: Function, at: number, every: number}>} */
@@ -438,6 +471,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
   /** @type {any} */
   const document = {
     hidden: false,
+    inView,
     activeElement: null,
     /** @param {string} tag */
     createElement: (tag) => new FakeElement(document, tag),
@@ -456,7 +490,10 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     dispatchEvent: (event) => { for (const fn of document.listeners[event.type] || []) fn(event); return true; },
   };
   document.documentElement = new FakeElement(document, 'html');
+  if (inView) document.documentElement.setAttribute('data-drip-shown', '');
   document.body = new FakeElement(document, 'body');
+  /** @type {Map<string, string>} */
+  const session = new Map(kept ? [['drip-kept', kept]] : []);
   document.documentElement.append(document.body);
   document.activeElement = document.body;
 
@@ -515,6 +552,16 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     reveals: [],
     /** The card the animation stub dealt, which home.js draws for real once the animation is done. @type {any} */
     dealt: null,
+    /** Each landing the counter played, with the drop count shown just before it. @type {any[]} */
+    landings: [],
+    /** Full-stash lists built, and the ones placed by their button. @type {any[]} */
+    pickers: [],
+    /** @type {any[]} */
+    placed: [],
+    /** Every number the drop count was set to, in order. @type {number[]} */
+    dropsShown: [],
+    /** The drop count on the page. */
+    drops: () => Number(document.querySelector('.drip-count .drip-num')?.textContent ?? NaN),
   };
 
   /** @type {any} */
@@ -525,7 +572,11 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     innerHeight: 900,
     performance: { now: () => now },
     Date: class extends Date { static now() { return EPOCH + now; } },
-    sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    sessionStorage: {
+      getItem: (/** @type {string} */ k) => session.get(k) ?? null,
+      setItem: (/** @type {string} */ k, /** @type {string} */ v) => { session.set(k, String(v)); },
+      removeItem: (/** @type {string} */ k) => { session.delete(k); },
+    },
     setTimeout: (/** @type {Function} */ fn, /** @type {number} */ ms) => addTimer(fn, ms, 0),
     clearTimeout: (/** @type {number} */ id) => { timers.delete(id); },
     setInterval: (/** @type {Function} */ fn, /** @type {number} */ ms) => addTimer(fn, ms, ms),
@@ -538,13 +589,34 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
     // The parts home.js draws with but these tests don't look at.
     DripGlass: { fraction: () => 0.5, make: () => h('svg'), set() {} },
     DripStash: { parts: () => ({ nodes: [h('span', {}, 'Stash')], to() {} }) },
-    DripSwap: { leftSec: () => 0, meta: () => '', fraction: () => 0, bar: () => null, picker: () => h('div'), place() {}, note: () => null, UNDO_MS: 5000 },
+    DripSwap: {
+      // Progress shows in the meta line and the bar, as in swap.js, so playing a stashed video redraws its row.
+      leftSec: () => 0, meta: (/** @type {any} */ v) => (v.resumeSec ? `${v.resumeSec}s in` : ''), fraction: (/** @type {any} */ v) => (v.resumeSec ? 0.2 : 0),
+      bar: () => null, note: () => null, UNDO_MS: 5000,
+      // Records each list built and each one placed, so a test can see the one on the page is the one placed.
+      picker: () => { const el = h('div', { class: 'drip-swap' }, h('ul', { class: 'drip-swap-list' })); tab.pickers.push(el); return el; },
+      place: (/** @type {any} */ el) => {
+        tab.placed.push(el);
+        el.classList.add('is-placed', 'is-above');
+        el.querySelector('.drip-swap-list').style.maxHeight = '180px';
+      },
+    },
     DripPour: { pour: async () => {} },
     DripCounter: {
       num: (/** @type {number} */ n) => h('span', { class: 'drip-num' }, String(n)),
       value: (/** @type {any} */ el) => Number(el.textContent),
-      to: (/** @type {any} */ el, /** @type {number} */ n) => { el.textContent = String(n); },
-      land: async () => {},
+      to: (/** @type {any} */ el, /** @type {number} */ n) => {
+        if (el === document.querySelector('.drip-count .drip-num')) tab.dropsShown.push(n);
+        el.textContent = String(n);
+      },
+      // Records what lands and lets it all in at once, as the real one does by the end.
+      land: async (/** @type {any} */ o) => {
+        tab.landings.push({ kind: o.kind, drops: o.drops.add, cards: o.cards ? o.cards.add : 0, shownBefore: tab.drops() });
+        const hook = world.duringLand;
+        if (hook) await hook(o);
+        await o.drops.release(o.drops.add);
+        if (o.cards) await o.cards.release(o.cards.add);
+      },
     },
     // reveal.js's contract, without its animation: find and pay, then wait for the picture, then done.
     DripReveal: {
@@ -573,7 +645,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'] } = {}
   context.window = context;
   context.globalThis = context;
   vm.createContext(context);
-  for (const file of ['lib/state.js', 'content/common.js', 'content/home.js']) {
+  for (const file of ['lib/state.js', 'lib/morph.js', 'content/common.js', 'content/home.js']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context, { filename: file });
   }
 
@@ -875,6 +947,85 @@ for (const reduced of [true, false]) {
     assert.ok(tab.document.activeElement === tab.button('block'));
     await tab.advance(3000);
     assert.ok(!tab.button('block').classList.contains('is-armed'));
+  });
+
+  test(`a minute ticking down keeps every control and an open menu, and changes only the minutes (${how}, Codex 2026-11-05)`, async () => {
+    const world = makeWorld();
+    world.state.watchSecondsLeft = 15 * 60;
+    world.state.backlog = [{ id: 's1', title: 'Stashed one', channel: 'C', length: '10:00' }];
+    const tab = await makeTab(world, { reduced });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    // With a card up, the stash folds to its header; open it so its rows are there too.
+    await tab.click('saved-head');
+    await tab.click('card-more');
+    const keys = ['watch', 'save', 'card-more', 'block', 'saved-head', 'x-s1', 'play-s1'];
+    const before = Object.fromEntries(keys.map((k) => [k, tab.button(k)]));
+    for (const k of keys) assert.ok(before[k], `no ${k} before`);
+    const card = tab.card();
+    assert.match(tab.root().textContent, /15m/);
+    // Another tab plays a minute.
+    world.state.watchSecondsLeft = 14 * 60;
+    for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+    await tab.advance(10);
+    assert.match(tab.root().textContent, /14m/);
+    for (const k of keys) assert.equal(tab.button(k), before[k], `${k} is the same element`);
+    assert.equal(tab.card(), card, 'the same card');
+    assert.equal(tab.button('card-more').getAttribute('aria-expanded'), 'true', 'the menu is still open');
+  });
+
+  test(`a full-stash list rebuilt while open is the one on the page, and placed (${how}, Codex 2026-11-05)`, async () => {
+    const world = makeWorld();
+    world.state.settings.stashMax = 1;
+    world.state.backlog = [{ id: 's1', title: 'Stashed one', channel: 'C', length: '10:00' }];
+    const tab = await makeTab(world, { reduced });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    await tab.click('save');
+    await tab.advance(10);
+    const first = tab.root().querySelector('.drip-swap');
+    assert.ok(first, 'the list is open');
+    // Another tab plays some of the stashed video, so the list is built again with its new progress.
+    world.state.backlog[0].resumeSec = 120;
+    for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+    await tab.advance(10);
+    const live = tab.root().querySelector('.drip-swap');
+    assert.notEqual(live, first, 'progress rebuilds the list');
+    assert.equal(live, tab.pickers.at(-1), 'the list on the page is the one just built');
+    assert.ok(tab.placed.includes(live), 'and it was placed by its button');
+    assert.ok(live.classList.contains('is-placed'));
+    // An unrelated redraw reuses the cached list, with its scroll and placement intact.
+    const list = live.querySelector('.drip-swap-list');
+    list.scrollTop = 75;
+    const built = tab.pickers.length;
+    const placed = tab.placed.length;
+    world.state.tokens.rec--;
+    for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+    await tab.advance(10);
+    assert.equal(tab.pickers.length, built, 'the unchanged list is reused');
+    assert.equal(tab.root().querySelector('.drip-swap'), live, 'the cached list stays on the page');
+    assert.equal(list.scrollTop, 75, 'its scroll stays put');
+    assert.equal(tab.placed.length, placed, 'it does not need placing again');
+    assert.ok(live.classList.contains('is-placed'));
+    assert.ok(live.classList.contains('is-above'));
+    assert.equal(list.style.maxHeight, '180px');
+  });
+
+  test(`a kept button runs the handler for what it shows now (${how}, Codex 2026-11-05)`, async () => {
+    const world = makeWorld();
+    world.state.backlog = [{ id: 's1', title: 'Stashed one', channel: 'C', length: '10:00' }, { id: 's2', title: 'Stashed two', channel: 'C', length: '10:00' }];
+    const tab = await makeTab(world, { reduced });
+    const head = tab.button('saved-head');
+    // The stash list toggles: a kept header's handler has to see the list as it is now, not as first drawn.
+    const open = () => tab.root().querySelector('.drip-saved')?.classList.contains('is-open');
+    const was = open();
+    await tab.click('saved-head');
+    assert.equal(open(), !was);
+    assert.equal(tab.button('saved-head'), head);
+    await tab.click('saved-head');
+    assert.equal(open(), was);
   });
 
   for (const cards of ['limited', 'unlimited']) {
@@ -1250,6 +1401,82 @@ test('in Dry hours the home page is out even with minutes left, and they come ba
   assert.equal(world.state.tokens.watch, 4, '40 minutes is 2 whole drops back');
   // The fake page has no layout, so the drops never land here: the "2 back" tag is a browser check.
   assert.deepEqual(world.state.dryBack, { until: world.D.dryUntil(world.state, world.time()), watch: 2 });
+});
+
+/** Whether a list of numbers never goes down. @param {number[]} list */
+const neverDown = (list) => list.every((n, i) => i === 0 || n >= list[i - 1]);
+
+test('"Done for now" into Dry hours lands the kept drops, then "2 back", and the count ends right (Codex, 2026-11-05)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 40 * 60;
+  world.state.tokens.watch = 2;
+  // The lock saw 4 drops when "Done for now" was clicked: 2 kept, and 2 back from the 40 minutes.
+  const until = world.D.dryUntil(world.state, world.time());
+  const tab = await makeTab(world, { inView: true, kept: `4:${until}` });
+  await tab.advance(3000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 2], ['back', 2]]);
+  assert.equal(tab.drops(), 4);
+  assert.equal(world.state.dryBack, null, 'the drops back were marked seen');
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('kept drops the lock saved before the drops came back land in full, then "2 back" (Codex, 2026-11-05)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 40 * 60;
+  world.state.tokens.watch = 2;
+  // A paused page locks on its own at the start, before any message has handed the drops back.
+  const tab = await makeTab(world, { inView: true, kept: '2:0' });
+  await tab.advance(3000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 2], ['back', 2]]);
+  assert.equal(tab.drops(), 4);
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('drops back the page hears of only once the kept drops are falling are in them: one landing, marked seen', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  const until = world.D.dryUntil(world.state, world.time());
+  // The worker handed 1 drop back and the lock counted it, but this page's state hasn't heard yet.
+  world.state.tokens.watch = 7;
+  world.state.drySeen = until;
+  /** @type {any} */ (world).duringLand = async () => {
+    /** @type {any} */ (world).duringLand = null;
+    world.state.dryBack = { until, watch: 1 };
+    for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+    await settle();
+  };
+  const tab = await makeTab(world, { inView: true, kept: `7:${until}` });
+  await tab.advance(4000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 7]]);
+  assert.equal(tab.drops(), 7);
+  assert.equal(world.state.dryBack, null, 'marked seen');
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('drops back and the day\'s refill both land, one after the other, and neither gets stuck (Codex, 2026-11-05)', async () => {
+  const world = makeWorld();
+  dryAtNoon(world);
+  world.state.watchSecondsLeft = 40 * 60;
+  world.state.tokens.watch = 2;
+  world.state.refill = { day: world.state.day, watch: 2, rec: 10 };
+  const tab = await makeTab(world, { inView: true });
+  await tab.advance(4000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['back', 2], ['new', 2]]);
+  assert.equal(tab.drops(), 4);
+  assert.equal(world.state.dryBack, null);
+  assert.equal(world.state.refill, null);
+  assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+});
+
+test('kept drops with nothing back land once, as before', async () => {
+  const world = makeWorld();
+  world.state.tokens.watch = 3;
+  const tab = await makeTab(world, { inView: true, kept: '3:0' });
+  await tab.advance(3000);
+  assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), [['kept', 3]]);
+  assert.equal(tab.drops(), 3);
 });
 
 test('in the 5 minutes before Dry hours, +15m is off and the gray line says when they start', async () => {

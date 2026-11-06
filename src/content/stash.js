@@ -173,7 +173,11 @@
     gap.className = 'drip-stash-icon';
     ghost.append(gap, 'Stashed');
     /** Fills or empties the bookmark, and changes the word when it should. @param {boolean} on */
-    const to = (on) => fill(icon, on, (s) => { word.textContent = s ? 'Stashed' : 'Stash'; });
+    const to = (on) => {
+      // This animates the nodes just built, so a page that patches itself in place puts these in, not its old ones.
+      row.setAttribute('data-morph-new', '');
+      return fill(icon, on, (s) => { word.textContent = s ? 'Stashed' : 'Stash'; });
+    };
     return { nodes: [row, ghost], icon, word, to };
   }
 

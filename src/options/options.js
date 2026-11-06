@@ -551,7 +551,11 @@ function absorb(res) {
   return res;
 }
 
-/** Save and Undo all hide the button pressed, so focus goes to the mode picker, the top of the form, not the page's. */
+/**
+ * Save and Undo all hide the button pressed, so focus goes to the mode picker, the top of the form, not the page's.
+ * Only after a key press: a mouse click leaves focus alone, since moving it scrolls the page to the top (air, 2026-11-05).
+ */
+const keyedSavebar = () => $('savebar').contains(document.activeElement) && !!document.activeElement?.matches(':focus-visible');
 const focusForm = () => /** @type {HTMLElement | null} */ (document.querySelector('.segmented [tabindex="0"]'))?.focus();
 
 /**
@@ -571,6 +575,8 @@ function savedLine(waiting) {
 async function save() {
   const changes = toSave();
   if (!Object.keys(changes).length) return;
+  // The form stays open while the worker answers. An edit made meanwhile is kept, not replaced by the saved plan.
+  const sent = { ...draft };
   /** @type {any} */
   let res = null;
   try {
@@ -585,8 +591,8 @@ async function save() {
     return;
   }
   absorb(res);
-  const hadFocus = $('savebar').contains(document.activeElement);
-  draft = Drip.planned(state);
+  const hadFocus = keyedSavebar();
+  draft = { ...Drip.planned(state), ...Drip.editsSince(sent, draft) };
   resetCardsKind();
   savedNote = savedLine(Object.keys(res.pending || {}));
   renderForm();
@@ -601,7 +607,7 @@ async function save() {
 
 /** Undo all: the form goes back to the saved settings, waiting changes included. */
 function undoAll() {
-  const hadFocus = $('savebar').contains(document.activeElement);
+  const hadFocus = keyedSavebar();
   draft = Drip.planned(state);
   resetCardsKind();
   savedNote = '';
@@ -686,6 +692,7 @@ function renderHistory() {
     class: `col${d.day === selectedDay ? ' is-selected' : ''}${d.today ? ' is-today' : ''}`,
     disabled: !d.counted,
     'aria-pressed': String(d.day === selectedDay),
+    'data-k': `day-${d.day}`,
     'aria-label': `${dayText(d.day, { weekday: 'long' })}, ${d.counted ? Drip.formatMinutes(d.watchedSec) : 'no data'}`,
     onclick: () => { selectedDay = d.day; renderHistory(); },
   },
@@ -695,11 +702,14 @@ function renderHistory() {
   const dayTitle = selectedDay === state.day ? 'Today' : dayText(selectedDay, { weekday: 'long', month: 'short', day: 'numeric' });
   const line = Drip.cardsLine(entry);
 
+  // A button pressed from the keyboard is rebuilt here, so focus goes to its new copy, or to the other arrow once the
+  // pressed one turns off at the end of the history (Codex, 2026-11-05).
+  const focusKey = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('#history [data-k]')?.getAttribute('data-k') || '';
   $('history').replaceChildren(...[
     h('div', { class: 'week-nav' },
-      h('button', { type: 'button', class: 'nav-btn', 'aria-label': 'Earlier week', disabled: !w.hasEarlier, onclick: () => { weeksBack++; renderHistory(); } }, icon('chevron-left')),
+      h('button', { type: 'button', class: 'nav-btn', 'data-k': 'earlier', 'aria-label': 'Earlier week', disabled: !w.hasEarlier, onclick: () => { weeksBack++; renderHistory(); } }, icon('chevron-left')),
       h('div', { class: 'week-label', 'aria-live': 'polite' }, weekLabel(w)),
-      h('button', { type: 'button', class: 'nav-btn', 'aria-label': 'Later week', disabled: !w.hasLater, onclick: () => { weeksBack = Math.max(0, weeksBack - 1); renderHistory(); } }, icon('chevron-right'))),
+      h('button', { type: 'button', class: 'nav-btn', 'data-k': 'later', 'aria-label': 'Later week', disabled: !w.hasLater, onclick: () => { weeksBack = Math.max(0, weeksBack - 1); renderHistory(); } }, icon('chevron-right'))),
     h('div', { class: 'avg-row' },
       h('div', {}, h('div', { class: 'label' }, 'Daily average'), h('div', { class: 'big' }, Drip.formatMinutes(w.average ?? 0))),
       changeLine(w)),
@@ -718,6 +728,11 @@ function renderHistory() {
         tile('unlock', 'tile-lock', entry ? entry.needThis.length : 0, 'Unlocks used')),
       line && h('p', { class: 'cards-line' }, line)),
   ].filter(Boolean));
+  if (focusKey) {
+    const other = { earlier: 'later', later: 'earlier' }[focusKey];
+    const pick = (/** @type {string} */ k) => /** @type {HTMLButtonElement | null} */ ($('history').querySelector(`[data-k="${k}"]:not([disabled])`));
+    (pick(focusKey) || (other && pick(other)) || pick(`day-${selectedDay}`))?.focus();
+  }
 }
 
 /** The reasons shown at first, and how many more each "Show more" adds. A heavy user has hundreds (Jesse, 2026-11-03). */

@@ -108,7 +108,7 @@
   }
 
   // A full stash (Q28): the list under one result's Stash, and the note after a swap.
-  /** @type {{button: HTMLElement, el: HTMLElement} | null} */
+  /** @type {{button: HTMLElement, el: HTMLElement, video: any, ids: string[]} | null} */
   let swap = null;
   /** @type {{el: HTMLElement, dropped: any, index: number, newId: string, timer: number} | null} */
   let swapped = null;
@@ -119,7 +119,7 @@
     const el = DripSwap.picker({ backlog: state.backlog, onPick: (/** @type {any} */ drop) => onSwap(button, video, drop), onClose: closeSwap });
     button.setAttribute('aria-expanded', 'true');
     button.parentElement?.append(el);
-    swap = { button, el };
+    swap = { button, el, video, ids: state.backlog.map((/** @type {any} */ v) => v.id) };
     DripSwap.place(el, button);
     if (keyboard) el.focusFirst();
   }
@@ -134,11 +134,25 @@
     if (had) button.focus();
   }
 
+  /** The stash changed under the open list, say in another tab: it closes, or shows what's there now (Codex, 2026-11-05). */
+  function followSwap() {
+    if (!swap || !state) return;
+    const what = Drip.swapFollow(swap.ids, state, swap.video.id);
+    if (what === 'close') closeSwap();
+    else if (what === 'redraw') openSwap(swap.button, swap.video, swap.el.contains(document.activeElement));
+  }
+
   /** @param {HTMLElement} button @param {any} video @param {any} drop */
   async function onSwap(button, video, drop) {
     const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
     closeSwap();
     const res = await send({ type: 'swapBacklog', video, dropId: drop.id });
+    // The video picked went from the stash in the meantime: the list comes back with what's there now.
+    if (res && !res.ok && res.error === 'not-stashed' && res.state) {
+      state = res.state;
+      if (button.isConnected && Drip.swapFollow([], state, video.id) !== 'close') openSwap(button, video, false);
+      return;
+    }
     if (!res || !res.ok || !res.dropped) return;
     clearSwapped();
     const dropped = res.dropped;
@@ -236,6 +250,7 @@
 
   onState((next) => {
     state = next;
+    followSwap();
     apply();
   });
   send({ type: 'get' }).then((res) => {

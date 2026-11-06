@@ -6,6 +6,7 @@
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
   const { send: sendMessage, h, onState, hourLabel, dayTimeLabel, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const DripMorph = /** @type {any} */ (globalThis).DripMorph;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
   /** @type {any} */
@@ -460,6 +461,9 @@
       const status = Drip.watchStatus(state, videoId(), Date.now());
       if (status.locked && (!locked || inGrace())) applyStatus(status);
     }
+    // The lock's lines follow the clock: +15m comes back when Dry hours end and goes 5 minutes before they start.
+    // showLock redraws only when its view changed (Codex, 2026-11-05).
+    if (locked && !inGrace() && liveLock()) showLock();
     if (locked && !inGrace()) pausePlayer(video);
     renderPill();
   }
@@ -818,7 +822,9 @@
     stopRings();
     const kept = state ? state.tokens.watch : 0;
     try {
-      if (kept > 0) sessionStorage.setItem(KEPT_KEY, String(kept));
+      // With the Dry hours whose drops back the count holds, if any, so home lands those second without counting them
+      // twice. A lock that went up before the drops came back saved a count without them (Codex, 2026-11-05).
+      if (kept > 0) sessionStorage.setItem(KEPT_KEY, `${kept}:${state?.dryBack?.until || 0}`);
     } catch {
       // Storage blocked: the home page just won't mention the drops.
     }
@@ -987,7 +993,9 @@
     else res = await send({ type: 'addBacklog', video: thisVideo(id) });
     if (res && !res.ok && res.error === 'stash-full' && !disconnected) {
       state = res.state;
-      openSwap(keyboard);
+      // Moved on to another video while the worker answered: the list would be for this one (Codex, 2026-11-05).
+      if (videoId() === id) openSwap(keyboard);
+      else renderPill();
       return;
     }
     took(res);
@@ -1019,6 +1027,8 @@
   let swapLayer = null;
   /** The video whose list is up, or ''. */
   let swapOpen = '';
+  /** The stashed videos the open list shows, so a change from another tab can redraw or close it. @type {string[]} */
+  let swapIds = [];
   /** @type {{dropped: any, index: number, newId: string, timer: number} | null} */
   let swapped = null;
 
@@ -1029,6 +1039,7 @@
       swapped = null;
     }
     if (swapOpen && (!state || swapOpen !== id || state.backlog.some((/** @type {any} */ v) => v.id === id))) swapOpen = '';
+    swapIds = swapOpen ? state.backlog.map((/** @type {any} */ v) => v.id) : [];
     const parts = [
       swapOpen && DripSwap.picker({ backlog: state.backlog, onPick: onSwap, onClose: closeSwap }),
       swapped && DripSwap.note(swapped.dropped, onSwapUndo),
@@ -1061,6 +1072,14 @@
     renderPill();
   }
 
+  /** The stash changed under the open list, say in another tab: it closes, or shows what's there now. */
+  function followSwap() {
+    if (!swapOpen || !state) return;
+    const what = Drip.swapFollow(swapIds, state, swapOpen);
+    if (what === 'close') closeSwap();
+    else if (what === 'redraw') openSwap(!!swapLayer?.contains(document.activeElement));
+  }
+
   function closeSwap() {
     const had = !!swapLayer?.contains(document.activeElement);
     swapOpen = '';
@@ -1076,6 +1095,17 @@
     const index = state.backlog.findIndex((/** @type {any} */ v) => v.id === drop.id);
     swapOpen = '';
     const res = await send({ type: 'swapBacklog', video: thisVideo(id), dropId: drop.id });
+    // The video picked went from the stash in the meantime: the list comes back with what's there now.
+    if (res && !res.ok && res.error === 'not-stashed' && res.state && !disconnected) {
+      state = res.state;
+      if (videoId() === id && Drip.swapFollow([], state, id) !== 'close') openSwap(false);
+      else {
+        // Room now, or moved on: the list that was up goes (Codex, 2026-11-05).
+        drawSwap();
+        renderPill();
+      }
+      return;
+    }
     if (res && res.ok && res.dropped) {
       if (swapped) clearTimeout(swapped.timer);
       const timer = window.setTimeout(() => {
@@ -1225,10 +1255,14 @@
     // Count down between ticks, which only go out every few seconds. During an ad, the time not banked yet is all ad
     // (syncAd banked what came before it), and ads aren't charged (Q27).
     const live = adShowing ? 0 : (runningSince === null ? playedMs : playedMs + performance.now() - runningSince) / 1000;
-    const pending = unsent.reduce((sum, entry) => sum + entry.seconds, 0) + live;
+    // The worker saves before it replies, so the state can already count a tick still waiting here. Those seconds
+    // aren't taken off twice (Codex, 2026-11-05).
+    const counted = (/** @type {string} */ key) => state.ticksIn.find((/** @type {[string, number]} */ t) => t[0] === key)?.[1] || 0;
+    const pending = unsent.reduce((sum, entry) => sum + Math.max(0, entry.seconds - counted(entry.key)), 0) + live;
     const left = Math.max(0, state.watchSecondsLeft - pending);
-    // The 5 minutes before Dry hours, the pill counts down to them instead, and shimmers (Jesse, 2026-11-04).
-    const soon = clockOn && !grace && !unlocked ? Drip.drySoon(state, Date.now()) : 0;
+    // The 5 minutes before Dry hours, the pill counts down to them instead, and shimmers (Jesse, 2026-11-04). A video
+    // finishing on grace too, since Dry hours stop it as well (Q32), and "Finishing this one" would promise otherwise.
+    const soon = clockOn && !unlocked && !allowed ? Drip.drySoon(state, Date.now()) : 0;
     const soonSec = (soon - Date.now()) / 1000;
     // At 5 minutes and at 1, once each for each video that plays, the pill says what happens, with rings.
     const stage = soon ? (soonSec <= 60 ? 1 : 5) : 0;
@@ -1243,11 +1277,11 @@
     const soonText = !soon ? ''
       : noticing ? `Dry hours · video stops at ${hourLabel(new Date(soon).getHours())}`
         : `Dry in ${soonSec < 60 ? '<1m' : Drip.formatMinutes(Math.ceil(soonSec / 60) * 60)}`;
-    const time = finishing ? 'Finishing this one' : allowed ? 'Allowed channel' : unlocked ? 'Unlocked' : soonText || Drip.formatMinutes(left);
+    const time = soonText || (finishing ? 'Finishing this one' : allowed ? 'Allowed channel' : unlocked ? 'Unlocked' : Drip.formatMinutes(left));
     // Paused, the minutes aren't draining, and the pill says so.
     const paused = !grace && !unlocked && !adShowing && !!video && video.paused && left > 0;
     // With grace on, the pill stays up through 0 too, until grace takes over, so it never blinks out at the switch.
-    pillLow = clockOn && !grace && !unlocked && !adShowing && (((left > 0 || state.settings.graceMode) && left <= LOW_SECONDS) || !!soon);
+    pillLow = clockOn && !unlocked && !adShowing && ((!grace && (left > 0 || state.settings.graceMode) && left <= LOW_SECONDS) || !!soon);
     if (clockOn && !unlocked) {
       const fraction = grace ? 0 : DripGlass.fraction({ watchSecondsLeft: left, watchSecondsBought: state.watchSecondsBought });
       if (fraction === 0 && pillGlass && Number(pillGlass.dataset.level) > 0) pillDrainAt = performance.now();
@@ -1271,7 +1305,7 @@
         // One inline line, so the smaller note sits on the minutes' baseline instead of being centered as its own box.
         h('span', { class: 'drip-pill-label' },
           h('span', { class: 'drip-pill-minutes' }, time),
-          !unlocked && h('span', { class: 'drip-sr' }, finishing ? ', time is up' : noticing ? '' : soon ? ', then no watching until they end' : ' left today'),
+          !unlocked && h('span', { class: 'drip-sr' }, noticing ? '' : soon ? ', then no watching until they end' : finishing ? ', time is up' : ' left today'),
           paused && h('span', { class: 'drip-pill-note' }, h('span', { class: 'drip-sep', 'aria-hidden': 'true' }, ' · '), 'paused'),
           adShowing && h('span', { class: 'drip-pill-note' }, ' Ad, not counted'))),
       stashOn && h('button', {
@@ -1286,7 +1320,9 @@
       for (const ev of ['focusin', 'focusout']) pill.addEventListener(ev, () => setTimeout(pillLook));
     }
     const focused = pill.contains(document.activeElement);
-    pill.replaceChildren(...content.filter(Boolean));
+    // In place (morph.js): the minutes changing every minute leave Stash the same button, so a press on it isn't lost
+    // (Codex, 2026-11-05).
+    DripMorph.morphChildren(pill, h('div', {}, ...content.filter(Boolean)));
     if (pill.parentElement !== parent) parent.append(pill);
     // No player found: pinned to the window instead, below YouTube's top bar, where it can still be seen and clicked.
     pill.classList.toggle('is-floating', parent === document.body);
@@ -1318,6 +1354,7 @@
     // Another tab may have used up the minutes. A video playing here when that happened gets grace too (Q3).
     if (wasFunded && status.locked && graceAllowed(id) && clockActive() && video && !video.paused) setGrace(id);
     applyStatus(status, !!(pendingTick && pendingTick.id === id && pendingTick.paid));
+    followSwap();
     renderPill();
   });
   // Time played up to here belongs to the video being left, not the next one.
