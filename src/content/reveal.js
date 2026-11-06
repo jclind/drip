@@ -506,6 +506,69 @@
   }
 
   /**
+   * Home's first reveal holds the loaded body's space when YouTube has no recommendations. The buttons stay in
+   * their starting state until there is a video. The welcome tour keeps its original reveal choreography.
+   * @param {Options & {empty: () => HTMLElement | null}} o
+   */
+  async function revealHome(o) {
+    const oldRow = /** @type {HTMLElement} */ (o.page.querySelector('.drip-actions'));
+    const empty = measureEmpty(oldRow);
+    const wasOpen = o.page.classList.contains('is-open');
+    o.page.querySelector('.drip-feed-space')?.remove();
+    const shell = o.card(null);
+    const s = split(shell);
+    s.thumb.classList.add('is-empty');
+    shell.inert = true;
+    oldRow.replaceWith(shell);
+    const H = s.body.offsetHeight;
+    const three = measureThree(s.row);
+    s.row.replaceWith(oldRow);
+    o.page.classList.add('is-open');
+    const opened = wasOpen ? Promise.resolve() :
+      play(s.body, [{ height: '0px', paddingBottom: '0px' }, { height: `${H}px`, paddingBottom: '16px' }], { duration: OPEN_MS, easing: OPEN_EASE });
+    const landing = deal(o.root, o.counter, s.thumb);
+    const video = await o.find();
+    const [card] = await Promise.all([landing, opened]);
+    stop(s.body);
+    s.body.style.overflow = 'visible';
+    if (!video) {
+      await undeal(o.root, card, o.counter);
+      const note = o.empty();
+      if (note) {
+        // The note's hidden loading body has exactly the geometry of s.body. Nothing below it moves.
+        shell.before(note);
+      } else {
+        o.page.classList.remove('is-open');
+        await play(s.body, [{ height: `${H}px`, paddingBottom: '16px' }, { height: '0px', paddingBottom: '0px' }], { duration: OPEN_MS, easing: EASE });
+      }
+      shell.replaceWith(o.actions());
+      return false;
+    }
+    // Only a successful reveal spends a card and forms the video's controls.
+    spendShown(o.counter);
+    foldSaved(o.saved, false, { duration: OPEN_MS, easing: OPEN_EASE });
+    const real = parts(o.card(video));
+    adopt(card, real);
+    real.title.classList.add('drip-held');
+    real.meta.classList.add('drip-held');
+    s.body.replaceChildren(real.thumb, real.title, real.meta);
+    oldRow.classList.add('drip-ghost');
+    s.wrap.prepend(real.row);
+    real.row.style.opacity = '0';
+    play(oldRow, [{ opacity: 1 }, { opacity: 0 }], { duration: 150 }).then(() => oldRow.remove());
+    const formed = morph(s.wrap, forward(empty, three)).then(async (layer) => {
+      real.row.style.opacity = '';
+      layer.remove();
+      await labels(real.row, true, 200);
+    });
+    await o.ready(video);
+    real.title.classList.remove('drip-held');
+    real.meta.classList.remove('drip-held');
+    await Promise.all([flip(card), formed, textIn([real.title, real.meta], 240)]);
+    return true;
+  }
+
+  /**
    * Reveal next, on a card that's up. Resolves true once the new card is face up, or false if nothing new came, after
    * the dealt card has gone back to the counter and the old one is face up again.
    * @param {Options} o
@@ -623,5 +686,5 @@
     await Promise.all([drop(o), wait(OPEN_MS)]);
   }
 
-  /** @type {any} */ (globalThis).DripReveal = { reveal, next, pass, passOut, dealCard, reduced };
+  /** @type {any} */ (globalThis).DripReveal = { reveal, revealHome, next, pass, passOut, dealCard, reduced };
 })();

@@ -27,6 +27,7 @@
     mount: 'ytd-two-column-browse-results-renderer #primary',
     item: 'ytd-rich-item-renderer, ytd-grid-video-renderer',
     feedNudge: 'ytd-feed-nudge-renderer',
+    signIn: 'ytd-masthead a[href*="accounts.google.com/ServiceLogin"]',
     link: 'a[href*="/watch?v="]',
     title: '#video-title, h3 a, h3',
     // Late 2026 markup uses camelCase classes (checked 2026-10-05); the kebab-case ones are the older markup.
@@ -65,6 +66,9 @@
   /** @type {any} */
   let state = null;
   let message = '';
+  /** The empty-feed note, kept through redraws until the next reveal or navigation.
+   * @type {{title: string, line: string, action: string, href: string} | null} */
+  let emptyFeed = null;
   let disconnected = false;
 
   /**
@@ -341,7 +345,16 @@
         const feed = await readCandidates();
         pool = feed.pool;
         if (pool.length === 0 && feed.noRecommendations) {
-          message = 'YouTube has no recommendations for you yet. Sign in or turn on watch history to get some.';
+          const signIn = /** @type {HTMLAnchorElement | null} */ (document.querySelector(SEL.signIn));
+          emptyFeed = signIn ? {
+            title: "You're signed out of YouTube.",
+            line: "YouTube only recommends videos when you're signed in.",
+            action: 'Sign in', href: signIn.href,
+          } : {
+            title: 'Your YouTube watch history is off.',
+            line: 'YouTube needs it to recommend videos.',
+            action: 'Turn on watch history', href: 'https://www.youtube.com/feed/history',
+          };
           return null;
         }
         // No videos and no empty-feed nudge: the grid's markup changed (Q25).
@@ -378,8 +391,9 @@
     if (busy || moving || blocking) return;
     busy = kind;
     message = '';
+    emptyFeed = null;
     if (deals()) {
-      const run = kind === 'reveal' ? DripReveal.reveal : DripReveal.next;
+      const run = kind === 'reveal' ? DripReveal.revealHome : DripReveal.next;
       const { ok, focused } = await animate(run, async () => (await findWith(msg))?.video || null);
       // The button that had focus is gone. Focus goes to what you'd press next.
       if (focused) focusOn(ok ? (kind === 'reveal' ? 'watch' : 'next') : kind === 'reveal' ? 'reveal' : 'next');
@@ -420,6 +434,7 @@
         counter: page?.querySelector('.drip-stats .drip-token-card'),
         card: (/** @type {any} */ video) => (video ? card(video) : openingCard()),
         actions,
+        empty: () => emptyFeed ? feedSpace() : null,
         ready: (/** @type {any} */ video) => thumbReady(video),
         saved: {
           now: () => root.querySelector('.drip-saved'),
@@ -1098,6 +1113,22 @@
       h('div', { class: 'drip-card-meta-row' }, h('span', { class: 'drip-meta' }, loadingText())));
   }
 
+  /** The loading body reserves the same space after the card returns, at every column width. */
+  function feedSpace() {
+    const loading = placeholderCard();
+    const note = emptyFeed;
+    if (note) {
+      loading.setAttribute('aria-hidden', 'true');
+      loading.removeAttribute('aria-busy');
+    }
+    return h('div', { class: `drip-feed-space${note ? ' is-empty' : ''}`, 'data-k': 'feed-space' },
+      loading,
+      note && h('section', { class: 'drip-feed-note', 'aria-labelledby': 'drip-feed-title' },
+        h('h2', { id: 'drip-feed-title' }, note.title),
+        h('p', {}, note.line),
+        h('a', { class: 'drip-feed-action', 'data-k': 'feed-action', href: note.href }, note.action)));
+  }
+
   /**
    * The loading card with the card's buttons under it, which the reveal animation opens up and turns +15m and Reveal
    * video into (reveal.js). Nothing on it is clickable until the real card replaces it.
@@ -1314,7 +1345,7 @@
     if (disconnected) return h('div', { class: 'drip-message' }, 'drip was updated. Refresh this page.');
     if (!state) return h('div', { class: 'drip-loading', 'aria-busy': 'true' });
     const current = shownCard();
-    const showCard = current || busy === 'reveal';
+    const showCard = current || busy === 'reveal' || (emptyFeed && cardsMode() !== 'off');
     const out = !showCard && outForDay();
     const note = out ? '' : outNote();
     // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
@@ -1326,9 +1357,10 @@
       // YouTube's search box goes in here (placeSearch), so a redraw keeps what's in it.
       search && h('div', { class: 'drip-search-slot', 'data-k': 'search-slot', 'data-morph-keep': true }),
       !showCard && (out ? outSea() : actions()),
-      current ? card(current) : busy === 'reveal' && placeholderCard(),
+      current ? card(current) : showCard && feedSpace(),
+      !current && showCard && actions(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
-      stashOn() && savedList());
+      stashOn() && savedList(!current && showCard ? 'empty' : undefined));
   }
 
   /**
@@ -1433,7 +1465,7 @@
 
   /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
-    if (state?.current) blockedCard = null;
+    if (state?.current) { blockedCard = null; emptyFeed = null; }
     askDry();
     const root = document.getElementById('drip-home');
     if (!root || moving || leaving || blocking) return;
@@ -1448,7 +1480,7 @@
       state.settings.clock, state.settings.cards, state.settings.stash, dryKey(), state.dryBack,
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
-    ], message, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, blockedCard]);
+    ], message, emptyFeed, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, blockedCard]);
     if (root.firstChild && key === rendered) {
       placeSearch(root);
       return freshen(root);
@@ -1743,6 +1775,7 @@
   document.addEventListener('yt-navigate-start', () => {
     restoreSearch();
     homeVisit++;
+    emptyFeed = null;
     blockedCard = null;
     closeMenu();
   });

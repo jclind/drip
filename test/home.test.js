@@ -1,8 +1,8 @@
 // @ts-check
 // The home page's reveal flow (home.js) when something fails partway, against a fake page, fake timers, and a fake
 // worker that runs the real rules. Written from AUDIT.md, "Reveals that fail partway", and the second review of it
-// (2026-10-16). reveal.js's animations are stood in for by a stub that keeps their contract: find, then ready, then
-// resolve true, or false when find found nothing.
+// (2026-10-16). Most cases use a reveal stub: find, ready, then resolve. Empty-feed cases run the real reveal.js
+// with immediate animation promises to check its deal and return paths as well as home.js's state.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -50,7 +50,8 @@ function parseCompound(s) {
     i += m ? m[0].length : 0;
     return m ? m[0] : '';
   };
-  if (/[\w-]/.test(s[0])) c.tag = name().toLowerCase();
+  if (s[0] === '*') i++;
+  else if (/[\w-]/.test(s[0])) c.tag = name().toLowerCase();
   while (i < s.length) {
     const ch = s[i++];
     if (ch === '#') c.id = name();
@@ -312,7 +313,10 @@ class FakeElement {
   /** No layout, except a page a test puts in view (makeTab's inView), where drip's home page has a box. */
   getClientRects() { return this.ownerDocument.inView && this.attrs.get('id') === 'drip-home' ? [{}] : []; }
   getAnimations() { return []; }
-  animate() { return { finished: Promise.resolve(), cancel() {}, currentTime: 0 }; }
+  animate(frames, options) {
+    this.ownerDocument.motions?.push({ el: this, frames, options, classes: this.className });
+    return { finished: Promise.resolve(), cancel() {}, currentTime: 0 };
+  }
 }
 
 async function settle() {
@@ -470,12 +474,12 @@ function addFeedNudge(root) {
 /**
  * One YouTube tab on the home page, running home.js.
  * @param {ReturnType<typeof makeWorld>} world
- * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string}} [opts] reduced: the browser asks for
+ * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string, realReveal?: boolean}} [opts] reduced: the browser asks for
  *   reduced motion, so nothing animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that
  *   kind's markup (gridMarks). inView: drip's home page is on screen, so drops land in the counter, and tab.landings
  *   records each landing. kept: what "Done for now" left in sessionStorage, "N" or "N:dryUntil" (watch.js onDone).
  */
-async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '' } = {}) {
+async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '', realReveal = false } = {}) {
   let now = 0;
   world.time = () => EPOCH + now;
   /** @type {Map<number, {fn: Function, at: number, every: number}>} */
@@ -490,6 +494,8 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
   const document = {
     hidden: false,
     inView,
+    timeline: { currentTime: 0 },
+    motions: [],
     activeElement: null,
     /** @param {string} tag */
     createElement: (tag) => new FakeElement(document, tag),
@@ -564,6 +570,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
   const tab = {
     reduced,
     document, location, world, errors, browse, runtime,
+    flights: () => document.motions.filter((m) => m.classes.includes('drip-deal is-flying')),
     /** What home.js logged with console.error. @type {any[][]} */
     logged: [],
     /** @type {any[]} */
@@ -588,6 +595,9 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
     URL, URLSearchParams, structuredClone, navigator: { userAgent: 'test', clipboard: { writeText: async () => {} } },
     CSS: { escape: (/** @type {string} */ s) => s.replace(/["\\]/g, '\\$&') },
     innerHeight: 900,
+    matchMedia: () => ({ matches: reduced }),
+    getComputedStyle: () => ({ backgroundColor: '#272727' }),
+    requestAnimationFrame: (fn) => addTimer(() => fn(now), 16, 0),
     performance: { now: () => now },
     Date: class extends Date { static now() { return EPOCH + now; } },
     sessionStorage: {
@@ -640,7 +650,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
     DripReveal: {
       reduced: () => tab.reduced,
       dealCard: (/** @type {any} */ img) => h('div', { class: 'drip-deal' }, h('div', { class: 'drip-deal-front' }, img)),
-      reveal: async (/** @type {any} */ o) => {
+      revealHome: async (/** @type {any} */ o) => {
         tab.reveals.push('reveal');
         const video = await o.find();
         if (!video) return false;
@@ -663,7 +673,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
   context.window = context;
   context.globalThis = context;
   vm.createContext(context);
-  for (const file of ['lib/state.js', 'lib/morph.js', 'content/common.js', 'content/home.js']) {
+  for (const file of ['lib/state.js', 'lib/morph.js', 'content/common.js', ...(realReveal ? ['content/reveal.js'] : []), 'content/home.js']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context, { filename: file });
   }
 
@@ -786,32 +796,95 @@ for (const reduced of [true, false]) {
   });
 
   for (const mode of ['Full drip', 'Curated']) {
-    test(`an empty YouTube feed shows a note and spends nothing in ${mode} (${how})`, async () => {
-      const world = makeWorld();
-      if (mode === 'Curated') {
-        world.state.settings.clock = false;
-        world.state.settings.cards = 'unlimited';
-      }
-      const tab = await makeTab(world, { reduced, grid: [] });
-      addFeedNudge(tab.browse.querySelector('#primary'));
-      const before = structuredClone(world.state);
-      await tab.click('reveal');
-      await tab.advance(100);
-      assert.equal(tab.document.getElementById('drip-broken'), null);
-      assert.equal(tab.message(), 'YouTube has no recommendations for you yet. Sign in or turn on watch history to get some.');
-      assert.equal(tab.root().querySelector('.drip-message').getAttribute('role'), 'status');
-      assert.doesNotMatch(tab.message(), /cards?|drops?|refresh|report|update/i);
-      assert.deepEqual(world.state, before, 'no card, drop, or reveal log charged');
-      assert.equal(world.count('reveal'), 0, 'the worker was never asked to spend');
-      assert.equal(tab.document.querySelector('iframe'), null, 'the nudge needs no fallback frame');
-      assert.ok(!tab.button('reveal').hasAttribute('disabled'), 'Reveal works again');
-      assert.deepEqual(tab.errors, []);
-    });
+    for (const signedOut of [true, false]) {
+      test(`an empty feed holds its space in ${mode}, signed ${signedOut ? 'out' : 'in'} (${how})`, async () => {
+        const world = makeWorld();
+        if (mode === 'Curated') Object.assign(world.state.settings, { clock: false, cards: 'unlimited' });
+        const tab = await makeTab(world, { reduced, grid: [], realReveal: true });
+        addFeedNudge(tab.browse.querySelector('#primary'));
+        const href = 'https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2F';
+        if (signedOut) {
+          const masthead = tab.document.createElement('ytd-masthead');
+          const link = tab.document.createElement('a');
+          link.setAttribute('href', href);
+          link.textContent = 'Sign in';
+          masthead.append(link);
+          tab.document.body.prepend(masthead);
+        }
+        const before = structuredClone(world.state);
+        await tab.click('reveal');
+        await tab.advance(100);
+        const space = tab.root().querySelector('.drip-feed-space.is-empty');
+        assert.ok(space, 'the dashed state holds the loaded body');
+        assert.equal(tab.root().querySelector('.drip-page').classList.contains('is-open'), true);
+        assert.equal(space.querySelector('h2').textContent, signedOut ? "You're signed out of YouTube." : 'Your YouTube watch history is off.');
+        assert.equal(space.querySelector('p').textContent, signedOut ? "YouTube only recommends videos when you're signed in." : 'YouTube needs it to recommend videos.');
+        assert.equal(tab.flights().length, !reduced && mode === 'Full drip' ? 2 : 0, 'one deal and one return, or no flight');
+        const action = space.querySelector('a');
+        assert.equal(action.textContent, signedOut ? 'Sign in' : 'Turn on watch history');
+        assert.equal(action.href, signedOut ? href : 'https://www.youtube.com/feed/history');
+        assert.equal(space.querySelector('.drip-card').getAttribute('aria-hidden'), 'true');
+        assert.doesNotMatch(space.textContent, /card|drop|refresh|report/i);
+        assert.equal(tab.document.getElementById('drip-broken'), null);
+        assert.deepEqual(world.state, before, 'no card, drop, or reveal log charged');
+        assert.equal(world.count('reveal'), 0, 'the worker was never asked to spend');
+        assert.equal(tab.document.querySelector('iframe'), null);
+        assert.equal(tab.button('pass'), null);
+        assert.equal(tab.button('next'), null);
+        assert.equal(tab.button('save'), null);
+        assert.match(tab.button('reveal').textContent, /Reveal video/);
+        assert.equal(tab.button('reveal').hasAttribute('disabled'), false);
+        if (mode === 'Full drip') assert.match(tab.button('add').textContent, /\+15m/);
+        else {
+          assert.equal(tab.button('add'), null);
+          assert.doesNotMatch(tab.button('reveal').textContent, /card/);
+          assert.deepEqual(tab.reveals, [], 'Curated never deals a card');
+        }
+
+        action.focus();
+        const flights = tab.flights().length;
+        world.state.watchSecondsLeft = 599;
+        for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+        await tab.advance(2000);
+        assert.equal(tab.root().querySelector('.drip-feed-space'), space, 'redraw keeps the box');
+        assert.equal(tab.button('feed-action'), action, 'redraw keeps the link and focus');
+        assert.equal(tab.document.activeElement, action);
+        assert.equal(tab.flights().length, flights, 'ticks never replay the flight');
+
+        await tab.click('reveal');
+        await tab.advance(100);
+        assert.ok(tab.root().querySelector('.drip-feed-space.is-empty'), 'a repeated empty read returns to the note');
+        assert.equal(tab.flights().length, flights * 2, 'only a new press deals and returns another card');
+        assert.equal(world.count('reveal'), 0);
+
+        // The next press enters the normal loading state and reads again, as after signing in.
+        tab.browse.querySelector('ytd-feed-nudge-renderer').remove();
+        await tab.click('reveal');
+        assert.equal(tab.root().querySelector('.drip-feed-note'), null, 'the old note gives way to loading');
+        assert.ok(tab.root().querySelector('.drip-card.is-loading'));
+        assert.match(tab.root().textContent, /Finding a video…/);
+        const item = tab.document.createElement('ytd-rich-item-renderer');
+        const link = tab.document.createElement('a');
+        link.setAttribute('href', '/watch?v=retry');
+        const title = tab.document.createElement('h3');
+        title.textContent = 'Video after sign in';
+        link.append(title);
+        item.append(link);
+        tab.browse.querySelector('#primary').append(item);
+        await tab.advance(400);
+        await loadPicture(tab);
+        await tab.advance(100);
+        assert.equal(world.count('reveal'), 1, 'a later Reveal reads the feed again');
+        assert.equal(world.state.current.id, 'retry');
+        assert.equal(tab.root().querySelector('.drip-feed-space'), null);
+        assert.deepEqual(tab.errors, []);
+      });
+    }
   }
 
   test(`no videos and no nudge still show the broken-grid banner (${how})`, async () => {
     const world = makeWorld();
-    const tab = await makeTab(world, { reduced, grid: [] });
+    const tab = await makeTab(world, { reduced, grid: [], realReveal: true });
     await tab.click('reveal');
     await tab.advance(40000);
     const banner = tab.document.getElementById('drip-broken');
@@ -839,7 +912,7 @@ for (const reduced of [true, false]) {
     frame.dispatchEvent({ type: 'load' });
     await tab.advance(100);
     assert.equal(tab.document.getElementById('drip-broken'), null);
-    assert.match(tab.message(), /YouTube has no recommendations for you yet/);
+    assert.match(tab.root().querySelector('.drip-feed-note').textContent, /Your YouTube watch history is off/);
     assert.doesNotMatch(tab.message(), /cards?|drops?|refresh|report|update/i);
     assert.equal(world.state.tokens.rec, 10);
     assert.equal(world.count('reveal'), 0);
@@ -856,7 +929,7 @@ for (const reduced of [true, false]) {
     await tab.click('reveal');
     await tab.advance(100);
     assert.equal(tab.document.getElementById('drip-broken'), null);
-    assert.match(tab.message(), /YouTube has no recommendations for you yet/);
+    assert.match(tab.root().querySelector('.drip-feed-note').textContent, /Your YouTube watch history is off/);
     assert.equal(world.state.tokens.rec, 10);
   });
 

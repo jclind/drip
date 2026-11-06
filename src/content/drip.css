@@ -1088,6 +1088,75 @@ html[dark] #drip-home .drip-out-sea {
   }
 }
 
+/* Empty home feed, design G. The hidden loading body holds the whole loaded card's geometry. */
+#drip-home .drip-feed-space {
+  position: relative;
+  padding-bottom: 16px;
+}
+
+#drip-home .drip-feed-space.is-empty > .drip-card {
+  visibility: hidden;
+}
+
+#drip-home .drip-feed-note {
+  position: absolute;
+  inset: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+  border: 1px dashed var(--drip-muted);
+  border-radius: var(--drip-radius);
+  text-align: center;
+}
+
+#drip-home .drip-feed-note h2 {
+  max-width: 100%;
+  margin: 0;
+  color: var(--drip-text);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.2px;
+}
+
+#drip-home .drip-feed-note p {
+  max-width: 300px;
+  margin: 8px 0 0;
+  color: var(--drip-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#drip-home .drip-feed-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: 44px;
+  margin-top: 14px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--drip-rule);
+  border-radius: 24px;
+  color: var(--drip-focus);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+#drip-home .drip-feed-action:hover {
+  border-color: currentColor;
+  background: var(--drip-chip);
+}
+
+#drip-home .drip-feed-action:focus-visible {
+  outline: 2px solid var(--drip-focus);
+  outline-offset: 4px;
+}
+
 /* The reveal card. The 16:9 box and two title lines are reserved before anything loads, so nothing shifts. */
 #drip-home .drip-card.is-new,
 #drip-home .drip-out-sea.is-new {

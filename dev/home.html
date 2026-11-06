@@ -24,10 +24,11 @@
     python3 -m http.server 8077 --bind 127.0.0.1
     http://localhost:8077/dev/home.html?scenario=card&theme=dark
   Scenarios are in SCENARIOS below. `click=<data-k>,...` clicks controls after load, 300ms apart, like click=reveal or click=x-<id>.
+  `feed=signed-out` or `feed=history-off` shows the empty-feed nudge. Add `mode=curated` for Curated.
   `grid=0` leaves the grid empty, so a reveal stays loading for 6 seconds. `reduced=1` plays it as with reduced motion. The page moves its URL to "/" because
   home.js only mounts there, so reload from the address you opened. A tool that reloads the tab gets the folder listing.
 -->
-<div id="masthead"></div>
+<ytd-masthead id="masthead" style="display:block"></ytd-masthead>
 <ytd-browse page-subtype="home">
   <ytd-two-column-browse-results-renderer>
     <div id="primary"><ytd-rich-grid-renderer id="grid"></ytd-rich-grid-renderer></div>
@@ -48,6 +49,13 @@
     window.matchMedia = (q) => (q.includes('prefers-reduced-motion') ? /** @type {any} */ ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} }) : media(q));
   }
   document.getElementById('harness-bar').textContent = `${params.get('scenario') || 'empty'} · ${theme}`;
+
+  if (params.get('feed') === 'signed-out') {
+    const signIn = document.createElement('a');
+    signIn.href = 'https://accounts.google.com/ServiceLogin?service=youtube';
+    signIn.textContent = 'Sign in';
+    document.getElementById('masthead').append(signIn);
+  }
 
   // Real video ids, so thumbnails load. Titles and channels are made up, like the mockups.
   const VIDEOS = [
@@ -121,6 +129,8 @@
   };
   (SCENARIOS[params.get('scenario') || 'empty'] || SCENARIOS.empty).call(SCENARIOS);
 
+  if (params.get('mode') === 'curated') Object.assign(s.settings, { clock: false, cards: 'unlimited' });
+
   /** @type {Record<string, any>} */
   const store = { drip: JSON.parse(JSON.stringify(s)) };
   /** @type {Record<string, any>} */
@@ -169,7 +179,9 @@
 
   // The fake home grid that Reveal reads, with the markup home.js's selectors expect.
   const grid = document.getElementById('grid');
-  if (params.get('grid') !== '0') {
+  if (params.has('feed')) {
+    grid.append(document.createElement('ytd-feed-nudge-renderer'));
+  } else if (params.get('grid') !== '0') {
     for (const v of VIDEOS) {
       const item = document.createElement('ytd-rich-item-renderer');
       const link = document.createElement('a');
