@@ -130,7 +130,7 @@ Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Pa
 - Layout, top to bottom: headline, a gray line "1 h 15 min watched today · 50 min last Tuesday" (only the first half when last week has no data), the two buttons with Done for now on the right, then the link. No token counts on this screen; the headline already says whether minutes can be bought. Jesse's mockup, 2026-10-07.
 - "+15 min" keeps its clock icon here and on the home page, so it looks the same everywhere.
 - The paused frame behind the panel is blurred and tinted blue, as if underwater.
-- "You've had your fill." drops the gray button and leaves Done for now alone in the middle. When the unlocks are gone too, "The glass refills at 4:00am." (the reset hour) takes the link's place, with "Next unlock back Friday at 9:14pm." under it (DRY-HOURS-PLAN.md A5, Claude's wording). A failed unlock says "You've used this week's unlocks."
+- "You've had your fill." drops the gray button and leaves Done for now alone in the middle. When the unlocks are gone too, "The glass refills at 4:00am." (the reset hour) takes the link's place, with "Next unlock back Friday at 9:14pm." under it (DRY-HOURS-PLAN.md A5, Claude's wording); with drops left, only the "Next unlock back" line shows (Jesse, 2026-11-06). A failed unlock says "You've used this week's unlocks."
 - Leaving the lock screen with drops unspent says so on the home page. It was the gray line "Kept 3 drops." until 2026-10-13, when Jesse's pick replaced it: the drops fall into the drop counter and a gray "3 kept" tag slides out beside it (see "The counter's motion as built").
 - Jesse confirmed these on 2026-10-07.
 

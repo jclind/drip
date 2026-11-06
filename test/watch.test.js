@@ -572,6 +572,36 @@ test('the lock screen says what can still happen: buy minutes, unlock, or nothin
   assert.match(tab.lockText(), /Next unlock back Friday at 9:14pm\./);
 });
 
+for (const dry of [false, true]) {
+  test(`with drops left and no unlocks, the lock shows only when an unlock returns${dry ? ' during Dry hours' : ''}`, async () => {
+    const world = makeWorld();
+    Object.assign(world.state.settings, { dryHours: dry, dryFrom: 11, dryTo: 13 });
+    world.D.logDay(world.state).needThis = [1, 2, 3].map((n) => ({ videoId: `v${n}`, title: '', reason: 'Class', at: world.epoch - n * 60e3 }));
+    const tab = makeTab(world, 'aaa');
+    await settle();
+    await tab.second();
+    assert.ok(tab.locked());
+    assert.ok(world.state.tokens.watch > 0);
+    assert.doesNotMatch(tab.lockText(), /refills|I need this one/);
+    assert.match(tab.lockText(), /Next unlock back next Tuesday at 11:57am\./);
+    if (dry) assert.match(tab.lockText(), /Dry until 1:00pm\./);
+    else assert.match(tab.lockText(), /\+15m/);
+  });
+}
+
+test('with drops left and unlocks disabled, the lock has no empty notes wrapper', async () => {
+  const world = makeWorld();
+  world.state.settings.needThisPerWeek = 0;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.second();
+  assert.ok(tab.locked());
+  assert.doesNotMatch(tab.lockText(), /refills|Next unlock back|I need this one/);
+  const panel = tab.body.querySelector('.drip-lock-panel');
+  assert.ok(panel);
+  assert.deepEqual(panel.children.filter((el) => el instanceof FakeElement).map((el) => el.className), ['drip-lock-title', 'drip-lock-sub', 'drip-lock-actions']);
+});
+
 test('a lock left open past midnight turns "tomorrow" into "today" (Codex, 2026-11-04)', async () => {
   const { world, tab } = await setup(3);
   world.state.tokens.watch = 0;
