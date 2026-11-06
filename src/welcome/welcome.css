@@ -623,7 +623,7 @@ html[dark] .rung:not([aria-checked="true"]) .mini {
   }
 }
 
-/* What changes on YouTube: one row per place, YouTube's way struck through, drip's in bold. Every row shares one grid,
+/* What changes on YouTube: one row per place, YouTube's way muted, drip's in bold. Every row shares one grid,
    so the columns line up. */
 .tour-changes {
   width: 100%;
@@ -672,15 +672,15 @@ html[dark] .rung:not([aria-checked="true"]) .mini {
   overflow: hidden;
   color: var(--muted);
   font-size: 13px;
-  text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent);
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tour-change-after {
+  color: var(--text);
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .tour-change-after small {
