@@ -18,6 +18,52 @@ test('Shorts open as ordinary watch pages (Q2)', () => {
   assert.equal(D.redirectTarget('https://www.youtube.com/shorts/'), HOME);
 });
 
+test('live links open as ordinary watch pages', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123'), 'https://www.youtube.com/watch?v=abc123');
+});
+
+test('live links accept a trailing slash', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123/'), 'https://www.youtube.com/watch?v=abc123');
+});
+
+test('live links drop share parameters', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123?si=abc'), 'https://www.youtube.com/watch?v=abc123');
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123?feature=share'), 'https://www.youtube.com/watch?v=abc123');
+});
+
+test('live links keep a numeric start time', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123?t=90'), 'https://www.youtube.com/watch?v=abc123&t=90s');
+});
+
+test('live links keep a start time in seconds', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123?t=90s'), 'https://www.youtube.com/watch?v=abc123&t=90s');
+});
+
+test('the bare live feed still goes to the token page', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live'), HOME);
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/'), HOME);
+});
+
+test('live links with an extra path part stay put', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123/x'), '');
+});
+
+test('live links handle start parameters the same way as embeds', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123/?start=30&si=abc'), 'https://www.youtube.com/watch?v=abc123&t=30s');
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123?t=45s&start=30'), 'https://www.youtube.com/watch?v=abc123&t=45s');
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc123?start=junk'), 'https://www.youtube.com/watch?v=abc123');
+});
+
+test('live links encode the video id like Shorts', () => {
+  assert.equal(D.redirectTarget('https://www.youtube.com/live/abc%2F123'), 'https://www.youtube.com/watch?v=abc%252F123');
+});
+
+test('live links on other hosts stay put', () => {
+  assert.equal(D.redirectTarget('https://example.com/live/abc123'), '');
+  assert.equal(D.redirectTarget('https://www.youtube-nocookie.com/live/abc123'), '');
+  assert.equal(D.redirectTarget('https://music.youtube.com/live/abc123'), '');
+});
+
 test('subscriptions, Explore, and the topic pages go to the token page (Q16)', () => {
   for (const path of ['/feed/subscriptions', '/feed/explore', '/feed/trending', '/gaming', '/music', '/news', '/sports',
     '/podcasts', '/live', '/shopping', '/channel/UCkYQyvc_i9hXEo4xic9Hh2g', '/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ', '/tv', '/tv/x',

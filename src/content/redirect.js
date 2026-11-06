@@ -1,6 +1,6 @@
 // @ts-check
 // Top-level players must go through the watch clock. Embeds on other sites stay free.
-// Shorts become ordinary watch pages, so the clock and the lock apply to them too.
+// Shorts and live links become ordinary watch pages, so the clock and the lock apply to them too.
 // The subscriptions and Explore feeds and pages go to the home page, where the token page lives (decision Q16).
 
 (function () {

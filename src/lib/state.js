@@ -1147,8 +1147,8 @@
   const FEEDS = /^\/(?:channel\/(?:UCkYQyvc_i9hXEo4xic9Hh2g|UC-9-kyTW8ZkZNDHQJ6FgpwQ)|feed\/(?:subscriptions|explore|trending|storefront|courses_destination|news_destination|music_destination)|gaming|shopping|podcasts|playables|hype|courses|learning|fashion|news|sports|music|live|shorts|hashtag\/[^/]+(?:\/shorts)?)\/?$/;
 
   /**
-   * Where a top-level YouTube URL should go instead, or '' to leave it. Shorts and embeds become watch pages, so the
-   * clock applies (Q2, Q7). Feeds go to the token page (Q16). The mobile site moves to the desktop site.
+   * Where a top-level YouTube URL should go instead, or '' to leave it. Shorts, live links, and embeds become watch
+   * pages, so the clock applies (Q2, Q7). Feeds go to the token page (Q16). The mobile site moves to the desktop site.
    * @param {string} href
    */
   function redirectTarget(href) {
@@ -1169,6 +1169,12 @@
     if (/^\/tv(?:\/|$)/.test(url.pathname)) return 'https://www.youtube.com/';
     const short = /^\/shorts\/([^/]+)\/?$/.exec(url.pathname);
     if (short) return `https://www.youtube.com/watch?v=${encodeURIComponent(short[1])}`;
+    const live = /^\/live\/([^/]+)\/?$/.exec(url.pathname);
+    if (live) {
+      const target = `https://www.youtube.com/watch?v=${encodeURIComponent(live[1])}`;
+      const start = (url.searchParams.get('t') || url.searchParams.get('start') || '').replace(/s$/, '');
+      return /^\d+$/.test(start) ? `${target}&t=${start}s` : target;
+    }
     if (FEEDS.test(url.pathname)) return 'https://www.youtube.com/';
     return '';
   }
