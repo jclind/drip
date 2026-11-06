@@ -14,7 +14,7 @@ html[dark] {
 main {
   max-width: 560px;
   margin: 0 auto;
-  padding: 72px 16px 64px;
+  padding: 32px 16px 64px;
 }
 
 .brand {
@@ -171,9 +171,22 @@ main {
   transition: filter 200ms, opacity 200ms;
 }
 
-.rung:not([data-mode="full"]):not([aria-checked="true"]) .mini {
+.rung:not([aria-checked="true"]) .mini {
+  --mini-ink: #767676;
+  --line: var(--mini-ink);
+  --chip: var(--mini-ink);
+  --muted: var(--mini-ink);
+  --blue: var(--mini-ink);
+  --gold: var(--mini-ink);
   filter: grayscale(1);
-  opacity: 0.6;
+}
+
+html[dark] .rung:not([aria-checked="true"]) .mini {
+  --mini-ink: #A0A0A0;
+}
+
+.rung:not([aria-checked="true"]) .m-num {
+  opacity: 1;
 }
 
 .mini > * {
@@ -369,6 +382,11 @@ main {
   margin-top: 20px;
 }
 
+#modesNext {
+  height: 40px;
+  padding: 0 20px;
+}
+
 @media (max-width: 560px) {
   .rung {
     grid-template-columns: 22px 1fr;
@@ -412,7 +430,7 @@ main {
 
 /* The tour: its title, one sentence, a stage with a working copy of one of drip's screens, then the step controls. */
 .tour {
-  margin-top: 48px;
+  margin-top: 24px;
 }
 
 .tour-head {
@@ -510,6 +528,7 @@ main {
   border-radius: 0;
   background: none;
   color: #fff;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.4));
   cursor: pointer;
 }
 
@@ -518,11 +537,11 @@ main {
 }
 
 .tour-player-play .drip-i {
-  width: 56px;
-  height: 56px;
-  padding: 16px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
+  background: #F1F1F1;
 }
 
 .tour-player.is-playing .tour-player-play .drip-i {
@@ -604,7 +623,7 @@ main {
   }
 }
 
-/* What changes on YouTube: one row per place, YouTube's way struck through, drip's in bold. Every row shares one grid,
+/* What changes on YouTube: one row per place, YouTube's way muted, drip's in bold. Every row shares one grid,
    so the columns line up. */
 .tour-changes {
   width: 100%;
@@ -653,15 +672,15 @@ main {
   overflow: hidden;
   color: var(--muted);
   font-size: 13px;
-  text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent);
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tour-change-after {
+  color: var(--text);
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .tour-change-after small {
