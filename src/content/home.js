@@ -26,6 +26,7 @@
     subsBrowse: 'ytd-browse[page-subtype="subscriptions"]',
     mount: 'ytd-two-column-browse-results-renderer #primary',
     item: 'ytd-rich-item-renderer, ytd-grid-video-renderer',
+    feedNudge: 'ytd-feed-nudge-renderer',
     link: 'a[href*="/watch?v="]',
     title: '#video-title, h3 a, h3',
     // Late 2026 markup uses camelCase classes (checked 2026-10-05); the kebab-case ones are the older markup.
@@ -59,6 +60,7 @@
   const DURATION = /^\d+(:\d\d)+$/;
 
   /** @typedef {{id: string, title: string, channel: string, length: string, views: string, age: string, kind: string, channelIds?: string[]}} Candidate */
+  /** @typedef {{pool: Candidate[], noRecommendations: boolean}} FeedRead */
 
   /** @type {any} */
   let state = null;
@@ -144,11 +146,16 @@
     return pool;
   }
 
-  /** Waits up to timeoutMs for the grid to have something in it. */
+  /** Whether YouTube says the home feed has no recommendations. @param {ParentNode} [root] */
+  function hasFeedNudge(root = document) {
+    return !!root.querySelector(SEL.homeBrowse)?.querySelector(SEL.feedNudge);
+  }
+
+  /** Waits up to timeoutMs for videos or YouTube's empty-feed nudge. */
   async function waitForPool(timeoutMs = 6000) {
     const start = Date.now();
     let pool = readPool();
-    while (pool.length === 0 && Date.now() - start < timeoutMs) {
+    while (pool.length === 0 && !hasFeedNudge() && Date.now() - start < timeoutMs) {
       await new Promise((r) => setTimeout(r, 300));
       pool = readPool();
     }
@@ -165,6 +172,7 @@
    * because YouTube only fills a feed that's in view. drip's scripts don't run inside it.
    * @param {string} path
    * @param {string} browseSelector
+   * @returns {Promise<FeedRead>}
    */
   async function readFeedInFrame(path, browseSelector, timeoutMs = 15000) {
     const frame = document.createElement('iframe');
@@ -179,33 +187,42 @@
         setTimeout(resolve, timeoutMs);
       });
       const start = Date.now();
+      /** @type {Candidate[]} */
       let pool = [];
+      let noRecommendations = false;
       while (Date.now() - start < timeoutMs) {
         const doc = frame.contentDocument;
         if (doc) pool = readPool(doc, browseSelector);
-        if (pool.some(isNew)) break;
+        noRecommendations = pool.length === 0 && browseSelector === SEL.homeBrowse && !!doc && hasFeedNudge(doc);
+        if (pool.some(isNew) || noRecommendations) break;
         // The first screenful can be all revealed already, so scroll to make YouTube load older videos.
         frame.contentWindow?.scrollTo(0, doc ? doc.documentElement.scrollHeight : 0);
         await new Promise((r) => setTimeout(r, 400));
       }
-      return pool;
+      return { pool, noRecommendations };
     } catch {
-      return [];
+      return { pool: [], noRecommendations: false };
     } finally {
       frame.remove();
     }
   }
 
-  /** The videos the next reveal can pick from, newest first for subscriptions. */
+  /** The videos the next reveal can pick from, newest first for subscriptions. @returns {Promise<FeedRead>} */
   async function readCandidates() {
     if (state && state.settings.feedSource === 'subscriptions') return readFeedInFrame('/feed/subscriptions', SEL.subsBrowse);
     const pool = await waitForPool();
-    if (pool.some(isNew)) return pool;
+    if (pool.some(isNew)) return { pool, noRecommendations: false };
+    if (pool.length === 0 && hasFeedNudge()) return { pool, noRecommendations: true };
     // This page's grid is hidden, so YouTube never loads past its first screenful. With all of that revealed, a hidden
     // frame of the home page scrolls for more, the way YouTube loads them when you scroll (Jesse, 2026-10-15).
     // What it read is kept for the next reveals, so each one doesn't load the page again.
-    if (!morePool.some(isNew)) morePool = await readFeedInFrame('/', SEL.homeBrowse);
-    return morePool.length ? morePool : pool;
+    let noRecommendations = false;
+    if (!morePool.some(isNew)) {
+      const feed = await readFeedInFrame('/', SEL.homeBrowse);
+      morePool = feed.pool;
+      noRecommendations = feed.noRecommendations;
+    }
+    return { pool: morePool.length ? morePool : pool, noRecommendations };
   }
 
   /** Videos the hidden home frame read past this page's grid. */
@@ -321,8 +338,13 @@
     try {
       let pool;
       try {
-        pool = await readCandidates();
-        // No videos at all, not just none new: the grid's markup changed (Q25).
+        const feed = await readCandidates();
+        pool = feed.pool;
+        if (pool.length === 0 && feed.noRecommendations) {
+          message = 'YouTube has no recommendations for you yet. Sign in or turn on watch history to get some.';
+          return null;
+        }
+        // No videos and no empty-feed nudge: the grid's markup changed (Q25).
         const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
         if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
           reportBroken('grid', SEL.item);

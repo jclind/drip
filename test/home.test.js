@@ -449,6 +449,24 @@ function gridMarks(document, item, kind) {
   } else throw new Error(`no markup for ${kind}`);
 }
 
+/** Loads the captured empty-feed fixture into the fake DOM. @param {FakeElement} root */
+function addFeedNudge(root) {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures', 'youtube-feed-nudge.html'), 'utf8');
+  const stack = [root];
+  for (const token of html.replace(/<!--[\s\S]*?-->/g, '').match(/<[^>]+>|[^<]+/g) || []) {
+    if (token.startsWith('</')) {
+      assert.equal(stack.pop()?.localName, token.slice(2, -1));
+    } else if (token.startsWith('<')) {
+      const tag = /^<([\w-]+)/.exec(token)[1];
+      const el = new FakeElement(root.ownerDocument, tag);
+      for (const attr of token.matchAll(/([\w-]+)="([^"]*)"/g)) el.setAttribute(attr[1], attr[2]);
+      stack[stack.length - 1].append(el);
+      if (tag !== 'img') stack.push(el);
+    } else if (token.trim()) stack[stack.length - 1].append(token.trim());
+  }
+  assert.equal(stack.length, 1, 'the fixture is balanced');
+}
+
 /**
  * One YouTube tab on the home page, running home.js.
  * @param {ReturnType<typeof makeWorld>} world
@@ -738,6 +756,94 @@ for (const reduced of [true, false]) {
     assert.equal(world.state.current.id, 'v1');
     assert.equal(tab.cardTitle(), 'Video v1');
     assert.equal(tab.message(), '');
+  });
+
+  for (const mode of ['Full drip', 'Curated']) {
+    test(`an empty YouTube feed shows a note and spends nothing in ${mode} (${how})`, async () => {
+      const world = makeWorld();
+      if (mode === 'Curated') {
+        world.state.settings.clock = false;
+        world.state.settings.cards = 'unlimited';
+      }
+      const tab = await makeTab(world, { reduced, grid: [] });
+      addFeedNudge(tab.browse.querySelector('#primary'));
+      const before = structuredClone(world.state);
+      await tab.click('reveal');
+      await tab.advance(100);
+      assert.equal(tab.document.getElementById('drip-broken'), null);
+      assert.equal(tab.message(), 'YouTube has no recommendations for you yet. Sign in or turn on watch history to get some.');
+      assert.equal(tab.root().querySelector('.drip-message').getAttribute('role'), 'status');
+      assert.doesNotMatch(tab.message(), /cards?|drops?|refresh|report|update/i);
+      assert.deepEqual(world.state, before, 'no card, drop, or reveal log charged');
+      assert.equal(world.count('reveal'), 0, 'the worker was never asked to spend');
+      assert.equal(tab.document.querySelector('iframe'), null, 'the nudge needs no fallback frame');
+      assert.ok(!tab.button('reveal').hasAttribute('disabled'), 'Reveal works again');
+      assert.deepEqual(tab.errors, []);
+    });
+  }
+
+  test(`no videos and no nudge still show the broken-grid banner (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced, grid: [] });
+    await tab.click('reveal');
+    await tab.advance(40000);
+    const banner = tab.document.getElementById('drip-broken');
+    assert.ok(banner);
+    assert.match(banner.textContent, /YouTube probably changed its page, and drip needs an update/);
+    assert.match(banner.textContent, /Send report/);
+    assert.match(tab.message(), /Try again after a refresh/);
+    assert.equal(world.state.tokens.rec, 10);
+    assert.equal(world.count('reveal'), 0);
+  });
+
+  test(`the hidden home frame's nudge shows the empty-feed note (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced, grid: [] });
+    await tab.click('reveal');
+    await tab.advance(6100);
+    const frame = tab.document.querySelector('iframe');
+    assert.ok(frame);
+    const browse = new FakeElement(tab.document, 'ytd-browse');
+    browse.setAttribute('page-subtype', 'home');
+    addFeedNudge(browse);
+    const html = new FakeElement(tab.document, 'html');
+    html.append(browse);
+    frame.contentDocument = { querySelector: (sel) => html.querySelector(sel) };
+    frame.dispatchEvent({ type: 'load' });
+    await tab.advance(100);
+    assert.equal(tab.document.getElementById('drip-broken'), null);
+    assert.match(tab.message(), /YouTube has no recommendations for this account/);
+    assert.doesNotMatch(tab.message(), /cards?|drops?|refresh|report|update/i);
+    assert.equal(world.state.tokens.rec, 10);
+    assert.equal(world.count('reveal'), 0);
+    assert.equal(tab.document.querySelector('iframe'), null, 'the frame is removed after reading the nudge');
+    assert.deepEqual(tab.errors, []);
+  });
+
+  test(`the empty-feed nudge is recognized by its tag in another language (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced, grid: [] });
+    addFeedNudge(tab.browse.querySelector('#primary'));
+    tab.browse.querySelector('#title').textContent = 'Recherchez des vidéos pour commencer';
+    tab.browse.querySelector('#subtitle').textContent = 'Regardez des vidéos pour obtenir des recommandations.';
+    await tab.click('reveal');
+    await tab.advance(100);
+    assert.equal(tab.document.getElementById('drip-broken'), null);
+    assert.match(tab.message(), /YouTube has no recommendations for this account/);
+    assert.equal(world.state.tokens.rec, 10);
+  });
+
+  test(`a nudge beside videos still lets Reveal deal a video (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced });
+    addFeedNudge(tab.browse.querySelector('#primary'));
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    assert.equal(world.state.tokens.rec, 9);
+    assert.equal(tab.cardTitle(), 'Video v1');
+    assert.equal(tab.message(), '');
+    assert.equal(tab.document.getElementById('drip-broken'), null);
   });
 
   test(`Block in the card's ⋯ menu takes two clicks, then keeps the blocked card until Reveal next (${how})`, async () => {
