@@ -128,7 +128,8 @@ function fakeStorage() {
 }
 
 class FakeVideo {
-  constructor() {
+  constructor(main = true) {
+    this.main = main;
     this.paused = true;
     this.readyState = 4;
     this.duration = 600;
@@ -143,6 +144,8 @@ class FakeVideo {
   fire(ev) { for (const fn of this.handlers[ev] || []) fn(); }
   async play() { if (this.paused) { this.paused = false; this.fire('playing'); } }
   pause() { if (!this.paused) { this.paused = true; this.fire('pause'); } }
+  /** @param {string} sel */
+  matches(sel) { return this.main && sel === '#movie_player video'; }
 }
 
 /**
@@ -207,6 +210,8 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
       if (sel === 'ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a') return tab.owner;
       return null;
     },
+    /** @param {string} sel */
+    querySelectorAll: (sel) => sel === 'video, audio' ? tab.media : [],
     /** @param {string} id */
     /** @param {string} id @returns {any} */
     getElementById: (id) => [...body.all(), ...playerEl.all()].find((el) => el.id === id) || null,
@@ -252,6 +257,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     second: async () => { for (const fn of [...intervals.values()]) await fn(); await settle(); },
     broken: () => document.getElementById('drip-broken'),
     video, root, body, location,
+    media: [video],
     pill: () => document.getElementById('drip-pill'),
     locked: () => !!document.getElementById('drip-lock'),
     lockText: () => document.getElementById('drip-lock')?.textContent || '',
@@ -366,6 +372,97 @@ async function setup(watchSeconds = 900) {
   world.sent.length = 0;
   return { world, tab };
 }
+
+test('the clock pauses stray media on /watch without stopping the main video', async () => {
+  const { world, tab } = await setup();
+  const stray = new FakeVideo(false);
+  tab.media.push(stray);
+  await stray.play();
+  await tab.tick();
+  assert.equal(stray.paused, true);
+  assert.equal(tab.video.paused, false);
+  world.state.watchSecondsLeft = 0;
+  saved(world);
+  await settle();
+  await stray.play();
+  await tab.tick();
+  assert.equal(stray.paused, true, 'zero minutes still blocks stray media');
+});
+
+test('the clock pauses all media off /watch, including when no main player is found', async () => {
+  const { tab } = await setup();
+  const stray = new FakeVideo(false);
+  tab.media.push(stray);
+  for (const pathname of ['/results', '/@channel']) {
+    tab.location.pathname = pathname;
+    await tab.video.play();
+    await stray.play();
+    await tab.tick();
+    assert.equal(tab.video.paused, true, pathname);
+    assert.equal(stray.paused, true, pathname);
+  }
+  tab.noPlayer = true;
+  await stray.play();
+  await tab.tick();
+  assert.equal(stray.paused, true);
+});
+
+test('with the clock off, main and other media keep playing on /watch', async () => {
+  const world = makeWorld();
+  world.state.settings.clock = false;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  const stray = new FakeVideo(false);
+  tab.media.push(stray);
+  await tab.video.play();
+  await stray.play();
+  await tab.tick();
+  assert.equal(tab.video.paused, false);
+  assert.equal(stray.paused, false);
+});
+
+test('with the clock off, navigating off /watch pauses the hidden main player', async () => {
+  const world = makeWorld();
+  world.state.settings.clock = false;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  const stray = new FakeVideo(false);
+  tab.media.push(stray);
+  for (const pathname of ['/results', '/@channel']) {
+    tab.location.pathname = '/watch';
+    await tab.video.play();
+    await tab.tick();
+    assert.equal(tab.video.paused, false);
+    tab.location.pathname = pathname;
+    await stray.play();
+    await tab.tick();
+    assert.equal(tab.video.paused, true, pathname);
+    assert.equal(stray.paused, false, pathname);
+  }
+});
+
+test('a broken player leaves stray media playing until enforcement recovers (Q25)', async () => {
+  const world = makeWorld();
+  world.state.watchSecondsLeft = 900;
+  const tab = makeTab(world, 'aaa');
+  tab.noVideo = true;
+  await settle();
+  for (let i = 0; i < 11; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.root.hasAttribute('data-drip-broken'), true);
+  const stray = new FakeVideo(false);
+  tab.media.push(stray);
+  await stray.play();
+  await tab.tick();
+  assert.equal(stray.paused, false);
+  tab.location.pathname = '/results';
+  await tab.tick();
+  assert.equal(stray.paused, false);
+  tab.noVideo = false;
+  await tab.tick();
+  await tab.tick();
+  assert.equal(tab.root.hasAttribute('data-drip-broken'), false);
+  assert.equal(stray.paused, true);
+});
 
 test('playback is charged in full, in a few batched ticks rather than one per second (finding 1)', async () => {
   const { world, tab } = await setup();

@@ -19,6 +19,8 @@
   // YouTube selectors. These break when YouTube changes its markup.
   const SEL = {
     video: '#movie_player video.html5-main-video',
+    mainVideo: '#movie_player video',
+    media: 'video, audio',
     watchPage: 'ytd-watch-flexy',
     theaterAttr: 'theater',
     theaterButton: '.ytp-size-button',
@@ -434,8 +436,21 @@
     return !status.unlocked && !status.allowed && status.secondsLeft - first.seconds <= 1;
   }
 
+  /** Backstop for playback that started before guard.js knew the clock was on, or bypassed play(). */
+  function pauseOtherMedia() {
+    if (!state || state.settings.clock === false || playerBroken || document.documentElement.hasAttribute('data-drip-broken')) return;
+    const onWatch = location.pathname === '/watch';
+    for (const media of /** @type {NodeListOf<HTMLMediaElement>} */ (document.querySelectorAll(SEL.media))) {
+      if (!media.paused && (!onWatch || !media.matches(SEL.mainVideo))) {
+        if (media === video) pauseVideo();
+        else media.pause();
+      }
+    }
+  }
+
   async function tick() {
     if (disconnected) return;
+    pauseOtherMedia();
     if (pendingTick) {
       if (performance.now() - pendingTick.startedAt >= 5000) {
         attach();

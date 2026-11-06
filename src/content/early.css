@@ -1,5 +1,12 @@
 /* Loaded at document_start so the home grid never paints. home.js still reads it. */
 
+/* Hover previews stay hidden in every mode, including their inline player. */
+ytd-video-preview,
+ytd-video-preview #player,
+#inline-preview-player {
+  display: none !important;
+}
+
 /* The grid stays in the DOM, parked off screen, so YouTube keeps filling it. */
 ytd-browse[page-subtype="home"] ytd-rich-grid-renderer {
   position: fixed !important;
