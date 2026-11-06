@@ -68,7 +68,7 @@ function pages() {
       name: 'home',
       url: 'https://www.youtube.com/',
       need: [
-        ...pick('home.js', home, ['homeBrowse', 'mount']),
+        ...pick('home.js', home, ['homeBrowse', 'mount', 'feedNudge']),
         // If the menu button goes, menu.js gives the sidebar back. If the sidebar is renamed, early.css stops hiding it.
         ...pick('menu.js', menu, ['guideButton', 'searchBox']),
         ['early.css sidebar', 'ytd-app tp-yt-app-drawer#guide'],
