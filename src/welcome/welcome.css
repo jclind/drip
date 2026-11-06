@@ -14,7 +14,7 @@ html[dark] {
 main {
   max-width: 560px;
   margin: 0 auto;
-  padding: 72px 16px 64px;
+  padding: 32px 16px 64px;
 }
 
 .brand {
@@ -412,7 +412,7 @@ main {
 
 /* The tour: its title, one sentence, a stage with a working copy of one of drip's screens, then the step controls. */
 .tour {
-  margin-top: 48px;
+  margin-top: 24px;
 }
 
 .tour-head {
