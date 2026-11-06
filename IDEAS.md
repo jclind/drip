@@ -94,6 +94,12 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 - A page Chrome opens on uninstall (`chrome.runtime.setUninstallURL`) with one question, "Why are you leaving?". It needs a small hosted page (Claude's suggestion, 2026-10-16, with the Settings feedback link).
 - Not worth it yet: syncing across devices, and notifications like "5 minutes left".
 
+## Found while testing 2026-11-06
+
+- Hover previews play whole videos. On search results (and likely History and channel pages), hovering a video starts YouTube's inline preview, and it can be unmuted and keeps playing, at 0 minutes too. Jesse found it on 2026-11-06 and wants it closed later. The PR 70 to 73 reviews flagged it as a hand check (71's hover-preview item, browser check 3 in `.second-opinion/reviews-70-73/merged.md`). Likely fix: hide or stop YouTube's inline preview player outside the watch page, or meter it like the watch page. Check Dry hours too.
+- The empty Home feed note ("YouTube has no recommendations for you yet", PR 87) looks thrown in, not designed (Jesse, 2026-11-06). Redo it through /design-variants.
+- In an incognito window, Reveal once showed a feed that looked like Jesse's own. A fresh incognito window showed the empty-feed note as expected, so it was likely YouTube's logged-out feed from earlier activity in that incognito session. Watch for it again.
+
 ## Known races
 
 - An older worker reply can overwrite newer saved state on a page (Codex, 2026-11-04). Tab A's status request is answered from a snapshot with 0 minutes, tab B buys minutes, A hears B's storage change and drops its lock, then A's older reply lands and `state = res.state` puts the 0-minute snapshot back, so the lock rises again. Every `state = res.state` in watch.js has it, and it predates Dry hours. The fix is a revision number the worker bumps on each save, and pages keep whichever state is newest.
