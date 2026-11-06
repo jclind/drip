@@ -1,0 +1,218 @@
+#!/usr/bin/env node
+// @ts-check
+// Captures the dev harness with headless Chrome over Node's built-in WebSocket. No dependencies.
+// Usage: bin/capture-screens [out] [name ...] (default out: dist/screens)
+
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const http = require('node:http');
+const os = require('node:os');
+const path = require('node:path');
+
+/** @type {{name: string, path: string, scheme: 'dark' | 'light'}[]} */
+const SCREENS = [
+  { name: 'home-empty-dark', path: '/dev/home.html?scenario=empty&theme=dark', scheme: 'dark' },
+  { name: 'home-empty-light', path: '/dev/home.html?scenario=empty&theme=light', scheme: 'light' },
+  { name: 'home-card-dark', path: '/dev/home.html?scenario=card&theme=dark', scheme: 'dark' },
+  { name: 'home-card-light', path: '/dev/home.html?scenario=card&theme=light', scheme: 'light' },
+  { name: 'home-stash-dark', path: '/dev/home.html?scenario=stashFullCard&theme=dark', scheme: 'dark' },
+  { name: 'home-out-dark', path: '/dev/home.html?scenario=out&theme=dark', scheme: 'dark' },
+  { name: 'home-signed-out-dark', path: '/dev/home.html?scenario=empty&feed=signed-out&theme=dark', scheme: 'dark' },
+  { name: 'home-curated-dark', path: '/dev/home.html?scenario=empty&mode=curated&theme=dark', scheme: 'dark' },
+  { name: 'welcome-choice-dark', path: '/dev/page.html?page=welcome', scheme: 'dark' },
+  ...Array.from({ length: 5 }, (_, i) => ({
+    name: `welcome-tour-${i + 1}-dark`, path: `/dev/page.html?page=welcome&mode=full#tour-${i + 1}`, scheme: /** @type {const} */ ('dark'),
+  })),
+  { name: 'welcome-choice-light', path: '/dev/page.html?page=welcome', scheme: 'light' },
+  { name: 'options-dark', path: '/dev/page.html?page=options&mode=full', scheme: 'dark' },
+  { name: 'options-light', path: '/dev/page.html?page=options&mode=full', scheme: 'light' },
+  { name: 'popup-dark', path: '/dev/page.html?page=popup&mode=full', scheme: 'dark' },
+  { name: 'popup-light', path: '/dev/page.html?page=popup&mode=full', scheme: 'light' },
+];
+
+const ROOT = path.resolve(__dirname, '..');
+const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+/** @type {Record<string, string>} */
+const TYPES = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png',
+  '.json': 'application/json; charset=utf-8', '.woff2': 'font/woff2',
+};
+
+const server = http.createServer(async (req, res) => {
+  try {
+    const pathname = decodeURIComponent(new URL(req.url || '/', 'http://127.0.0.1').pathname);
+    const file = await fs.promises.realpath(path.resolve(ROOT, `.${pathname}`));
+    if (!file.startsWith(`${ROOT}${path.sep}`)) {
+      res.writeHead(403).end();
+      return;
+    }
+    const data = await fs.promises.readFile(file);
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+    res.end(req.method === 'HEAD' ? undefined : data);
+  } catch {
+    res.writeHead(404).end('Not found');
+  }
+});
+
+async function main() {
+  const out = path.resolve(process.argv[2] || 'dist/screens');
+  const names = process.argv.slice(3);
+  const unknown = names.filter((name) => !SCREENS.some((screen) => screen.name === name));
+  if (unknown.length) throw new Error(`Unknown screen: ${unknown.join(', ')}`);
+  const screens = names.length ? SCREENS.filter((screen) => names.includes(screen.name)) : SCREENS;
+  fs.mkdirSync(out, { recursive: true });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drip-screens-'));
+  /** @type {import('node:child_process').ChildProcess | undefined} */
+  let chrome;
+  /** @type {WebSocket | undefined} */
+  let ws;
+  /** @type {Promise<void>} */
+  let exited = Promise.resolve();
+  let stopped = false;
+  let written = 0;
+  let failed = 0;
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => { server.removeListener('error', reject); resolve(undefined); });
+    });
+    const origin = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`;
+    chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`,
+      '--no-first-run', '--no-default-browser-check', '--mute-audio', 'about:blank'], { stdio: 'ignore' });
+    exited = new Promise((resolve) => chrome.once('close', () => { stopped = true; resolve(); }));
+    /** @type {Error | null} */
+    let launchError = null;
+    chrome.once('error', (err) => { launchError = err; });
+    const portFile = path.join(dir, 'DevToolsActivePort');
+    for (let i = 0; i < 150 && !fs.existsSync(portFile) && !launchError && !stopped; i++) await sleep(100);
+    if (launchError) throw launchError;
+    if (!fs.existsSync(portFile) || stopped) throw new Error('Chrome did not start its DevTools server');
+    const port = fs.readFileSync(portFile, 'utf8').split('\n')[0];
+    const targets = await (await fetch(`http://127.0.0.1:${port}/json`, { signal: AbortSignal.timeout(10000) })).json();
+    const target = targets.find((/** @type {any} */ t) => t.type === 'page');
+    if (!target) throw new Error('Chrome has no page target');
+    const socket = new WebSocket(target.webSocketDebuggerUrl);
+    ws = socket;
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('DevTools connection timed out')), 10000);
+      socket.onopen = () => { clearTimeout(timer); resolve(undefined); };
+      socket.onerror = () => { clearTimeout(timer); reject(new Error('DevTools connection failed')); };
+    });
+    let nextId = 0;
+    /** @type {Map<number, {resolve: (value: any) => void, reject: (err: Error) => void, timer: ReturnType<typeof setTimeout>}>} */
+    const waiting = new Map();
+    /** @type {string | null} */
+    let loadError = null;
+    socket.onmessage = (event) => {
+      const msg = JSON.parse(String(event.data));
+      if (msg.method === 'Network.responseReceived') {
+        const response = msg.params.response;
+        // page.html fetches the real HTML, so that response matters as well as the main document.
+        if (response.url.startsWith(origin) && response.status >= 400 &&
+            (msg.params.type === 'Document' || new URL(response.url).pathname.endsWith('.html'))) {
+          loadError = `HTTP ${response.status}: ${response.url}`;
+        }
+      }
+      const pending = waiting.get(msg.id);
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      waiting.delete(msg.id);
+      if (msg.error) pending.reject(new Error(msg.error.message));
+      else pending.resolve(msg.result);
+    };
+    const dropAll = () => {
+      for (const pending of waiting.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(new Error('Chrome closed the DevTools connection'));
+      }
+      waiting.clear();
+    };
+    socket.onclose = dropAll;
+    socket.onerror = dropAll;
+    /** @param {string} method @param {object} [params] @returns {Promise<any>} */
+    const cdp = (method, params = {}) => new Promise((resolve, reject) => {
+      if (socket.readyState !== WebSocket.OPEN) return reject(new Error('DevTools connection is closed'));
+      const id = ++nextId;
+      const timer = setTimeout(() => {
+        waiting.delete(id);
+        reject(new Error(`${method} got no answer in 30 seconds`));
+      }, 30000);
+      waiting.set(id, { resolve, reject, timer });
+      socket.send(JSON.stringify({ id, method, params }));
+    });
+    /** @param {string} expression @returns {Promise<any>} */
+    const evaluate = async (expression) => {
+      const result = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+      if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
+      return result.result.value;
+    };
+    /** @param {string} expression @param {number} timeout @returns {Promise<boolean>} */
+    const until = async (expression, timeout) => {
+      const deadline = Date.now() + timeout;
+      do {
+        if (loadError) throw new Error(loadError);
+        if (await evaluate(expression)) return true;
+        await sleep(100);
+      } while (Date.now() < deadline);
+      return false;
+    };
+    await cdp('Page.enable');
+    await cdp('Network.enable');
+    await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    for (const screen of screens) {
+      try {
+        loadError = null;
+        // A blank document makes hash-only tour changes load afresh too. Never reload the home harness's rewritten URL.
+        await cdp('Page.navigate', { url: 'about:blank' });
+        if (!await until('location.href === "about:blank" && document.readyState === "complete"', 10000)) {
+          throw new Error('Blank page did not load');
+        }
+        await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: screen.scheme }] });
+        const navigation = await cdp('Page.navigate', { url: origin + screen.path });
+        if (navigation.errorText) throw new Error(navigation.errorText);
+        // The page harness replaces its document asynchronously. Wait for its injected <base> and that document's load.
+        const contentReady = screen.path.startsWith('/dev/page.html') ? ' && !!document.querySelector("base")' : '';
+        if (!await until(`location.origin === ${JSON.stringify(origin)} && document.readyState === "complete"${contentReady}`, 30000)) {
+          throw new Error('Page did not load in 30 seconds');
+        }
+        await evaluate('document.fonts.ready.then(() => true)');
+        await until('!document.getAnimations().some((animation) => animation.playState === "running")', 6000);
+        await sleep(300);
+        if (loadError) throw new Error(loadError);
+        const shot = await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+        const file = path.join(out, `${screen.name}.png`);
+        fs.writeFileSync(file, Buffer.from(shot.data, 'base64'));
+        console.log(file);
+        written++;
+      } catch (err) {
+        console.error(`${screen.name}: ${err instanceof Error ? err.message : String(err)}`);
+        failed++;
+      }
+    }
+  } finally {
+    ws?.close();
+    try {
+      if (chrome && !stopped) {
+        chrome.kill();
+        const timer = setTimeout(() => chrome?.kill('SIGKILL'), 5000);
+        try { await exited; } finally { clearTimeout(timer); }
+      }
+    } finally {
+      await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  console.log(`${written} PNGs written${failed ? `, ${failed} failed` : ''}.`);
+  if (failed) process.exitCode = 1;
+}
+
+/** @param {number} ms */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+main().catch((err) => {
+  console.error(err instanceof Error ? err.message : String(err));
+  process.exitCode = 1;
+});

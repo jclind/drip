@@ -26,3 +26,8 @@ Your tokens and backlog live in Chrome's storage for the extension, so updating 
 - Developer mode, at the bottom of Settings, shows the dev panel: a box at the bottom left of YouTube pages for setting minutes and tokens, running the daily reset now, and clearing state. It undoes every limit while it's on. `touch dev/ENABLED` also turns the panel on, and turns on the localhost route in `dev/reload.html`. Don't create that file on a copy you use for real. The store build has neither the panel nor the toggle.
 - `test/BROWSER.md` is the checklist for what Node can't test. Run it on a computer whose Chrome window is visible, since a hidden window doesn't play video.
 - Editors check types through `jsconfig.json`. To check from the command line without adding a dependency to the repo, install the checker in a scratch folder: `npm i --prefix /tmp/drip-tsc typescript@5 @types/chrome @types/node`, then `/tmp/drip-tsc/node_modules/.bin/tsc -p jsconfig.json --typeRoots /tmp/drip-tsc/node_modules/@types`. It should print nothing.
+
+### Screenshots
+
+`bin/capture-screens` saves 1280x800 PNGs of the dev harness screens to `dist/screens` using headless Chrome (`CHROME` overrides its path).
+Run `bin/capture-screens /tmp/drip-screens` for another folder, or append names to capture a subset: `bin/capture-screens /tmp/drip-screens home-card-dark options-light`.
