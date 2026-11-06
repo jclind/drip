@@ -1,6 +1,6 @@
 # drip privacy policy
 
-Draft, 2026-10-06, updated 2026-11-05. Needs a public URL before the store listing goes up.
+Draft, 2026-10-06, updated 2026-11-05. Published at https://jesselind.com/projects/drip/privacy, from jesselind's `src/pages/projects/drip/privacy.astro`. Change both together.
 
 drip processes browsing activity and YouTube page content locally in your browser. It sends none of that information to drip's developer or anyone else. There is no drip server, no account, no analytics, and no tracking. The YouTube requests and reports you can choose to send are described below.
 
