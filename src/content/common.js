@@ -107,13 +107,17 @@
   }
 
   /**
-   * A cartoon or lucide icon from src/icons, drawn as a CSS mask so it takes the color of the text around it.
+   * A cartoon or lucide icon from src/icons, drawn as a CSS mask so it takes the color of the text around it. The mask
+   * is a data: URL from icons.js, which says why.
    * @param {string} name
    * @param {string} [cls]
    */
   function icon(name, cls = '') {
     const el = h('span', { class: `drip-i drip-i-${name} ${cls}`.trim(), 'aria-hidden': 'true' });
-    el.style.setProperty('--drip-icon', `url("${chrome.runtime.getURL(`src/icons/${name}.svg`)}")`);
+    const icons = /** @type {any} */ (globalThis).DripIcons;
+    // icons.js loads first in Chrome (manifest.json). The Node tests load common.js without it.
+    if (icons) icons.paint(el, name);
+    else el.style.setProperty('--drip-icon', `url("${chrome.runtime.getURL(`src/icons/${name}.svg`)}")`);
     return el;
   }
 
