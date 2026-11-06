@@ -130,7 +130,7 @@ test('initialState has the specified shape and independent mutable values', () =
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
     current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dropsBought: 0, dryBack: null, installedAt: time(5),
-    channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false, ticksIn: [],
+    channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false, firstDayEnded: false, ticksIn: [],
   });
   state.settings.recTokensPerDay = 1;
   state.backlog.push(video('a'));
@@ -838,6 +838,46 @@ test('a day after install, and for state from before installedAt, raises wait fo
   assert.equal(D.firstDayUntil(old, time(5, 13)), 0);
   assert.deepEqual(D.updateSettings(old, { stashMax: 20 }, time(5, 13)).pending, { stashMax: 20 });
   assert.equal(D.hydrate(fresh(), time(5, 13)).installedAt, time(5));
+});
+
+test('a clock before installation cannot reopen first-day settings (Q6, A20)', () => {
+  const state = fresh();
+  const beforeInstall = state.installedAt - 1;
+  assert.equal(D.firstDayUntil(state, beforeInstall), 0);
+  const result = D.updateSettings(state, { clock: false }, beforeInstall);
+  assert.deepEqual(result.applied, {});
+  assert.deepEqual(result.pending, { clock: false });
+  assert.equal(state.settings.clock, true);
+  assert.equal(D.firstDayUntil(state, state.installedAt), state.installedAt + DAY_MS, 'installation starts the window');
+});
+
+test('first-day expiry stays ended after clock rollback and storage reload (Q6, A20)', () => {
+  const state = fresh();
+  const until = state.installedAt + DAY_MS;
+  D.rollDay(state, until - 1);
+  assert.equal(D.firstDayUntil(state, until - 1), until);
+  // The regular worker path must record expiry even when there is no new day to roll.
+  assert.equal(D.rollDay(state, until), false);
+  const reloaded = D.hydrate(JSON.parse(JSON.stringify(state)), time(5, 13));
+  D.rollDay(reloaded, time(5, 13));
+  assert.equal(D.firstDayUntil(reloaded, time(5, 13)), 0);
+  const result = D.updateSettings(reloaded, { clock: false }, time(5, 13));
+  assert.deepEqual(result.applied, {});
+  assert.deepEqual(result.pending, { clock: false });
+  assert.equal(reloaded.settings.clock, true);
+  assert.equal(D.allowChannel(reloaded, { ids: ['@late'], name: 'Late' }, time(5, 13)).waits, true);
+  D.devAction(reloaded, 'first-day-on', time(5, 13));
+  assert.equal(D.firstDayUntil(reloaded, time(5, 13)), 0, 'the developer toggle cannot clear permanent expiry');
+});
+
+test('state saved before firstDayEnded defaults to an active first day only within its window (Q6, A20)', () => {
+  const { firstDayEnded, ...stored } = fresh();
+  const state = D.hydrate(stored, time(5, 13));
+  assert.equal(state.firstDayEnded, false);
+  assert.equal(D.firstDayUntil(state, time(5, 13)), time(6));
+  D.rollDay(state, time(6));
+  assert.equal(state.firstDayEnded, true);
+  assert.equal(D.firstDayUntil(state, time(5, 13)), 0);
 });
 
 test('an earlier reset hour on the first day ends today at the new hour, without a refill', () => {

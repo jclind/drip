@@ -30,6 +30,7 @@
  * @property {ChannelsPending | null} channelsPending List changes that loosen, waiting for the reset (Q6).
  * @property {boolean} firstDayOff Developer mode's "loosening waits, even in the first day": firstDayUntil reports no
  *   first day, so every loosening waits for the reset (Jesse, 2026-11-03). Test tooling, off by default.
+ * @property {boolean} firstDayEnded The worker has seen the first 24 hours end. Clock rollback cannot reopen them (Q6).
  * @property {{id: string, ids: string[]}[]} allowedToday Videos a watch page showed are from an allowed channel, with
  *   that channel's ids. Free only while the channel is still allowed, and cleared at the reset.
  * @property {[string, number][]} ticksIn The last few tick keys, each with the seconds sent under it. A tab hears the
@@ -178,7 +179,7 @@
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
       refill: null, drySeen: 0, boughtAt: 0, dropsBought: 0, dryBack: null, installedAt: now, channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [],
-      firstDayOff: false, ticksIn: [],
+      firstDayOff: false, firstDayEnded: false, ticksIn: [],
     };
   }
 
@@ -255,6 +256,7 @@
     if (back && count(back.until, 0) > 0 && count(back.watch, 0) > 0) state.dryBack = { until: back.until, watch: back.watch };
     state.installedAt = count(stored.installedAt, 0);
     state.firstDayOff = stored.firstDayOff === true;
+    state.firstDayEnded = stored.firstDayEnded === true;
     state.ticksIn = cleanTicks(stored.ticksIn).slice(-TICKS_IN);
     const lists = /** @type {any} */ (stored.channels);
     state.channels = { allow: cleanChannels(lists?.allow).filter((c) => c.ids.length), block: cleanChannels(lists?.block) };
@@ -310,6 +312,8 @@
 
   /** @param {State} state @param {number} now */
   function rollDay(state, now) {
+    // Every worker message runs this, even when the day stays the same. Persist expiry before a clock rollback (Q6).
+    if (state.installedAt > 0 && now >= state.installedAt + FIRST_DAY_MS) state.firstDayEnded = true;
     const oldHour = state.settings.resetHour;
     const nextDay = dayKey(now, oldHour);
     if (nextDay <= state.day) return false;
@@ -956,9 +960,9 @@
    * @param {State} state @param {number} [now]
    */
   function firstDayUntil(state, now) {
-    if (state.firstDayOff) return 0;
+    if (state.firstDayOff || state.firstDayEnded) return 0;
     const until = state.installedAt ? state.installedAt + FIRST_DAY_MS : 0;
-    return now && now < until ? until : 0;
+    return now !== undefined && now >= state.installedAt && now < until ? until : 0;
   }
 
   /**

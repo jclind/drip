@@ -570,6 +570,27 @@ test('the worker applies a raise at once in the first day after install (Q6)', a
   assert.equal(old.store.drip.settings.stashMax, 20);
 });
 
+test('a status message persists first-day expiry through worker restart and clock rollback (Q6, A20)', async () => {
+  const now = Date.now();
+  const raw = worker().Drip.initialState(now);
+  raw.installedAt = now - 86400000 - 1000;
+  delete raw.firstDayEnded; // Storage from before this flag was added.
+  const w = worker(raw);
+  const status = await w.send({ type: 'status', videoId: 'abc' });
+  assert.equal(status.state.day, raw.day, 'expiry needs no day rollover');
+  assert.equal(w.store.drip.firstDayEnded, true);
+  assert.equal(w.writes(), 1, 'the regular status path saves expiry');
+  await w.send({ type: 'status', videoId: 'abc' });
+  assert.equal(w.writes(), 1, 'later status messages need no extra write');
+  const restarted = w.restart();
+  await restarted.advance(-23 * 3600000);
+  const result = await restarted.send({ type: 'updateSettings', changes: { clock: false } });
+  assert.deepEqual({ ...result.applied }, {});
+  assert.equal(result.pending.clock, false);
+  assert.equal(restarted.store.drip.settings.clock, true);
+  assert.equal(restarted.store.drip.firstDayEnded, true);
+});
+
 test('swapBacklog and a tick with the player position reach the stash (Q28)', async () => {
   const w = worker();
   await w.send({ type: 'updateSettings', changes: { stashMax: 1 } });
