@@ -882,6 +882,67 @@ for (const reduced of [true, false]) {
     }
   }
 
+  for (const signedOut of [true, false]) {
+    test(`Reveal next keeps the current card and explains the empty feed, signed ${signedOut ? 'out' : 'in'} (${how})`, async () => {
+      const world = makeWorld();
+      const tab = await makeTab(world, { reduced, realReveal: true });
+      await tab.click('reveal');
+      await loadPicture(tab);
+      await tab.advance(100);
+      assert.equal(tab.cardTitle(), 'Video v1');
+      const before = structuredClone(world.state);
+      for (const item of tab.browse.querySelectorAll('ytd-rich-item-renderer')) item.remove();
+      addFeedNudge(tab.browse.querySelector('#primary'));
+      if (signedOut) {
+        const masthead = tab.document.createElement('ytd-masthead');
+        const link = tab.document.createElement('a');
+        link.setAttribute('href', 'https://accounts.google.com/ServiceLogin?service=youtube');
+        masthead.append(link);
+        tab.document.body.prepend(masthead);
+      }
+
+      await tab.click('next');
+      await tab.advance(400);
+      assert.equal(tab.cardTitle(), 'Video v1');
+      assert.equal(tab.message(), signedOut
+        ? "You're signed out of YouTube, so there's nothing new."
+        : "Your YouTube watch history is off, so there's nothing new.");
+      assert.equal(tab.root().querySelector('.drip-feed-space'), null);
+      assert.equal(tab.button('next').hasAttribute('disabled'), false);
+      assert.deepEqual(world.state, before, 'the failed read spends nothing and keeps the card');
+      assert.equal(world.count('revealNext'), 0);
+      assert.deepEqual(tab.errors, []);
+    });
+  }
+
+  for (const dry of [false, true]) {
+    test(`the out view replaces an empty feed when ${dry ? 'Dry hours begin' : 'minutes and drops run out'} in another tab (${how})`, async () => {
+      const world = makeWorld();
+      const tab = await makeTab(world, { reduced, grid: [], realReveal: true });
+      addFeedNudge(tab.browse.querySelector('#primary'));
+      await tab.click('reveal');
+      await tab.advance(100);
+      assert.ok(tab.root().querySelector('.drip-feed-space.is-empty'));
+
+      if (dry) dryAtNoon(world);
+      else {
+        world.state.tokens.watch = 0;
+        world.state.watchSecondsLeft = 0;
+      }
+      for (const fn of world.listeners) fn({ drip: { newValue: structuredClone(world.state) } }, 'local');
+      await tab.advance(2000);
+
+      assert.ok(tab.root().querySelector('.drip-page.is-out'));
+      assert.ok(tab.root().querySelector('.drip-out-sea'));
+      assert.match(tab.root().textContent, dry ? /Dry hours\./ : /You're out for today\./);
+      assert.equal(tab.root().querySelector('.drip-feed-space'), null);
+      assert.equal(tab.button('reveal'), null);
+      assert.equal(tab.button('add'), null);
+      assert.equal(world.count('reveal'), 0);
+      assert.deepEqual(tab.errors, []);
+    });
+  }
+
   test(`no videos and no nudge still show the broken-grid banner (${how})`, async () => {
     const world = makeWorld();
     const tab = await makeTab(world, { reduced, grid: [], realReveal: true });

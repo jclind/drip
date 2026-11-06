@@ -346,6 +346,12 @@
         pool = feed.pool;
         if (pool.length === 0 && feed.noRecommendations) {
           const signIn = /** @type {HTMLAnchorElement | null} */ (document.querySelector(SEL.signIn));
+          if (state?.current) {
+            message = signIn
+              ? "You're signed out of YouTube, so there's nothing new."
+              : "Your YouTube watch history is off, so there's nothing new.";
+            return null;
+          }
           emptyFeed = signIn ? {
             title: "You're signed out of YouTube.",
             line: "YouTube only recommends videos when you're signed in.",
@@ -1466,6 +1472,7 @@
   /** Rebuilds the page only when something it shows changed. A button replaced mid-click loses the click. */
   function render() {
     if (state?.current) { blockedCard = null; emptyFeed = null; }
+    if (state && outForDay()) emptyFeed = null;
     askDry();
     const root = document.getElementById('drip-home');
     if (!root || moving || leaving || blocking) return;
