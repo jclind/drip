@@ -1376,6 +1376,8 @@
       current ? card(current) : showCard && feedSpace(),
       !current && showCard && actions(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
+      // Always on the page, so a screen reader hears the empty-feed reason when its text arrives (Codex, 2026-11-06).
+      h('div', { class: 'drip-sr', role: 'status', 'data-k': 'feed-status' }, emptyFeed ? `${emptyFeed.title} ${emptyFeed.line}` : ''),
       stashOn() && savedList(!current && showCard ? 'empty' : undefined));
   }
 

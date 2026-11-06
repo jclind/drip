@@ -861,6 +861,8 @@ for (const reduced of [true, false]) {
         assert.equal(tab.root().querySelector('.drip-page').classList.contains('is-open'), true);
         assert.equal(space.querySelector('h2').textContent, signedOut ? "You're signed out of YouTube." : 'Your YouTube watch history is off.');
         assert.equal(space.querySelector('p').textContent, signedOut ? "YouTube only recommends videos when you're signed in." : 'YouTube needs it to recommend videos.');
+        assert.equal(tab.root().querySelector('[data-k="feed-status"]').textContent,
+          `${space.querySelector('h2').textContent} ${space.querySelector('p').textContent}`, 'a screen reader hears why');
         assert.equal(tab.flights().length, !reduced && mode === 'Full drip' ? 2 : 0, 'one deal and one return, or no flight');
         assert.equal(tab.morphs().length, 0, 'a pre-checked empty feed never morphs the buttons');
         assert.deepEqual(tab.reveals, !reduced && mode === 'Full drip' ? ['revealEmpty'] : []);
