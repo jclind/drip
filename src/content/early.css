@@ -23,6 +23,9 @@ yt-lockup-view-model {
   a[href^="/watch?"] yt-thumbnail-view-model:not(.ytThumbnailViewModelAspectRatio2By3) {
     outline: 1px solid var(--drip-thumb-ring-color) !important;
     outline-offset: 1px;
+    /* The outline follows this element's own radius, and YouTube rounds the image inside it, not this box
+       (Jesse saw square corners, 2026-11-06). 12px is YouTube's radius for search and lockup thumbnails. */
+    border-radius: 12px;
     transition: outline-color 150ms ease !important;
 
     & img {
