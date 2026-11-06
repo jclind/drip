@@ -12,11 +12,12 @@ drip limits how much YouTube you watch: it replaces the home feed with a daily a
 
 ## Permission justifications
 
-- `storage`: keeps your settings, token balances, backlog, and 90-day log in the browser. Nothing leaves it.
-- Content scripts on `https://www.youtube.com/*`: replace the home page, hide recommendations and Shorts, run the watch clock, and add Stash buttons.
+- `storage`: keeps your settings, token balances, stash, channel lists, and 90-day log in the browser. Nothing leaves it.
+- Host permission `https://www.youtube.com/*`: when a channel goes on the allow or block list without its name or picture, as one added by handle in Settings does, the service worker loads that channel's public page, without cookies, to read its name and picture (`lookUpChannel` in `src/background.js`). Added 2026-11-04 with the channel lists.
+- Content scripts on `https://www.youtube.com/*`: replace the home page, hide recommendations and Shorts, run the watch clock, and add Stash and Allow buttons.
 - Content script on `https://m.youtube.com/*` and `https://www.youtube-nocookie.com/*`: sends the mobile site and directly opened embeds to the desktop watch page, so the clock applies.
 
-No host permissions, no remote code, no data collection. Data-use answers: collects nothing.
+One host permission (www.youtube.com, above), no remote code, no data collection. Data-use answers: collects nothing.
 
 ## Short description (132 characters max)
 

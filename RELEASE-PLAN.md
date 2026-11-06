@@ -4,6 +4,17 @@ Written 2026-10-06 on air, against `main` at `9555307`. Draft for Jesse to appro
 
 "1.0" here means a build Jesse could put on the Chrome Web Store, minus the visual design, which comes after with his input. DESIGN.md calls the core loop "v1" (Q23), so this plan says "1.0" to keep the two apart.
 
+## Upload day, 2026-11-06
+
+Jesse asked for these to be waiting for the session on upload day (2026-11-05). In order:
+
+1. Merge PR 69 (the pre-publish bug hunt), so the zip has its fixes and the updated store docs.
+2. In `manifest.json`, change `version` from `0.1.0` to `1.0.0` and commit it. `bin/build-release` refuses uncommitted changes.
+3. Run `bin/build-release`. It runs `node --test` and writes `dist/drip-1.0.0.zip`.
+4. Unzip it, load the folder unpacked in Chrome (not the checkout), and run `test/BROWSER.md` against it. On `chrome://extensions`, drip should have no Errors button. The worker's `importScripts('devpanel/clock.js')` fails in a store build and is caught, so an error there would be the first thing to check.
+5. Put `store/PRIVACY.md` at a public URL and give it to the listing. It was rewritten in PR 69 for the channel lists and the channel-page lookup.
+6. Upload the zip, fill the listing from `store/LISTING.md`, then tag the release as `bin/build-release` prints: `git tag v1.0.0 && git push origin v1.0.0`.
+
 ## Status, 2026-10-06 evening
 
 - Steps 1 to 6 are done in stacked PRs #10 (audit) → #11 (state rules) → #12 (watch clock) → #13 (welcome, live pages, release build) → #14 (broken-page banner, store drafts). Merge them in that order. Each one had a Codex review, and every finding was fixed. 86 tests pass.

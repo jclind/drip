@@ -129,7 +129,7 @@ test('initialState has the specified shape and independent mutable values', () =
   assert.deepEqual(state, {
     version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
-    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dryBack: null, installedAt: time(5),
+    current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dropsBought: 0, dryBack: null, installedAt: time(5),
     channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false, ticksIn: [],
   });
   state.settings.recTokensPerDay = 1;
@@ -855,6 +855,52 @@ test('an earlier reset hour on the first day ends today at the new hour, without
   assert.equal(D.rollDay(state, time(5, 7)), false);
 });
 
+// Q12, Jesse, 2026-11-05: after the reset hour changes, the next reset is the first one at the new hour at least 12
+// hours after the last. Before, 11pm to midnight refilled at 11pm and again at midnight.
+
+test('a reset hour moved from 11pm to midnight skips the midnight an hour later', () => {
+  const state = fresh();
+  state.settings.resetHour = 23;
+  state.day = D.dayKey(time(5, 12), 23);
+  D.updateSettings(state, { resetHour: 0 });
+  assert.deepEqual(state.pending?.changes, { resetHour: 0 });
+  state.tokens.watch = 0;
+  assert.equal(D.rollDay(state, time(5, 23, 1)), true, 'the change applies at the 11pm reset');
+  assert.equal(state.settings.resetHour, 0);
+  assert.equal(state.tokens.watch, 4);
+  state.tokens.watch = 0;
+  assert.equal(D.rollDay(state, time(6, 0, 1)), false, 'midnight is an hour after the last reset');
+  assert.equal(D.rollDay(state, time(6, 23, 59)), false);
+  assert.equal(state.tokens.watch, 0);
+  assert.equal(D.rollDay(state, time(7, 0, 1)), true, 'the next midnight, 25 hours after');
+  assert.equal(state.tokens.watch, 4);
+});
+
+test('on the first day, 11pm to midnight at 11:30pm does not refill at midnight either', () => {
+  const state = D.initialState(time(5, 23, 10));
+  state.settings.resetHour = 23;
+  state.day = D.dayKey(time(5, 23, 10), 23);
+  state.tokens.watch = 0;
+  assert.deepEqual(D.updateSettings(state, { resetHour: 0 }, time(5, 23, 30)).applied, { resetHour: 0 });
+  assert.equal(D.rollDay(state, time(6, 0, 30)), false);
+  assert.equal(state.tokens.watch, 0);
+  assert.equal(D.rollDay(state, time(7, 0, 30)), true);
+});
+
+test('an earlier reset hour 12 hours or more away keeps its first reset, and a later one makes a long day', () => {
+  const earlier = fresh();
+  D.updateSettings(earlier, { resetHour: 3 });
+  assert.equal(D.rollDay(earlier, time(6, 4)), true);
+  assert.equal(D.rollDay(earlier, time(7, 3, 1)), true, '4am to 3am the next day is 23 hours');
+  // A day is named for the date it starts at its reset hour, so 8pm on the 6th starts the 6th, the day that began at
+  // 4am. The day runs to 8pm on the 7th, 40 hours. Longer than 24, so it hands nothing back.
+  const later = fresh();
+  D.updateSettings(later, { resetHour: 20 });
+  assert.equal(D.rollDay(later, time(6, 4)), true);
+  assert.equal(D.rollDay(later, time(6, 20, 1)), false);
+  assert.equal(D.rollDay(later, time(7, 20, 1)), true);
+});
+
 test('settings result lists only this call, preserves other pending keys, and feeds apply now', () => {
   const state = fresh();
   D.updateSettings(state, { recTokensPerDay: 20 });
@@ -1216,4 +1262,50 @@ test('cardsLine says how the day\'s cards ended and drops the zero parts', () =>
   assert.equal(D.cardsLine(day({ recSpent: 1, saved: 1 })), 'Of 1 card, 1 saved.');
   assert.equal(D.cardsLine(day({ recSpent: 6, saved: 2, watched: 1, passed: 3 })), 'Of 6 cards, 2 saved, 1 watched, and 3 passed.');
   assert.equal(D.cardsLine(day({ recSpent: 1 })), '1 card revealed.');
+});
+
+test('state saved by the first version (2026-10-05) loads with what it had, and the new fields at their defaults', () => {
+  // initialState and its first changes as b0ca083 wrote them: no watchSecondsBought, refill, installedAt, channels,
+  // or Dry hours, and the old needThisPerDay setting. Pre-publish bug hunt, 2026-11-05.
+  const raw = {
+    version: 1,
+    settings: { watchTokensPerDay: 4, minutesPerToken: 15, recTokensPerDay: 10, rolloverDays: 2, resetHour: 4, graceMode: false, needThisPerDay: 2, feedSource: 'home' },
+    pending: { effectiveDay: '2026-10-06', changes: { recTokensPerDay: 20, needThisPerDay: 3 } },
+    day: '2026-10-05', tokens: { watch: 3, rec: 9 }, watchSecondsLeft: 600,
+    current: { id: 'aaaaaaaaaaa', title: 'A', channel: 'C', length: '1:00' },
+    backlog: [{ id: 'bbbbbbbbbbb', title: 'B', channel: 'C', length: '2:00' }], seen: ['aaaaaaaaaaa'], unlocked: ['ccccccccccc'],
+    log: { '2026-10-05': { watchedSec: 300, watchSpent: 1, recSpent: 1, saved: 0, passed: 0, needThis: [{ videoId: 'ccccccccccc', title: 'C', reason: 'Study', at: time(5, 11) }] } },
+  };
+  const state = D.hydrate(structuredClone(raw), time(5, 13));
+  assert.equal(D.rollDay(state, time(5, 13)), false);
+  assert.deepEqual(state.tokens, { watch: 3, rec: 9 });
+  assert.equal(state.watchSecondsLeft, 600);
+  assert.equal(state.watchSecondsBought, 600, 'old state counts what is left as bought');
+  assert.equal(state.current?.id, 'aaaaaaaaaaa');
+  assert.deepEqual(state.backlog.map((v) => v.id), ['bbbbbbbbbbb']);
+  assert.deepEqual(state.pending, { effectiveDay: '2026-10-06', changes: { recTokensPerDay: 20 } });
+  assert.equal('needThisPerDay' in state.settings, false);
+  assert.equal(state.settings.dryHours, false);
+  assert.equal(state.installedAt, 0);
+  assert.equal(D.firstDayUntil(state, time(5, 13)), 0, 'no first day for an old install, so loosening waits');
+  assert.equal(D.needThisUsed(state, time(5, 13)), 1);
+  assert.equal(D.watchStatus(state, 'ccccccccccc', time(5, 13)).locked, false);
+  assert.equal(state.log['2026-10-05'].watched, 0);
+  assert.deepEqual(state.channels, { allow: [], block: [] });
+  assert.equal(state.dropsBought, 0);
+  // Its first reset applies the waiting change and refills as usual.
+  assert.equal(D.rollDay(state, time(6, 5)), true);
+  assert.equal(state.settings.recTokensPerDay, 20);
+  assert.deepEqual(state.tokens, { watch: 7, rec: 29 });
+});
+
+test('a reset hour moved from 11pm to midnight keeps the refill under the day it renames, so home shows it (Codex, PR 69)', () => {
+  const state = fresh();
+  state.settings.resetHour = 23;
+  state.day = D.dayKey(time(5, 12), 23);
+  D.updateSettings(state, { resetHour: 0 });
+  state.tokens.watch = 0;
+  assert.equal(D.rollDay(state, time(5, 23, 1)), true);
+  assert.ok(state.refill);
+  assert.equal(state.refill.day, state.day);
 });

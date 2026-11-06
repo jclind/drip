@@ -356,3 +356,111 @@ test('minutes from a dev button, with no purchase time, are left to the current 
   assert.equal(D.enterDry(state, time(5, 15)), false);
   assert.equal(state.watchSecondsLeft, 900);
 });
+
+// Pre-publish bug hunt, 2026-11-05. Q32: at the start, "each whole drop of them goes back to the counter". A drop is
+// what was paid for it, so the minutes come back at the price they were bought at, and never as more drops than were
+// bought.
+
+test('drops come back at the price they were bought at, after minutes per drop was lowered', () => {
+  const state = dry(23, 6, time(5, 22));
+  state.tokens.watch = 1;
+  assert.equal(D.spendWatch(state, time(5, 22, 40)).ok, true);
+  // Lowering minutes per drop tightens, so it applies at once (Q6).
+  D.updateSettings(state, { minutesPerToken: 1 }, time(5, 22, 41));
+  assert.equal(state.settings.minutesPerToken, 1);
+  D.enterDry(state, time(5, 23, 1));
+  assert.equal(state.tokens.watch, 1, 'one drop paid, one drop back, not 15 one-minute drops');
+  assert.deepEqual(state.dryBack, { until: time(6, 6), watch: 1 });
+  assert.equal(state.watchSecondsLeft, 0);
+});
+
+test('minutes under a drop at the price paid are lost, however small minutes per drop is now', () => {
+  const state = dry(23, 6, time(5, 22));
+  state.tokens.watch = 2;
+  D.spendWatch(state, time(5, 21));
+  D.spendWatch(state, time(5, 21));
+  // 20 of the 30 minutes watched leaves 10, under one 15-minute drop.
+  D.charge(state, 20 * 60, 'abc');
+  D.updateSettings(state, { minutesPerToken: 1 }, time(5, 22));
+  D.enterDry(state, time(5, 23, 1));
+  assert.equal(state.tokens.watch, 0);
+  assert.equal(state.dryBack, null);
+});
+
+test('drops bought at two prices come back at what they cost', () => {
+  // The first day, when raising minutes per drop applies at once too (Q6).
+  const state = D.initialState(time(5, 20));
+  Object.assign(state.settings, { dryHours: true, dryFrom: 23, dryTo: 6 });
+  D.spendWatch(state, time(5, 21));
+  D.updateSettings(state, { minutesPerToken: 30 }, time(5, 21, 1));
+  D.spendWatch(state, time(5, 21, 2));
+  // 15 + 30 minutes bought for 2 drops, none watched: both come back.
+  D.enterDry(state, time(5, 23, 1));
+  assert.equal(state.tokens.watch, 4);
+});
+
+/** One worker message, in background.js's order. @param {any} state @param {number} now @param {(s: any, n: number) => any} [fn] */
+function message(state, now, fn = () => ({ ok: true })) {
+  D.enterDry(state, now);
+  D.rollDay(state, now);
+  const result = fn(state, now);
+  D.enterDry(state, now);
+  return result;
+}
+
+test('Dry hours moved over an hour already past take nothing: those hours were not dry then', () => {
+  const state = dry(4, 5, time(5, 8));
+  state.tokens.watch = 1;
+  message(state, time(5, 8, 30), (s, n) => D.spendWatch(s, n));
+  // 4am to 10am holds every hour 4am to 5am does, so it applies at once (Q6), at 3pm, outside the range.
+  const res = message(state, time(5, 15), (s, n) => D.updateSettings(s, { dryTo: 10 }, n));
+  assert.deepEqual(res.applied, { dryTo: 10 });
+  assert.equal(state.watchSecondsLeft, 15 * 60, 'the minutes bought at 8:30 still play');
+  assert.equal(state.tokens.watch, 0);
+  assert.equal(state.dryBack, null);
+});
+
+test('Dry hours turned on for an hour already past take nothing either', () => {
+  const state = settled(time(5, 8));
+  state.tokens.watch = 1;
+  message(state, time(5, 8, 30), (s, n) => D.spendWatch(s, n));
+  message(state, time(5, 15), (s, n) => D.updateSettings(s, { dryHours: true, dryFrom: 9, dryTo: 10 }, n));
+  assert.equal(state.settings.dryHours, true);
+  assert.equal(state.watchSecondsLeft, 15 * 60);
+  assert.equal(state.tokens.watch, 0);
+});
+
+test('on the first day, Watch time off and on again after a dry hour takes nothing for it', () => {
+  // Off waits after the first day, so only the first day can turn the clock off and on in one day (Q6).
+  const state = D.initialState(time(5, 8));
+  Object.assign(state.settings, { dryHours: true, dryFrom: 9, dryTo: 10 });
+  message(state, time(5, 8, 30), (s, n) => D.spendWatch(s, n));
+  message(state, time(5, 8, 40), (s, n) => D.updateSettings(s, { clock: false }, n));
+  message(state, time(5, 11), (s, n) => D.updateSettings(s, { clock: true }, n));
+  assert.equal(state.watchSecondsLeft, 15 * 60);
+  assert.equal(state.tokens.watch, 3);
+});
+
+test('turning Dry hours on over the current hour still takes the minutes back at once', () => {
+  const state = settled(time(5, 15));
+  state.tokens.watch = 1;
+  message(state, time(5, 14), (s, n) => D.spendWatch(s, n));
+  message(state, time(5, 15), (s, n) => D.updateSettings(s, { dryHours: true, dryFrom: 15, dryTo: 16 }, n));
+  assert.equal(state.watchSecondsLeft, 0);
+  assert.equal(state.tokens.watch, 1);
+});
+
+test('drops bought before the update that added dropsBought still all come back with one bought after (Codex, PR 69)', () => {
+  const state = dry(23, 6);
+  D.spendWatch(state, time(5, 21));
+  D.spendWatch(state, time(5, 21));
+  // Saved by the version before dropsBought: two drops' minutes, no count.
+  const stored = structuredClone(state);
+  delete stored.dropsBought;
+  const upgraded = D.hydrate(stored, time(5, 21, 30));
+  assert.equal(upgraded.dropsBought, 2, 'counted from the minutes bought, at today\'s price');
+  D.spendWatch(upgraded, time(5, 22));
+  assert.equal(upgraded.tokens.watch, 1);
+  assert.equal(D.enterDry(upgraded, time(5, 23)), true);
+  assert.equal(upgraded.tokens.watch, 4, 'all three back');
+});
