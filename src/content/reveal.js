@@ -429,6 +429,7 @@
    * @property {() => Promise<any>} find Finds and pays for the next video. Resolves with it, or null if that failed.
    * @property {(video: any) => Promise<void>} ready Resolves once the video's picture has loaded, or given up on.
    * @property {Saved} [saved] Stash, which folds while a card is up.
+   * @property {() => HTMLElement | null} [empty] The empty-feed space to keep after a reveal finds nothing.
    */
 
   /** The count rolls one card lower as the card leaves it (counter.js). Returns a function that rolls it back. */
@@ -449,6 +450,8 @@
   async function reveal(o) {
     const oldRow = /** @type {HTMLElement} */ (o.page.querySelector('.drip-actions'));
     const empty = measureEmpty(oldRow);
+    const wasOpen = o.page.classList.contains('is-open');
+    o.page.querySelector('.drip-feed-space')?.remove();
 
     // The loading card goes in where the buttons were, its block 0px tall, and its buttons under it.
     const shell = o.card(null);
@@ -467,7 +470,8 @@
     o.page.classList.add('is-open');
     foldSaved(o.saved, false, { duration: OPEN_MS, easing: OPEN_EASE });
     // The padding opens with the height. Left at 16px, it would drop the buttons 16px the moment the space started.
-    const opened = play(s.body, [{ height: '0px', paddingBottom: '0px' }, { height: `${H}px`, paddingBottom: '16px' }], { duration: OPEN_MS, easing: OPEN_EASE })
+    const opened = (wasOpen ? Promise.resolve() :
+      play(s.body, [{ height: '0px', paddingBottom: '0px' }, { height: `${H}px`, paddingBottom: '16px' }], { duration: OPEN_MS, easing: OPEN_EASE }))
       .then(() => {
         stop(s.body);
         s.body.style.overflow = 'visible';
@@ -484,8 +488,13 @@
     if (!video) {
       putBack();
       const [card] = await Promise.all([landing, opened, formed]);
-      await undeal(o.root, card, o.counter);
-      await close(o, shell, s, empty);
+      const space = o.empty?.();
+      if (space) {
+        await Promise.all([undeal(o.root, card, o.counter), close(o, shell, s, empty, space)]);
+      } else {
+        await undeal(o.root, card, o.counter);
+        await close(o, shell, s, empty);
+      }
       return false;
     }
 
@@ -506,13 +515,12 @@
   }
 
   /**
-   * Home's first reveal holds the loaded body's space when YouTube has no recommendations. The buttons stay in
-   * their starting state until there is a video. The welcome tour keeps its original reveal choreography.
-   * @param {Options & {empty: () => HTMLElement | null}} o
+   * A home feed already known to be empty deals and returns a card without morphing the starting buttons.
+   * The caller's find only sets the empty-feed note and resolves null, without asking the worker to spend a card.
+   * @param {Options} o
    */
-  async function revealHome(o) {
+  async function revealEmpty(o) {
     const oldRow = /** @type {HTMLElement} */ (o.page.querySelector('.drip-actions'));
-    const empty = measureEmpty(oldRow);
     const wasOpen = o.page.classList.contains('is-open');
     o.page.querySelector('.drip-feed-space')?.remove();
     const shell = o.card(null);
@@ -521,51 +529,26 @@
     shell.inert = true;
     oldRow.replaceWith(shell);
     const H = s.body.offsetHeight;
-    const three = measureThree(s.row);
     s.row.replaceWith(oldRow);
     o.page.classList.add('is-open');
     const opened = wasOpen ? Promise.resolve() :
       play(s.body, [{ height: '0px', paddingBottom: '0px' }, { height: `${H}px`, paddingBottom: '16px' }], { duration: OPEN_MS, easing: OPEN_EASE });
     const landing = deal(o.root, o.counter, s.thumb);
-    const video = await o.find();
+    await o.find();
     const [card] = await Promise.all([landing, opened]);
     stop(s.body);
     s.body.style.overflow = 'visible';
-    if (!video) {
-      await undeal(o.root, card, o.counter);
-      const note = o.empty();
-      if (note) {
-        // The note's hidden loading body has exactly the geometry of s.body. Nothing below it moves.
-        shell.before(note);
-      } else {
-        o.page.classList.remove('is-open');
-        await play(s.body, [{ height: `${H}px`, paddingBottom: '16px' }, { height: '0px', paddingBottom: '0px' }], { duration: OPEN_MS, easing: EASE });
-      }
-      shell.replaceWith(o.actions());
-      return false;
+    await undeal(o.root, card, o.counter);
+    const note = o.empty?.();
+    if (note) {
+      // The note's hidden loading body has exactly the geometry of s.body. Nothing below it moves.
+      shell.before(note);
+    } else {
+      o.page.classList.remove('is-open');
+      await play(s.body, [{ height: `${H}px`, paddingBottom: '16px' }, { height: '0px', paddingBottom: '0px' }], { duration: OPEN_MS, easing: EASE });
     }
-    // Only a successful reveal spends a card and forms the video's controls.
-    spendShown(o.counter);
-    foldSaved(o.saved, false, { duration: OPEN_MS, easing: OPEN_EASE });
-    const real = parts(o.card(video));
-    adopt(card, real);
-    real.title.classList.add('drip-held');
-    real.meta.classList.add('drip-held');
-    s.body.replaceChildren(real.thumb, real.title, real.meta);
-    oldRow.classList.add('drip-ghost');
-    s.wrap.prepend(real.row);
-    real.row.style.opacity = '0';
-    play(oldRow, [{ opacity: 1 }, { opacity: 0 }], { duration: 150 }).then(() => oldRow.remove());
-    const formed = morph(s.wrap, forward(empty, three)).then(async (layer) => {
-      real.row.style.opacity = '';
-      layer.remove();
-      await labels(real.row, true, 200);
-    });
-    await o.ready(video);
-    real.title.classList.remove('drip-held');
-    real.meta.classList.remove('drip-held');
-    await Promise.all([flip(card), formed, textIn([real.title, real.meta], 240)]);
-    return true;
+    shell.replaceWith(o.actions());
+    return false;
   }
 
   /**
@@ -625,22 +608,26 @@
   /**
    * Closes the card's space and turns its buttons back into +15m and Reveal video, with Stash opening in step. Ends
    * with the empty page's buttons where the card was.
+   * An empty-feed space keeps the body's height and the buttons' position while the goo runs backwards.
    * @param {Options} o @param {HTMLElement} card @param {ReturnType<typeof split>} s @param {Empty} empty
+   * @param {HTMLElement | null} [space]
    */
-  async function close(o, card, s, empty) {
+  async function close(o, card, s, empty, space = null) {
     const three = measureThree(s.row);
     await labels(s.row, false, 120);
     s.row.style.opacity = '0';
     s.body.style.overflow = '';
     const H = s.body.offsetHeight;
-    o.page.classList.remove('is-open');
+    if (!space) o.page.classList.remove('is-open');
     const timing = { duration: OPEN_MS, delay: 120, easing: EASE };
     // The padding closes with the height, or the buttons jump up 16px once the space is gone.
-    const closing = play(s.body, [{ height: `${H}px`, paddingBottom: '16px' }, { height: '0px', paddingBottom: '0px' }], timing);
+    const closing = space ? Promise.resolve() :
+      play(s.body, [{ height: `${H}px`, paddingBottom: '16px' }, { height: '0px', paddingBottom: '0px' }], timing);
     const saved = foldSaved(o.saved, true, timing);
     const layer = await morph(s.wrap, backward(empty, three));
     await closing;
     const actions = o.actions();
+    if (space) card.before(space);
     card.replaceWith(actions);
     layer.remove();
     await Promise.all([labels(actions, true, 200), saved]);
@@ -686,5 +673,5 @@
     await Promise.all([drop(o), wait(OPEN_MS)]);
   }
 
-  /** @type {any} */ (globalThis).DripReveal = { reveal, revealHome, next, pass, passOut, dealCard, reduced };
+  /** @type {any} */ (globalThis).DripReveal = { reveal, revealEmpty, next, pass, passOut, dealCard, reduced };
 })();

@@ -226,6 +226,8 @@
       morePool = feed.pool;
       noRecommendations = feed.noRecommendations;
     }
+    // A fresh home frame can say the feed is empty while the visible grid still holds already-seen videos.
+    if (noRecommendations) return { pool: [], noRecommendations: true };
     return { pool: morePool.length ? morePool : pool, noRecommendations };
   }
 
@@ -330,8 +332,9 @@
    * Reads the feed, then sends `msg` with the videos it found. Resolves with the worker's reply when it worked, or
    * null after setting the message that says why not.
    * @param {Record<string, unknown>} msg
+   * @param {boolean} [emptyAtClick] The home grid had no videos and already showed YouTube's feed nudge.
    */
-  async function findWith(msg) {
+  async function findWith(msg, emptyAtClick = false) {
     // A slow read (Subscriptions can take 15 seconds) says so on the loading card. The animation holds redraws, so the
     // text changes in place.
     slow = false;
@@ -342,7 +345,7 @@
     try {
       let pool;
       try {
-        const feed = await readCandidates();
+        const feed = emptyAtClick ? { pool: [], noRecommendations: true } : await readCandidates();
         pool = feed.pool;
         if (pool.length === 0 && feed.noRecommendations) {
           const signIn = /** @type {HTMLAnchorElement | null} */ (document.querySelector(SEL.signIn));
@@ -395,12 +398,19 @@
    */
   async function revealWith(kind, msg) {
     if (busy || moving || blocking) return;
+    let emptyAtClick = false;
+    try {
+      emptyAtClick = kind === 'reveal' && state?.settings.feedSource !== 'subscriptions' &&
+        hasFeedNudge() && readPool().length === 0;
+    } catch {
+      // A failed pre-check takes the normal path, where findWith reports feed-read errors.
+    }
     busy = kind;
     message = '';
     emptyFeed = null;
     if (deals()) {
-      const run = kind === 'reveal' ? DripReveal.revealHome : DripReveal.next;
-      const { ok, focused } = await animate(run, async () => (await findWith(msg))?.video || null);
+      const run = kind === 'next' ? DripReveal.next : emptyAtClick ? DripReveal.revealEmpty : DripReveal.reveal;
+      const { ok, focused } = await animate(run, async () => (await findWith(msg, emptyAtClick))?.video || null);
       // The button that had focus is gone. Focus goes to what you'd press next.
       if (focused) focusOn(ok ? (kind === 'reveal' ? 'watch' : 'next') : kind === 'reveal' ? 'reveal' : 'next');
       return;
@@ -411,7 +421,7 @@
     render();
     let ok = false;
     try {
-      ok = !!(await findWith(msg));
+      ok = !!(await findWith(msg, emptyAtClick));
     } finally {
       busy = '';
       render();
