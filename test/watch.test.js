@@ -504,6 +504,48 @@ test('time runs out on time: the video stops within a second of zero (Q3)', asyn
   assert.ok(total <= 4.01, `played ${total} seconds on a 3-second balance`);
 });
 
+for (const [minutes, label] of [[15, '15m'], [75, '1h 15m']]) {
+  test(`the first lock of the day with drops says how to start, at ${minutes} minutes per drop`, async () => {
+    const world = makeWorld();
+    world.state.settings.minutesPerToken = minutes;
+    world.state.log['2026-09-29'] = { ...structuredClone(world.D.logDay(world.state)), watchedSec: 3000 };
+    const tab = makeTab(world, 'aaa');
+    await settle();
+    await tab.second();
+    assert.ok(tab.locked());
+    assert.match(tab.lockText(), /^Start with a drop\./);
+    assert.ok(tab.lockText().includes(`Each drop buys ${label} of watching.`));
+    assert.doesNotMatch(tab.lockText(), /watched today|last Tuesday|Time for a breather/);
+  });
+}
+
+test('a first lock redraws with the watched line once any watching is logged today', async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.second();
+  assert.match(tab.lockText(), /^Start with a drop\./);
+  for (const [seconds, label] of [[1, '<1m'], [60, '1m']]) {
+    world.D.logDay(world.state).watchedSec = seconds;
+    saved(world);
+    await settle();
+    assert.match(tab.lockText(), /^Time for a breather\./);
+    assert.ok(tab.lockText().includes(`${label} watched today`));
+    assert.doesNotMatch(tab.lockText(), /Start with a drop|Each drop buys/);
+  }
+});
+
+test('a first lock with no drops keeps the fill headline and watched line', async () => {
+  const world = makeWorld();
+  world.state.tokens.watch = 0;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.second();
+  assert.match(tab.lockText(), /^You've had your fill\./);
+  assert.match(tab.lockText(), /0m watched today/);
+  assert.doesNotMatch(tab.lockText(), /Start with a drop|Each drop buys|\+15m/);
+});
+
 test('the lock screen says what can still happen: buy minutes, unlock, or nothing until the reset (DESIGN.md "Lock screen")', async () => {
   const { world, tab } = await setup(3);
   await play(world, tab, 5);
@@ -741,6 +783,18 @@ function dryWorld(hour, minute, second = 0, ms = 0) {
   world.state.day = world.D.dayKey(world.epoch, 4);
   Object.assign(world.state.settings, { dryHours: true, dryFrom: 23, dryTo: 6 });
   return world;
+}
+
+for (const [hour, minute, line] of [[23, 30, 'Dry until 6:00am.'], [22, 56, 'Dry hours start at 11:00pm.']]) {
+  test(`a first lock keeps the Dry hours line: ${line}`, async () => {
+    const world = dryWorld(hour, minute);
+    const tab = makeTab(world, 'aaa');
+    await settle();
+    await tab.second();
+    assert.match(tab.lockText(), /^Time for a breather\./);
+    assert.ok(tab.lockText().includes(line));
+    assert.doesNotMatch(tab.lockText(), /Start with a drop|Each drop buys|watched today|\+15m/);
+  });
 }
 
 test('a paid video pauses when Dry hours start, with minutes left and grace mode on (Jesse, 2026-11-04)', async () => {

@@ -124,7 +124,7 @@ Settled:
 
 Lock screen (started 2026-10-07). The satisfying moment here goes to leaving. Paying stays neutral and justifying stays a little effortful:
 
-- Headline: "You've had your fill." when no watch tokens are left, "Time for a breather." when there are tokens to buy minutes. Jesse's lines.
+- Headline: "You've had your fill." when no watch tokens are left, "Time for a breather." when there are tokens to buy minutes. Jesse's lines. Before anything is watched today, with drops to buy, the headline is "Start with a drop." and the line under it is "Each drop buys 15m of watching." (Jesse's pick, 2026-11-05).
 - "Back to drip home" becomes "Done for now", the white primary button, with no icon. A slow shimmer sweeps across it every few seconds. The pill's low-time shimmer is the only other one. Clicking it sends rings through the panel, and the water falls away onto the home page.
 - "+15 min · -1 drop" is the gray secondary button, with white text. "I need this one · 2 left this week" is a gray text link, and its reason box gets no animation. The count is the rolling 7 days of Q20.
 - Layout, top to bottom: headline, a gray line "1 h 15 min watched today · 50 min last Tuesday" (only the first half when last week has no data), the two buttons with Done for now on the right, then the link. No token counts on this screen; the headline already says whether minutes can be bought. Jesse's mockup, 2026-10-07.

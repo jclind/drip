@@ -932,10 +932,13 @@
     const drySoon = Drip.drySoon(state, now);
     const hasDrops = state.tokens.watch > 0;
     const canBuy = hasDrops && !dryEnd && !drySoon;
+    const firstWatch = canBuy && Drip.watchedSummary(state).today === 0;
+    const headline = firstWatch ? 'Start with a drop.' : hasDrops ? 'Time for a breather.' : "You've had your fill.";
     const line = dryEnd ? `Dry until ${hourLabel(new Date(dryEnd).getHours())}.`
-      : drySoon ? `Dry hours start at ${hourLabel(new Date(drySoon).getHours())}.` : watchedLine();
+      : drySoon ? `Dry hours start at ${hourLabel(new Date(drySoon).getHours())}.`
+      : firstWatch ? `Each drop buys ${Drip.formatMinutes(s.minutesPerToken * 60)} of watching.` : watchedLine();
     const existing = liveLock();
-    const view = JSON.stringify([videoId(), canBuy, hasDrops, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, line]);
+    const view = JSON.stringify([videoId(), canBuy, hasDrops, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, headline, line]);
     if (existing && lockView === view) return;
     lockView = view;
     lockVideoId = videoId();
@@ -963,7 +966,7 @@
     const panel = h(
       'div',
       { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },
-      h('h2', { class: 'drip-lock-title', id: 'drip-lock-title' }, hasDrops ? 'Time for a breather.' : "You've had your fill."),
+      h('h2', { class: 'drip-lock-title', id: 'drip-lock-title' }, headline),
       h('div', { class: 'drip-lock-sub' }, line),
       h('div', { class: `drip-lock-actions${canBuy ? '' : ' is-alone'}` },
         canBuy && h('button', { class: 'drip-b drip-b-gray drip-lock-add', 'data-k': 'add', onclick: onAddTime, title: `Add ${s.minutesPerToken} minutes for 1 drop` },
