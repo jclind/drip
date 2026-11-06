@@ -1,10 +1,13 @@
 // @ts-check
-// drip's icons as data: URLs, for the CSS masks that draw them on YouTube's pages. A mask pointing at a
-// chrome-extension:// URL still draws, but Chrome first tries to load it as an SVG document, which a youtube.com page
-// may not, and logs "Unsafe attempt to load URL ... Domains, protocols and ports must match." under Errors on drip's
-// card in chrome://extensions, once per icon per page (Jesse, 2026-11-05). A data: URL has no origin to cross.
-// Every icon is fetched once when the script loads, so they're ready before the first draw. A classic script that sets
-// globalThis.DripIcons; menu.js and common.js run in the same content-script world and share it.
+// drip's icons as data: URLs, for the CSS masks that draw them on YouTube's pages. A youtube.com page that loads a
+// chrome-extension:// file itself, by fetch or as a mask, gets it, but Chrome lists "Unsafe attempt to load URL ...
+// Domains, protocols and ports must match." under Errors on drip's card each time (Jesse, 2026-11-05). So the page
+// never loads one: the worker reads the SVGs and sends their text, in one message, and they become data: URLs.
+// A prerendered page (the copy of youtube.com Chrome loads unseen while the address bar is typed in) waits until it's
+// shown, since it may never be.
+//
+// A classic script that sets globalThis.DripIcons; menu.js and common.js run in the same content-script world and
+// share it.
 
 (() => {
   const g = /** @type {any} */ (globalThis);
@@ -18,32 +21,35 @@
     'settings', 'smartphone', 'square-play', 'thumbs-up', 'unlock', 'users', 'x',
   ];
 
+  /** Settles once the page is shown: at once, or when a prerendered page is activated. */
+  const shown = /** @type {any} */ (document).prerendering
+    ? new Promise((resolve) => document.addEventListener('prerenderingchange', () => resolve(undefined), { once: true }))
+    : Promise.resolve();
+
   /** @type {Map<string, string>} */
   const ready = new Map();
-  /** @type {Map<string, Promise<string>>} */
-  const loading = new Map();
+  /** @type {Promise<void> | null} */
+  let loading = null;
 
-  /** @param {string} name @returns {Promise<string>} */
-  function load(name) {
-    let pending = loading.get(name);
-    if (!pending) {
-      pending = fetch(chrome.runtime.getURL(`src/icons/${name}.svg`))
-        .then((res) => (res.ok ? res.text() : Promise.reject(new Error(`icon ${name}: ${res.status}`))))
-        .then((svg) => {
-          const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-          ready.set(name, url);
-          return url;
+  /** Asks the worker for every icon once. A failed ask (the worker restarting, the extension reloaded) is tried again. */
+  function loadAll() {
+    if (!loading) {
+      loading = shown
+        .then(() => chrome.runtime.sendMessage({ type: 'icons', names: NAMES }))
+        .then((res) => {
+          if (!res || !res.ok || !res.icons) throw new Error('icons: no answer');
+          for (const [name, svg] of Object.entries(res.icons)) {
+            if (typeof svg === 'string') ready.set(name, `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+          }
         });
-      // A failed load (the extension reloaded under the page) can be tried again on the next draw.
-      pending.catch(() => loading.delete(name));
-      loading.set(name, pending);
+      loading.catch(() => { loading = null; });
     }
-    return pending;
+    return loading;
   }
 
   /**
    * Gives el the icon as its --drip-icon mask: now if it's loaded, else as soon as it is. Never a chrome-extension://
-   * URL, so a mask drawn before the icon arrives is blank for those few milliseconds instead of logging an error.
+   * URL, so a mask drawn before the icons arrive is blank for those few milliseconds.
    * @param {HTMLElement} el @param {string} name
    */
   function paint(el, name) {
@@ -52,10 +58,13 @@
       el.style.setProperty('--drip-icon', `url("${url}")`);
       return;
     }
-    load(name).then((later) => el.style.setProperty('--drip-icon', `url("${later}")`), () => {});
+    loadAll().then(() => {
+      const later = ready.get(name);
+      if (later) el.style.setProperty('--drip-icon', `url("${later}")`);
+    }, () => {});
   }
 
-  for (const name of NAMES) load(name).catch(() => {});
+  loadAll().catch(() => {});
 
-  g.DripIcons = { NAMES, paint, load, url: (/** @type {string} */ name) => ready.get(name) };
+  g.DripIcons = { NAMES, paint, url: (/** @type {string} */ name) => ready.get(name) };
 })();

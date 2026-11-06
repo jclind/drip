@@ -1,7 +1,7 @@
 // @ts-check
 
-// icons.js hands the content scripts' CSS masks data: URLs, never chrome-extension:// ones, which Chrome logs as
-// "Unsafe attempt to load URL" on drip's card (Jesse, 2026-11-05).
+// YouTube's pages never load a chrome-extension:// icon themselves, which Chrome lists as "Unsafe attempt to load URL"
+// under Errors on drip's card (Jesse, 2026-11-05). icons.js gets the SVG text from the worker and makes data: URLs.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,23 +12,40 @@ const vm = require('node:vm');
 const ROOT = path.join(__dirname, '..');
 const read = (/** @type {string} */ p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
-/** Loads icons.js with a fake chrome and a fetch that serves src/icons, or fails for the names in `broken`. */
-function load(broken = new Set()) {
+/**
+ * Loads icons.js with a fake worker that answers { type: 'icons' } from src/icons, or fails while `fail.on`. With
+ * `prerendering`, the page starts hidden and `show()` activates it. Any fetch is recorded, to prove there are none.
+ */
+function load({ fail = { on: false }, prerendering = false } = {}) {
+  /** @type {any[]} */
+  const asked = [];
   /** @type {string[]} */
   const fetched = [];
+  /** @type {(() => void)[]} */
+  const activate = [];
+  const document = {
+    prerendering,
+    addEventListener: (/** @type {string} */ type, /** @type {() => void} */ fn) => { if (type === 'prerenderingchange') activate.push(fn); },
+  };
   const context = vm.createContext({
-    chrome: { runtime: { getURL: (/** @type {string} */ p) => `chrome-extension://abc/${p}` } },
-    fetch: async (/** @type {string} */ url) => {
-      fetched.push(url);
-      const file = url.replace('chrome-extension://abc/', '');
-      const name = path.basename(file, '.svg');
-      if (broken.has(name)) return { ok: false, status: 404, text: async () => '' };
-      return { ok: true, status: 200, text: async () => read(file) };
-    },
+    document,
+    fetch: async (/** @type {string} */ url) => { fetched.push(url); throw new Error('no fetch'); },
+    chrome: { runtime: {
+      getURL: (/** @type {string} */ p) => `chrome-extension://abc/${p}`,
+      sendMessage: async (/** @type {any} */ msg) => {
+        asked.push(msg);
+        if (fail.on) throw new Error('Could not establish connection');
+        /** @type {Record<string, string>} */
+        const icons = {};
+        for (const name of msg.names) icons[name] = read(`src/icons/${name}.svg`);
+        return { ok: true, icons };
+      },
+    } },
   });
   context.globalThis = context;
   vm.runInContext(read('src/content/icons.js'), context);
-  return { icons: context.DripIcons, fetched };
+  const show = () => { document.prerendering = false; activate.splice(0).forEach((fn) => fn()); };
+  return { icons: context.DripIcons, asked, fetched, show };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -46,10 +63,12 @@ test('icons.js lists every file in src/icons, and nothing else', () => {
   assert.deepEqual([...icons.NAMES].sort(), files);
 });
 
-test('every icon is fetched once at load, and paint gives a data: URL of that file', async () => {
-  const { icons, fetched } = load();
-  assert.equal(fetched.length, icons.NAMES.length);
+test('the icons come from one message to the worker, with no fetch, and paint gives a data: URL of the file', async () => {
+  const { icons, asked, fetched } = load();
   await settle();
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].type, 'icons');
+  assert.deepEqual(fetched, []);
   const span = el();
   icons.paint(span, 'clock');
   const value = span.props['--drip-icon'];
@@ -58,11 +77,12 @@ test('every icon is fetched once at load, and paint gives a data: URL of that fi
   const svg = decodeURIComponent(value.slice('url("data:image/svg+xml;charset=utf-8,'.length, -2));
   assert.equal(svg, read('src/icons/clock.svg'));
   assert.ok(!value.slice(5, -2).includes('"'), 'no quote inside url("...")');
-  icons.paint(el(), 'clock');
-  assert.equal(fetched.length, icons.NAMES.length, 'no second fetch');
+  icons.paint(el(), 'x');
+  await settle();
+  assert.equal(asked.length, 1, 'no second message');
 });
 
-test('an icon drawn before it has loaded is blank, then filled in, and never points at chrome-extension://', async () => {
+test('an icon drawn before the answer is blank, then filled in', async () => {
   const { icons } = load();
   const span = el();
   icons.paint(span, 'drop');
@@ -71,19 +91,32 @@ test('an icon drawn before it has loaded is blank, then filled in, and never poi
   assert.match(span.props['--drip-icon'], /^url\("data:/);
 });
 
-test('an icon that failed to load is fetched again on the next paint', async () => {
-  const broken = new Set(['x']);
-  const { icons, fetched } = load(broken);
+test('a worker that did not answer is asked again on the next paint', async () => {
+  const fail = { on: true };
+  const { icons, asked } = load({ fail });
   await settle();
   const span = el();
   icons.paint(span, 'x');
   await settle();
   assert.equal(span.props['--drip-icon'], undefined);
-  broken.clear();
+  fail.on = false;
   icons.paint(span, 'x');
   await settle();
   assert.match(span.props['--drip-icon'], /^url\("data:/);
-  assert.equal(fetched.filter((u) => u.endsWith('/x.svg')).length, 3);
+  assert.equal(asked.length, 3);
+});
+
+test('a prerendered page asks for nothing until it is shown, then fills in what was drawn', async () => {
+  const { icons, asked, show } = load({ prerendering: true });
+  const span = el();
+  icons.paint(span, 'clock');
+  await settle();
+  assert.equal(asked.length, 0);
+  assert.equal(span.props['--drip-icon'], undefined);
+  show();
+  await settle();
+  assert.equal(asked.length, 1);
+  assert.match(span.props['--drip-icon'], /^url\("data:/);
 });
 
 test('the manifest loads icons.js before menu.js and before common.js', () => {
@@ -95,12 +128,13 @@ test('the manifest loads icons.js before menu.js and before common.js', () => {
   }
 });
 
-test('no content script sets a chrome-extension:// URL as a mask any more', () => {
-  for (const file of ['src/content/menu.js', 'src/content/common.js']) {
-    const src = read(file);
-    for (const line of src.split('\n').filter((l) => l.includes("'--drip-icon'") && l.includes('getURL'))) {
-      // common.js keeps one, behind `if (icons)`, for the Node tests that load it without icons.js.
-      assert.ok(file.endsWith('common.js') && /else el\.style/.test(line), `${file}: ${line.trim()}`);
+test('no content script loads a chrome-extension:// file on YouTube', () => {
+  for (const file of fs.readdirSync(path.join(ROOT, 'src/content')).filter((f) => f.endsWith('.js'))) {
+    const lines = read(`src/content/${file}`).split('\n').filter((l) => l.includes('getURL(') && !l.trim().startsWith('//'));
+    for (const line of lines) {
+      // common.js and pour.js keep one each, for drip's own pages (and Node tests), where icons.js isn't loaded.
+      const allowed = (file === 'common.js' && /else el\.style/.test(line)) || (file === 'pour.js' && /icons \?/.test(line));
+      assert.ok(allowed, `${file}: ${line.trim()}`);
     }
   }
 });

@@ -425,6 +425,36 @@ async function openSettings(section) {
   if (id) await chrome.runtime.sendMessage({ type: 'settingsGoto', section: id }).catch(() => {});
 }
 
+/** @type {Map<string, string>} */
+const iconText = new Map();
+
+/**
+ * The SVG text of drip's icons, for content scripts (src/content/icons.js). A youtube.com page that loads a
+ * chrome-extension:// file directly, by fetch or as a CSS mask, gets it, but Chrome lists "Unsafe attempt to load
+ * URL ... Domains, protocols and ports must match." under Errors on drip's card each time (Jesse, 2026-11-05). The
+ * worker reads its own files with no such check.
+ * @param {unknown} names
+ * @returns {Promise<Record<string, string>>}
+ */
+async function iconsFor(names) {
+  const list = Array.isArray(names) ? names.filter((n) => typeof n === 'string' && /^[a-z0-9-]{1,40}$/.test(n)).slice(0, 100) : [];
+  /** @type {Record<string, string>} */
+  const out = {};
+  await Promise.all(list.map(async (name) => {
+    if (!iconText.has(name)) {
+      try {
+        const res = await fetch(chrome.runtime.getURL(`src/icons/${name}.svg`));
+        if (res.ok) iconText.set(name, await res.text());
+      } catch {
+        // Not a file drip has. Left out of the answer.
+      }
+    }
+    const svg = iconText.get(name);
+    if (svg !== undefined) out[name] = svg;
+  }));
+  return out;
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // The dev panel and Settings ask whether developer mode is on. The panel's buttons only work while it is.
   if (msg && (msg.type === 'devStatus' || msg.type === 'devAction' || msg.type === 'setDevMode')) {
@@ -442,6 +472,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== 'object') {
     sendResponse({ ok: false, error: 'unknown-message' });
     return;
+  }
+  if (msg.type === 'icons') {
+    iconsFor(msg.names).then((icons) => sendResponse({ ok: true, icons }), (err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
   }
   if (msg.type === 'openSettings') {
     openSettings(msg.section).then(() => sendResponse({ ok: true }), (err) => sendResponse({ ok: false, error: String(err) }));

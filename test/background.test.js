@@ -125,7 +125,10 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   /** @type {any} */
   const context = { chrome, console, Date: WorkerDate,
     setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, at: WorkerDate.now() + ms }); return id; },
-    clearTimeout: (id) => timers.delete(id), structuredClone, URL, fetch: async () => ({ ok: dev }),
+    clearTimeout: (id) => timers.delete(id), structuredClone, URL,
+    fetch: async (/** @type {string} */ url) => (url.startsWith('src/icons/')
+      ? (fs.existsSync(path.join(SRC, '..', url)) ? { ok: true, text: async () => fs.readFileSync(path.join(SRC, '..', url), 'utf8') } : { ok: false })
+      : { ok: dev }),
     OffscreenCanvas: FakeCanvas, Path2D: class { constructor(d) { this.d = d; } } };
   context.globalThis = context;
   context.importScripts = (/** @type {string} */ file) => vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
@@ -718,4 +721,13 @@ test('the dev clock refuses without developer mode, and without Dry hours to jum
   const w = worker(undefined, { dev: true });
   assert.equal((await w.send({ type: 'devAction', action: 'clock-dry-6m' })).error, 'no-dry-hours');
   assert.equal('dripDevClock' in w.store, false);
+});
+
+test('the worker sends content scripts the text of the icons they ask for, and nothing outside src/icons', async () => {
+  const w = worker();
+  const res = await w.send({ type: 'icons', names: ['clock', 'nope', '../manifest', 'x', 7] });
+  assert.equal(res.ok, true);
+  assert.deepEqual(Object.keys(res.icons).sort(), ['clock', 'x']);
+  assert.equal(res.icons.clock, fs.readFileSync(path.join(SRC, 'icons', 'clock.svg'), 'utf8'));
+  assert.deepEqual(Object.keys((await w.send({ type: 'icons', names: 'clock' })).icons), []);
 });

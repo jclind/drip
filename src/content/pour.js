@@ -52,7 +52,11 @@
    */
   function drop(width) {
     const img = document.createElement('img');
-    img.src = /** @type {any} */ (globalThis).DripIcons?.url('drop') || chrome.runtime.getURL('src/icons/drop.svg');
+    // On YouTube, from icons.js, never the chrome-extension:// file, which Chrome lists under Errors on drip's card
+    // (icons.js says why); the icons arrive long before anything animates. The welcome tour is drip's own page, with
+    // no icons.js, and loads the file.
+    const icons = /** @type {any} */ (globalThis).DripIcons;
+    img.src = icons ? icons.url('drop') || '' : chrome.runtime.getURL('src/icons/drop.svg');
     img.alt = '';
     Object.assign(img.style, { position: 'absolute', left: '0', top: '0', width: `${width}px`, height: 'auto', translate: '-50% -50%' });
     layer().append(img);
