@@ -52,6 +52,7 @@
    */
   function drop(width) {
     const img = document.createElement('img');
+    // From icons.js, which never loads in a prerendered page (it says why). Animations only run on a page in view.
     img.src = /** @type {any} */ (globalThis).DripIcons?.url('drop') || chrome.runtime.getURL('src/icons/drop.svg');
     img.alt = '';
     Object.assign(img.style, { position: 'absolute', left: '0', top: '0', width: `${width}px`, height: 'auto', translate: '-50% -50%' });

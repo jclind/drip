@@ -12,11 +12,21 @@ const vm = require('node:vm');
 const ROOT = path.join(__dirname, '..');
 const read = (/** @type {string} */ p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
-/** Loads icons.js with a fake chrome and a fetch that serves src/icons, or fails for the names in `broken`. */
-function load(broken = new Set()) {
+/**
+ * Loads icons.js with a fake chrome and a fetch that serves src/icons, or fails for the names in `broken`. With
+ * `prerendering`, the page starts hidden and `show()` activates it.
+ */
+function load(broken = new Set(), prerendering = false) {
   /** @type {string[]} */
   const fetched = [];
+  /** @type {(() => void)[]} */
+  const activate = [];
+  const document = {
+    prerendering,
+    addEventListener: (/** @type {string} */ type, /** @type {() => void} */ fn) => { if (type === 'prerenderingchange') activate.push(fn); },
+  };
   const context = vm.createContext({
+    document,
     chrome: { runtime: { getURL: (/** @type {string} */ p) => `chrome-extension://abc/${p}` } },
     fetch: async (/** @type {string} */ url) => {
       fetched.push(url);
@@ -28,7 +38,8 @@ function load(broken = new Set()) {
   });
   context.globalThis = context;
   vm.runInContext(read('src/content/icons.js'), context);
-  return { icons: context.DripIcons, fetched };
+  const show = () => { document.prerendering = false; activate.splice(0).forEach((fn) => fn()); };
+  return { icons: context.DripIcons, fetched, show };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
@@ -48,8 +59,8 @@ test('icons.js lists every file in src/icons, and nothing else', () => {
 
 test('every icon is fetched once at load, and paint gives a data: URL of that file', async () => {
   const { icons, fetched } = load();
-  assert.equal(fetched.length, icons.NAMES.length);
   await settle();
+  assert.equal(fetched.length, icons.NAMES.length);
   const span = el();
   icons.paint(span, 'clock');
   const value = span.props['--drip-icon'];
@@ -103,4 +114,17 @@ test('no content script sets a chrome-extension:// URL as a mask any more', () =
       assert.ok(file.endsWith('common.js') && /else el\.style/.test(line), `${file}: ${line.trim()}`);
     }
   }
+});
+
+test('a prerendered page loads no icon until it is shown, then loads them all and fills in what was drawn', async () => {
+  const { icons, fetched, show } = load(new Set(), true);
+  const span = el();
+  icons.paint(span, 'clock');
+  await settle();
+  assert.equal(fetched.length, 0, 'nothing fetched while prerendering');
+  assert.equal(span.props['--drip-icon'], undefined);
+  show();
+  await settle();
+  assert.equal(fetched.length, icons.NAMES.length);
+  assert.match(span.props['--drip-icon'], /^url\("data:/);
 });

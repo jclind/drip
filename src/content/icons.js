@@ -1,10 +1,14 @@
 // @ts-check
-// drip's icons as data: URLs, for the CSS masks that draw them on YouTube's pages. A mask pointing at a
-// chrome-extension:// URL still draws, but Chrome first tries to load it as an SVG document, which a youtube.com page
-// may not, and logs "Unsafe attempt to load URL ... Domains, protocols and ports must match." under Errors on drip's
-// card in chrome://extensions, once per icon per page (Jesse, 2026-11-05). A data: URL has no origin to cross.
-// Every icon is fetched once when the script loads, so they're ready before the first draw. A classic script that sets
-// globalThis.DripIcons; menu.js and common.js run in the same content-script world and share it.
+// drip's icons as data: URLs, for the CSS masks that draw them on YouTube's pages. Every icon is fetched once, so
+// they're ready before the first draw, and a mask never points at a chrome-extension:// URL.
+//
+// Chrome refuses any extension file to a prerendered page: the copy of youtube.com it loads unseen while the address
+// bar is typed in, from the new tab page. Each try logs "Unsafe attempt to load URL ... Domains, protocols and ports
+// must match." under Errors on drip's card in chrome://extensions, with chrome://newtab/ as the context (Jesse,
+// 2026-11-05). So nothing loads until the page is shown: document.prerendering, then prerenderingchange.
+//
+// A classic script that sets globalThis.DripIcons; menu.js and common.js run in the same content-script world and
+// share it.
 
 (() => {
   const g = /** @type {any} */ (globalThis);
@@ -18,6 +22,11 @@
     'settings', 'smartphone', 'square-play', 'thumbs-up', 'unlock', 'users', 'x',
   ];
 
+  /** Settles once the page is shown: at once, or when a prerendered page is activated. */
+  const shown = /** @type {any} */ (document).prerendering
+    ? new Promise((resolve) => document.addEventListener('prerenderingchange', () => resolve(undefined), { once: true }))
+    : Promise.resolve();
+
   /** @type {Map<string, string>} */
   const ready = new Map();
   /** @type {Map<string, Promise<string>>} */
@@ -27,7 +36,8 @@
   function load(name) {
     let pending = loading.get(name);
     if (!pending) {
-      pending = fetch(chrome.runtime.getURL(`src/icons/${name}.svg`))
+      pending = shown
+        .then(() => fetch(chrome.runtime.getURL(`src/icons/${name}.svg`)))
         .then((res) => (res.ok ? res.text() : Promise.reject(new Error(`icon ${name}: ${res.status}`))))
         .then((svg) => {
           const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
