@@ -449,3 +449,18 @@ test('turning Dry hours on over the current hour still takes the minutes back at
   assert.equal(state.watchSecondsLeft, 0);
   assert.equal(state.tokens.watch, 1);
 });
+
+test('drops bought before the update that added dropsBought still all come back with one bought after (Codex, PR 69)', () => {
+  const state = dry(23, 6);
+  D.spendWatch(state, time(5, 21));
+  D.spendWatch(state, time(5, 21));
+  // Saved by the version before dropsBought: two drops' minutes, no count.
+  const stored = structuredClone(state);
+  delete stored.dropsBought;
+  const upgraded = D.hydrate(stored, time(5, 21, 30));
+  assert.equal(upgraded.dropsBought, 2, 'counted from the minutes bought, at today\'s price');
+  D.spendWatch(upgraded, time(5, 22));
+  assert.equal(upgraded.tokens.watch, 1);
+  assert.equal(D.enterDry(upgraded, time(5, 23)), true);
+  assert.equal(upgraded.tokens.watch, 4, 'all three back');
+});

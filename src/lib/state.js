@@ -246,8 +246,11 @@
     if (refill && typeof refill.day === 'string') state.refill = { day: refill.day, watch: count(refill.watch, 0), rec: count(refill.rec, 0) };
     state.drySeen = count(stored.drySeen, 0);
     state.boughtAt = count(stored.boughtAt, 0);
-    // State from before this field gives the minutes back at today's price, as it did then.
-    state.dropsBought = count(stored.dropsBought, 0);
+    // State from before this field counts its bought minutes as whole drops at today's price (never more than paid for),
+    // so a drop bought after the update doesn't make them all one drop (Codex, PR 69).
+    state.dropsBought = stored.dropsBought === undefined
+      ? Math.floor(state.watchSecondsBought / Math.max(1, state.settings.minutesPerToken * 60))
+      : count(stored.dropsBought, 0);
     const back = /** @type {any} */ (stored.dryBack);
     if (back && count(back.until, 0) > 0 && count(back.watch, 0) > 0) state.dryBack = { until: back.until, watch: back.watch };
     state.installedAt = count(stored.installedAt, 0);
@@ -331,6 +334,8 @@
     state.allowedToday = [];
     state.day = nextDay;
     settleResetHour(state, oldHour);
+    // A moved reset hour can rename the day; the home page shows a refill only under the day's own name (Codex, PR 69).
+    if (state.refill) state.refill.day = state.day;
     const oldest = addDays(nextDay, -89);
     for (const day of Object.keys(state.log)) {
       if (day < oldest) delete state.log[day];

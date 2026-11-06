@@ -1298,3 +1298,14 @@ test('state saved by the first version (2026-10-05) loads with what it had, and 
   assert.equal(state.settings.recTokensPerDay, 20);
   assert.deepEqual(state.tokens, { watch: 7, rec: 29 });
 });
+
+test('a reset hour moved from 11pm to midnight keeps the refill under the day it renames, so home shows it (Codex, PR 69)', () => {
+  const state = fresh();
+  state.settings.resetHour = 23;
+  state.day = D.dayKey(time(5, 12), 23);
+  D.updateSettings(state, { resetHour: 0 });
+  state.tokens.watch = 0;
+  assert.equal(D.rollDay(state, time(5, 23, 1)), true);
+  assert.ok(state.refill);
+  assert.equal(state.refill.day, state.day);
+});
