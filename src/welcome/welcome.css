@@ -171,9 +171,22 @@ main {
   transition: filter 200ms, opacity 200ms;
 }
 
-.rung:not([data-mode="full"]):not([aria-checked="true"]) .mini {
+.rung:not([aria-checked="true"]) .mini {
+  --mini-ink: #767676;
+  --line: var(--mini-ink);
+  --chip: var(--mini-ink);
+  --muted: var(--mini-ink);
+  --blue: var(--mini-ink);
+  --gold: var(--mini-ink);
   filter: grayscale(1);
-  opacity: 0.6;
+}
+
+html[dark] .rung:not([aria-checked="true"]) .mini {
+  --mini-ink: #A0A0A0;
+}
+
+.rung:not([aria-checked="true"]) .m-num {
+  opacity: 1;
 }
 
 .mini > * {
@@ -367,6 +380,11 @@ main {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+#modesNext {
+  height: 40px;
+  padding: 0 20px;
 }
 
 @media (max-width: 560px) {
