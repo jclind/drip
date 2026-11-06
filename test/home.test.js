@@ -723,6 +723,33 @@ async function blockCard(tab) {
   await tab.click('block');
 }
 
+/** @type {{name: string, setup: (s: any) => void, priced: boolean}[]} */
+const stashPrices = [
+  { name: 'a drop will be bought', setup: (s) => {}, priced: true },
+  { name: 'minutes remain', setup: (s) => { s.watchSecondsLeft = 60; }, priced: false },
+  { name: 'the clock is off', setup: (s) => { s.settings.clock = false; }, priced: false },
+  { name: 'the video is unlocked', setup: (s) => { s.unlocked = ['s1']; }, priced: false },
+  { name: 'no drops remain', setup: (s) => { s.tokens.watch = 0; }, priced: false },
+];
+for (const { name, setup, priced } of stashPrices) {
+  test(`a Stash link announces its price only when it costs a drop: ${name}`, async () => {
+    const world = makeWorld();
+    world.state.backlog = [{ id: 's1', title: 'Stashed one', channel: 'C', length: '10:00' }];
+    setup(world.state);
+    const tab = await makeTab(world);
+    if (!tab.button('play-s1')) await tab.click('saved-head');
+    const link = tab.button('play-s1');
+    assert.ok(link);
+    assert.equal(link.textContent.includes(', costs 1 drop'), priced);
+    if (priced) {
+      const price = link.querySelector('.drip-sr');
+      assert.equal(price.getAttribute('aria-hidden'), null, 'the price is available to screen readers');
+      await tab.click('play-s1');
+      assert.equal(world.state.tokens.watch, 3, 'activating the priced link buys one drop');
+    }
+  });
+}
+
 // Most of these run both ways: with reduced motion, where home.js draws a placeholder and redraws, and with the
 // animation, where reveal.js holds redraws until it's done.
 for (const reduced of [true, false]) {

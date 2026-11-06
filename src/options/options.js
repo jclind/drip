@@ -63,7 +63,7 @@ const PARTS = [
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
       { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', hint: 'When time runs out partway through.' },
       // Q32. The three keys wait for the reset as one range, so the row has one chip for all of them.
-      { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'Videos on minutes stop. Whole unspent drops come back.' },
+      { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'Watching on paid minutes stops. Minutes left come back as whole drops.' },
       { key: 'dryFrom', label: 'From', kind: 'hour', inRow: true },
       { key: 'dryTo', label: 'To', kind: 'hour', inRow: true },
       { key: 'needThisPerWeek', label: '"I need this one" per week', kind: 'stepper', min: 0, max: 20,
@@ -107,7 +107,8 @@ const PARTS = [
   {
     // Not mode parts: the same in every mode, so the picker leaves them alone.
     id: 'day', title: 'Every day', icon: 'clock',
-    summary: (d) => `New day at ${DripPage.hourLabel(d.resetHour)}, unspent saved for ${plural(d.rolloverDays, 'day', 'days')}`,
+    summary: (d) => `New day at ${DripPage.hourLabel(d.resetHour)}${!d.clock && d.cards !== 'limited' ? ''
+      : d.rolloverDays === 1 ? ', no carry-over' : `, balances capped at ${plural(d.rolloverDays, 'day', 'days')} of allowance`}`,
     fields: [
       { key: 'resetHour', label: 'New day starts at', kind: 'hour' },
       { key: 'rolloverDays', label: 'Save unspent for', kind: 'stepper', min: 1, max: 7,
