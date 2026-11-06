@@ -21,13 +21,24 @@ rm -rf "$out" "$out.zip"
 mkdir -p "$out"
 git archive HEAD src icons | tar -x -C "$out"
 rm -rf "$out/src/devpanel"
-node -e "
-  const m = require('./manifest.json');
-  delete m.externally_connectable;
-  m.content_scripts = m.content_scripts.filter((c) => !c.js?.some((f) => f.startsWith('src/devpanel/')));
-  require('fs').writeFileSync('$out/manifest.json', JSON.stringify(m, null, 2) + '\n');
-"
-if grep -q -e localhost -e devpanel "$out/manifest.json" || [ -e "$out/dev" ] || [ -e "$out/src/devpanel" ]; then
+node - "$out" <<'NODE'
+const fs = require('node:fs');
+const out = process.argv[2];
+const m = require('./manifest.json');
+delete m.externally_connectable;
+m.content_scripts = m.content_scripts.filter((c) => !c.js?.some((f) => f.startsWith('src/devpanel/')));
+fs.writeFileSync(`${out}/manifest.json`, JSON.stringify(m, null, 2) + '\n');
+const worker = `${out}/src/background.js`;
+const source = fs.readFileSync(worker, 'utf8');
+// Remove the dev clock import and its comment from the copied worker only.
+const shipping = source
+  .replace(/\/\/ The dev clock[^\n]*\ntry \{\n  importScripts\('devpanel\/clock\.js'\);\n\} catch \{\n  \/\/ Store build: real time\.\n\}\n/, '')
+  .replace(' (src/devpanel/panel.js)', '')
+  // The release manifest has no panel scripts, so this check is always false in the store build.
+  .replace(/^const shipsPanel = .*;$/m, 'const shipsPanel = false;');
+fs.writeFileSync(worker, shipping);
+NODE
+if grep -q -e localhost -e devpanel "$out/manifest.json" || grep -q devpanel "$out/src/background.js" || [ -e "$out/dev" ] || [ -e "$out/src/devpanel" ]; then
   echo "build-release: the dev route is still in the build" >&2
   exit 1
 fi

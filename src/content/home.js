@@ -1226,7 +1226,7 @@
         }, icon('arrow'), h('span', { class: 'drip-next-label' }, next ? 'Revealing…' : 'Reveal next'), !next && cardsMode() === 'limited' && price('card')),
         h('button', {
           class: 'drip-b drip-b-gray drip-pass', 'data-k': 'pass', disabled: next, onclick: () => onResolve('pass', video.id),
-          title: "Pass. It's free, and this video won't come back.", 'aria-label': 'Pass',
+          title: "Pass. It's free. Stashed videos stay in your stash.", 'aria-label': 'Pass',
         }, icon('x')),
         swapping && swapList()),
       swapped && swapped.newId === video.id && DripSwap.note(swapped.dropped, onSwapUndo));
@@ -1275,7 +1275,8 @@
             },
           },
           h('span', { class: 'drip-saved-title' }, video.title || 'Untitled'),
-          h('span', { class: 'drip-saved-meta' }, DripSwap.meta(video))),
+          h('span', { class: 'drip-saved-meta' }, DripSwap.meta(video)),
+          costsDrop(video.id) && h('span', { class: 'drip-sr' }, ', costs 1 drop')),
           h('button', {
             class: 'drip-saved-x', 'data-k': `x-${video.id}`, title: 'Remove from stash', 'aria-label': `Remove ${video.title || 'video'} from stash`,
             onclick: () => onRemove(video.id),
