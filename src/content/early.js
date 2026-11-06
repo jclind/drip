@@ -1,5 +1,5 @@
 // @ts-check
-// Guard the main player's first play before the watch clock and overlay load.
+// Guard the main player's first play and tell the page world whether the watch clock is on.
 
 (function () {
   /** @type {any} */
@@ -64,6 +64,12 @@
       setHold(!!id);
       return;
     }
+    // Match earlyLocked when a pending clock change is due but the worker hasn't rolled the day over yet.
+    const settings = Drip.cleanSettings(state?.settings);
+    const today = Drip.dayKey(Date.now(), settings.resetHour ?? Drip.DEFAULT_SETTINGS.resetHour);
+    const pendingClock = state?.pending && typeof state.pending.effectiveDay === 'string' && state.pending.effectiveDay <= today
+      ? Drip.cleanSettings(state.pending.changes) : {};
+    document.documentElement.toggleAttribute('data-drip-clock', (pendingClock.clock ?? settings.clock) !== false);
     // Grace is watch.js's call, for a video already playing when time ran out. It marks that video on <html>.
     locked = Drip.earlyLocked(state, Date.now(), id) && document.documentElement.getAttribute('data-drip-grace') !== id;
     setHold(!!id && locked);
