@@ -6,6 +6,14 @@ Draft, 2026-10-06. Visual assets (screenshots, promo tiles) come with the design
 
 drip (tentative, Q17). Google's branding rules don't allow "YouTube" in the name. Search the store for clashes before submitting.
 
+## Category
+
+Lifestyle > Well-being (Jesse, 2026-11-06). Feed-hiding extensions like UnDistracted sit there, and it's far smaller than Productivity > Workflow & Planning.
+
+## Privacy policy URL
+
+https://jesselind.com/projects/drip/privacy (jesselind PR 30). The page's text is `PRIVACY.md`. Change both together.
+
 ## Single purpose
 
 drip reduces distractions on YouTube by replacing its endless home feed with a search box or one recommendation at a time. Optional daily allowances limit recommendations and watch time.
@@ -40,4 +48,4 @@ Replaces YouTube's endless home feed with a search box or one recommendation at 
 
 1. Bump `version` in `manifest.json` to 1.0.0.
 2. `bin/build-release`, then load `dist/drip-1.0.0.zip` unzipped in Chrome and run `test/BROWSER.md`.
-3. Put `PRIVACY.md` at a public URL. The contact email is `apps@jesselind.com` (forwards to Jesse's Gmail through ImprovMX), and the developer account should use it too.
+3. Check that https://jesselind.com/projects/drip/privacy is live and matches `PRIVACY.md`. The contact email is `apps@jesselind.com` (forwards to Jesse's Gmail through ImprovMX), and the developer account should use it too.
