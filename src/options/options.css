@@ -1205,10 +1205,11 @@ a.channel-link:focus-visible {
   font-size: 13px;
 }
 
-/* The first day's note under the title (renderFirstDay): small and tinted, apart from the settings text. */
+/* The first day's note under the title (renderFirstDay): small and tinted, apart from the settings text. The clock
+   sits centered on the text, however many lines it wraps to (Jesse, 2026-11-05). */
 .first-day {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   margin: -12px 0 28px;
   padding: 8px 12px;
@@ -1226,7 +1227,7 @@ a.channel-link:focus-visible {
 .first-day .first-day-icon {
   flex: none;
   width: 16px;
-  height: 18px;
+  height: 16px;
   color: var(--blue);
 }
 
