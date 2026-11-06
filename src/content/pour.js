@@ -52,7 +52,7 @@
    */
   function drop(width) {
     const img = document.createElement('img');
-    img.src = chrome.runtime.getURL('src/icons/drop.svg');
+    img.src = /** @type {any} */ (globalThis).DripIcons?.url('drop') || chrome.runtime.getURL('src/icons/drop.svg');
     img.alt = '';
     Object.assign(img.style, { position: 'absolute', left: '0', top: '0', width: `${width}px`, height: 'auto', translate: '-50% -50%' });
     layer().append(img);

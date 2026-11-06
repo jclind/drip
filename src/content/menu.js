@@ -51,7 +51,7 @@
   /** @param {string} name */
   function icon(name) {
     const node = el('span', { class: `drip-i drip-i-${name}`, 'aria-hidden': 'true' });
-    node.style.setProperty('--drip-icon', `url("${chrome.runtime.getURL(`src/icons/${name}.svg`)}")`);
+    /** @type {any} */ (globalThis).DripIcons.paint(node, name);
     return node;
   }
 
