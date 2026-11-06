@@ -100,6 +100,10 @@ Each step ends with `node --test` passing, a Codex review (`/codex-review`), and
 5. **Efficiency fixes** that the step 1 numbers justify. At least finding 1. Re-measure and put before and after in `AUDIT.md`.
 6. **The missing features**, 1 through 7 above, one PR each.
 7. **Release check.** Build the zip, load it unpacked on air from the zip (not the checkout), run `test/BROWSER.md` against it, and confirm the dev route is gone. Then the visuals phase starts with Jesse.
+   Done 2026-11-05 at `ca02525`, split two ways (Jesse agreed the same day):
+   - `bin/build-release` built `dist/drip-0.1.0.zip`. A diff against the checkout shows the zip is the same files minus `src/devpanel`, `externally_connectable`, and the two dev-panel content scripts, so the dev route is gone and every other file is byte for byte what the tests ran.
+   - The full `test/BROWSER.md` ran on air's dev install of `main`: 30 lines passed, 14 passed in part or were skipped (system settings, a second visible tab, `chrome-extension://` pages, logged out), none failed. It found one older bug: a mouse Save or Undo all in Settings scrolled to the top. Fixed in PR 80.
+   - Jesse loaded the zip unpacked on the MacBook in place of the dev install. The welcome tour, the token page with no dev panel, Settings with no Developer mode, Reveal, Watch, Stash on the pill, search, and the popup all passed. That covered the lines air skipped for `chrome-extension://` pages.
 
 ## How another model can check this plan
 
