@@ -812,7 +812,7 @@ for (const reduced of [true, false]) {
     frame.dispatchEvent({ type: 'load' });
     await tab.advance(100);
     assert.equal(tab.document.getElementById('drip-broken'), null);
-    assert.match(tab.message(), /YouTube has no recommendations for this account/);
+    assert.match(tab.message(), /YouTube has no recommendations for you yet/);
     assert.doesNotMatch(tab.message(), /cards?|drops?|refresh|report|update/i);
     assert.equal(world.state.tokens.rec, 10);
     assert.equal(world.count('reveal'), 0);
@@ -829,7 +829,7 @@ for (const reduced of [true, false]) {
     await tab.click('reveal');
     await tab.advance(100);
     assert.equal(tab.document.getElementById('drip-broken'), null);
-    assert.match(tab.message(), /YouTube has no recommendations for this account/);
+    assert.match(tab.message(), /YouTube has no recommendations for you yet/);
     assert.equal(world.state.tokens.rec, 10);
   });
 
