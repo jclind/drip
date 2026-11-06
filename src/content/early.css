@@ -1,5 +1,43 @@
 /* Loaded at document_start so the home grid never paints. home.js still reads it. */
 
+/* Video result selectors stay here. Search uses ytd-thumbnail; history and channels use
+   yt-thumbnail-view-model. Watch links and the portrait exclusion leave Shorts alone.
+   Nesting keeps these selectors in one place (Chrome 121+, as in the manifest). */
+ytd-video-renderer,
+yt-lockup-view-model {
+  /* Match drip.css's --drip-rule grays outside drip's own UI. */
+  --drip-thumb-ring: rgba(0, 0, 0, 0.1);
+  --drip-thumb-ring-color: transparent;
+  --drip-thumb-brightness: 1;
+
+  html[dark] & {
+    --drip-thumb-ring: rgba(255, 255, 255, 0.12);
+  }
+
+  &:is(:hover, :focus-within) {
+    --drip-thumb-ring-color: var(--drip-thumb-ring);
+    --drip-thumb-brightness: 1.08;
+  }
+
+  ytd-thumbnail:has(> a#thumbnail[href^="/watch?"]),
+  a[href^="/watch?"] yt-thumbnail-view-model:not(.ytThumbnailViewModelAspectRatio2By3) {
+    outline: 1px solid var(--drip-thumb-ring-color) !important;
+    outline-offset: 1px;
+    transition: outline-color 150ms ease !important;
+
+    & img {
+      filter: brightness(var(--drip-thumb-brightness)) !important;
+      transition: filter 150ms ease !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      &, & img {
+        transition: none !important;
+      }
+    }
+  }
+}
+
 /* Hover previews stay hidden in every mode, including their inline player. */
 ytd-video-preview,
 ytd-video-preview #player,
