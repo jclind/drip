@@ -413,6 +413,45 @@ input.toggle:checked::after {
   display: none;
 }
 
+/* Balance cap: the draft's token totals before the days stepper. */
+.cap-right {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cap-results {
+  display: flex;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.cap-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.cap-token .drip-i {
+  width: 14px;
+  height: 17px;
+}
+
+@media (max-width: 480px) {
+  .setting[data-field="rolloverDays"] {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cap-right {
+    margin-left: auto;
+  }
+}
+
 /* History. */
 
 .card {
@@ -926,15 +965,129 @@ button.col.is-selected .letter {
   text-decoration: underline;
 }
 
-/* Your data (RELEASE-PLAN.md, item 5): Export, Import, and Reset in a row, and Reset's question in place of them. */
+/* Your data: a compact result, optional help, and a reset panel showing what stays. */
+.data-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+button.data-info {
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font: 600 12px/1 system-ui, sans-serif;
+}
+
+button.data-info[aria-expanded="true"] {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+.data-about {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--gray);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 60ch;
+}
+
+.data-about p {
+  margin: 0;
+}
+
+.data-about p + p {
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.data-tools,
+.confirm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .data-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.data-confirm p {
-  margin: 0 0 12px;
+.data-tools button.link {
+  padding: 7px 0 7px 12px;
+  font-size: 13px;
+  text-underline-offset: 3px;
+}
+
+.data-confirm {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--gray);
+}
+
+.confirm-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.reset-effects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.reset-effects h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reset-effects ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+}
+
+.reset-effects li + li {
+  margin-top: 4px;
+}
+
+.reset-keeps {
+  border-left: 1px solid var(--line);
+  padding-left: 20px;
+}
+
+@media (max-width: 419px) {
+  .reset-effects {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .reset-keeps {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 14px 0 0;
+  }
 }
 
 .data-result:empty {
@@ -945,6 +1098,7 @@ button.col.is-selected .letter {
   margin: 12px 0 0;
 }
 
+/* Keep the existing error panel and its explanation. */
 .data-result.is-done {
   margin-top: 16px;
   padding: 16px 20px;
@@ -980,6 +1134,39 @@ button.col.is-selected .letter {
 
 .data-result li + li {
   margin-top: 4px;
+}
+
+.data-result.is-success {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 13px;
+}
+
+.data-result.is-success .done-title {
+  display: inline-flex;
+  gap: 6px;
+  margin: 0 4px 0 0;
+  font-size: inherit;
+}
+
+.data-result.is-success .done-title .drip-i {
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
+.data-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gray);
 }
 
 @keyframes data-done-in {

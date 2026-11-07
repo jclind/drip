@@ -12,6 +12,7 @@ var DripPage = /** @type {any} */ (globalThis).DripPage;
  * @typedef {Object} Field
  * @property {string} key
  * @property {string} label
+ * @property {string} [chipLabel] Short name for named waiting chips and Undo.
  * @property {'stepper' | 'hour' | 'toggle' | 'choice'} kind
  * @property {string} [hint]
  * @property {number} [min]
@@ -42,7 +43,7 @@ const dryWords = (d) => (d.dryHours && d.dryFrom !== d.dryTo ? `${shortHour(d.dr
  * @property {string} icon
  * @property {string} [iconClass]
  * @property {Field} [toggle] The mode part (Q29) its header switch turns on and off. Off folds the section.
- * @property {(d: Record<string, any>) => string} summary One line under the title, from the form's values.
+ * @property {(d: Record<string, any>) => string} [summary] One line under the title, from the form's values.
  * @property {Field[]} fields
  */
 
@@ -53,29 +54,24 @@ const PARTS = [
   {
     id: 'watch', title: 'Watch time', icon: 'drop', iconClass: 'drip-token-drop',
     toggle: { key: 'clock', label: 'Watch time', kind: 'toggle' },
-    summary: (d) => (d.clock
-      ? `${plural(d.watchTokensPerDay, 'drop', 'drops')} a day, ${d.minutesPerToken}m each${dryWords(d) === 'Off' ? '' : `, dry ${dryWords(d)}`}`
-      : 'Off. Videos play with no clock.'),
     fields: [
       { key: 'watchTokensPerDay', label: 'Drops per day', kind: 'stepper', min: 0, max: 48,
         unit: () => [DripPage.icon('drop', 'drip-token-drop')], say: (n) => plural(n, 'drop', 'drops') },
       { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
-      { key: 'graceMode', label: 'Finish the current video', kind: 'toggle', hint: 'When time runs out partway through.' },
+      { key: 'graceMode', label: 'Finish video when time runs out', kind: 'toggle' },
       // Q32. The three keys wait for the reset as one range, so the row has one chip for all of them.
       { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'Paid watching stops. Whole drops return.' },
       { key: 'dryFrom', label: 'From', kind: 'hour', inRow: true },
       { key: 'dryTo', label: 'To', kind: 'hour', inRow: true },
-      { key: 'needThisPerWeek', label: '"I need this one" per week', kind: 'stepper', min: 0, max: 20,
-        say: (n) => String(n), hint: 'Needs a typed reason. Counts the last 7 days.' },
+      { key: 'needThisPerWeek', label: '"I need this one" per rolling 7 days', chipLabel: 'Unlocks', kind: 'stepper', min: 0, max: 20,
+        say: (n) => String(n), hint: 'Type a reason to unlock.' },
     ],
   },
   {
     id: 'cards', title: 'Cards', icon: 'card', iconClass: 'drip-token-card',
     // The switch turns cards off, or back on as counted or unlimited, whichever the row below shows.
     toggle: { key: 'cards', label: 'Cards', kind: 'choice', options: [['limited', 'Counted'], ['unlimited', 'Unlimited'], ['off', 'Off']] },
-    summary: (d) => (d.cards === 'off' ? 'Off. Home shows a search box.'
-      : `${d.cards === 'unlimited' ? 'Unlimited cards' : `${plural(d.recTokensPerDay, 'card', 'cards')} a day`} from ${d.feedSource === 'home' ? 'your Home feed' : 'Subscriptions'}`),
     fields: [
       // The stepper hides while cards are unlimited, leaving the Counted or Unlimited picker beside it (cardsKind).
       { key: 'recTokensPerDay', label: 'Cards per day', kind: 'stepper', min: 0, max: 100,
@@ -83,38 +79,33 @@ const PARTS = [
       // Settings is where the feed source lives for now (Q5).
       { key: 'feedSource', label: 'Reveal from', kind: 'choice', options: [['home', 'Home feed'], ['subscriptions', 'Subscriptions']] },
       // Q30. Upcoming and members-only videos are never dealt, so they have no switch.
-      { key: 'streams', label: 'Reveal live streams', kind: 'toggle',
-        hint: 'Live now and past streams. Upcoming and members-only videos never come up.' },
+      { key: 'streams', label: 'Reveal live and past streams', kind: 'toggle',
+        hint: 'Never upcoming or members-only.' },
     ],
   },
   {
     id: 'stash', title: 'Stash', icon: 'save',
     toggle: { key: 'stash', label: 'Stash', kind: 'toggle' },
-    summary: (d) => (d.stash ? `Holds ${plural(d.stashMax, 'video', 'videos')}` : 'Off. No Stash buttons.'),
     fields: [
       // Q28. Lowering it keeps every stashed video; a full stash asks which one to swap out.
-      { key: 'stashMax', label: 'Stash holds', kind: 'stepper', min: 1, max: 50,
-        unit: (n) => [n === 1 ? 'video' : 'videos'], say: (n) => plural(n, 'video', 'videos'),
-        hint: 'A full stash asks which video to swap out.' },
+      { key: 'stashMax', label: 'Stash limit', chipLabel: 'Stash holds', kind: 'stepper', min: 1, max: 50,
+        unit: (n) => [n === 1 ? 'video' : 'videos'], say: (n) => plural(n, 'video', 'videos') },
     ],
   },
   {
     id: 'search', title: 'Search', icon: 'search',
     toggle: { key: 'searchCap', label: 'Search', kind: 'toggle' },
-    summary: (d) => (d.searchCap ? 'Stops at 10 results' : 'Off. Search shows every result.'),
+    summary: (d) => (d.searchCap ? 'Stops at 10 results' : ''),
     fields: [],
   },
   {
     // Not mode parts: the same in every mode, so the picker leaves them alone.
     id: 'day', title: 'Every day', icon: 'clock',
-    summary: (d) => `New day at ${DripPage.hourLabel(d.resetHour)}${!d.clock && d.cards !== 'limited' ? ''
-      : d.rolloverDays === 1 ? ', no carry-over' : `, balances capped at ${plural(d.rolloverDays, 'day', 'days')} of allowance`}`,
     fields: [
       { key: 'resetHour', label: 'New day starts at', kind: 'hour' },
-      { key: 'rolloverDays', label: 'Save unspent for', kind: 'stepper', min: 1, max: 7,
+      { key: 'rolloverDays', label: 'Balance cap', kind: 'stepper', min: 1, max: 7,
         idle: (d) => (!d.clock && d.cards !== 'limited' ? 'Not used without watch time or counted cards.' : ''),
-        unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days'),
-        hint: 'Unspent drops and cards carry over up to this many days.' },
+        unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days') },
       // Q16.
       { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle' },
       // Q2. Off brings back the shelves only. A Short still opens as a regular video.
@@ -322,11 +313,11 @@ function chip(f, named) {
   // "4:00am until 4:00am" says nothing, so a new reset hour names the end of today instead. Dry hours name the range.
   const now = f.key === 'dryHours' ? dryWords(state.settings) : valueWords(f, state.settings[f.key]);
   const text = f.key === 'resetHour' ? `Today ends at ${resetLabel()}`
-    : `${named ? `${f.label} ` : ''}${now} until ${resetLabel()}`;
+    : `${named ? `${f.chipLabel || f.label} ` : ''}${now} until ${resetLabel()}`;
   return h('span', { class: 'chip', title: `Your change starts ${effectiveLabel()}` },
     h('span', {}, text),
     h('span', { 'aria-hidden': 'true' }, '·'),
-    h('button', { type: 'button', class: 'chip-undo', 'aria-label': `Undo the waiting change to ${f.label}`, onclick: () => cancel(f.key) }, 'Undo'));
+    h('button', { type: 'button', class: 'chip-undo', 'aria-label': `Undo the waiting change to ${f.chipLabel || f.label}`, onclick: () => cancel(f.key) }, 'Undo'));
 }
 
 /** "3:10pm tomorrow", for the end of the first day after install. @param {number} until */
@@ -436,7 +427,8 @@ function fieldRow(f) {
       f.idle && h('div', { class: 'hint idle-note' }),
       // Under the hint, so the switch lines up with every other one on the right.
       f.key === 'dryHours' && dryRange()),
-    f.key === 'recTokensPerDay' ? h('div', { class: 'controls' }, input, cardsKindPicker()) : input);
+    f.key === 'recTokensPerDay' ? h('div', { class: 'controls' }, input, cardsKindPicker())
+      : f.key === 'rolloverDays' ? h('div', { class: 'cap-right' }, h('div', { class: 'cap-results', 'aria-live': 'polite' }), input) : input);
 }
 
 /** A part's section: a header with its icon, name, summary, and switch, then its rows. @param {Part} p */
@@ -449,7 +441,7 @@ function partSection(p) {
       h('div', { class: 'part-text' },
         h('div', { class: 'setting-line' },
           h('h2', { class: 'part-name' }, t ? h('label', { for: fieldId(t.key) }, p.title) : p.title), t && chip(t)),
-        h('div', { class: 'part-sum' }),
+        p.summary && p.summary(draft) && h('div', { class: 'part-sum' }, p.summary(draft)),
         // Shown only while the section is folded, so a waiting change inside it stays in view with its Undo.
         h('div', { class: 'setting-line folded-chips' }, ...p.fields.map((f) => chip(f, true)))),
       t && (t.key === 'cards' ? cardsSwitch() : control(t, ''))),
@@ -478,15 +470,35 @@ function syncParts() {
     const off = !!p.toggle && !partOn(p.toggle.key, draft);
     section.classList.toggle('is-off', off);
     section.querySelector('.rows')?.toggleAttribute('inert', off);
+    const summary = p.summary ? p.summary(draft) : '';
     const sum = section.querySelector('.part-sum');
-    if (sum) sum.textContent = p.summary(draft);
+    if (!summary) sum?.remove();
+    else if (sum) sum.textContent = summary;
+    else section.querySelector('.folded-chips')?.before(DripPage.h('div', { class: 'part-sum' }, summary));
   }
+  syncBalanceCap();
   const range = /** @type {HTMLElement | null} */ (document.querySelector('.dry-range'));
   if (range) range.hidden = !draft.dryHours;
   const counted = document.querySelector('[data-field="recTokensPerDay"]');
   counted?.classList.toggle('is-unlimited', draft.cards === 'unlimited');
   const stepper = counted?.querySelector('.stepper');
   if (stepper) /** @type {HTMLElement} */ (stepper).hidden = draft.cards === 'unlimited';
+}
+
+/** The cap follows the draft, including allowances and parts changed without saving. */
+function syncBalanceCap() {
+  const caps = /** @type {HTMLElement | null} */ (document.querySelector('.cap-results'));
+  if (!caps) return;
+  const { h, icon } = DripPage;
+  const drops = draft.watchTokensPerDay * draft.rolloverDays;
+  const cards = draft.recTokensPerDay * draft.rolloverDays;
+  const spoken = [draft.clock && plural(drops, 'drop', 'drops'), draft.cards === 'limited' && plural(cards, 'card', 'cards')].filter(Boolean);
+  caps.hidden = !spoken.length;
+  caps.replaceChildren(...[
+    draft.clock && h('span', { class: 'cap-token', 'aria-hidden': 'true' }, icon('drop', 'drip-token-drop'), String(drops)),
+    draft.cards === 'limited' && h('span', { class: 'cap-token', 'aria-hidden': 'true' }, icon('card', 'drip-token-card'), String(cards)),
+    spoken.length ? h('span', { class: 'sr' }, `${spoken.join(', ')} at most`) : null,
+  ].filter(Boolean));
 }
 
 /** Dims a setting that does nothing in the form's mix, and says why. Runs on every edit. */
@@ -895,9 +907,7 @@ async function addChannel(list) {
     // The storage event may have redrawn the list while the worker answered, so clear the field that's there now.
     const live = /** @type {HTMLInputElement | null} */ (channelsEl?.querySelector(`[data-k="${list}-input"]`));
     if (live) live.value = '';
-    const when = res.waits ? ` from ${resetLabel()}` : '';
-    channelsNote[list] = list === 'allow' ? `Allowed${when}. Its name and picture show once you open the channel.`
-      : 'Blocked. Home cards show only a name, so it catches them once you open the channel or one of its videos.';
+    channelsNote[list] = '';
   } else channelsNote[list] = channelError(res);
   renderChannels();
 }
@@ -1032,34 +1042,41 @@ function renderChannels(force = false) {
 // Your data (RELEASE-PLAN.md, item 5): export, import, and reset. Import and reset go through the worker's rules, so a
 // change that loosens a limit waits for the reset, and neither touches today's drops or cards.
 
-/** @param {number} n @param {string} one @param {string} many */
-const counted = (n, one, many) => (n ? [plural(n, one, many)] : []);
-
-/** A list as words: "a", "a and b", "a, b, and c". @param {string[]} parts */
-function words(parts) {
-  if (parts.length < 3) return parts.join(' and ');
-  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
-}
-
 /** A line under the buttons, for an export or a refusal. @param {string} text */
 function dataSays(text) {
-  $('dataResult').classList.remove('is-done', 'is-failed');
+  $('dataResult').classList.remove('is-done', 'is-failed', 'is-success');
   $('dataResult').replaceChildren(text);
 }
 
-/**
- * A finished import or reset: a panel with a check, a title, and one line per thing that changed. A one-line note
- * under the buttons was too quiet for something this big (Jesse, 2026-11-03).
- * @param {string} title @param {string[]} lines @param {boolean} [failed] An import that didn't happen: an x, not a check.
+/** A result pill, with the Channels clock tag when imported allowed channels wait.
+ * @param {string} text @param {boolean} [waits]
  */
-function dataDone(title, lines, failed = false) {
+function dataChip(text, waits = false) {
+  const { h, icon } = DripPage;
+  return h('span', { class: 'data-chip' }, text,
+    waits && h('span', { class: 'channel-when', title: `Starts at ${resetLabel()}` },
+      h('span', { class: 'sr' }, 'Starts at '), icon('clock-line'), resetLabel()));
+}
+
+/**
+ * Success is one line of chips and any extra detail. Refusals keep their explanation panel.
+ * @param {string} title @param {string[]} [lines] @param {boolean} [failed]
+ * @param {HTMLElement[]} [chips]
+ */
+function dataDone(title, lines = [], failed = false, chips = []) {
   const { h, icon } = DripPage;
   const box = $('dataResult');
   box.classList.add('is-done');
   box.classList.toggle('is-failed', failed);
-  box.replaceChildren(
-    h('div', { class: 'done-title' }, icon(failed ? 'x' : 'check'), title),
-    h('ul', {}, ...lines.map((line) => h('li', {}, line))));
+  box.classList.toggle('is-success', !failed);
+  box.replaceChildren(...(failed ? [
+    h('div', { class: 'done-title' }, icon('x'), title),
+    h('ul', {}, ...lines.map((line) => h('li', {}, line))),
+  ] : [
+    h('span', { class: 'done-title' }, icon('check'), h('strong', {}, title)),
+    ...chips,
+    ...lines.map((line) => h('span', { class: 'muted' }, line)),
+  ]));
   box.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
@@ -1091,7 +1108,7 @@ function exportData() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  dataSays('Exported your settings, stash, history, and channel lists.');
+  dataDone('Exported');
 }
 
 /** The largest file Import reads. An export with years of history is well under this. */
@@ -1129,14 +1146,13 @@ async function importFile() {
     return refuse(["drip didn't answer.", 'Try again in a moment.']);
   }
   afterData(res, kept);
-  const added = [...counted(res.stashAdded, 'stashed video', 'stashed videos'), ...counted(res.daysAdded, 'day of history', 'days of history'),
-    ...counted(res.channelsAdded, 'channel', 'channels')];
   dataDone('Imported', [
-    'Settings now match the file.',
-    added.length ? `Added ${words(added)}.` : 'Nothing new for the stash, history, or channel lists.',
     ...(res.stashSkipped ? [`${plural(res.stashSkipped, "video didn't", "videos didn't")} fit in the stash.`] : []),
-    ...(res.channelsWaiting ? [`${plural(res.channelsWaiting, 'allowed channel starts', 'allowed channels start')} at ${resetLabel()}.`] : []),
     ...(waitsLine(res.pending) ? [waitsLine(res.pending)] : []),
+  ], false, [
+    ...(res.stashAdded ? [dataChip(`+${res.stashAdded} in stash`)] : []),
+    ...(res.daysAdded ? [dataChip(`+${plural(res.daysAdded, 'day of history', 'days of history')}`)] : []),
+    ...(res.channelsAdded ? [dataChip(`+${plural(res.channelsAdded, 'channel', 'channels')}`, !!res.channelsWaiting)] : []),
   ]);
 }
 
@@ -1144,9 +1160,8 @@ async function importFile() {
 function showResetConfirm(open) {
   if (open) dataSays('');
   $('resetConfirm').hidden = !open;
-  $('dataButtons').hidden = open;
+  $('resetData').hidden = open;
   if (open) {
-    $('resetWhen').textContent = resetLabel();
     $('resetNo').focus();
   } else {
     $('resetData').focus();
@@ -1166,15 +1181,19 @@ async function resetData() {
   // A reset drops edits in progress too, since they were changes to the settings it just put back.
   afterData(res, {});
   dataDone('Reset', [
-    'Settings are back to how drip started.',
-    res.stashCleared ? `Emptied the stash of ${plural(res.stashCleared, 'video', 'videos')}.` : 'The stash was already empty.',
-    ...(res.allowCleared ? [`Took ${plural(res.allowCleared, 'channel', 'channels')} off the allow list.`] : []),
-    ...(res.unblocked ? [`Unblocked ${plural(res.unblocked, 'channel', 'channels')}.`] : []),
-    ...(res.unblocking ? [`${plural(res.unblocking, 'blocked channel is', 'blocked channels are')} unblocked at ${resetLabel()}.`] : []),
-    'Your history and today\'s drops and cards are unchanged.',
     ...(waitsLine(res.pending) ? [waitsLine(res.pending)] : []),
+  ], false, [
+    ...(res.stashCleared ? [dataChip('Stash emptied')] : []),
+    ...(res.allowCleared ? [dataChip(`−${res.allowCleared} allowed`)] : []),
+    ...(res.unblocked ? [dataChip(`−${res.unblocked} blocked`)] : []),
   ]);
 }
+
+$('dataInfo').addEventListener('click', () => {
+  const open = $('dataAbout').hidden;
+  $('dataAbout').hidden = !open;
+  $('dataInfo').setAttribute('aria-expanded', String(open));
+});
 
 $('exportData').addEventListener('click', exportData);
 $('importData').addEventListener('click', () => $('importFile').click());
