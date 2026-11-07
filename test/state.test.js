@@ -24,7 +24,7 @@ test('API contains every contract name, and defaults are frozen', () => {
   assert.deepEqual(Object.keys(D).sort(), [
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'planned', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
-    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'swapFollow', 'editsSince', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
+    'firstDayUntil', 'removeBacklog', 'swapBacklog', 'swapFollow', 'editsSince', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUses', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData',
@@ -707,6 +707,22 @@ test('the week counts uses within the last 7 × 24 hours, across resets', () => 
   assert.equal(D.needThisLeft(state, now), 1);
 });
 
+test('the rolling list agrees with the count at the seven-day boundary and preserves reset days', () => {
+  const now = time(12, 12);
+  const state = D.initialState(now);
+  logUse(state, '2026-10-05', now - WEEK_MS - 1);
+  logUse(state, '2026-10-05', now - WEEK_MS);
+  logUse(state, '2026-10-05', now - WEEK_MS + 1);
+  logUse(state, '2026-10-11', now - DAY_MS);
+  const before = structuredClone(state);
+  const list = D.needThisUses(state, now);
+  assert.deepEqual(list.map(({ day, use }) => [day, use.at]), [
+    ['2026-10-05', now - WEEK_MS + 1], ['2026-10-11', now - DAY_MS],
+  ]);
+  assert.equal(list.length, D.needThisUsed(state, now));
+  assert.deepEqual(state, before);
+});
+
 test('a use with no time never counts, and one in the future counts as now', () => {
   const now = time(12, 12);
   const state = D.initialState(now);
@@ -714,8 +730,10 @@ test('a use with no time never counts, and one in the future counts as now', () 
   state.log['2026-10-11'].needThis.push(/** @type {any} */ ({ videoId: 'x', title: '', reason: 'No time' }));
   state.log['2026-10-11'].needThis.push(/** @type {any} */ ({ videoId: 'y', title: '', reason: 'Bad time', at: 'soon' }));
   assert.equal(D.needThisUsed(state, now), 0);
+  assert.deepEqual(D.needThisUses(state, now), []);
   logUse(state, '2026-10-12', now + 3 * DAY_MS);
   assert.equal(D.needThisUsed(state, now), 1, 'after the clock went back');
+  assert.equal(D.needThisUses(state, now)[0].use.at, now + 3 * DAY_MS, 'the list preserves the recorded time');
   assert.equal(D.needThisUsed(state, now + 6 * DAY_MS), 1, 'and it still counts as used no later than now');
 });
 

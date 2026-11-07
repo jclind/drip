@@ -882,22 +882,32 @@
    * @param {State} state @param {number} now @returns {number[]}
    */
   function weekUses(state, now) {
-    /** @type {number[]} */
-    const times = [];
-    for (const entry of Object.values(state.log || {})) {
+    return needThisUses(state, now).map(({ use }) => Math.min(use.at, now)).sort((a, b) => a - b);
+  }
+
+  /**
+   * The uses counted by the rolling allowance, with their reset-day keys. Keeps the log's uses unchanged.
+   * Missing times never count; a future use counts as now, as weekUses does.
+   * @param {State} state @param {number} now
+   * @returns {{day: string, use: LogDay['needThis'][number]}[]}
+   */
+  function needThisUses(state, now) {
+    /** @type {{day: string, use: LogDay['needThis'][number]}[]} */
+    const uses = [];
+    for (const [day, entry] of Object.entries(state.log || {})) {
       for (const use of Array.isArray(entry?.needThis) ? entry.needThis : []) {
         const at = use?.at;
         if (typeof at !== 'number' || !Number.isFinite(at) || at <= 0) continue;
         const when = Math.min(at, now);
-        if (now - when < WEEK_MS) times.push(when);
+        if (now - when < WEEK_MS) uses.push({ day, use });
       }
     }
-    return times.sort((a, b) => a - b);
+    return uses;
   }
 
   /** "I need this one" uses in the last 7 × 24 hours. @param {State} state @param {number} now */
   function needThisUsed(state, now) {
-    return weekUses(state, now).length;
+    return needThisUses(state, now).length;
   }
 
   /** @param {State} state @param {number} now */
@@ -1796,7 +1806,7 @@
   /** @type {any} */ (globalThis).Drip = {
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
-    firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
+    firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUses, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,

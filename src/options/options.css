@@ -13,8 +13,49 @@
   margin: 0 0 32px;
 }
 
-.settings h1.history-title {
-  margin: 56px 0 28px;
+.tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs button {
+  margin-bottom: -1px;
+  padding: 10px 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.tabs button[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+.tabs button:focus-visible {
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+#panel-history > .card:first-child {
+  margin-top: 4px;
+}
+
+#panel-channels #channels {
+  border-bottom: 0;
+}
+
+#panel-channels .part-head {
+  padding-top: 4px;
+  margin-bottom: 8px;
+}
+
+#panel-channels .rows-pad {
+  padding-left: 0;
 }
 
 .settings h2.caps {
@@ -113,7 +154,8 @@
   transition: grid-template-rows 220ms ease, opacity 220ms ease;
 }
 
-.part.is-off .rows {
+.part.is-off .rows,
+.dry-rows.is-off {
   grid-template-rows: 0fr;
   opacity: 0;
 }
@@ -146,22 +188,35 @@
   gap: 8px;
 }
 
-/* Dry hours' From and To, under the row's hint. */
-.dry-range {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
+/* Dry hours and its child rows share one left edge and one waiting chip. Spacing groups them. */
+.dry-family {
+  margin-bottom: 12px;
 }
 
-.dry-range[hidden] {
-  display: none;
+.dry-family > .setting {
+  align-items: start;
+  margin-bottom: 0;
 }
 
-.dry-label {
+.dry-family > .setting .setting-line {
+  min-height: 32px;
+}
+
+.dry-rows > .rows-inner {
+  margin-left: 0;
+}
+
+.dry-times {
+  padding: 4px 4px 0 0;
+}
+
+.dry-times .setting:last-child {
+  margin-bottom: 0;
+}
+
+.dry-times .setting-label {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .setting {
@@ -349,10 +404,16 @@ input.toggle:checked::after {
   transform: translateX(28px);
 }
 
-/* The feedback line under the last section. */
+/* The feedback line closes the Settings tab, under Your data. */
 .feedback {
-  margin: 20px 0 0;
+  margin: 40px 0 0;
   font-size: 13px;
+}
+
+/* The last part's bottom line already divides the form from Your data. */
+#settings + #data {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .feedback a {
@@ -749,17 +810,32 @@ button.col.is-selected .letter {
   border-top: 1px solid var(--line);
 }
 
-.reasons {
+.reasons,
+.reason-rows {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 18px;
 }
 
-.reasons-count {
-  margin: -8px 0 16px;
+.reasons-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+#reasons-earlier {
+  margin-top: 24px;
+}
+
+.reasons-none {
+  margin: 0;
 }
 
 .reasons-more {
@@ -774,18 +850,23 @@ button.col.is-selected .letter {
   display: none;
 }
 
-.reason {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.reason-day {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.reason-rows {
+  gap: 12px;
 }
 
 .date {
   display: grid;
   place-items: center;
   flex: none;
-  width: 58px;
-  height: 58px;
+  width: 44px;
+  height: 44px;
   border-radius: 6px;
   background: var(--gray);
   line-height: 1.1;
@@ -793,32 +874,54 @@ button.col.is-selected .letter {
 
 .date-month {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 
 .date-day {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .reason-text {
-  min-width: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
 }
 
-.reason-text a {
+.reason-link {
   display: block;
+  min-width: 0;
   color: var(--text);
-  font-size: 15px;
-  font-weight: 500;
   text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.reason-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
   white-space: nowrap;
 }
 
-.reason-text a:hover {
+.reason-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reason-title .drip-i {
+  width: 12px;
+  height: 12px;
+}
+
+.reason-link:hover .reason-text {
   text-decoration: underline;
+}
+
+.reason-link:hover .reason-title {
+  color: var(--text);
 }
 
 .sample-note {
