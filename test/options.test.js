@@ -26,6 +26,7 @@ function page() {
       this.checked = false;
       this.disabled = false;
       this.style = { setProperty() {} };
+      this.scrolls = [];
       this.classList = {
         contains: (/** @type {string} */ name) => this.className.split(' ').includes(name),
         toggle: (/** @type {string} */ name, /** @type {boolean} */ on) => {
@@ -44,6 +45,8 @@ function page() {
     get textContent() { return this.children.map((c) => typeof c === 'string' ? c : c.textContent).join(''); }
     set textContent(value) { this.replaceChildren(value); }
     get dataset() { return Object.fromEntries(Object.entries(this.attrs).filter(([k]) => k.startsWith('data-')).map(([k, v]) => [k.slice(5), v])); }
+    get tabIndex() { return Number(this.attrs.tabindex ?? -1); }
+    set tabIndex(value) { this.attrs.tabindex = String(value); }
     /** @param {string} k @param {string} v */
     setAttribute(k, v) { this.attrs[k] = String(v); }
     /** @param {string} k */
@@ -51,9 +54,11 @@ function page() {
     /** @param {string} k @param {boolean} on */
     toggleAttribute(k, on) { if (on) this.attrs[k] = ''; else delete this.attrs[k]; }
     /** @param {any[]} kids */
-    append(...kids) { for (const kid of kids) { this.children.push(kid instanceof El ? kid : String(kid)); if (kid instanceof El) kid.parent = this; } }
+    append(...kids) { for (const kid of kids) { if (kid instanceof El) kid.remove(); this.children.push(kid instanceof El ? kid : String(kid)); if (kid instanceof El) kid.parent = this; } }
     /** @param {any[]} kids */
     replaceChildren(...kids) { this.children = []; this.append(...kids); }
+    /** @param {El | null} node @returns {boolean} */
+    contains(node) { return node === this || this.children.some((c) => c instanceof El && c.contains(node)); }
     remove() { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); }
     /** @param {string} selector @returns {El | null} */
     closest(selector) { return this.matches(selector) ? this : this.parent?.closest(selector) || null; }
@@ -63,9 +68,13 @@ function page() {
     before(node) { const at = this.parent.children.indexOf(this); this.parent.children.splice(at, 0, node); node.parent = this.parent; }
     /** @param {string} selector */
     matches(selector) {
+      const parts = selector.match(/(?:\[[^\]]*\]|[^\s])+/g) || [];
+      if (parts.length > 1) return this.matches(parts.at(-1)) && !!this.parent?.closest(parts.slice(0, -1).join(' '));
       const attrs = [...selector.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)];
       if (attrs.some(([, k, v]) => !(k in this.attrs) || (v !== undefined && this.attrs[k] !== v))) return false;
       const simple = selector.replace(/\[[^\]]*\]/g, '');
+      const id = /#([\w-]+)/.exec(simple)?.[1];
+      if (id && this.attrs.id !== id) return false;
       const tag = /^\w+/.exec(simple)?.[0];
       return (!tag || tag === this.tag) && [...simple.matchAll(/\.([\w-]+)/g)].every(([, cls]) => this.classList.contains(cls));
     }
@@ -81,15 +90,21 @@ function page() {
     async fire(event, detail = {}) { for (const fn of this.events[event] || []) await fn(detail); }
     click() { return this.fire('click'); }
     focus() { activeElement = this; }
-    scrollIntoView() {}
+    scrollIntoView(options) { this.scrolls.push(options); }
   }
   const body = new El('body');
-  // Only the static IDs are needed. Dynamic form rows are built by the real page code.
+  // Keep static nesting too, so panel tests catch misplaced form, data, and save controls.
   const html = fs.readFileSync(path.join(SRC, 'options/options.html'), 'utf8');
-  for (const [, tag, attrs] of html.matchAll(/<(\w+)\b([^>]*\bid="[^"]*"[^>]*)>/g)) {
+  const stack = [body];
+  for (const [token] of html.split('<body')[1].split('</body>')[0].replace(/^[^>]*>/, '').matchAll(/<!--[\s\S]*?-->|<[^>]*>|[^<]+/g)) {
+    if (token.startsWith('<!--')) continue;
+    if (token.startsWith('</')) { stack.pop(); continue; }
+    if (!token.startsWith('<')) { stack.at(-1).append(token); continue; }
+    const [, tag, attrs] = /^<(\w+)\b([^>]*)>/.exec(token);
     const el = new El(tag);
     for (const [, k, v] of attrs.matchAll(/([\w-]+)(?:="([^"]*)")?/g)) el.setAttribute(k, v ?? '');
-    body.append(el);
+    stack.at(-1).append(el);
+    if (!['input', 'br', 'hr', 'img', 'meta', 'link'].includes(tag)) stack.push(el);
   }
   const document = {
     body,
@@ -101,9 +116,10 @@ function page() {
   const ctx = vm.createContext({
     document, Blob, structuredClone, URL: { createObjectURL: () => 'blob:export', revokeObjectURL() {} },
     setTimeout() {}, clearTimeout() {}, setInterval() {}, matchMedia: () => ({ matches: true }),
-    location: { search: '', hash: '' }, window: { addEventListener() {} },
+    history: { replaceState: (_state, _title, hash) => { ctx.location.hash = hash; } },
+    location: { search: '', hash: '' }, window: { addEventListener: (event, fn) => body.addEventListener(`window-${event}`, fn) },
     chrome: {
-      runtime: { getURL: (/** @type {string} */ p) => p, sendMessage: () => new Promise(() => {}), onMessage: { addListener() {} } },
+      runtime: { getURL: (/** @type {string} */ p) => p, sendMessage: () => new Promise(() => {}), onMessage: { addListener: (fn) => body.addEventListener('message', fn) } },
       storage: { onChanged: { addListener() {} } },
     },
   });
@@ -115,7 +131,6 @@ function page() {
     draft = Drip.planned(state);
     sample = { id: 'test' };
     renderHistory = () => {};
-    renderReasons = () => {};
   `, ctx);
   /** @param {string} code */
   const run = (code) => vm.runInContext(code, ctx);
@@ -237,7 +252,7 @@ test('reset results show removed counts, keep balances and history, and omit zer
     state.backlog.push({ id: 'a', title: 'A' });
     state.channels.allow.push({ ids: ['@allowed'], name: 'Allowed' });
     state.channels.block.push({ ids: ['@blocked'], name: 'Blocked' });
-    state.log['2026-11-05'] = { watchedSec: 60 };
+    state.log['2026-11-05'] = { watchedSec: 60, needThis: [] };
     state.tokens = { watch: 1, rec: 2 };
     draft = { ...Drip.planned(state), stashMax: 30 }`);
   await p.get('resetYes').click();
@@ -279,4 +294,185 @@ test('successful channel adds clear stale notes; invalid handles keep error note
   p.document.querySelector('[data-k="allow-input"]').value = 'invalid';
   await p.run("addChannel('allow')");
   assert.match(p.run('channelsNote.allow'), /isn't a channel handle or link/);
+});
+
+test('page panels keep the form mounted, preserve drafts, and save from Channels and History', async () => {
+  const p = page();
+  p.run('renderForm()');
+  const form = p.get('settings');
+  const clock = p.get('field-clock');
+  const channels = p.get('channels');
+  const ids = p.document.body.querySelectorAll('[id]').map((el) => el.getAttribute('id'));
+  assert.equal(new Set(ids).size, ids.length, 'static and generated IDs are unique');
+  assert.ok(p.get('panel-settings').contains(form));
+  for (const id of ['firstDay', 'data', 'dev']) assert.ok(p.get('panel-settings').contains(p.get(id)), id);
+  assert.ok(p.get('panel-channels').contains(channels));
+  assert.equal(form.contains(channels), false);
+  assert.ok(p.get('panel-history').contains(p.get('history')));
+  assert.ok(p.get('panel-history').contains(p.get('reasons-section')));
+  assert.equal(p.get('panel-settings').contains(p.get('savebar')), false);
+  for (const tab of ['channels', 'history']) {
+    p.run('draft.watchTokensPerDay = state.settings.watchTokensPerDay - 1; draftChanged()');
+    await p.get(`tab-${tab}`).click();
+    assert.equal(p.run('location.hash'), `#${tab}`);
+    assert.equal(p.get(`panel-${tab}`).hidden, false);
+    assert.equal(p.get('settings'), form);
+    assert.equal(p.get('savebar').hidden, false);
+    if (tab === 'channels') assert.equal(p.get('field-clock'), clock);
+    p.get('save').focus();
+    await p.get('save').click();
+    assert.equal(p.run('state.settings.watchTokensPerDay'), tab === 'channels' ? 3 : 2);
+    assert.equal(p.get(`panel-${tab}`).hidden, false);
+    assert.equal(p.document.activeElement, p.get(`tab-${tab}`));
+    assert.equal(p.get('channels'), channels, 'saving does not replace Channels');
+  }
+});
+
+test('page tabs have one tab stop, arrow wrapping, Home, and End', async () => {
+  const p = page();
+  let prevented = 0;
+  const press = (tab, key) => p.get(`tab-${tab}`).fire('keydown', { key, preventDefault: () => prevented++ });
+  await press('settings', 'ArrowLeft');
+  assert.equal(p.document.activeElement, p.get('tab-history'));
+  await press('history', 'Home');
+  assert.equal(p.document.activeElement, p.get('tab-settings'));
+  await press('settings', 'End');
+  assert.equal(p.document.activeElement, p.get('tab-history'));
+  await press('history', 'ArrowRight');
+  assert.equal(p.document.activeElement, p.get('tab-settings'));
+  await press('settings', 'ArrowRight');
+  assert.equal(p.document.activeElement, p.get('tab-channels'));
+  assert.equal(prevented, 5);
+  for (const tab of ['settings', 'channels', 'history']) {
+    const selected = tab === 'channels';
+    assert.equal(p.get(`tab-${tab}`).tabIndex, selected ? 0 : -1);
+    assert.equal(p.get(`tab-${tab}`).getAttribute('aria-selected'), String(selected));
+    assert.equal(p.get(`tab-${tab}`).getAttribute('aria-controls'), `panel-${tab}`);
+    assert.equal(p.get(`panel-${tab}`).hidden, !selected);
+  }
+});
+
+test('hashes and worker messages select the same panels and flash form sections', async () => {
+  const p = page();
+  p.run('renderForm()');
+  for (const tab of ['settings', 'channels', 'history']) {
+    p.run(`location.hash = '#${tab}'`);
+    await p.document.body.fire('window-hashchange');
+    assert.equal(p.get(`panel-${tab}`).hidden, false);
+  }
+  for (const section of ['watch', 'cards', 'stash', 'search', 'day', 'youtube']) {
+    await p.document.body.fire('message', { type: 'settingsGoto', section });
+    assert.equal(p.get('panel-settings').hidden, false);
+    assert.equal(p.run('location.hash'), `#${section}`);
+    assert.equal(p.get(section).scrolls.length, 1);
+    assert.ok(p.get(section).querySelector('.part-head').classList.contains('is-arriving'));
+    p.run(`gotoSection('history', false); location.hash = '#${section}'`);
+    await p.document.body.fire('window-hashchange');
+    assert.equal(p.get('panel-settings').hidden, false);
+    assert.equal(p.get(section).scrolls.length, 2);
+  }
+  p.run("gotoSection('history', false); location.hash = ''");
+  await p.document.body.fire('window-hashchange');
+  assert.equal(p.get('panel-settings').hidden, false);
+  p.run("location.hash = '#%invalid'");
+  await p.document.body.fire('window-hashchange');
+  assert.equal(p.get('panel-settings').hidden, false);
+});
+
+test('Dry hours folds inert child rows and retains one range chip, and YouTube has its own group', async () => {
+  const p = page();
+  p.run(`state.pending = { effectiveDay: Drip.addDays(state.day, 1), changes: { dryHours: true, dryFrom: 22, dryTo: 7 } };
+    draft = Drip.planned(state); renderForm()`);
+  assert.deepEqual(p.get('watch').querySelectorAll('[data-field]').map((el) => el.dataset.field),
+    ['watchTokensPerDay', 'minutesPerToken', 'dryHours', 'dryFrom', 'dryTo', 'graceMode', 'needThisPerWeek']);
+  assert.deepEqual(p.get('day').querySelectorAll('[data-field]').map((el) => el.dataset.field), ['resetHour', 'rolloverDays']);
+  assert.deepEqual(p.get('youtube').querySelectorAll('[data-field]').map((el) => el.dataset.field), ['hideBell', 'hideShorts']);
+  assert.equal(p.get('youtube').querySelector('.toggle').getAttribute('id'), 'field-hideBell');
+  assert.ok(p.get('youtube').querySelector('.drip-i-square-play'));
+  const family = p.document.querySelector('.dry-family');
+  assert.equal(family.querySelectorAll('.chip').length, 1);
+  assert.match(family.querySelector('.chip').textContent, /Off until 4:00am/);
+  assert.equal(p.get('label-dryFrom').textContent, 'Starts at');
+  assert.equal(p.get('label-dryTo').textContent, 'Ends at');
+  assert.equal(p.get('label-dryFrom').getAttribute('for'), 'field-dryFrom');
+  const range = p.get('dry-detail');
+  assert.equal(range.getAttribute('inert'), null);
+  p.get('field-dryHours').checked = false;
+  await p.get('field-dryHours').fire('change');
+  assert.equal(range.classList.contains('is-off'), true);
+  assert.equal(range.getAttribute('inert'), '');
+  p.get('field-dryHours').checked = true;
+  await p.get('field-dryHours').fire('change');
+  assert.equal(range.classList.contains('is-off'), false);
+  assert.equal(range.getAttribute('inert'), null);
+  assert.equal(p.get('field-dryFrom').getAttribute('id'), 'field-dryFrom');
+});
+
+test('reasons show the rolling window, group reset dates, and use complete linked reasons', () => {
+  const p = page();
+  p.run(`
+    const now = Date.now(), week = 7 * 86400e3;
+    state.log = {
+      '2026-10-30': { needThis: [
+        { videoId: 'out', title: 'Outside', reason: 'Outside reason', at: now - week },
+        { videoId: 'in', title: 'Inside', reason: 'Inside reason', at: now - week + 1 }
+      ] },
+      '2026-11-06': { needThis: [
+        { videoId: 'older', title: '', reason: 'A long reason without quotes', at: now - 2 },
+        { videoId: 'newer', title: 'Newer title', reason: 'Newest reason', at: now - 1 }
+      ] }
+    };
+    renderReasons();
+  `);
+  assert.equal(p.get('reasons-used').textContent, '3 of 3');
+  assert.equal(p.get('reasons-total').textContent, '1 in all');
+  assert.equal(p.get('reasons-week').querySelectorAll('.date').length, 2);
+  assert.equal(p.get('reasons-week').querySelectorAll('.reason-rows')[0].getAttribute('aria-label'), 'November 6');
+  assert.deepEqual(p.get('reasons-week').querySelectorAll('.date').map((el) => el.getAttribute('aria-hidden')), ['true', 'true']);
+  const links = p.get('reasons-week').querySelectorAll('a');
+  assert.equal(links[0].getAttribute('href'), 'https://www.youtube.com/watch?v=newer');
+  assert.equal(links[0].getAttribute('title'), 'Newer title');
+  assert.equal(links[0].getAttribute('target'), '_blank');
+  assert.equal(links[0].getAttribute('rel'), 'noopener');
+  assert.equal(links[1].querySelector('.reason-text').textContent, 'A long reason without quotes');
+  assert.equal(links[1].querySelector('.reason-title-text').textContent, 'older');
+  assert.equal(links[0].querySelector('.drip-i-arrow-up-right').getAttribute('aria-hidden'), 'true');
+  links[0].focus();
+  p.run('renderReasons()');
+  assert.equal(p.get('reasons-week').querySelector('a'), links[0], 'ticks preserve the links and focus');
+  assert.equal(p.document.activeElement, links[0]);
+  p.run(`state.log['2026-11-06'].needThis[1].reason = 'Edited reason'; renderReasons()`);
+  assert.equal(p.get('reasons-week').querySelector('.reason-text').textContent, 'Edited reason');
+  p.run('state.settings.needThisPerWeek = 0; renderReasons()');
+  assert.equal(p.get('reasons-used').textContent, '3');
+  p.run('Date.now = () => new Date(2026, 11, 6, 12).getTime(); renderReasons()');
+  assert.equal(p.get('reasons-used').textContent, '0');
+  assert.equal(p.get('reasons-none').hidden, false);
+  assert.equal(p.get('reasons-total').textContent, '4 in all');
+  p.run('state.log = {}; renderReasons()');
+  assert.equal(p.get('reasons-section').hidden, true);
+});
+
+test('Earlier paginates separately, focuses the first new link, and Show fewer restores five', async () => {
+  const p = page();
+  p.run(`state.log = {
+    '2026-11-06': { needThis: Array.from({ length: 8 }, (_, i) => ({ videoId: 'recent' + i, title: 'Recent', reason: 'Recent reason', at: Date.now() - i })) },
+    '2026-10-01': { needThis: Array.from({ length: 30 }, (_, i) => ({ videoId: 'old' + i, title: 'Old', reason: 'Old reason', at: Date.now() - 8 * 86400e3 - i })) }
+  }; renderReasons()`);
+  assert.equal(p.get('reasons-week').querySelectorAll('a').length, 8);
+  assert.equal(p.get('reasons').querySelectorAll('a').length, 5);
+  assert.match(p.get('reasons-more').textContent, /Show 20 more25 not shown/);
+  await p.get('reasons-more').querySelector('[data-k="more"]').click();
+  assert.equal(p.get('reasons').querySelectorAll('a').length, 25);
+  assert.equal(p.document.activeElement, p.get('reasons').querySelectorAll('a')[5]);
+  await p.get('reasons-more').querySelector('[data-k="more"]').click();
+  assert.equal(p.get('reasons').querySelectorAll('a').length, 30);
+  assert.equal(p.document.activeElement, p.get('reasons').querySelectorAll('a')[25]);
+  assert.equal(p.get('reasons-more').querySelector('[data-k="more"]'), null);
+  await p.get('reasons-more').querySelector('[data-k="fewer"]').click();
+  assert.equal(p.get('reasons').querySelectorAll('a').length, 5);
+  assert.equal(p.document.activeElement, p.get('reasons-more').querySelector('[data-k="more"]'));
+  p.run(`delete state.log['2026-10-01']; renderReasons()`);
+  assert.equal(p.get('reasons-earlier').hidden, true);
+  assert.equal(p.get('reasons-section').hidden, false);
 });

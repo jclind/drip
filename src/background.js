@@ -403,7 +403,7 @@ async function devStatus() {
 }
 
 // The Settings sections the popup's counts may open (RELEASE-PLAN.md, item 2).
-const SETTINGS_SECTIONS = ['watch', 'cards', 'stash', 'search', 'channels', 'day'];
+const SETTINGS_SECTIONS = ['watch', 'cards', 'stash', 'search', 'channels', 'day', 'youtube', 'settings', 'history'];
 
 /**
  * Opens Settings at a section, which flashes on arrival. A Settings tab that's already open comes forward and goes
@@ -422,7 +422,7 @@ async function openSettings(section) {
   await chrome.tabs.update(open.tabId, { active: true });
   await chrome.windows.update(open.windowId, { focused: true });
   // Only extension pages hear this. The popup ignores it, and options.js scrolls and flashes.
-  if (id) await chrome.runtime.sendMessage({ type: 'settingsGoto', section: id }).catch(() => {});
+  await chrome.runtime.sendMessage({ type: 'settingsGoto', section: id || 'settings' }).catch(() => {});
 }
 
 /** @type {Map<string, string>} */

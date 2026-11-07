@@ -1,6 +1,5 @@
 // @ts-check
-// Settings (DESIGN.md, "Settings"): the mode, then one section per part (Q29) with the next-day rule, then History and
-// the unlock reasons.
+// Settings, Channels, and History tabs (DESIGN.md, "Settings"). The form keeps its draft across tabs.
 
 /** @type {any} */
 // var, not const: these page scripts share one type-check program, and only var may be declared twice.
@@ -24,7 +23,7 @@ var DripPage = /** @type {any} */ (globalThis).DripPage;
  * @property {(n: number) => string} [spoken] The value for screen readers, when `say` is too short to read aloud.
  * @property {[string, string][]} [options]
  * @property {(d: Record<string, any>) => string} [idle] Why the setting does nothing in the form's mix, or ''.
- * @property {boolean} [inRow] Drawn inside another setting's row, like Dry hours' From and To, not as a row of its own.
+ * @property {boolean} [inRow] A child row of Dry hours, sharing its waiting-change chip.
  */
 
 /** @param {number} n @param {string} one @param {string} many */
@@ -59,11 +58,11 @@ const PARTS = [
         unit: () => [DripPage.icon('drop', 'drip-token-drop')], say: (n) => plural(n, 'drop', 'drops') },
       { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
-      { key: 'graceMode', label: 'Finish video when time runs out', kind: 'toggle' },
       // Q32. The three keys wait for the reset as one range, so the row has one chip for all of them.
       { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'Paid watching stops. Whole drops return.' },
-      { key: 'dryFrom', label: 'From', kind: 'hour', inRow: true },
-      { key: 'dryTo', label: 'To', kind: 'hour', inRow: true },
+      { key: 'dryFrom', label: 'Starts at', kind: 'hour', inRow: true },
+      { key: 'dryTo', label: 'Ends at', kind: 'hour', inRow: true },
+      { key: 'graceMode', label: 'Finish video when time runs out', kind: 'toggle' },
       { key: 'needThisPerWeek', label: '"I need this one" per rolling 7 days', chipLabel: 'Unlocks', kind: 'stepper', min: 0, max: 20,
         say: (n) => String(n), hint: 'Type a reason to unlock.' },
     ],
@@ -106,6 +105,11 @@ const PARTS = [
       { key: 'rolloverDays', label: 'Balance cap', kind: 'stepper', min: 1, max: 7,
         idle: (d) => (!d.clock && d.cards !== 'limited' ? 'Not used without watch time or counted cards.' : ''),
         unit: (n) => [n === 1 ? 'day' : 'days'], say: (n) => plural(n, 'day', 'days') },
+    ],
+  },
+  {
+    id: 'youtube', title: 'YouTube', icon: 'square-play',
+    fields: [
       // Q16.
       { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle' },
       // Q2. Off brings back the shelves only. A Short still opens as a regular video.
@@ -400,18 +404,6 @@ function pickMode(name) {
   /** @type {HTMLElement | null} */ (document.querySelector(`.segmented [data-mode="${name}"]`))?.focus();
 }
 
-/** Dry hours' From and To pickers, under the row's hint while the switch is on (syncParts). */
-function dryRange() {
-  const { h } = DripPage;
-  const hours = Array.from({ length: 24 }, (_, hour) => /** @type {[string, string]} */ ([String(hour), DripPage.hourLabel(hour)]));
-  /** @param {'dryFrom' | 'dryTo'} key @param {string} label */
-  const one = (key, label) => [
-    h('span', { class: 'dry-label', id: `label-${key}` }, label),
-    picker(fieldId(key), hours, String(draft[key]), (v) => { draft[key] = Number(v); draftChanged(); }, `label-${key}`),
-  ];
-  return h('div', { class: 'dry-range' }, ...one('dryFrom', 'From'), ...one('dryTo', 'To'));
-}
-
 /** One setting's row: label, waiting chip, hint, and control. @param {Field} f */
 function fieldRow(f) {
   const { h } = DripPage;
@@ -420,13 +412,12 @@ function fieldRow(f) {
     ? h('span', { class: 'setting-label', id: labelId }, f.label)
     : h('label', { class: 'setting-label', id: labelId, for: fieldId(f.key) }, f.label);
   const input = control(f, labelId);
+  if (f.key === 'dryHours') input.setAttribute('aria-controls', 'dry-detail');
   return h('div', { class: 'setting', 'data-field': f.key },
     h('div', { class: 'setting-text' },
       h('div', { class: 'setting-line' }, label, chip(f)),
       f.hint && h('div', { class: 'hint' }, f.hint),
-      f.idle && h('div', { class: 'hint idle-note' }),
-      // Under the hint, so the switch lines up with every other one on the right.
-      f.key === 'dryHours' && dryRange()),
+      f.idle && h('div', { class: 'hint idle-note' })),
     f.key === 'recTokensPerDay' ? h('div', { class: 'controls' }, input, cardsKindPicker())
       : f.key === 'rolloverDays' ? h('div', { class: 'cap-right' }, h('div', { class: 'cap-results', 'aria-live': 'polite' }), input) : input);
 }
@@ -446,14 +437,19 @@ function partSection(p) {
         h('div', { class: 'setting-line folded-chips' }, ...p.fields.map((f) => chip(f, true)))),
       t && (t.key === 'cards' ? cardsSwitch() : control(t, ''))),
     p.fields.length > 0 && h('div', { class: 'rows' },
-      h('div', { class: 'rows-inner' }, h('div', { class: 'rows-pad' }, ...p.fields.filter((f) => !f.inRow).map(fieldRow)))));
+      h('div', { class: 'rows-inner' }, h('div', { class: 'rows-pad' }, ...p.fields.filter((f) => !f.inRow).map((f) =>
+        f.key === 'dryHours' ? h('div', { class: 'dry-family' }, fieldRow(f),
+          h('div', { class: 'rows dry-rows', id: 'dry-detail' },
+            h('div', { class: 'rows-inner' }, h('div', { class: 'dry-times' }, ...p.fields.filter((child) => child.inRow).map(fieldRow)))))
+          : fieldRow(f))))));
 }
 
 function renderForm() {
   renderFirstDay();
-  // Channels sit before Every day. They aren't form fields, so their section is kept, not rebuilt with the form.
-  $('settings').replaceChildren(modeRow(), ...PARTS.filter((p) => p.id !== 'day').map(partSection), channelsSection(),
-    ...PARTS.filter((p) => p.id === 'day').map(partSection));
+  $('settings').replaceChildren(modeRow(), ...PARTS.map(partSection));
+  // Channels keep their own mounted section and apply changes without Save.
+  if (!channelsEl) $('panel-channels').append(channelsSection());
+  else renderChannels();
   syncParts();
   syncIdle();
   renderBar();
@@ -477,8 +473,9 @@ function syncParts() {
     else section.querySelector('.folded-chips')?.before(DripPage.h('div', { class: 'part-sum' }, summary));
   }
   syncBalanceCap();
-  const range = /** @type {HTMLElement | null} */ (document.querySelector('.dry-range'));
-  if (range) range.hidden = !draft.dryHours;
+  const range = document.getElementById('dry-detail');
+  range?.classList.toggle('is-off', !draft.dryHours);
+  range?.toggleAttribute('inert', !draft.dryHours);
   const counted = document.querySelector('[data-field="recTokensPerDay"]');
   counted?.classList.toggle('is-unlimited', draft.cards === 'unlimited');
   const stepper = counted?.querySelector('.stepper');
@@ -565,11 +562,15 @@ function absorb(res) {
 }
 
 /**
- * Save and Undo all hide the button pressed, so focus goes to the mode picker, the top of the form, not the page's.
+ * Save and Undo all hide the button pressed, so focus goes to the mode picker in Settings or the current page tab.
  * Only after a key press: a mouse click leaves focus alone, since moving it scrolls the page to the top (air, 2026-11-05).
  */
 const keyedSavebar = () => $('savebar').contains(document.activeElement) && !!document.activeElement?.matches(':focus-visible');
-const focusForm = () => /** @type {HTMLElement | null} */ (document.querySelector('.segmented [tabindex="0"]'))?.focus();
+const focusForm = () => {
+  const activeTab = PAGE_TABS.find((name) => !$(`panel-${name}`).hidden) || 'settings';
+  if (activeTab === 'settings') /** @type {HTMLElement | null} */ (document.querySelector('.segmented [tabindex="0"]'))?.focus();
+  else $(`tab-${activeTab}`).focus();
+};
 
 /**
  * "Saved.", then when this save's waiting changes start: "Quiet starts at 4:00am." for a mode, else "2 changes start
@@ -610,6 +611,7 @@ async function save() {
   savedNote = savedLine(Object.keys(res.pending || {}));
   renderForm();
   renderHistory();
+  renderReasons();
   if (hadFocus) focusForm();
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => {
@@ -761,28 +763,57 @@ function focusReasonsButton(which) {
   (buttons.find((b) => b.dataset.k === which) || buttons[0])?.focus({ preventScroll: true });
 }
 
+/** One date tile per reset day, with that day's links beside it. @param {{day: string, use: any}[]} entries */
+function reasonDays(entries) {
+  const { h, icon } = DripPage;
+  /** @type {Map<string, any[]>} */
+  const days = new Map();
+  for (const { day, use } of entries) {
+    if (!days.has(day)) days.set(day, []);
+    days.get(day)?.push(use);
+  }
+  return [...days].map(([day, uses]) => h('li', { class: 'reason-day' },
+    h('div', { class: 'date', 'aria-hidden': 'true' },
+      h('span', { class: 'date-month' }, dayText(day, { month: 'short' })),
+      h('span', { class: 'date-day' }, dayText(day, { day: 'numeric' }))),
+    h('ul', { class: 'reason-rows', 'aria-label': dayText(day, { month: 'long', day: 'numeric' }) },
+      ...uses.map((use) => h('li', {},
+        h('a', { class: 'reason-link', href: `https://www.youtube.com/watch?v=${encodeURIComponent(use.videoId)}`,
+          target: '_blank', rel: 'noopener', title: use.title || use.videoId },
+        h('span', { class: 'reason-text' }, use.reason),
+        h('span', { class: 'reason-title' }, h('span', { class: 'reason-title-text' }, use.title || use.videoId), icon('arrow-up-right'))))))));
+}
+
 function renderReasons() {
   if (!state) return;
   const { h } = DripPage;
+  const now = Date.now();
   const uses = Object.keys(state.log).sort().reverse().flatMap((day) =>
-    state.log[day].needThis.slice().reverse().map((/** @type {any} */ use) => ({ day, ...use })));
+    state.log[day].needThis.slice().reverse().map((/** @type {any} */ use) => ({ day, use })));
+  const recent = new Set(Drip.needThisUses(state, now).map((/** @type {any} */ entry) => entry.use));
+  const week = uses.filter(({ use }) => recent.has(use));
+  const older = uses.filter(({ use }) => !recent.has(use));
+  const shown = older.slice(0, reasonsShown);
   // Ticks save the state every few seconds while a video plays, and rebuilt buttons lose focus and clicks (Codex,
   // 2026-11-03), so redraw only when the list or its count would change.
-  // The same rolling 7 × 24 hours the lock counts (Q20), not the last 7 reset days.
-  const week = Drip.needThisUsed(state, Date.now());
-  const key = JSON.stringify([state.day, reasonsShown, uses.length, week, uses.slice(0, reasonsShown).map((use) => [use.day, use.at, use.title])]);
+  const allowance = state.settings.needThisPerWeek;
+  const key = JSON.stringify([reasonsShown, allowance, older.length, week, shown]);
   if (key === reasonsKey) return;
   reasonsKey = key;
   $('reasons-section').hidden = uses.length === 0;
-  // The count says how often, so the list can stay short.
-  $('reasons-count').textContent = uses.length === 1 ? 'Once.'
-    : `${plural(uses.length, 'time', 'times')} in all, ${week} in the last 7 days.`;
-  const left = uses.length - reasonsShown;
+  const count = Drip.needThisUsed(state, now);
+  $('reasons-used').textContent = allowance ? `${count} of ${allowance}` : String(count);
+  $('reasons-week').replaceChildren(...reasonDays(week));
+  $('reasons-none').hidden = week.length > 0;
+  $('reasons-earlier').hidden = older.length === 0;
+  $('reasons-total').textContent = `${older.length} in all`;
+  const left = Math.max(0, older.length - reasonsShown);
   $('reasons-more').replaceChildren(...[
     left > 0 && h('button', { type: 'button', 'data-k': 'more', onclick: () => {
+      const firstNew = reasonsShown;
       reasonsShown += REASONS_STEP;
       renderReasons();
-      focusReasonsButton('more');
+      /** @type {HTMLElement | undefined} */ ([...$('reasons').querySelectorAll('a')][firstNew])?.focus();
     } }, `Show ${Math.min(left, REASONS_STEP)} more`),
     left > 0 && h('span', { class: 'muted' }, `${left} not shown`),
     reasonsShown > REASONS_FIRST && h('button', { type: 'button', class: 'link', 'data-k': 'fewer', onclick: () => {
@@ -792,13 +823,7 @@ function renderReasons() {
       focusReasonsButton('more');
     } }, 'Show fewer'),
   ].filter(Boolean));
-  $('reasons').replaceChildren(...uses.slice(0, reasonsShown).map((use) => h('li', { class: 'reason' },
-    h('div', { class: 'date', 'aria-label': dayText(use.day, { month: 'long', day: 'numeric' }) },
-      h('span', { class: 'date-month', 'aria-hidden': 'true' }, dayText(use.day, { month: 'short' })),
-      h('span', { class: 'date-day', 'aria-hidden': 'true' }, dayText(use.day, { day: 'numeric' }))),
-    h('div', { class: 'reason-text' },
-      h('a', { href: `https://www.youtube.com/watch?v=${encodeURIComponent(use.videoId)}`, target: '_blank', rel: 'noopener' }, use.title || use.videoId),
-      h('div', { class: 'muted' }, `"${use.reason}"`)))));
+  $('reasons').replaceChildren(...reasonDays(shown));
 }
 // A use leaving the 7 days changes nothing stored, so the count rechecks every minute (Codex, 2026-11-04).
 setInterval(renderReasons, 60000);
@@ -1331,8 +1356,43 @@ Promise.all([chrome.runtime.sendMessage({ type: 'devStatus' }), chrome.runtime.s
   renderForm();
   renderHistory();
   renderReasons();
-  // The sections didn't exist when Chrome looked for the #fragment, so options.html#cards goes there now.
-  if (location.hash) arrive(decodeURIComponent(location.hash.slice(1)), false);
+  // The sections didn't exist when Chrome looked for the #fragment. Select the panel before scrolling there.
+  gotoSection(hashSection(), false);
+});
+
+const PAGE_TABS = ['settings', 'channels', 'history'];
+const FORM_SECTIONS = PARTS.map((p) => p.id);
+
+/** Hashes and worker messages use the same route, keeping the mounted form and its edits. */
+function gotoSection(/** @type {string} */ id, /** @type {boolean} */ smooth, updateHash = false) {
+  const tab = PAGE_TABS.includes(id) ? id : 'settings';
+  for (const name of PAGE_TABS) {
+    const on = name === tab;
+    const button = $(`tab-${name}`);
+    button.setAttribute('aria-selected', String(on));
+    button.tabIndex = on ? 0 : -1;
+    $(`panel-${name}`).hidden = !on;
+  }
+  if (updateHash) history.replaceState(null, '', `#${PAGE_TABS.includes(id) || FORM_SECTIONS.includes(id) ? id : 'settings'}`);
+  if (FORM_SECTIONS.includes(id)) arrive(id, smooth);
+}
+
+function hashSection() {
+  try { return decodeURIComponent(location.hash.slice(1)); }
+  catch { return ''; }
+}
+
+PAGE_TABS.forEach((name, index) => {
+  const button = $(`tab-${name}`);
+  button.addEventListener('click', () => gotoSection(name, false, true));
+  button.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? PAGE_TABS.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + PAGE_TABS.length) % PAGE_TABS.length;
+    $(`tab-${PAGE_TABS[next]}`).focus();
+    gotoSection(PAGE_TABS[next], false, true);
+  });
 });
 
 /**
@@ -1356,6 +1416,6 @@ function arrive(id, smooth) {
 // A popup count used while Settings is already open: the worker brought this tab forward, and this page goes there itself,
 // so a change not yet saved stays.
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg && msg.type === 'settingsGoto' && typeof msg.section === 'string') arrive(msg.section, true);
+  if (msg && msg.type === 'settingsGoto' && typeof msg.section === 'string') gotoSection(msg.section, true, true);
 });
-window.addEventListener('hashchange', () => arrive(decodeURIComponent(location.hash.slice(1)), true));
+window.addEventListener('hashchange', () => gotoSection(hashSection(), true));

@@ -9,87 +9,99 @@
   </head>
   <body class="settings">
     <main>
-      <h1>drip settings</h1>
-      <p class="sample-note" id="sampleNote" hidden>
-        Sample data: <strong id="sampleName"></strong>. Nothing on this page is saved.
-        <button class="link" id="sampleBack" type="button">Show my data</button>
-      </p>
-
-      <p class="first-day" id="firstDay" hidden></p>
-      <form id="settings" novalidate></form>
-      <!-- Where someone ends up after scrolling past every setting without finding theirs. Email, so nothing leaves the
-           browser unless they send it. -->
-      <p class="feedback">
-        <a href="mailto:apps@jesselind.com?subject=drip%3A%20a%20setting%20I%27d%20want">Missing a setting? Tell me what you'd want.</a>
-      </p>
-
-      <h1 class="history-title">History</h1>
-      <div class="card" id="history"></div>
-
-      <section id="reasons-section" hidden>
-        <h2 class="caps">Why you needed one</h2>
-        <p class="muted reasons-count" id="reasons-count"></p>
-        <ul class="reasons" id="reasons"></ul>
-        <div class="reasons-more" id="reasons-more"></div>
-      </section>
-
-      <section id="data">
-        <h2 class="data-title">Your data <button type="button" class="data-info" id="dataInfo"
-          aria-expanded="false" aria-controls="dataAbout" aria-label="About Export and Import">i</button></h2>
-        <div class="data-about" id="dataAbout" hidden>
-          <p>A .json file of your settings, stash, history, and channel lists. Import adds its stash, history, and channels, and uses its settings.</p>
-          <p>Looser limits wait for the next new day, except in your first 24 hours.</p>
-        </div>
-        <div class="data-tools">
-          <div class="data-buttons" id="dataButtons">
-            <button type="button" id="exportData">Export</button>
-            <button type="button" id="importData">Import</button>
-            <input type="file" id="importFile" accept=".json,application/json" hidden />
-          </div>
-          <button type="button" class="link" id="resetData">Reset…</button>
-        </div>
-        <div class="data-confirm" id="resetConfirm" hidden>
-          <div class="confirm-head">
-            <h3>Reset drip?</h3>
-            <div class="data-buttons">
-              <button type="button" id="resetNo">Cancel</button>
-              <button type="button" class="primary" id="resetYes">Reset</button>
-            </div>
-          </div>
-          <div class="reset-effects">
-            <div>
-              <h4>Resets</h4>
-              <ul><li>Settings to defaults</li><li>Stash, emptied</li><li>Channel lists, emptied</li></ul>
-            </div>
-            <div class="reset-keeps">
-              <h4>Keeps</h4>
-              <ul><li>History</li><li>Today's drops and cards</li></ul>
-            </div>
-          </div>
-        </div>
-        <div class="muted data-result" id="dataResult" role="status"></div>
-      </section>
-
-      <!-- Shown only in a build that has the dev panel, so never in the store build. -->
-      <section id="dev" hidden>
-        <h2 class="caps">Developer mode</h2>
-        <label class="dev-row">
-          <input type="checkbox" id="devMode" />
-          <span>Show the dev panel on YouTube pages</span>
-        </label>
-        <label class="dev-row" id="firstDayOffRow" hidden>
-          <input type="checkbox" id="firstDayOff" />
-          <span>Loosening waits for the reset, even in the first day</span>
-        </label>
-        <div class="dev-row sample-row" id="sampleRow" hidden>
-          <label for="sample">Show Settings with</label>
-          <div class="picker-wrap"><select class="picker" id="sample"></select></div>
-        </div>
-        <p class="muted" id="devHint">
-          For testing. The panel sets minutes and tokens and runs the daily reset now, so it undoes every limit while
-          it's on. Turn it off when you're done.
+      <h1>drip</h1>
+      <div class="tabs" role="tablist" aria-label="drip">
+        <button type="button" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="true" tabindex="0">Settings</button>
+        <button type="button" role="tab" id="tab-channels" aria-controls="panel-channels" aria-selected="false" tabindex="-1">Channels</button>
+        <button type="button" role="tab" id="tab-history" aria-controls="panel-history" aria-selected="false" tabindex="-1">History</button>
+      </div>
+      <div id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
+        <p class="sample-note" id="sampleNote" hidden>
+          Sample data: <strong id="sampleName"></strong>. Nothing on this page is saved.
+          <button class="link" id="sampleBack" type="button">Show my data</button>
         </p>
-      </section>
+
+        <p class="first-day" id="firstDay" hidden></p>
+        <form id="settings" novalidate></form>
+        <!-- Where someone ends up after scrolling past every setting without finding theirs. Email, so nothing leaves the
+             browser unless they send it. -->
+        <p class="feedback">
+          <a href="mailto:apps@jesselind.com?subject=drip%3A%20a%20setting%20I%27d%20want">Missing a setting? Tell me what you'd want.</a>
+        </p>
+
+        <section id="data">
+          <h2 class="data-title">Your data <button type="button" class="data-info" id="dataInfo"
+            aria-expanded="false" aria-controls="dataAbout" aria-label="About Export and Import">i</button></h2>
+          <div class="data-about" id="dataAbout" hidden>
+            <p>A .json file of your settings, stash, history, and channel lists. Import adds its stash, history, and channels, and uses its settings.</p>
+            <p>Looser limits wait for the next new day, except in your first 24 hours.</p>
+          </div>
+          <div class="data-tools">
+            <div class="data-buttons" id="dataButtons">
+              <button type="button" id="exportData">Export</button>
+              <button type="button" id="importData">Import</button>
+              <input type="file" id="importFile" accept=".json,application/json" hidden />
+            </div>
+            <button type="button" class="link" id="resetData">Reset…</button>
+          </div>
+          <div class="data-confirm" id="resetConfirm" hidden>
+            <div class="confirm-head">
+              <h3>Reset drip?</h3>
+              <div class="data-buttons">
+                <button type="button" id="resetNo">Cancel</button>
+                <button type="button" class="primary" id="resetYes">Reset</button>
+              </div>
+            </div>
+            <div class="reset-effects">
+              <div>
+                <h4>Resets</h4>
+                <ul><li>Settings to defaults</li><li>Stash, emptied</li><li>Channel lists, emptied</li></ul>
+              </div>
+              <div class="reset-keeps">
+                <h4>Keeps</h4>
+                <ul><li>History</li><li>Today's drops and cards</li></ul>
+              </div>
+            </div>
+          </div>
+          <div class="muted data-result" id="dataResult" role="status"></div>
+        </section>
+
+        <!-- Shown only in a build that has the dev panel, so never in the store build. -->
+        <section id="dev" hidden>
+          <h2 class="caps">Developer mode</h2>
+          <label class="dev-row">
+            <input type="checkbox" id="devMode" />
+            <span>Show the dev panel on YouTube pages</span>
+          </label>
+          <label class="dev-row" id="firstDayOffRow" hidden>
+            <input type="checkbox" id="firstDayOff" />
+            <span>Loosening waits for the reset, even in the first day</span>
+          </label>
+          <div class="dev-row sample-row" id="sampleRow" hidden>
+            <label for="sample">Show Settings with</label>
+            <div class="picker-wrap"><select class="picker" id="sample"></select></div>
+          </div>
+          <p class="muted" id="devHint">
+            For testing. The panel sets minutes and tokens and runs the daily reset now, so it undoes every limit while
+            it's on. Turn it off when you're done.
+          </p>
+        </section>
+      </div>
+      <div id="panel-channels" role="tabpanel" aria-labelledby="tab-channels" hidden></div>
+      <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+        <div class="card" id="history"></div>
+        <section id="reasons-section" hidden>
+          <h2 class="caps">Why you needed one</h2>
+          <div class="reasons-head"><span>Last 7 days</span><span id="reasons-used"></span></div>
+          <ul class="reasons" id="reasons-week"></ul>
+          <p class="muted reasons-none" id="reasons-none" hidden>None this week.</p>
+          <div id="reasons-earlier">
+            <div class="reasons-head"><span>Earlier</span><span id="reasons-total"></span></div>
+            <ul class="reasons" id="reasons"></ul>
+            <div class="reasons-more" id="reasons-more"></div>
+          </div>
+        </section>
+      </div>
     </main>
 
     <!-- Stays in view while there are edits not saved. The live region sits outside it, since a hidden one can't speak. -->

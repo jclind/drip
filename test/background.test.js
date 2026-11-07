@@ -679,6 +679,26 @@ test('openSettings opens the top of Settings for an unknown or empty section', a
   assert.deepEqual(w.created.map((c) => ({ ...c })), [{ url: OPTIONS }, { url: OPTIONS }]);
 });
 
+test('openSettings accepts the YouTube section and the Settings and History tabs', async () => {
+  const w = worker();
+  for (const section of ['youtube', 'settings', 'history']) {
+    assert.equal((await w.send({ type: 'openSettings', section })).ok, true);
+  }
+  assert.deepEqual(w.created.map((c) => ({ ...c })), ['youtube', 'settings', 'history'].map((section) => ({ url: `${OPTIONS}#${section}` })));
+});
+
+test('openSettings without a section selects Settings in an existing tab', async () => {
+  const w = worker(undefined, { contexts: [
+    { contextType: 'TAB', tabId: 9, windowId: 4, documentUrl: `${OPTIONS}#history` },
+  ] });
+  assert.equal((await w.send({ type: 'openSettings' })).ok, true);
+  assert.deepEqual(w.created, []);
+  assert.deepEqual(JSON.parse(JSON.stringify(w.calls)), [
+    ['tab', 9, { active: true }], ['window', 4, { focused: true }],
+    ['broadcast', { type: 'settingsGoto', section: 'settings' }],
+  ]);
+});
+
 test('openSettings brings an open Settings tab forward and tells it where to go, without reloading it', async () => {
   const w = worker(undefined, { contexts: [
     { contextType: 'TAB', tabId: 7, windowId: 3, documentUrl: `chrome-extension://drip/src/welcome/welcome.html` },
