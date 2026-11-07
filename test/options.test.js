@@ -476,3 +476,12 @@ test('Earlier paginates separately, focuses the first new link, and Show fewer r
   assert.equal(p.get('reasons-earlier').hidden, true);
   assert.equal(p.get('reasons-section').hidden, false);
 });
+
+test('dev/options.html shows the same page as Settings, so the localhost copy never goes stale', () => {
+  const body = (/** @type {string} */ file) => {
+    const html = fs.readFileSync(file, 'utf8');
+    return html.slice(html.indexOf('<body'));
+  };
+  assert.equal(body(path.join(__dirname, '..', 'dev', 'options.html')), body(path.join(SRC, 'options', 'options.html')),
+    'copy the <body> of src/options/options.html into dev/options.html');
+});

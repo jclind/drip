@@ -23,12 +23,6 @@
 
         <p class="first-day" id="firstDay" hidden></p>
         <form id="settings" novalidate></form>
-        <!-- Where someone ends up after scrolling past every setting without finding theirs. Email, so nothing leaves the
-             browser unless they send it. -->
-        <p class="feedback">
-          <a href="mailto:apps@jesselind.com?subject=drip%3A%20a%20setting%20I%27d%20want">Missing a setting? Tell me what you'd want.</a>
-        </p>
-
         <section id="data">
           <h2 class="data-title">Your data <button type="button" class="data-info" id="dataInfo"
             aria-expanded="false" aria-controls="dataAbout" aria-label="About Export and Import">i</button></h2>
@@ -67,6 +61,12 @@
         </section>
 
         <!-- Shown only in a build that has the dev panel, so never in the store build. -->
+        <!-- The Settings tab's last line, where someone ends up after scrolling past every setting without finding theirs. Email, so nothing leaves the
+             browser unless they send it. -->
+        <p class="feedback">
+          <a href="mailto:apps@jesselind.com?subject=drip%3A%20a%20setting%20I%27d%20want">Missing a setting? Tell me what you'd want.</a>
+        </p>
+
         <section id="dev" hidden>
           <h2 class="caps">Developer mode</h2>
           <label class="dev-row">

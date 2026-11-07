@@ -404,10 +404,16 @@ input.toggle:checked::after {
   transform: translateX(28px);
 }
 
-/* The feedback line under the last section. */
+/* The feedback line closes the Settings tab, under Your data. */
 .feedback {
-  margin: 20px 0 0;
+  margin: 40px 0 0;
   font-size: 13px;
+}
+
+/* The last part's bottom line already divides the form from Your data. */
+#settings + #data {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .feedback a {
