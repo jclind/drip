@@ -34,28 +34,40 @@
       </section>
 
       <section id="data">
-        <h2 class="caps">Your data</h2>
-        <p class="muted">
-          Export saves your settings, stash, history, and channel lists as a file. Import adds a file's stash, history,
-          and channels and uses its settings. Anything that loosens a limit starts at the next new day.
-        </p>
-        <div class="data-buttons" id="dataButtons">
-          <button type="button" id="exportData">Export</button>
-          <button type="button" id="importData">Import</button>
-          <input type="file" id="importFile" accept=".json,application/json" hidden />
-          <button type="button" id="resetData">Reset</button>
+        <h2 class="data-title">Your data <button type="button" class="data-info" id="dataInfo"
+          aria-expanded="false" aria-controls="dataAbout" aria-label="About Export and Import">i</button></h2>
+        <div class="data-about" id="dataAbout" hidden>
+          <p>A .json file of your settings, stash, history, and channel lists. Import adds its stash, history, and channels, and uses its settings.</p>
+          <p>Looser limits wait for the next new day, except in your first 24 hours.</p>
+        </div>
+        <div class="data-tools">
+          <div class="data-buttons" id="dataButtons">
+            <button type="button" id="exportData">Export</button>
+            <button type="button" id="importData">Import</button>
+            <input type="file" id="importFile" accept=".json,application/json" hidden />
+          </div>
+          <button type="button" class="link" id="resetData">Reset…</button>
         </div>
         <div class="data-confirm" id="resetConfirm" hidden>
-          <p>
-            Put every setting back to how drip started, and empty your stash and channel lists? Your history and today's
-            drops and cards stay. Anything that loosens a limit starts at <span id="resetWhen"></span>.
-          </p>
-          <div class="data-buttons">
-            <button type="button" class="primary" id="resetYes">Reset</button>
-            <button type="button" id="resetNo">Cancel</button>
+          <div class="confirm-head">
+            <h3>Reset drip?</h3>
+            <div class="data-buttons">
+              <button type="button" id="resetNo">Cancel</button>
+              <button type="button" class="primary" id="resetYes">Reset</button>
+            </div>
+          </div>
+          <div class="reset-effects">
+            <div>
+              <h4>Resets</h4>
+              <ul><li>Settings to defaults</li><li>Stash, emptied</li><li>Channel lists, emptied</li></ul>
+            </div>
+            <div class="reset-keeps">
+              <h4>Keeps</h4>
+              <ul><li>History</li><li>Today's drops and cards</li></ul>
+            </div>
           </div>
         </div>
-        <p class="muted data-result" id="dataResult" role="status"></p>
+        <div class="muted data-result" id="dataResult" role="status"></div>
       </section>
 
       <!-- Shown only in a build that has the dev panel, so never in the store build. -->
