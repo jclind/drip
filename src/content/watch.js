@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send: sendMessage, h, onState, hourLabel, dayTimeLabel, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send: sendMessage, h, onState, hourLabel, dayTimeLabel, lockFoot, orbiter, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
   const DripMorph = /** @type {any} */ (globalThis).DripMorph;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
@@ -776,6 +776,9 @@
     ringButton = null;
   }
 
+  /** The spark that runs around "Done for now" every few seconds (common.js orbitLap). */
+  const startOrbit = orbiter(() => /** @type {HTMLElement | null} */ (document.querySelector('#drip-lock .drip-done')), ring);
+
   /** The click's rings play this long before the water starts to fall. */
   const LEAVE_MS = 700;
   /** While YouTube is still fetching its home page, another ring goes out this often. On air that fetch took 1.2s. */
@@ -940,7 +943,7 @@
     // When the next unlock comes back, once the week's are used (Q20).
     const needBack = Drip.needThisBack(state, now);
     // The label, not the time, goes in the view key, so "tomorrow" turns into "today" at midnight (Codex, 2026-11-04).
-    const backLabel = needBack > 0 ? dayTimeLabel(needBack, now) : '';
+    const backLabel = needBack > 0 ? dayTimeLabel(needBack, now, true) : '';
     // In Dry hours no drop can be bought, and the line under the title says when they end (Q32).
     const dryEnd = Drip.dryUntil(state, now);
     // Drops stop selling 5 minutes before, since the minutes would stop at the start.
@@ -975,11 +978,7 @@
           h('div', { class: 'drip-reason-row' },
             h('button', { class: 'drip-lock-link', 'data-k': 'cancel', onclick: closeReason }, 'Cancel'),
             h('button', { class: 'drip-b drip-b-gray', 'data-k': 'unlock', onclick: () => onNeedThis(reason.value) }, icon('unlock'), h('span', {}, 'Unlock this video'))))
-        : !hasDrops || backLabel
-          ? h('div', {},
-            !hasDrops && h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`),
-            backLabel && h('div', { class: 'drip-lock-note' }, `Next unlock back ${backLabel}.`))
-          : null;
+        : lockFoot(hasDrops ? '' : hourLabel(s.resetHour), backLabel);
     const panel = h(
       'div',
       { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },
@@ -991,11 +990,12 @@
         h('button', {
           class: 'drip-b drip-b-primary drip-done', 'data-k': 'done', onclick: onDone,
           onpointerenter: startRings, onpointerleave: stopRings, onfocus: startRings, onblur: stopRings,
-        }, h('span', {}, 'Done for now'))),
+        }, h('span', { class: 'drip-done-water', 'aria-hidden': 'true' }), h('span', {}, 'Done for now'))),
       lockMessage && h('div', { class: 'drip-lock-note', role: 'status' }, lockMessage),
       unlocks,
     );
     placeLockPanel(panel);
+    startOrbit();
     if (focused && reasonOpen && needLeft > 0) {
       reason.focus();
       reason.setSelectionRange(selectionStart, selectionEnd);

@@ -85,20 +85,101 @@
   }
 
   /**
-   * "today at 9:14pm", "tomorrow at 9:14pm", "Friday at 9:14pm", or "next Wednesday at 9:14pm" a week out.
-   * @param {number} ms @param {number} now
+   * "today at 9:14pm", "tomorrow at 9:14pm", "Friday at 9:14pm", or "next Wednesday at 9:14pm" a week out. Short, for
+   * the lock's footer: "today 9:14pm", "Fri 9:14pm", "next Wed 9:14pm".
+   * @param {number} ms @param {number} now @param {boolean} [short]
    */
-  function dayTimeLabel(ms, now) {
+  function dayTimeLabel(ms, now, short = false) {
     const date = new Date(ms);
     const hour = date.getHours();
     const time = `${hour % 12 === 0 ? 12 : hour % 12}:${String(date.getMinutes()).padStart(2, '0')}${hour < 12 ? 'am' : 'pm'}`;
     const today = new Date(now);
     const days = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
       - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000);
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const weekday = date.toLocaleDateString('en-US', { weekday: short ? 'short' : 'long' });
     // A week out lands on today's weekday, where a bare "Wednesday" would read as today.
     const day = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : days >= 7 ? `next ${weekday}` : weekday;
-    return `${day} at ${time}`;
+    return short ? `${day} ${time}` : `${day} at ${time}`;
+  }
+
+  /**
+   * The lock's footer (DESIGN.md "Lock screen", Jesse's pick B, 2026-11-07): a rule, then when the glass refills on the
+   * left and when the next unlock returns on the right, each after its icon. One alone is centered.
+   * @param {string} refill "4:00am", or '' to leave it out @param {string} back "Fri 9:14pm", or ''
+   */
+  function lockFoot(refill, back) {
+    if (!refill && !back) return null;
+    return h('div', { class: `drip-lock-foot${refill && back ? '' : ' is-one'}` },
+      refill && h('span', { class: 'drip-lock-fact' }, icon('drop', 'drip-token-drop'), h('span', {}, `Refills ${refill}`)),
+      back && h('span', { class: 'drip-lock-fact' }, icon('unlock'), h('span', {}, `Unlock back ${back}`)));
+  }
+
+  /** How often the spark runs around "Done for now" while nobody points at it. */
+  const ORBIT_EVERY_MS = 3600;
+
+  /**
+   * One lap around "Done for now" (Jesse's pick Z2, 2026-11-07): a glowing blue spark runs once around the button's edge,
+   * shedding small pale blue stars, and as it gets home one ring leaves the button. It's all drawn in the panel, so the
+   * button's face never moves.
+   * @param {HTMLElement} button @param {(button: HTMLElement) => void} ring
+   */
+  function orbitLap(button, ring) {
+    const panel = button.closest('.drip-lock-panel');
+    if (!panel) return;
+    const p = panel.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+    const track = h('span', { class: 'drip-orbit', 'aria-hidden': 'true' });
+    track.style.cssText = `left:${b.left - p.left}px;top:${b.top - p.top}px;width:${b.width}px;height:${b.height}px`;
+    const spark = h('span', { class: 'drip-orbit-spark' });
+    track.append(spark);
+    panel.append(track);
+    const lap = spark.animate([
+      { offsetDistance: '0%', opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.85 },
+      { offsetDistance: '100%', opacity: 0 }], { duration: 1300, easing: 'cubic-bezier(0.45, 0, 0.3, 1)', fill: 'both' });
+    lap.finished.then(() => track.remove(), () => track.remove());
+    let shed = 0;
+    const timer = setInterval(() => {
+      if (++shed > 9 || !spark.isConnected) return clearInterval(timer);
+      const at = spark.getBoundingClientRect();
+      const box = panel.getBoundingClientRect();
+      const size = 4 + Math.round(Math.random() * 3);
+      const star = h('span', { class: 'drip-orbit-star', 'aria-hidden': 'true' });
+      star.style.cssText = `left:${at.left - box.left}px;top:${at.top - box.top}px;width:${size}px;height:${size}px`;
+      panel.append(star);
+      star.animate([
+        { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 0.9 },
+        { transform: `translate(${Math.random() * 12 - 6}px, ${Math.random() * 12 - 8}px) scale(0) rotate(90deg)`, opacity: 0 }],
+      { duration: 600, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'both' }).finished.then(() => star.remove(), () => star.remove());
+    }, 120);
+    setTimeout(() => {
+      if (button.isConnected && !button.matches(':hover, :focus-visible') && !button.classList.contains('is-leaving')) ring(button);
+    }, 1150);
+  }
+
+  /**
+   * Runs orbitLap every ORBIT_EVERY_MS on whichever "Done for now" find returns, and stops once there's none. A lap is
+   * skipped while the pointer or focus is on the button (the water pour has the stage), while it's leaving, while it or
+   * the tab is hidden, and with reduced motion.
+   * @param {() => HTMLElement | null} find @param {(button: HTMLElement) => void} ring
+   * @returns {() => void} starts it, if it isn't running
+   */
+  function orbiter(find, ring) {
+    /** @type {ReturnType<typeof setInterval> | undefined} */
+    let timer;
+    const tick = () => {
+      const button = find();
+      if (!button) {
+        clearInterval(timer);
+        timer = undefined;
+        return;
+      }
+      if (document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches || !button.getClientRects().length
+        || button.classList.contains('is-leaving') || button.matches(':hover, :focus-visible')) return;
+      orbitLap(button, ring);
+    };
+    return () => {
+      if (timer === undefined) timer = setInterval(tick, ORBIT_EVERY_MS);
+    };
   }
 
   /** @param {string} id */
@@ -283,5 +364,5 @@
   // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
   const KEPT_KEY = 'drip-kept';
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, dayTimeLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, dayTimeLabel, lockFoot, orbiter, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
 })();
