@@ -116,11 +116,52 @@
 
   /** How often the spark runs around "Done for now" while nobody points at it. */
   const ORBIT_EVERY_MS = 3600;
+  /** The first lap, once the lock's panel has surfaced (it rises 0.65s in and takes 0.46s). */
+  const ORBIT_FIRST_MS = 1400;
+  /** One lap, and the moment the ring leaves as the spark gets home. */
+  const LAP_MS = 1300;
+  const RING_AT_MS = 1150;
+
+  /**
+   * The point a fraction t of the way around a w × h pill with corner radius r, clockwise from the left end of the top
+   * edge.
+   * @param {number} t @param {number} w @param {number} h @param {number} r
+   * @returns {[number, number]}
+   */
+  function pillPoint(t, w, h, r) {
+    const flat = w - 2 * r;
+    const side = h - 2 * r;
+    const arc = (Math.PI / 2) * r;
+    let d = (((t % 1) + 1) % 1) * (2 * flat + 2 * side + 4 * arc);
+    /** @type {[number, number, number, number][]} corner centers and start angles */
+    const corners = [[w - r, r, -90, 0], [w - r, h - r, 0, 0], [r, h - r, 90, 0], [r, r, 180, 0]];
+    const edges = [[r, 0, 1, 0, flat], [w, r, 0, 1, side], [w - r, h, -1, 0, flat], [0, h - r, 0, -1, side]];
+    for (let i = 0; i < 4; i++) {
+      const [x, y, dx, dy, len] = edges[i];
+      if (d <= len) return [x + dx * d, y + dy * d];
+      d -= len;
+      if (d <= arc) {
+        const [cx, cy, start] = corners[i];
+        const a = ((start + (d / arc) * 90) * Math.PI) / 180;
+        return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+      }
+      d -= arc;
+    }
+    return [r, 0];
+  }
+
+  /** @param {string} color "rgb(…)" or "rgba(…)" @param {number} alpha */
+  function withAlpha(color, alpha) {
+    const [r = 0, g = 0, b = 0] = (color.match(/[\d.]+/g) || []).map(Number);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
 
   /**
    * One lap around "Done for now" (Jesse's pick Z2, 2026-11-07): a glowing blue spark runs once around the button's edge,
    * shedding small pale blue stars, and as it gets home one ring leaves the button. It's all drawn in the panel, so the
-   * button's face never moves.
+   * button's face never moves. Everything animates left, top, size, and color, never transform or opacity, so nothing
+   * gets a compositor layer: layers coming and going under the lock's masked, blurred overlay made Chrome drop the
+   * overlay for a frame (Jesse, 2026-11-07).
    * @param {HTMLElement} button @param {(button: HTMLElement) => void} ring
    */
   function orbitLap(button, ring) {
@@ -128,32 +169,47 @@
     if (!panel) return;
     const p = panel.getBoundingClientRect();
     const b = button.getBoundingClientRect();
-    const track = h('span', { class: 'drip-orbit', 'aria-hidden': 'true' });
-    track.style.cssText = `left:${b.left - p.left}px;top:${b.top - p.top}px;width:${b.width}px;height:${b.height}px`;
-    const spark = h('span', { class: 'drip-orbit-spark' });
-    track.append(spark);
-    panel.append(track);
-    const lap = spark.animate([
-      { offsetDistance: '0%', opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.85 },
-      { offsetDistance: '100%', opacity: 0 }], { duration: 1300, easing: 'cubic-bezier(0.45, 0, 0.3, 1)', fill: 'both' });
-    lap.finished.then(() => track.remove(), () => track.remove());
+    const x0 = b.left - p.left;
+    const y0 = b.top - p.top;
+    const r = b.height / 2;
+    const spark = h('span', { class: 'drip-orbit-spark', 'aria-hidden': 'true' });
+    panel.append(spark);
+    const core = getComputedStyle(spark).backgroundColor;
+    const glow = '0 0 6px 2px rgba(66, 165, 246, A), 0 0 14px 4px rgba(66, 165, 246, B)';
+    const look = (/** @type {number} */ a) => ({
+      backgroundColor: withAlpha(core, a), boxShadow: glow.replace('A', String(0.9 * a)).replace('B', String(0.45 * a)),
+    });
+    // The lap's easing, applied to where the spark is, so left and top can be keyframed linearly.
+    const ease = (/** @type {number} */ t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+    const steps = 48;
+    /** @type {Keyframe[]} */
+    const frames = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const [x, y] = pillPoint(ease(t), b.width, b.height, r);
+      const a = t < 0.1 ? t / 0.1 : t > 0.85 ? (1 - t) / 0.15 : 1;
+      frames.push({ offset: t, left: `${x0 + x}px`, top: `${y0 + y}px`, ...look(a) });
+    }
+    const lap = spark.animate(frames, { duration: LAP_MS, fill: 'both' });
+    lap.finished.then(() => spark.remove(), () => spark.remove());
     let shed = 0;
     const timer = setInterval(() => {
       if (++shed > 9 || !spark.isConnected) return clearInterval(timer);
-      const at = spark.getBoundingClientRect();
-      const box = panel.getBoundingClientRect();
+      const left = parseFloat(getComputedStyle(spark).left);
+      const top = parseFloat(getComputedStyle(spark).top);
       const size = 4 + Math.round(Math.random() * 3);
       const star = h('span', { class: 'drip-orbit-star', 'aria-hidden': 'true' });
-      star.style.cssText = `left:${at.left - box.left}px;top:${at.top - box.top}px;width:${size}px;height:${size}px`;
       panel.append(star);
+      const tint = getComputedStyle(star).backgroundColor;
       star.animate([
-        { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 0.9 },
-        { transform: `translate(${Math.random() * 12 - 6}px, ${Math.random() * 12 - 8}px) scale(0) rotate(90deg)`, opacity: 0 }],
+        { left: `${left}px`, top: `${top}px`, width: `${size}px`, height: `${size}px`, backgroundColor: withAlpha(tint, 0.9) },
+        { left: `${left + Math.random() * 12 - 6}px`, top: `${top + Math.random() * 12 - 8}px`, width: '0px', height: '0px',
+          backgroundColor: withAlpha(tint, 0) }],
       { duration: 600, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'both' }).finished.then(() => star.remove(), () => star.remove());
     }, 120);
     setTimeout(() => {
       if (button.isConnected && !button.matches(':hover, :focus-visible') && !button.classList.contains('is-leaving')) ring(button);
-    }, 1150);
+    }, RING_AT_MS);
   }
 
   /**
@@ -178,7 +234,12 @@
       orbitLap(button, ring);
     };
     return () => {
-      if (timer === undefined) timer = setInterval(tick, ORBIT_EVERY_MS);
+      if (timer !== undefined) return;
+      // A placeholder until the first lap, so a rebuild in the meantime doesn't start a second timer.
+      timer = setTimeout(() => {
+        tick();
+        if (timer !== undefined) timer = setInterval(tick, ORBIT_EVERY_MS);
+      }, ORBIT_FIRST_MS);
     };
   }
 

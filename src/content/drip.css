@@ -299,17 +299,18 @@ html[dark] #drip-lock {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 0 6px 2px rgba(66, 165, 246, 0.9), 0 0 14px 4px rgba(66, 165, 246, 0.45);
-  offset-path: inset(0 round calc(var(--drip-btn-h) / 2));
-  offset-rotate: 0deg;
+  translate: -50% -50%;
 }
 
 html:not([dark]) #drip-lock .drip-orbit-spark {
   background: var(--drip-blue);
 }
 
-/* The small pale blue stars the spark sheds as it goes. */
+/* The small pale blue stars the spark sheds as it goes. They and the spark move by left and top, never transform or
+   opacity, so they get no compositor layers (see drip-done-ring). */
 #drip-lock .drip-orbit-star {
   position: absolute;
+  translate: -50% -50%;
   z-index: 2;
   background: #6cb8f7;
   clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
@@ -421,9 +422,12 @@ html:not([dark]) #drip-lock .drip-orbit-spark {
   text-align: right;
 }
 
+/* The drop and the lock carry their weight low, so centered on the line they look low next to the caps. 1px up
+   lines their middles up with the text's (Jesse, 2026-11-07). */
 #drip-lock .drip-lock-fact .drip-i {
   width: 14px;
   height: 15px;
+  margin-top: -2px;
 }
 
 /* "I need this one" opens a plain box with no animation. Justifying should take a little effort. */
@@ -2189,14 +2193,17 @@ html[dark] #drip-home .drip-menu {
   }
 }
 
+/* The ring fades by its outline color, not opacity: an opacity animation gets its own compositor layer, and adding and
+   removing layers under the lock's masked, blurred overlay made Chrome drop the overlay for a frame (Jesse,
+   2026-11-07). */
 @keyframes drip-done-ring {
   from {
-    opacity: 0.85;
+    outline-color: var(--drip-ring);
     outline-offset: 0;
   }
 
   to {
-    opacity: 0;
+    outline-color: transparent;
     outline-offset: 8px;
   }
 }
