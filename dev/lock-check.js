@@ -22,15 +22,28 @@
     const r = el.getBoundingClientRect();
     return `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`;
   };
+  // The player's classes worth tracking: ads, and the mode it's in.
+  const PLAYER_STATE = /^ad-|^(playing|paused|ended|unstarted|cued)-mode$|^ytp-.*(cued|ad)/;
+  // Ads, banners, and sign-in prompts, by id, class, or tag. Not "ad" inside words like "header" or "loading".
+  const ADISH = /(^|[\s_-])ads?($|[\s_-])|-ad-|ad-slot|promo|banner|companion|consent|sign-?in/i;
   const inLock = (/** @type {Element} */ el) => !!el.closest('#drip-lock');
 
-  /** Elements outside the lock that reach past the right edge of the window, widest first. */
+  /** Whether an ancestor inside the window cuts the element off, so it can't make the page scroll. */
+  const clipped = (/** @type {Element} */ el, /** @type {number} */ edge) => {
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const c = getComputedStyle(a);
+      if (c.position === 'fixed' || (c.overflowX !== 'visible' && a.getBoundingClientRect().right <= edge + 1)) return true;
+    }
+    return getComputedStyle(el).position === 'fixed';
+  };
+
+  /** Elements outside the lock that reach past the right edge of the window and could make the page scroll sideways. */
   const tooWide = () => {
     const edge = document.documentElement.clientWidth;
     return [...document.querySelectorAll('body *')]
       .filter((el) => !inLock(el))
       .map((el) => ({ el, r: el.getBoundingClientRect() }))
-      .filter(({ r }) => r.width > 0 && r.right > edge + 1)
+      .filter(({ el, r }) => r.width > 0 && r.right > edge + 1 && !clipped(el, edge))
       .sort((a, b) => b.r.right - a.r.right)
       .slice(0, 12)
       .map(({ el, r }) => ({ el: name(el), right: Math.round(r.right), width: Math.round(r.width), position: getComputedStyle(el).position }));
@@ -49,7 +62,7 @@
       htmlOverflow: getComputedStyle(de).overflow,
       bodyOverflow: getComputedStyle(document.body).overflow,
       player: box(document.querySelector('#movie_player')),
-      playerClasses: (document.querySelector('#movie_player')?.className || '').split(/\s+/).filter((c) => /ad|mode|cued|unstarted/.test(c)).join(' '),
+      playerClasses: (document.querySelector('#movie_player')?.className || '').split(/\s+/).filter((c) => PLAYER_STATE.test(c)).join(' '),
       video: box(video),
       videoVisibility: video ? getComputedStyle(video).visibility : null,
       lock: name(document.querySelector('#drip-lock')),
@@ -76,7 +89,7 @@
       video: () => box(document.querySelector('#movie_player video.html5-main-video')),
       primary: () => box(document.querySelector('#primary')),
       secondary: () => box(document.querySelector('#secondary')),
-      playerClasses: () => (document.querySelector('#movie_player')?.className || '').split(/\s+/).filter((c) => /ad|mode|cued|unstarted/.test(c)).join(' '),
+      playerClasses: () => (document.querySelector('#movie_player')?.className || '').split(/\s+/).filter((c) => PLAYER_STATE.test(c)).join(' '),
     };
     /** @type {Record<string, string | null>} */
     const last = {};
@@ -108,7 +121,7 @@
             if (!el.isConnected && verb === 'added') continue;
             const r = el.isConnected ? el.getBoundingClientRect() : null;
             const big = r && r.width * r.height > 20000;
-            if (big || /ad|promo|banner|companion|consent|sign/i.test(`${el.id} ${el.className} ${el.tagName}`)) note(`${verb} ${name(el)}${r ? ` ${box(el)}` : ''}`);
+            if (big || ADISH.test(`${el.id} ${typeof el.className === 'string' ? el.className : ''} ${el.tagName}`)) note(`${verb} ${name(el)}${r ? ` ${box(el)}` : ''}`);
           }
         }
       }
