@@ -581,6 +581,53 @@
    * into an overlay that's already up just replaces the old one, so the water doesn't rise again.
    * @param {HTMLElement} panel
    */
+  /**
+   * A still of the player, for the lock's background (DESIGN.md "Lock screen": the paused frame, blurred and tinted).
+   * The lock used to blur the live player through its backdrop-filter, so whatever YouTube loaded into the paused
+   * player, an ad or the next stream, showed through, and the swap now and then dropped the blur for a frame and showed
+   * the video plainly. dev/flash-log.js put both right after the video's "emptied" (Jesse, 2026-11-07). The still covers
+   * the whole player and is opaque, and drip.css hides the live video under it. It's the paused frame where the video
+   * is on screen, drawn where it sits, or else the video's thumbnail: before playback YouTube parks the video above the
+   * player and shows the thumbnail. Null when there's no player to cover.
+   * @returns {HTMLElement | null}
+   */
+  function frozenFrame() {
+    const player = document.querySelector(SEL.player);
+    // The tests' stand-in player has no layout.
+    if (!player || typeof player.getBoundingClientRect !== 'function') return null;
+    const p = player.getBoundingClientRect();
+    if (p.width < 2 || p.height < 2) return null;
+    const frame = h('div', { class: 'drip-frame', 'aria-hidden': 'true', 'data-video': videoId() });
+    frame.style.cssText = `left:${p.left}px;top:${p.top}px;width:${p.width}px;height:${p.height}px`;
+    const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
+    const v = typeof video?.getBoundingClientRect === 'function' ? video.getBoundingClientRect() : null;
+    const onScreen = !!video && !!v && video.readyState >= 2 && !!video.videoWidth
+      && v.bottom > p.top + p.height / 2 && v.top < p.bottom - p.height / 2;
+    if (video && v && onScreen) {
+      // It's blurred 20px, so a small copy is plenty.
+      const scale = Math.min(1, 640 / p.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(p.width * scale);
+      canvas.height = Math.round(p.height * scale);
+      try {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(video, (v.left - p.left) * scale, (v.top - p.top) * scale, v.width * scale, v.height * scale);
+          frame.append(canvas);
+          return frame;
+        }
+      } catch {
+        // Falls through to the thumbnail.
+      }
+    }
+    const id = videoId();
+    if (!id) return frame;
+    frame.append(h('img', { src: `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`, alt: '' }));
+    return frame;
+  }
+
   function placeLockPanel(panel) {
     if (falling) {
       falling.panel = panel;
@@ -591,6 +638,12 @@
       const old = lock.querySelector('.drip-lock-panel');
       if (old) old.replaceWith(panel);
       else lock.append(panel);
+      // A lock that came up before the video had a frame, or that stayed up into another video, takes a new still.
+      const still = /** @type {HTMLElement | null} */ (lock.querySelector('.drip-frame'));
+      if (!still || still.dataset.video !== videoId()) {
+        const fresh = frozenFrame();
+        if (fresh) still ? still.replaceWith(fresh) : lock.prepend(fresh);
+      }
       return;
     }
     // A lock still draining away goes at once, and a new one rises.
@@ -599,7 +652,7 @@
     // Only running out drops the last of the water. The "drip was updated" notice goes up at once.
     const glass = locked && !disconnected ? lastDropGlass() : null;
     if (!glass) {
-      document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), panel));
+      document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, frozenFrame(), sea(), panel));
       return;
     }
     // The pill's last water falls as a drop, and the lock's water rises from where it lands (pour.js).
@@ -610,7 +663,7 @@
       if (falling !== fall) return;
       falling = null;
       if (!locked || location.pathname !== '/watch') return;
-      const lock = h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), fall.panel);
+      const lock = h('div', { id: 'drip-lock', class: 'drip-ui' }, frozenFrame(), sea(), fall.panel);
       document.body.append(lock);
       if (x !== null) DripPour.riseFrom(lock, x);
     });
