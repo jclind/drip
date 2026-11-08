@@ -71,7 +71,8 @@
     if (!l || !blocks.length) return;
     watcher?.disconnect();
     // A rise that hasn't finished keeps its animation; is-full comes from common.js when it ends.
-    const risen = l.getAnimations().every((a) => !/water-rise$/.test(/** @type {any} */ (a).animationName || ''));
+    // The rise fills both ways, so it stays listed once finished.
+    const risen = l.getAnimations().every((a) => a.playState !== 'running' || !/water-rise$/.test(/** @type {any} */ (a).animationName || ''));
     const scratch = document.createElement('div');
     scratch.className = l.className;
     if (resting(l) && risen) CONDITIONS[current().condition](scratch);
