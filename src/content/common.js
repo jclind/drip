@@ -159,9 +159,9 @@
   /**
    * One lap around "Done for now" (Jesse's pick Z2, 2026-11-07): a glowing blue spark runs once around the button's edge,
    * shedding small pale blue stars, and as it gets home one ring leaves the button. It's all drawn in the panel, so the
-   * button's face never moves. Everything animates left, top, size, and color, never transform or opacity, so nothing
-   * gets a compositor layer: layers coming and going under the lock's masked, blurred overlay made Chrome drop the
-   * overlay for a frame (Jesse, 2026-11-07).
+   * button's face never moves. Everything animates left, top, size, and color, never transform or opacity, to keep
+   * animated layers from coming and going under the lock's blurred overlay. That was a guess at why the overlay
+   * dropped for a frame (Jesse, 2026-11-07), and the drops went on after it.
    * @param {HTMLElement} button @param {(button: HTMLElement) => void} ring
    */
   function orbitLap(button, ring) {
@@ -426,9 +426,9 @@
   const KEPT_KEY = 'drip-kept';
 
   // Once the lock's water is all the way up, its wave mask and clip-path cover nothing, so drip.css takes them off
-  // (#drip-lock.is-full) until it drains. A masked, clipped overlay with a backdrop-filter is what Chrome mispaints:
-  // it showed the page unmasked on a drain's last frames, and now and then dropped the whole overlay for a frame while
-  // the lock sat still, on YouTube and in the welcome tour (Jesse, 2026-11-07).
+  // (#drip-lock.is-full) until it drains. Chrome showed the page unmasked on a drain's last frames, so masked, clipped
+  // and blurred together is a suspect for the other glitch too: now and then the whole overlay dropped for a frame
+  // while the lock sat still, on YouTube and in the welcome tour (Jesse, 2026-11-07). Not proved; dev/mask-ab.js tests it.
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('animationend', (e) => {
       const lock = /** @type {HTMLElement | null} */ (e.target);

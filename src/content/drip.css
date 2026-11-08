@@ -334,7 +334,7 @@ html:not([dark]) #drip-lock .drip-orbit-spark {
 }
 
 /* The small pale blue stars the spark sheds as it goes. They and the spark move by left and top, never transform or
-   opacity, so they get no compositor layers (see drip-done-ring). */
+   opacity (see drip-done-ring). */
 #drip-lock .drip-orbit-star {
   position: absolute;
   translate: -50% -50%;
@@ -2220,9 +2220,8 @@ html[dark] #drip-home .drip-menu {
   }
 }
 
-/* The ring fades by its outline color, not opacity: an opacity animation gets its own compositor layer, and adding and
-   removing layers under the lock's masked, blurred overlay made Chrome drop the overlay for a frame (Jesse,
-   2026-11-07). */
+/* The ring fades by its outline color, not opacity, to keep animated layers from coming and going under the lock's
+   blurred overlay. That was a guess at why the overlay dropped for a frame (Jesse, 2026-11-07), not a proven cause. */
 @keyframes drip-done-ring {
   from {
     outline-color: var(--drip-ring);
@@ -2268,10 +2267,14 @@ html[dark] #drip-home .drip-menu {
     outline: none;
   }
 
+  /* No rise, so no animationend to add is-full (common.js): the mask and clip come off here instead. */
   #drip-lock,
   #drip-lock.is-draining,
   #drip-lock.is-surfacing {
     animation: none;
+    -webkit-mask: none;
+    mask: none;
+    clip-path: none;
   }
 
   #drip-lock.is-draining {

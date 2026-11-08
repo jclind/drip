@@ -577,18 +577,13 @@
   }
 
   /**
-   * Puts a panel in the lock overlay. A new overlay plays the water rising and then the panel surfacing. A panel swapped
-   * into an overlay that's already up just replaces the old one, so the water doesn't rise again.
-   * @param {HTMLElement} panel
-   */
-  /**
    * A still of the player, for the lock's background (DESIGN.md "Lock screen": the paused frame, blurred and tinted).
    * The lock used to blur the live player through its backdrop-filter, so whatever YouTube loaded into the paused
-   * player, an ad or the next stream, showed through, and the swap now and then dropped the blur for a frame and showed
-   * the video plainly. dev/flash-log.js put both right after the video's "emptied" (Jesse, 2026-11-07). The still covers
-   * the whole player and is opaque, and drip.css hides the live video under it. It's the paused frame where the video
-   * is on screen, drawn where it sits, or else the video's thumbnail: before playback YouTube parks the video above the
-   * player and shows the thumbnail. Null when there's no player to cover.
+   * player, an ad, its thumbnail, or the next stream, showed through and changed under the blur. dev/flash-log.js put
+   * those changes right after the video's "emptied" (Jesse, 2026-11-07). The still covers the whole player, and drip.css
+   * hides the live video under it. It's the paused frame where the video is on screen, drawn where it sits, or else the
+   * video's thumbnail: before playback YouTube parks the video above the player and shows the thumbnail. Null when
+   * there's no player to cover.
    * @returns {HTMLElement | null}
    */
   function frozenFrame() {
@@ -599,30 +594,44 @@
     if (p.width < 2 || p.height < 2) return null;
     // It's blurred 20px, so a small copy is plenty.
     const scale = Math.min(1, 640 / p.width);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(p.width * scale);
-    canvas.height = Math.round(p.height * scale);
+    /** @param {HTMLCanvasElement} c */
+    const size = (c) => {
+      c.width = Math.round(p.width * scale);
+      c.height = Math.round(p.height * scale);
+      return c;
+    };
+    const canvas = size(document.createElement('canvas'));
+    // The picture untinted, so a theme switch can tint it again without drawing the video, which may have changed.
+    const base = size(document.createElement('canvas'));
     const ctx = canvas.getContext?.('2d');
-    if (!ctx) return null;
+    const bctx = base.getContext?.('2d');
+    if (!ctx || !bctx) return null;
     // The overlay's own tint (drip.css --drip-tint) is painted into the still, so the still needs no layer of its own
     // over it. A tint layer reaching past the still's edge tinted that strip twice and showed as a box (Jesse,
-    // 2026-11-07). saturate(1.2) matches the overlay's backdrop-filter.
-    const tint = document.documentElement.hasAttribute('dark') ? 'rgba(3, 22, 46, 0.6)' : 'rgba(150, 195, 240, 0.45)';
+    // 2026-11-07).
+    const tint = () => {
+      const dark = document.documentElement.hasAttribute('dark');
+      ctx.filter = 'none';
+      ctx.drawImage(base, 0, 0);
+      ctx.fillStyle = dark ? 'rgba(3, 22, 46, 0.6)' : 'rgba(150, 195, 240, 0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+    // saturate(1.2) matches the overlay's backdrop-filter.
     /** @param {CanvasImageSource | null} source @param {number} x @param {number} y @param {number} w @param {number} h */
     const paint = (source, x, y, w, h) => {
-      ctx.filter = 'none';
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      bctx.filter = 'none';
+      bctx.fillStyle = '#000';
+      bctx.fillRect(0, 0, base.width, base.height);
       if (source) {
-        ctx.filter = 'saturate(1.2)';
-        ctx.drawImage(source, x * scale, y * scale, w * scale, h * scale);
-        ctx.filter = 'none';
+        bctx.filter = 'saturate(1.2)';
+        bctx.drawImage(source, x * scale, y * scale, w * scale, h * scale);
+        bctx.filter = 'none';
       }
-      ctx.fillStyle = tint;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      tint();
     };
     const frame = h('div', { class: 'drip-frame', 'aria-hidden': 'true', 'data-video': videoId() }, canvas);
     frame.style.cssText = `left:${p.left}px;top:${p.top}px;width:${p.width}px;height:${p.height}px`;
+    retint.set(frame, tint);
     const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
     const v = typeof video?.getBoundingClientRect === 'function' ? video.getBoundingClientRect() : null;
     const onScreen = !!video && !!v && video.readyState >= 2 && !!video.videoWidth
@@ -646,10 +655,50 @@
       const h2 = img.naturalHeight * fill;
       paint(img, (p.width - w) / 2, (p.height - h2) / 2, w, h2);
     };
+    // No thumbnail: the lock blurs the live player again, as it did before the still.
+    img.onerror = () => frame.remove();
     img.src = `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
     return frame;
   }
 
+  /** Each still's tint, to paint again when YouTube's theme changes under the lock. */
+  const retint = new WeakMap();
+
+  /** The still follows the player when the window resizes, zooms, or scrolls. It's blurred, so stretching it is fine. */
+  function moveStill() {
+    const still = /** @type {HTMLElement | null} */ (document.querySelector('#drip-lock .drip-frame'));
+    const player = document.querySelector(SEL.player);
+    if (!still || !player) return;
+    const p = player.getBoundingClientRect();
+    if (p.width < 2 || p.height < 2) return;
+    still.style.cssText = `left:${p.left}px;top:${p.top}px;width:${p.width}px;height:${p.height}px`;
+  }
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    let queued = false;
+    const queue = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        moveStill();
+      });
+    };
+    window.addEventListener('resize', queue);
+    window.addEventListener('scroll', queue, { passive: true });
+  }
+  if (typeof MutationObserver === 'function') {
+    new MutationObserver(() => {
+      const still = document.querySelector('#drip-lock .drip-frame');
+      if (still) retint.get(still)?.();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['dark'] });
+  }
+
+  /**
+   * Puts a panel in the lock overlay. A new overlay plays the water rising and then the panel surfacing. A panel swapped
+   * into an overlay that's already up just replaces the old one, so the water doesn't rise again.
+   * @param {HTMLElement} panel
+   */
   function placeLockPanel(panel) {
     if (falling) {
       falling.panel = panel;
