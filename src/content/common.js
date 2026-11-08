@@ -425,5 +425,16 @@
   // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
   const KEPT_KEY = 'drip-kept';
 
+  // Once the lock's water is all the way up, its wave mask and clip-path cover nothing, so drip.css takes them off
+  // (#drip-lock.is-full) until it drains. A masked, clipped overlay with a backdrop-filter is what Chrome mispaints:
+  // it showed the page unmasked on a drain's last frames, and now and then dropped the whole overlay for a frame while
+  // the lock sat still, on YouTube and in the welcome tour (Jesse, 2026-11-07).
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('animationend', (e) => {
+      const lock = /** @type {HTMLElement | null} */ (e.target);
+      if (lock && lock.id === 'drip-lock' && /water-rise$/.test(e.animationName)) lock.classList.add('is-full');
+    });
+  }
+
   /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, dayTimeLabel, lockFoot, orbiter, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
 })();
