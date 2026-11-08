@@ -597,34 +597,56 @@
     if (!player || typeof player.getBoundingClientRect !== 'function') return null;
     const p = player.getBoundingClientRect();
     if (p.width < 2 || p.height < 2) return null;
-    const frame = h('div', { class: 'drip-frame', 'aria-hidden': 'true', 'data-video': videoId() });
+    // It's blurred 20px, so a small copy is plenty.
+    const scale = Math.min(1, 640 / p.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(p.width * scale);
+    canvas.height = Math.round(p.height * scale);
+    const ctx = canvas.getContext?.('2d');
+    if (!ctx) return null;
+    // The overlay's own tint (drip.css --drip-tint) is painted into the still, so the still needs no layer of its own
+    // over it. A tint layer reaching past the still's edge tinted that strip twice and showed as a box (Jesse,
+    // 2026-11-07). saturate(1.2) matches the overlay's backdrop-filter.
+    const tint = document.documentElement.hasAttribute('dark') ? 'rgba(3, 22, 46, 0.6)' : 'rgba(150, 195, 240, 0.45)';
+    /** @param {CanvasImageSource | null} source @param {number} x @param {number} y @param {number} w @param {number} h */
+    const paint = (source, x, y, w, h) => {
+      ctx.filter = 'none';
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (source) {
+        ctx.filter = 'saturate(1.2)';
+        ctx.drawImage(source, x * scale, y * scale, w * scale, h * scale);
+        ctx.filter = 'none';
+      }
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+    const frame = h('div', { class: 'drip-frame', 'aria-hidden': 'true', 'data-video': videoId() }, canvas);
     frame.style.cssText = `left:${p.left}px;top:${p.top}px;width:${p.width}px;height:${p.height}px`;
     const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
     const v = typeof video?.getBoundingClientRect === 'function' ? video.getBoundingClientRect() : null;
     const onScreen = !!video && !!v && video.readyState >= 2 && !!video.videoWidth
       && v.bottom > p.top + p.height / 2 && v.top < p.bottom - p.height / 2;
     if (video && v && onScreen) {
-      // It's blurred 20px, so a small copy is plenty.
-      const scale = Math.min(1, 640 / p.width);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(p.width * scale);
-      canvas.height = Math.round(p.height * scale);
       try {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(video, (v.left - p.left) * scale, (v.top - p.top) * scale, v.width * scale, v.height * scale);
-          frame.append(canvas);
-          return frame;
-        }
+        paint(video, v.left - p.left, v.top - p.top, v.width, v.height);
+        return frame;
       } catch {
         // Falls through to the thumbnail.
       }
     }
+    // Before playback YouTube parks the video above the player and shows the thumbnail, cropped to fill.
     const id = videoId();
-    if (!id) return frame;
-    frame.append(h('img', { src: `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`, alt: '' }));
+    if (!id) return null;
+    paint(null, 0, 0, 0, 0);
+    const img = new Image();
+    img.onload = () => {
+      const fill = Math.max(p.width / img.naturalWidth, p.height / img.naturalHeight);
+      const w = img.naturalWidth * fill;
+      const h2 = img.naturalHeight * fill;
+      paint(img, (p.width - w) / 2, (p.height - h2) / 2, w, h2);
+    };
+    img.src = `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
     return frame;
   }
 
