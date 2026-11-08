@@ -129,6 +129,23 @@ html:has(#drip-lock:not(.is-draining, .is-surfacing) > .drip-frame) #movie_playe
   visibility: hidden !important;
 }
 
+/* While the lock is up the page under it stays put (Jesse, 2026-11-08). Scrolling did nothing but slide the blurred
+   page around. The gutter keeps the scroll bar's width, so nothing under the lock reflows. YouTube's ambient glow
+   (#cinematics) is off too: it paints from the video, so it kept changing with the ads under the still, and in the
+   default view it reaches past the window's edge, which let the page scroll sideways. */
+html:has(#drip-lock:not(.is-draining, .is-surfacing)) {
+  overflow: hidden !important;
+  scrollbar-gutter: stable;
+}
+
+html:has(#drip-lock:not(.is-draining, .is-surfacing)) body {
+  overflow: visible !important;
+}
+
+html:has(#drip-lock:not(.is-draining, .is-surfacing)) #cinematics {
+  display: none !important;
+}
+
 /* Under the water, behind the panel: faint bubbles rising and two small fish crossing now and then (watch.js sea()).
    The overlay's mask covers them too, so they only show where the water has risen. */
 #drip-lock .drip-sea {
