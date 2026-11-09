@@ -5,7 +5,7 @@ The `/council` run on drip's store images, started 2026-11-09. `/council continu
 ## Settings (Jesse, 2026-11-09)
 
 - Seats: Anthropic (fresh `general-purpose` Agent), OpenAI (Codex, gpt-6.1-sol high), Meta (Muse, through `~/ai-context/bin/muse-exec`).
-- Goal: every seat scores every screenshot and tile c2 at design 9 or more and AI look 2 or less.
+- Goal (Jesse, changed 2026-11-09 after round 18's level 2 stall): every seat picks this set to ship and names no blocking fix that two seats agree on. Scores are still reported. The first goal, design 9+ and AI look 2 or less from every seat, was not reached in rounds 14 to 18.
 - A seat that fails or runs out: go on with the rest, say so, and leave it out until Jesse adds it back.
 - Pace: ask Jesse before each round.
 - Reviewed: `store/images-v2/screenshot-1.png` to `-5.png` and `tile-c2.png`. Tile c3 is no longer reviewed.
@@ -13,11 +13,11 @@ The `/council` run on drip's store images, started 2026-11-09. `/council continu
 
 ## Current
 
-- Round: 19 next (a fix round on V), waiting on Jesse.
-- Tactic: fix, on V. Round 18's head-to-head between V (v2), A, and B, run with Claude and Codex only (Jesse, 2026-11-09), went to V from both seats as a whole set. Codex took B for Settings alone; Claude took A for Modes and History and B for the tile, but said mixing sets looks like indecision. So the divergent round confirmed the base instead of replacing it, and showed the Claude seat's AI-look floor is not the layout alone: it still names V's split as the most common store layout, and it scored V lower in this round (design 6 to 8, AI look 3 to 5) than in the fix rounds.
-- Base: `frames-v2.html` with round 18's agreed fixes (this commit). A and B stay in `frames-v3.html` and `store/images-v3/`.
-- Muse: out of quota until about 21:04 on 2026-11-09; it hasn't seen A or B.
-- Next step: Jesse's call. Level 2 of the stall rule applies (a divergent round, and the Claude seat still stuck): another divergent round, a different goal, or different seats.
+- Round: 20 next, Muse's ship verdict on the round-19 set with its fixes. Claude and Codex both said "Ship: yes, blocking fixes: none" in round 19, so the goal is met for two of three seats.
+- Tactic: fix (ship check).
+- Base: `frames-v2.html` with round 19's agreed optional fixes (this commit).
+- Muse: out of quota until about 21:04 on 2026-11-09.
+- Next step: at Muse's reset and with Jesse's go, round 20 with Muse alone (or all three): ship verdict and blocking fixes on the current set. If Muse says ship with no blocking fix two seats share, the goal is met: write the final council report.
 
 ## Score history
 
@@ -40,12 +40,26 @@ Design/AI look per image. Rounds 12 and 13 are from the two-judge loop, for refe
 | 16 | Muse | 7/4 | 6/5 | 8/3 | 6/3 | 7/3 | 7/3 |
 | 18 | Claude (V, in comparison) | 7/4 | 8/3 | 7/4 | 8/3 | 6/5 | 6/5 |
 | 18 | Codex (V, in comparison) | 8/2 | 8/3 | 7/3 | 7/3 | 8/2 | 8/2 |
+| 19 | Claude (ship: yes) | 8/3 | 8/3 | 8/3 | 8/2 | 8/3 | 8/3 |
+| 19 | Codex (ship: yes) | 9/2 | 8/2 | 8/2 | 8/1 | 9/1 | 9/1 |
 
 Measured noise, Claude seat, identical images (round 13): one point on design, one on AI look, two on the tile.
 
 ## Decisions log
 
 What the next brief's "Decisions so far" draws on. Newest first.
+
+### Round 19: ship check, Claude and Codex
+
+Both: "Ship: yes. Blocking fixes: none."
+
+Applied, optional fixes both seats raised:
+- 2: the subline no longer repeats the water note: "An optional daily limit, counted in drops." (Claude; Codex wanted the two lines to stop overlapping too.)
+- 3: "Start strict, or just hide the feed." replaced, since Codex called it the weakest line and Claude a forced wrap: "Start with Full drip, or choose a lighter mode." (Codex's line.)
+- 4: the subline states the first-day rule precisely: "After your first 24 hours: tighten now, loosen at reset." (Codex; Claude found "after day one" ambiguous). The leader's drop onto the chip is longer, so it reads as meant (both called the short jog a slip).
+- 5: Saturday's sample has no unlock: an unlock on a day under its limit looked wrong (Claude; Muse in round 15).
+
+Considered, not applied: Claude on 4's right margin (fourth round asking), 1's legend higher, a less listicle headline on 3, a less generic headline on 5, the tile's wave; Codex on shorter notes on 1, 3, and 5 and a larger tagline on the tile.
 
 ### Round 18: head-to-head, then triage on V
 

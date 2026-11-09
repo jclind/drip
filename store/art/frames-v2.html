@@ -96,7 +96,7 @@
     },
     2: {
       h: 'When time\nruns out.',
-      p: 'An optional daily limit. When it\'s\nused up, the video stops.',
+      p: 'An optional daily limit,\ncounted in drops.',
       src: '/dev/page.html?page=welcome#tour-4',
       // The tour's stage alone, full height, cropped past its blurred edges. It sits at 362 to 921 across and 231 to 729
       // down in the page.
@@ -159,7 +159,7 @@
     },
     3: {
       h: 'Three ways\nto use drip.',
-      p: 'Start strict, or just\nhide the feed.',
+      p: 'Start with Full drip,\nor choose a lighter mode.',
       src: '/dev/page.html?page=welcome',
       w: 680, h2: 713, x: -32, y: -76, scale: 1.15,
       // The page's own logo and tagline repeat the frame's mark.
@@ -172,7 +172,7 @@
     },
     4: {
       h: 'Easy to tighten.\nSlow to loosen.',
-      p: 'Stricter settings apply now. Looser\nones wait for the reset after day one.',
+      p: 'After your first 24 hours:\ntighten now, loosen at reset.',
       src: '/dev/page.html?page=options&settled=1&sample=1&pending=1',
       // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden. The
       // sample raised drops from 4 to 5, so the row shows the waiting change.
@@ -181,7 +181,7 @@
       ready: '[role=tab]',
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
       notes: [
-        { sel: '.chip', has: '4 drops', say: 'Raised to 5 drops. Today\nstays at 4 until 4:00am.', above: 9 },
+        { sel: '.chip', has: '4 drops', say: 'Raised to 5 drops. Today\nstays at 4 until 4:00am.', above: 17 },
       ],
     },
     5: {
