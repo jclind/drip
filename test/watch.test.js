@@ -257,6 +257,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     /** Runs every timer once, as one second passing would. */
     second: async () => { for (const fn of [...intervals.values()]) await fn(); await settle(); },
     broken: () => document.getElementById('drip-broken'),
+    runtime: context.chrome.runtime,
     video, root, body, location, document,
     media: [video],
     pill: () => document.getElementById('drip-pill'),
@@ -1273,6 +1274,22 @@ test('a watch page with no player for 10 seconds says drip is broken and locks n
   assert.match(tab.broken().textContent, /video player/);
   assert.equal(tab.locked(), false);
   assert.ok(tab.root.hasAttribute('data-drip-broken'), 'guard.js lets play() through');
+});
+
+test('a tab whose drip was reloaded stops watching for a broken player instead of throwing', async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, 'aaa');
+  tab.noPlayer = true;
+  await settle();
+  // What Chrome does to a content script whose extension was reloaded: the id goes, and its APIs throw. Before the
+  // fix, reportBroken's getManifest threw out of this timer, and Chrome listed it under Errors on drip's card.
+  tab.runtime.id = undefined;
+  tab.runtime.getManifest = () => { throw new Error('Extension context invalidated.'); };
+  for (let i = 0; i < 12; i++) {
+    world.advance(1);
+    await tab.second();
+  }
+  assert.equal(tab.broken(), null);
 });
 
 test('a slow load with no player yet waits for the page to finish loading before it says drip is broken', async () => {
