@@ -369,6 +369,10 @@ The Claude judge also reversed two of its round-12 asks: the legend (moved down 
 
 Agreed by every report this round, for a round 14 if there is one: take "YouTube" out of 1's headline; say the 4-to-5 change once on 4; note 3's dot sits on the card border next to the radio; 5's Unlocks leader skims the tile tops. A frame bug two runs caught: a two-line note's leader starts after its first line, so when the second line is longer the leader runs between the lines.
 
+### Round 14 on: the council
+
+From round 14 the store images run under `/council` (`~/ai-context/skills/council/SKILL.md`) with three seats: Claude, Codex, and Muse. Its state, score history, and decisions log are in `STATE.md`; reports are `reviews/round-N-<seat>.md` as before.
+
 ## How to run a round (v2)
 
 1. Edit `store/art/frames-v2.html` (and `dev/page.html` or `store/art/videos.js` for sample data).
