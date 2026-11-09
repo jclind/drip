@@ -42,9 +42,9 @@
   .legend .card { height: 30px; justify-self: center; transform: rotate(8deg); }
   /* The lock's water, carried across the paper on screenshot 2. Its color is the strip's water at the seam, sampled from
      a capture top and bottom, so the two halves read as one body (round 13; round 12 lightened it 20% and the seam
-     showed). The crest runs flat for its last 80px so it meets the seam level. */
-  .water { position: absolute; left: 0; width: 560px; bottom: 0; background: linear-gradient(rgb(28, 58, 64), rgb(10, 34, 42)); }
-  .water::before { content: ""; position: absolute; left: 0; right: 0; top: -25px; height: 26px; background: rgb(28, 58, 64);
+     showed; round 17 resampled it greener after the thumbnail's hills got lighter). The crest runs flat for its last 80px so it meets the seam level. */
+  .water { position: absolute; left: 0; width: 560px; bottom: 0; background: linear-gradient(rgb(36, 68, 66), rgb(13, 40, 45)); }
+  .water::before { content: ""; position: absolute; left: 0; right: 0; top: -25px; height: 26px; background: rgb(36, 68, 66);
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 26' preserveAspectRatio='none'%3E%3Cpath d='M0 13C70 3 150 3 230 11S370 24 450 15C490 11 520 12 560 12V26H0Z'/%3E%3C/svg%3E") 0 0 / 560px 26px no-repeat;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 26' preserveAspectRatio='none'%3E%3Cpath d='M0 13C70 3 150 3 230 11S370 24 450 15C490 11 520 12 560 12V26H0Z'/%3E%3C/svg%3E") 0 0 / 560px 26px no-repeat; }
   .water-note { color: var(--paper); }
@@ -154,11 +154,11 @@
       }, 600),
       notes: [
         { sel: '#drip-lock .drip-lock-add', say: 'Stop here, or spend a drop\nfor 15 more minutes.' },
-        { at: 690, say: 'At zero, the water rises\nover the paused video.' },
+        { at: 690, say: 'At 0 minutes left, the video\npauses under the water.' },
       ],
     },
     3: {
-      h: 'Choose\nyour limits.',
+      h: 'Three ways\nto use drip.',
       p: 'Search only, one pick at a time,\nor daily watch limits.',
       src: '/dev/page.html?page=welcome',
       w: 680, h2: 713, x: -32, y: -76, scale: 1.15,
@@ -172,7 +172,7 @@
     },
     4: {
       h: 'Easy to tighten.\nSlow to loosen.',
-      p: 'Stricter settings apply now.\nLooser ones wait for the daily reset.',
+      p: 'Stricter settings apply now. Looser\nones wait for the reset after day one.',
       src: '/dev/page.html?page=options&settled=1&sample=1&pending=1',
       // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden. The
       // sample raised drops from 4 to 5, so the row shows the waiting change.
@@ -182,7 +182,7 @@
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
       notes: [
         { text: 'Drops per day', say: 'Raised to 5 drops.\nThe 5th waits for the reset.' },
-        { text: 'Dry hours', say: 'Dry hours: 11pm to 6am,\nstarting tonight.' },
+        { text: 'Dry hours', say: 'Dry hours start tonight:\n11pm to 6am.' },
       ],
     },
     5: {
@@ -205,7 +205,7 @@
         setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300);
       },
       notes: [
-        { sel: '.tile:has(.drip-token-drop)', say: 'Each day shows its drops,\ncards, and unlocks.' },
+        { sel: '.tile:has(.drip-token-drop)', say: 'Saturday: 30 minutes,\nexactly 2 drops.' },
       ],
     },
   };

@@ -33,18 +33,30 @@
            C 530 196 450 204 410 176 C 380 222 300 236 250 208 C 210 250 130 262 80 236 C 50 262 20 266 0 258 Z" fill="#1c2330" opacity="0.92"/>
   <path d="M0 210 C 60 236 140 220 190 246 C 250 230 320 262 380 240 C 430 262 500 246 540 262 C 520 290 430 300 360 288
            C 290 306 200 300 140 288 C 90 300 30 296 0 290 Z" fill="#2a3242" opacity="0.7"/>
-  <!-- rain under the storm, uneven -->
+  <!-- rain under the storm: a dense curtain on the left, thinning in bursts to the right (round 17; the even row before read as stock) -->
   <g stroke="#a7b2c6" stroke-linecap="round" opacity="0.4">
-    <line x1="42" y1="286" x2="22" y2="382" stroke-width="2"/>
-    <line x1="96" y1="300" x2="80" y2="372" stroke-width="1.5"/>
-    <line x1="141" y1="296" x2="118" y2="420" stroke-width="2.5"/>
-    <line x1="203" y1="304" x2="190" y2="358" stroke-width="1.5"/>
-    <line x1="238" y1="300" x2="214" y2="404" stroke-width="2"/>
-    <line x1="296" y1="306" x2="281" y2="372" stroke-width="1.5"/>
-    <line x1="331" y1="298" x2="312" y2="388" stroke-width="2"/>
-    <line x1="390" y1="300" x2="378" y2="346" stroke-width="1.5"/>
-    <line x1="428" y1="294" x2="412" y2="370" stroke-width="2"/>
-    <line x1="472" y1="286" x2="464" y2="322" stroke-width="1.5"/>
+    <line x1="68" y1="289" x2="53" y2="368" stroke-width="2.4"/>
+    <line x1="147" y1="302" x2="137" y2="359" stroke-width="2"/>
+    <line x1="58" y1="281" x2="49" y2="326" stroke-width="2"/>
+    <line x1="14" y1="274" x2="-1" y2="376" stroke-width="1.6"/>
+    <line x1="139" y1="299" x2="133" y2="331" stroke-width="2"/>
+    <line x1="168" y1="306" x2="155" y2="378" stroke-width="1.2"/>
+    <line x1="66" y1="286" x2="41" y2="392" stroke-width="2"/>
+    <line x1="103" y1="278" x2="93" y2="316" stroke-width="1.2"/>
+    <line x1="94" y1="275" x2="86" y2="322" stroke-width="2.4"/>
+    <line x1="83" y1="271" x2="63" y2="358" stroke-width="2.4"/>
+    <line x1="145" y1="290" x2="119" y2="430" stroke-width="1.2"/>
+    <line x1="227" y1="296" x2="218" y2="363" stroke-width="1.6"/>
+    <line x1="242" y1="313" x2="228" y2="417" stroke-width="1.2"/>
+    <line x1="240" y1="284" x2="230" y2="335" stroke-width="1.2"/>
+    <line x1="327" y1="268" x2="323" y2="297" stroke-width="1.2"/>
+    <line x1="347" y1="265" x2="326" y2="363" stroke-width="1.2"/>
+    <line x1="413" y1="305" x2="406" y2="340" stroke-width="2"/>
+    <line x1="329" y1="295" x2="322" y2="337" stroke-width="1.2"/>
+    <line x1="312" y1="270" x2="304" y2="327" stroke-width="2.4"/>
+    <line x1="406" y1="288" x2="399" y2="333" stroke-width="1.6"/>
+    <line x1="491" y1="276" x2="472" y2="386" stroke-width="1.6"/>
+    <line x1="476" y1="297" x2="467" y2="344" stroke-width="1.6"/>
   </g>
   <!-- far range -->
   <path d="M0 410 L90 372 L150 388 L230 336 L300 362 L380 318 L450 352 L520 330 L600 366 L690 322 L760 348 L840 300

@@ -13,11 +13,11 @@ The `/council` run on drip's store images, started 2026-11-09. `/council continu
 
 ## Current
 
-- Round: 16 next (council round 3), waiting on Jesse's go.
-- Tactic: fix. No stall: Codex rose on 3 and 5 in round 15, Claude on 2 and 5.
-- Base: `frames-v2.html` with round 15's triage applied (this commit).
-- Muse: 66% of its 5-hour window used after round 15 (resets about 4.5 hours after 2026-11-09 17:00), 22% of its week. A 12-image round uses about 25% of the window, so round 16 fits and round 17 may not.
-- Next step: copy `reviews/round-15-prompt.md` to `round-16-prompt.md`, replace Decisions so far with round 15's, swap in round 15's images as the previous set, stage, run the three seats.
+- Round: 17 next (council round 4), waiting on Jesse.
+- Tactic: fix, but a divergent round is due. Not a stall by the skill's rule, since Codex keeps rising (1, 5, c2 at 9/1 in round 16). The Claude seat is flat: rounds 14 to 16 all sit at design 7 to 8 and AI look 3 to 4, inside its measured noise, and every Claude report names the cream-panel-plus-app layout as the cause. Fix rounds have started to swing: screenshot 3's headline changed in every round from 14 to 17, the lock's bubbles went smaller then the Claude seat asked for a bigger one, and the video under the lock moved four times.
+- Base: `frames-v2.html` with round 16's triage applied (this commit).
+- Muse: 86% of its 5-hour window after round 16 (resets about 21:40 on 2026-11-09), 28% of its week. Round 16's report stopped partway, likely at a limit. Round 17 can't include Muse until the reset.
+- Next step: Jesse's call between a fix round 17 with Claude and Codex now, and a divergent round (each seat proposes a layout far from v2; two or three get built beside it and compared head to head).
 
 ## Score history
 
@@ -35,12 +35,42 @@ Design/AI look per image. Rounds 12 and 13 are from the two-judge loop, for refe
 | 15 | Claude | 8/3 | 8/3 | 7/3 | 8/3 | 8/3 | 7/3 |
 | 15 | Codex | 8/2 | 8/2 | 9/1 | 8/1 | 9/1 | 9/1 |
 | 15 | Muse | 7/5 | 6/5 | 7/3 | 8/2 | 7/3 | 6/4 |
+| 16 | Claude | 8/3 | 7/4 | 7/3 | 8/2 | 7/3 | 7/4 |
+| 16 | Codex | 9/1 | 8/2 | 8/1 | 8/1 | 9/1 | 9/1 |
+| 16 | Muse | 7/4 | 6/5 | 8/3 | 6/3 | 7/3 | 7/3 |
 
 Measured noise, Claude seat, identical images (round 13): one point on design, one on AI look, two on the tile.
 
 ## Decisions log
 
 What the next brief's "Decisions so far" draws on. Newest first.
+
+### Round 16 triage
+
+Compared with round 15: Codex better on 1, 2, 4, 5, c2, worse on 3; Claude better on 4 and c2, slightly better on 1 and 3, same on 2 and 5; Muse better on 1 to 4 (its report stopped before 5's comparison and the tile).
+
+Applied, Agreed:
+- 1: the rain is clustered, a dense curtain on the left thinning in bursts, with varied starts and lengths (Claude: the even row reads as stock; Muse: redraw with specific detail).
+- 2: the band's water resampled greener to match the strip at the seam (Claude, Codex). The note no longer says a vague "At zero": "At 0 minutes left, the video pauses under the water." (Claude; Muse asked for a line about the pictured state.)
+- 3: headline "Three ways to use drip." (Codex and Claude both asked to replace "Choose your limits."; Codex suggested "Pick your YouTube mode.", but YouTube in a headline is what every round-13 report flagged, so the line follows Claude's "Three ways to use it.").
+- 4: the second note leads with the behavior: "Dry hours start tonight: 11pm to 6am." (Codex; Claude asked for what dry hours do, not just times).
+- 5: the note gives a fact the tiles don't: "Saturday: 30 minutes, exactly 2 drops." (Muse; Claude said the old note narrated the tile labels.)
+
+Applied, Verified single:
+- 4: the subline now carries the first-day exception: "Stricter settings apply now. Looser ones wait for the reset after day one." Screenshot 3's page says changes apply right away for the first 24 hours, so the old subline was wrong for day one (Codex).
+
+Tried and reverted:
+- 2: the drawn video under the lock moved to show its gold sky (Claude, Muse). At 120% and 85% 55% the navy patch got bigger, not smaller, so it went back to round 15's 130% and 55% 95%. Four positions tried in four rounds; the lock's real blur turns any of them into soft color fields.
+
+Considered, not applied (one seat, or seats disagree):
+- Bubbles on 2: Claude wants one clearly larger, Muse wants fewer. They pull opposite ways.
+- Claude: 4's right margin (third round asking); a ripple under the tile's drop and a taller crest; a Quiet note on 3.
+- Codex: 4's first note as "5 drops after reset. 4 until then."; 1's leader without the elbow.
+- Muse: literal mode previews on 3 (drip's own UI, can't change here); the legend icons' shadow; a bigger chart on 5.
+
+Rejected, with the reason:
+- Muse, third time: 34m left next to 2 drops, and now 7 cards next to a 10-card default. Both are consistent: 34m is today's glass, 2 drops are saved, and 7 cards are left after 3 were used.
+- Muse, again: 4's last row cut off. It's fully in frame.
 
 ### Round 15 triage
 
