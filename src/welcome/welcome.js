@@ -885,10 +885,12 @@
 
   /**
    * The player with the pill. Returns the element and a stop function for its timer.
-   * @param {{onEmpty?: () => void, autoplay?: boolean}} [opts]
+   * @param {{onEmpty?: () => void, autoplay?: boolean, under?: boolean}} [opts]
    */
   function player(opts = {}) {
     const video = playing();
+    // Design round (designs/tour-player): a scene drawn into the player, fed each tick. Not in the real page.
+    const scene = /** @type {any} */ (globalThis).DripScene?.make(video, { under: !!opts.under });
     let isPlaying = false;
     /** @type {ReturnType<typeof setInterval> | undefined} */
     let timer;
@@ -902,6 +904,7 @@
       bar.style.width = `${Math.min(100, (at / length) * 100)}%`;
       box.classList.toggle('is-playing', isPlaying);
       pill.update(isPlaying);
+      scene?.update({ playing: isPlaying, at, length, left: sand.watchSecondsLeft, fraction: DripGlass.fraction(sand), glass: pillGlass, box });
       if (buttonShown !== String(isPlaying)) {
         buttonShown = String(isPlaying);
         button.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
@@ -950,7 +953,7 @@
         }
       },
     });
-    box.append(button, h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
+    box.append(...(scene ? [scene.el] : []), button, h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
     draw();
     if (opts.autoplay) play();
     return { el: box, stop };
@@ -1264,7 +1267,7 @@
         stage.querySelector('#drip-lock')?.remove();
         reasonOpen = false;
         note = '';
-        const p = player();
+        const p = player({ under: true });
         setUnder(p.el, p);
         const lockPanel = panel();
         lockPanel.classList.add('is-new');

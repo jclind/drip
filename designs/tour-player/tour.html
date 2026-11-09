@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>drip tour player</title>
+<script>
+  // dev/page.html for the welcome page only, with the tour player's scenes (scenes.js) loaded. ?v=a, b, or c picks the
+  // variant, and &video=tour-orbit (or another sample id) picks the player's video without going through step 2.
+  // The theme follows Chrome's; index.html sets it on its frame. Serve the worktree's root and open
+  // /designs/tour-player/tour.html?v=a#tour-3.
+  (() => {
+  const listeners = { addListener() {}, removeListener() {} };
+  const params = new URLSearchParams(location.search);
+  const mode = params.get('mode');
+  /** @type {any} */
+  let state = null;
+  /** @type {any} */ (window).chrome = {
+    runtime: {
+      id: 'dev',
+      getURL: (/** @type {string} */ p) => `/${p}`,
+      openOptionsPage() {},
+      onMessage: listeners,
+      sendMessage(/** @type {any} */ msg) {
+        const D = /** @type {any} */ (globalThis).Drip;
+        if (!D) return Promise.resolve({ ok: true });
+        if (!state) {
+          state = D.initialState(Date.now());
+          if (mode && D.MODES[mode]) Object.assign(state.settings, D.MODES[mode]);
+        }
+        const res = msg.type === 'updateSettings' ? D.updateSettings(state, msg.changes, Date.now()) : { ok: true };
+        return Promise.resolve({ ...res, state: structuredClone(state) });
+      },
+    },
+    storage: { onChanged: listeners, local: { get: async () => ({}) } },
+    windows: { getCurrent: async () => ({}) },
+    tabs: { query: async () => [] },
+  };
+  fetch('/src/welcome/welcome.html', { cache: 'no-store' }).then((r) => r.text()).then((html) => {
+    const extra = `<link rel="stylesheet" href="/designs/tour-player/scenes.css?${Date.now()}">`
+      + `<script src="/designs/tour-player/scenes.js?${Date.now()}"><\/script>`;
+    // The queries keep Chrome from serving an old copy while the mockups change.
+    const fresh = html.replace(/(src|href)="(coach|welcome)\.(js|css)"/g, `$1="$2.$3?${Date.now()}"`);
+    document.open();
+    document.write(fresh.replace('<head>', '<head><base href="/src/welcome/">').replace('<script src="coach.js', `${extra}<script src="coach.js`));
+    document.close();
+  });
+  })();
+</script>
