@@ -106,20 +106,24 @@
     if (theaterTimer !== null && theaterFor === id) return;
     if (theaterTimer !== null) clearInterval(theaterTimer);
     theaterTimer = null;
-    if (!id || theaterHandled.has(id) || (locked && !inGrace())) {
+    // A locked video skips theater mode. applyStatus tells fade.js when the lock is up: on a full load YouTube's
+    // navigate-finish lands here while the lock may still be waiting on the channel, and showing the page then showed
+    // the paused video with no lock (Jesse, 2026-11-09, with allowed channels).
+    if (locked && !inGrace()) return;
+    if (!id || theaterHandled.has(id)) {
       theaterDone();
       return;
     }
     if (!state) return;
     const deadline = performance.now() + 10000;
     let clickedAt = -Infinity;
-    function stop() {
+    function stop(show = true) {
       if (theaterTimer !== null) clearInterval(theaterTimer);
       theaterTimer = null;
-      theaterDone();
+      if (show) theaterDone();
     }
     function attempt() {
-      if (locked && !inGrace()) return stop();
+      if (locked && !inGrace()) return stop(false);
       const currentId = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
       if (disconnected || currentId !== id) return stop();
       if (performance.now() >= deadline) {
