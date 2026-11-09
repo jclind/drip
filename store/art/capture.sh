@@ -33,4 +33,4 @@ shoot() { # name width height query [motion]
 
 for n in 1 3 4 5; do shoot "screenshot-$n" 1280 800 "shot=$n"; done
 shoot screenshot-2 1280 800 shot=2 motion
-for t in c d d2 e; do shoot "tile-$t" 440 280 "tile=$t"; done
+for t in c d d2 d3 e; do shoot "tile-$t" 440 280 "tile=$t"; done

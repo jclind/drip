@@ -163,6 +163,28 @@ Fixes for round 4, checked against the images:
 
 Still split: tiles. Codex keeps c (8/1); Claude prefers d2 with the line 15 to 20% larger (c 5/5, d2 6/4).
 
+### Round 4, 2026-11-09
+
+Scored: screenshots 1 to 5, tiles c and d3 (larger wordmark and line than d2). Reports: `reviews/round-4-codex.md` and `reviews/round-4-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 3 | 7 | 4 |
+| 2 Lock | 8 | 2 | 6 | 4 |
+| 3 Modes | 7 | 3 | 7 | 4 |
+| 4 Settings | 7 | 2 | 6 | 4 |
+| 5 History | 8 | 2 | 7 | 4 |
+| Tile c | 8 | 1 | 6 | 4 |
+| Tile d3 | 7 | 2 | 7 | 4 |
+
+What changed: copy on every frame (no "paid", plain headline on 4, 5's comparison), 1 at 1.35x with room under the buttons, the ride under the lock brightened, bubbles kept low, 4 at 1.25x from the tabs with the page title hidden, 5's card at 1.12x. Rejected: Claude's round 3 ask to raise History's minutes toward 1h30, since the default day is 4 drops of 15 minutes and screenshots 3 and 4 say so.
+
+Plateau: the Claude judge has given AI look 3 to 5 on every screenshot for four rounds, and 4 on all seven images this round, whatever changed. Codex is at 1 to 3. Both name the same structure as the template signal: a headline on the left, the page in a panel on the right, one dark frame for all five. Crops and copy aren't moving that score.
+
+Errors of mine the judges caught: 5's subline said "last week's average", but the chart shows last week against the week before's average. 3's "Switch any time" overclaims, since after day one a looser mode waits for the reset.
+
+Open fixes if the frame stays: 3's headline, 4's "Each drop is 15 minutes" (the setting can change it), 5's subline, 1 "Spend a card to reveal the next video", the right-edge seam on 2, the gap under d3's wordmark. Claude also wants the drawn thumbnail reworked (uneven rain, a warmer light, a clearer rider) and "Stash" unpressed.
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.
