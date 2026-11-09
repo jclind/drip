@@ -90,18 +90,20 @@
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
       ready: '.drip-thumb img.is-loaded',
       legend: true, legendY: 430,
-      notes: [
-        { sel: '.drip-next', say: 'Not this one? The next pick costs a card.', above: 12 },
-      ],
+      // The channel, views, and age look real, so the frame says they're sample (Codex, ref round 1). The note about
+      // the next pick is gone: the card's legend line and the button's "-1" already say it (both seats, ref round 1).
+      foot: 'Sample video.',
+      notes: [],
     },
     2: {
       h: 'When time\nruns out.',
-      p: 'An optional daily limit,\ncounted in drops.',
+      p: 'An optional daily limit.\nWhen it\'s used up, the video pauses.',
       src: '/dev/page.html?page=welcome#tour-4',
       // The tour's stage alone, full height, cropped past its blurred edges. It sits at 362 to 921 across and 231 to 729
       // down in the page.
       w: 1280, h2: 800, x: -730, y: -416, scale: 1.7,
-      motion: true, water: 150,
+      // Ref round 1 took the drawn water band off the paper: its crest stopped at the seam with no surface beside it.
+      motion: true,
       // Roboto, as on YouTube: the welcome page doesn't load it. The spark that circles "Done for now" only makes sense
       // moving, and the pill under the water showed as a clipped word, so both are hidden. The paused player gets
       // screenshot 1's ride, brightened so it shows through the lock's tint and blur.
@@ -153,8 +155,7 @@
         });
       }, 600),
       notes: [
-        { sel: '#drip-lock .drip-lock-add', say: 'Stop here, or spend a drop\nfor 15 more minutes.' },
-        { at: 690, say: 'At 0 minutes left, the video\npauses under the water.' },
+        { sel: '#drip-lock .drip-lock-add', say: 'Or spend a drop\nfor 15 more minutes.' },
       ],
     },
     3: {
@@ -166,13 +167,12 @@
       css: '.hero { visibility: hidden !important; }',
       ready: 'input[type=radio], [role=radio]',
       notes: [
-        { sel: '[data-mode=full] .dot', gap: 8, nodot: true, say: 'The default: 4 drops\nand 10 cards a day.' },
         { text: 'Customize', say: 'Or set your own mix.' },
       ],
     },
     4: {
       h: 'Easy to tighten.\nSlow to loosen.',
-      p: 'After your first 24 hours:\ntighten now, loosen at reset.',
+      p: 'After your first 24 hours: tighten now,\nloosen at the daily reset.',
       src: '/dev/page.html?page=options&settled=1&sample=1&pending=1',
       // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden. The
       // sample raised drops from 4 to 5, so the row shows the waiting change.
@@ -186,7 +186,7 @@
     },
     5: {
       h: 'Your week\nin minutes.',
-      p: 'Sample week: 41 minutes a day,\ndown from 48 the week before.',
+      p: 'Sample week: 41 minutes a day,\ndown from 48.',
       src: '/dev/page.html?page=options&settled=1&sample=1#history',
       // The week's card, scaled so its edges fall just outside the strip and its gray is the strip's background.
       w: 728, h2: 770, x: -137, y: -264, scale: 1.36, bg: CARD_GRAY,
@@ -203,9 +203,7 @@
         /** @type {HTMLElement} */ (d.querySelector('[data-k=earlier]')).click();
         setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300);
       },
-      notes: [
-        { sel: '.tile:has(.drip-token-drop)', say: 'Saturday: 30 minutes,\nexactly 2 drops.' },
-      ],
+      // No note: the Saturday tiles already show 30m and 2 drops (both seats, ref round 1).
     },
   };
 

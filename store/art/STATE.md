@@ -1,6 +1,69 @@
 # Council state: drip store images
 
-The `/council` run on drip's store images, started 2026-11-09. `/council continue` picks it up from here. The rounds before the council (0 to 13, two judges) are in `HILL-CLIMB.md`.
+Two runs. The current one, `store-images-ref`, comes first; `/council continue` picks it up from its Current section. The first run (rounds 14 to 19) follows it and is closed. The rounds before the council (0 to 13, two judges) are in `HILL-CLIMB.md`.
+
+# Run 2: store-images-ref (started 2026-11-09)
+
+A fresh pass on the round-19 set, judged against 13 top Chrome Web Store extensions' images (`reference/ref-01.png` to `-13.png`, kept out of git through `.git/info/exclude`). It answers Jesse's three concerns about it: how much text, screenshot 2's water band at the seam, and tile c2's two-line tagline. The brief doesn't pass on the first run's decisions or tell seats about earlier rounds, only the hard limits and the water-partway problem as a technical fact.
+
+## Settings (Jesse, 2026-11-09)
+
+- Seats: Anthropic (fresh `general-purpose` Agent) and OpenAI (Codex, gpt-6.1-sol high). Muse is out of this run.
+- Goal: both seats rate every drip image at or above the middle of the 13 references, and no blocking fix that both seats name is left.
+- A seat that fails or runs out: stop and ask Jesse.
+- Pace: up to 4 rounds without asking, then ask. Stop sooner at the goal or a stall.
+- Reviewed: `store/images-v2/screenshot-1.png` to `-5.png` and `tile-c2.png`.
+- Files: briefs `reviews/ref-N-prompt.md`, reports `reviews/ref-N-<seat>.md`, images `rounds/ref-N/`.
+
+## Current
+
+- Round: 2 next.
+- Tactic: fix.
+- Base: `frames-v2.html` with ref round 1's cuts (this commit).
+- Next step: round 2 on the new set, with ref round 1's set alongside for the comparison and the decisions below in the brief.
+
+## Score history
+
+Design/AI look per image, and the seat's median for the references.
+
+| Round | Seat | Refs median | 1 | 2 | 3 | 4 | 5 | c2 |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Claude | 7/4 | 8/3 | 6/4 | 7/3 | 7/3 | 7/3 | 7/3 |
+| 1 | Codex | 8/5 | 7/2 | 7/2 | 7/2 | 7/2 | 8/2 | 8/1 |
+
+Below the references' middle in round 1: Codex 1, 2, 3, 4; Claude 2.
+
+## Decisions log
+
+### Ref round 1
+
+Used: the Claude seat 87,217 tokens; Codex 51,054 tokens (19 images each).
+
+Both seats on Jesse's questions:
+- Text: too much. Both called the notes the problem, not the headlines. Both counted 20 to 40 words in a typical reference and none with leader lines.
+- Screenshot 2's band: not deliberate. Both said remove it, and both rejected a drawn surface over the strip (fake UI over the real capture, and it would contradict the lock's full water).
+- Tile c2's tagline: reads well; keep the copy and the two lines.
+
+Applied, Agreed (both seats):
+- 1: the "Not this one? The next pick costs a card." note is gone (the card legend line and the button's "-1" say it).
+- 2: the water band and its note "At 0 minutes left, the video pauses under the water." are gone; the pause moved into the subline: "An optional daily limit. / When it's used up, the video pauses." (Claude's wording; Codex asked for "An optional daily limit that pauses playback."). The other note is shorter, "Or spend a drop / for 15 more minutes." (Claude asked for this; Codex asked to cut it, so the smaller change went in.)
+- 3: the "The default: 4 drops and 10 cards a day." note is gone (the card's own "1h of watching and 10 new videos" says it plainer).
+- 4: the subline names the reset: "After your first 24 hours: tighten now, / loosen at the daily reset." (both called the bare "reset" undefined; Codex's wording, since Claude's "until tomorrow" isn't accurate with a 4:00am reset).
+- 5: the "Saturday: 30 minutes, exactly 2 drops." note is gone, and the subline is shorter: "Sample week: 41 minutes a day, / down from 48." `capture.sh` skips the notes check for screenshot 5, which has none now.
+
+Applied, Verified single:
+- 1: "Sample video." under the subline (Codex's only blocker). The channel name, views, and age look real, and the brief's own limit says sample data is labeled or obviously sample.
+- Claude's blocker (2's "0 minutes left" next to a drop on offer) is gone with the note. Drops carry over from earlier days, so a spare drop after a full day is real.
+
+Considered, not applied (one seat):
+- Codex: shorter legend lines on 1 ("One drop = 15 minutes by default."); cut 2's drop note; cut 3's "Or set your own mix." note; narrow the panel and enlarge 3's capture; a tighter crop on 4's drop rows; a larger cyclist on 1; 6px more between the tile's wordmark and tagline; 1's subline as "A Chrome extension that replaces YouTube's home feed with one pick."
+- Claude: cut 3's subline; 4's subline as "Lower limits apply now. Higher ones wait until tomorrow."; move 4's text down so the panel isn't top-heavy; 5's subline as "A sample week."; 1's subline without "Chrome extension"; a smaller scale on 2's strip so more water shows around the lock; Friday's bar trimmed to about 60m; the tile's tagline in semibold, 10 to 15% larger, and a thicker wave or none.
+
+Watch next round: 3's remaining note starts with "Or" right after a subline that ends "or choose a lighter mode."
+
+# Run 1: rounds 14 to 19 (closed 2026-11-09)
+
+Closed by Jesse on 2026-11-09: Muse's round-20 ship check was skipped, and Claude and Codex's "ship" in round 19 counts as the result.
 
 ## Settings (Jesse, 2026-11-09)
 

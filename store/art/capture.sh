@@ -37,7 +37,8 @@ shoot() { # name width height query [motion]
       --force-dark-mode --window-size="$2,$3" --force-device-scale-factor=$dsf --virtual-time-budget=$budget --screenshot="$out/$1.png" --log-net-log="$profile/net-$1.json" \
       "http://127.0.0.1:$port/store/art/$page?$4" >/dev/null 2>&1
     [ "$dsf" = 1 ] || sips -z "$3" "$2" "$out/$1.png" >/dev/null
-    case "$page$1" in frames-v2.htmlscreenshot-*) ;; *) break ;; esac
+    # Screenshot 5 has no note since ref round 1, so there's nothing for has-notes.py to find.
+    case "$page$1" in frames-v2.htmlscreenshot-5) break ;; frames-v2.htmlscreenshot-*) ;; *) break ;; esac
     python3 store/art/has-notes.py "$out/$1.png" && break
     [ $tries -lt 4 ] || { echo "capture: $1 has no notes after $tries tries" >&2; exit 1; }
     echo "capture: $1 had no notes, trying again" >&2
