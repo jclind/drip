@@ -17,10 +17,11 @@ A fresh pass on the round-19 set, judged against 13 top Chrome Web Store extensi
 
 ## Current
 
-- Round: 5 next. Jesse said run another round (2026-11-09); ask him again after it.
-- Tactic: fix.
-- Base: every frame on the 480px panel (this commit). `rounds/ref-4-applied/` is the set after round 4's fixes, before this change.
-- Next step: round 5, with Jesse's two decisions in the brief as the owner's, then report to him.
+- Round: 5 done; paused for Jesse.
+- Goal: not met, and within the seats' noise. Claude puts 3 and 4 below the middle; Codex puts only 1 below (the cyclist). Both say ship, no blocking fixes. Images that didn't change between rounds 4 and 5 moved a point either way (Claude 3 and 4 down, Codex 3 and the tile up), so one point is each seat's noise, and every image sits within it of the middle.
+- Base: every frame on the 480px panel, with round 5's note cut on 4 (this commit).
+- Recommendation: stop here and ship this set. The remaining asks split the seats (below), so another fix round would apply nothing new.
+- Waiting on Jesse: stop or go on; 1's cyclist; 4's crop.
 
 ## Jesse's decisions (2026-11-09, after ref round 4)
 
@@ -42,11 +43,33 @@ Design/AI look per image, and the seat's median for the references.
 | 3 | Codex | 8 | 8/2 | 6/2 | 8/2 | 7/2 | 8/2 | 8/1 |
 | 4 | Claude | 7 | 7/3 | 2b 7/3 (2 6/4, 2a 6/4) | 7/3 | 7/3 | 7/3 | 7/3 |
 | 4 | Codex | 7 | 8/2 | 2b 7/2 (2 6/4, 2a 7/2) | 7/2 | 8/2 | 7/2 | 6/2 |
+| 5 | Claude | 7 | 7/3 | 7/3 | 6/3 | 6/3 | 7/3 | 7/2 |
+| 5 | Codex | 8 | 7/2 | 8/2 | 8/1 | 8/1 | 8/1 | 8/1 |
 
 Below the references' middle in round 1: Codex 1, 2, 3, 4; Claude 2. Round 2: Codex 2, 3, 4; Claude 2, 3. Both seats: ship, no blocking fixes. Round 3: both seats 2 and 4 (Claude called the tile, at 6, at the middle for a tile); both ship, no blocking fixes.
 Round 4, with 2b: Claude none; Codex the tile only. Both ship with 2b, no blocking fixes.
+Round 5: Claude 3 and 4; Codex 1. Both ship, no blocking fixes.
 
 ## Decisions log
+
+### Ref round 5
+
+Used: the Claude seat 88,350 tokens; Codex 53,553 tokens (25 images each).
+
+Compared with round 4 (after its fixes): both called 1, 2, and 5 better; 3, 4, and the tile the same (unchanged). Claude: the single panel width stops the logo and headline jumping between frames.
+
+Applied, Agreed (both seats):
+- 4: the note is "Raised to 5 drops." The chip it points at says "4 drops until 4:00am".
+
+Not applied, the seats split:
+- 1's cyclist about twice as tall, with more contrast (Codex, fifth round asking; the only reason it puts 1 below the middle). Claude: the thumbnail's job is "this is a video", and it does that.
+- 4's capture: Claude puts 4 below the middle because the toggles sit about 20px from the right edge and 160px of black sits above the tabs; it asks for 80px side gutters like 1 and 2 and the tabs at y 128 like 3's question. Codex: the vertical position is balanced. Fitting 80px gutters means a scale of about 1.2, smaller than before round 3's crop.
+- 1's and 5's top and bottom margins, about 20px since the 480px move (Claude: take back half the bump; Codex called both better).
+- 1's subline without "A Chrome extension for" (Claude: filler on the store; Codex: keep, it gives context).
+
+Considered, not applied (one seat):
+- Claude: 3 without the Next button, its cards scaled up into the room.
+- Codex: 2's arrow wider and heavier; 5's subline "Sample week. Minutes, drops, and cards by day."; "A card reveals one video." (optional, it said).
 
 ### Ref round 4
 

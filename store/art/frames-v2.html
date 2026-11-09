@@ -191,7 +191,8 @@
       ready: '[role=tab]',
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
       notes: [
-        { sel: '.chip', has: '4 drops', say: 'Raised to 5 drops. Today\nstays at 4 until 4:00am.', above: 17 },
+        // The chip it points at says the rest, "4 drops until 4:00am" (both seats, ref round 5).
+        { sel: '.chip', has: '4 drops', say: 'Raised to 5 drops.', above: 17 },
       ],
     },
     5: {
