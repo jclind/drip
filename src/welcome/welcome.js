@@ -884,13 +884,76 @@
   }
 
   /**
+   * One wave band of the tour's sea, 640 wide so it can roll by one 80-wide wave and loop, and deep enough to stay
+   * past the frame's bottom when the sea rises.
+   * @param {number} y @param {number} amp
+   */
+  function wave(y, amp) {
+    let d = `M0 ${y}`;
+    for (let x = 0; x < 640; x += 80) d += ` q20 ${-amp} 40 0 t40 0`;
+    return `${d} V240 H0 Z`;
+  }
+
+  // What the tour's player plays: a small sea at dusk (DESIGN.md, "Tour player as built"). The sea creeps up and the sun
+  // sets as the minutes drain, the boat lists in the last few, and at 0 it sinks before the lock's water rises. The
+  // player under the lock shows it sunk. Everything moves only while the player plays (welcome.css).
+  function seaPicture() {
+    return `
+    <defs><linearGradient id="tour-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#27466b"/><stop offset=".55" stop-color="#c98a6c"/><stop offset="1" stop-color="#f3c99a"/>
+    </linearGradient></defs>
+    <rect width="320" height="180" fill="url(#tour-sky)"/>
+    <g class="tour-sun"><circle cx="226" cy="88" r="17" fill="#ffe0a3"/><circle cx="226" cy="88" r="30" fill="#ffe0a3" opacity=".18"/></g>
+    <g fill="#fff">
+      <path class="tour-cloud" opacity=".55" d="M30 40a9 9 0 0 1 16-6 12 12 0 0 1 22 4 7 7 0 0 1 2 14H32a7 7 0 0 1-2-12Z"/>
+      <path class="tour-cloud tour-cloud-2" opacity=".4" d="M170 26a7 7 0 0 1 13-4 9 9 0 0 1 17 3 6 6 0 0 1 1 11h-29a5 5 0 0 1-2-10Z"/>
+      <path class="tour-cloud tour-cloud-3" opacity=".35" d="M260 54a6 6 0 0 1 11-3 8 8 0 0 1 14 3 5 5 0 0 1 1 9h-25a5 5 0 0 1-1-9Z"/>
+    </g>
+    <g class="tour-sea">
+      <g class="tour-wave"><path d="${wave(112, 3)}" fill="#3d7097"/></g>
+      <g class="tour-boat-at"><g class="tour-boat">
+        <path d="M-3 -40 L-3 -2" stroke="#3b2a20" stroke-width="2"/>
+        <path d="M-1 -38 L24 -6 L-1 -6 Z" fill="#fbf3e4"/>
+        <path d="M-5 -34 L-20 -7 L-5 -7 Z" fill="#e9dcc6"/>
+        <path d="M-26 -3 H24 L18 8 H-20 Z" fill="#9c4a2e"/>
+        <path d="M-26 -3 H24" stroke="#6b2f1c" stroke-width="2"/>
+      </g></g>
+      <g class="tour-wave tour-wave-mid"><path d="${wave(120, 4)}" fill="#2c5b80"/></g>
+      <g class="tour-wave tour-wave-front"><path d="${wave(132, 5)}" fill="#1f4767"/></g>
+    </g>`;
+  }
+
+  /**
+   * The sea scene for one player. `under` is the paused player under the lock, where the boat has already sunk.
+   * @param {boolean} under
+   */
+  function seaScene(under) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 320 180');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    svg.setAttribute('class', `tour-scene${under ? ' is-sunk' : ''}`);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = seaPicture();
+    // Arriving with an empty glass isn't the end of a video, so nothing drains until this player has played.
+    let played = false;
+    /** @param {boolean} playing @param {boolean} unlocked @param {number} fraction */
+    function update(playing, unlocked, fraction) {
+      if (playing) played = true;
+      // An unlocked video plays free, so its sea stays calm.
+      const drained = under ? 1 : unlocked || !played ? 0 : 1 - fraction;
+      svg.style.setProperty('--drained', drained.toFixed(4));
+      svg.classList.toggle('is-sinking', !under && played && !unlocked && fraction <= 0);
+    }
+    return { el: svg, update };
+  }
+
+  /**
    * The player with the pill. Returns the element and a stop function for its timer.
-   * @param {{onEmpty?: () => void, autoplay?: boolean, under?: boolean}} [opts]
+   * @param {{onEmpty?: () => void, autoplay?: boolean, under?: boolean}} [opts] `under` is the paused player under the lock.
    */
   function player(opts = {}) {
     const video = playing();
-    // Design round (designs/tour-player): a scene drawn into the player, fed each tick. Not in the real page.
-    const scene = /** @type {any} */ (globalThis).DripScene?.make(video, { under: !!opts.under });
+    const scene = seaScene(!!opts.under);
     let isPlaying = false;
     /** @type {ReturnType<typeof setInterval> | undefined} */
     let timer;
@@ -904,7 +967,7 @@
       bar.style.width = `${Math.min(100, (at / length) * 100)}%`;
       box.classList.toggle('is-playing', isPlaying);
       pill.update(isPlaying);
-      scene?.update({ playing: isPlaying, unlocked: sand.unlocked.includes(video.id), at, length, left: sand.watchSecondsLeft, fraction: DripGlass.fraction(sand), glass: pillGlass, box });
+      scene.update(isPlaying, sand.unlocked.includes(video.id), DripGlass.fraction(sand));
       if (buttonShown !== String(isPlaying)) {
         buttonShown = String(isPlaying);
         button.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
@@ -953,7 +1016,8 @@
         }
       },
     });
-    box.append(...(scene ? [scene.el] : []), button, h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
+    box.append(scene.el, button, h('span', { class: 'tour-player-speed', 'aria-hidden': 'true' }, `×${SPEED}`),
+      h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
     draw();
     if (opts.autoplay) play();
     return { el: box, stop };
