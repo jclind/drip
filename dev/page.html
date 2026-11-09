@@ -46,7 +46,12 @@
             // On a full day: an unlock only comes up once the minutes run out (round 5).
             state.log[D.addDays(state.day, -3)].needThis.push({ videoId: 'store-knife', title: 'Sharpening on a single whetstone', reason: 'Class assignment due tonight', at: at - 3 * 86400000 });
             state.tokens = { watch: 2, rec: 7 };
+            // Saturday's cards differ from screenshot 1's 7 left, so the two images don't look copied (round 8).
+            Object.assign(state.log[D.addDays(state.day, -2)], { recSpent: 5, saved: 1, watched: 2, passed: 2 });
           }
+          // &pending=1 raises Drops per day from 4 to 5 a week after install, so the change waits for the reset (Q6):
+          // the store's Settings image shows "Slow to loosen" happening.
+          if (params.get('pending') === '1') D.updateSettings(state, { watchTokensPerDay: 5 }, Date.now());
         }
         const res = msg.type === 'updateSettings' ? D.updateSettings(state, msg.changes, Date.now())
           : msg.type === 'cancelPending' ? D.cancelPending(state, msg.key) : { ok: true };

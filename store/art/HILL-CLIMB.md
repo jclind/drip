@@ -241,6 +241,24 @@ Noise: the Claude judge gave 3 on four screenshots in round 6 and 4 on the same 
 
 Round 8 changes: every leader runs level from the middle of its note; notes are placed top to bottom by target; the drip mark moves to the top so notes can sit by low targets; the tour's coach ring and Done's rings are hidden, and focus is cleared so no control looks pressed; bigger bubbles plus a note explaining the water; 4 shows all of Watch time under "Easy to tighten. Slow to loosen."; 5's card fills the strip edge to edge; tile c2 (larger, tagline on two lines). v2 now captures at 2x and scales down with `sips`, since Codex found the lock's text soft; `has-notes.py` retries a 2x capture whose page wasn't ready in time (it happened about one shot in four).
 
+### Round 8, 2026-11-09 (v2)
+
+Reports: `reviews/round-8-codex.md`, `reviews/round-8-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 7 | 3 |
+| 2 Lock | 8 | 2 | 7 | 3 |
+| 3 Modes | 8 | 1 | 6 | 3 |
+| 4 Settings | 7 | 1 | 7 | 3 |
+| 5 History | 8 | 1 | 7 | 3 |
+| Tile c | 8 | 1 | 6 | 4 |
+| Tile c2 | 9 | 1 | 7 | 3 |
+
+Tile c2 meets the target with Codex. Claude: 3 on every screenshot. Its reason this time: the cream, serif, and blue-leader look is now a common "tasteful default", and nothing in the frame is drip's own except the strip.
+
+Round 9 changes, aimed at that: a legend on screenshot 1 with drip's real drop and card icons ("A drop is 15 minutes of watching. A card reveals one new video."); screenshot 4's sample raises drops from 4 to 5 after day one (`dev/page.html` `&pending=1`), so the page shows its own "4 drops until 4:00am · Undo" chip under "Easy to tighten. Slow to loosen."; Saturday's sample uses 5 cards, not 7, so it doesn't mirror screenshot 1's counter; History ends above its summary line, with the strip in the card's gray; the lock keeps two notes; new headlines on 3 ("Choose how strict.") and 5 ("Where your hour went.").
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.
