@@ -5,7 +5,9 @@
 set -eu
 cd "$(dirname "$0")/../.."
 page=frames.html out=store/images tiles="c d d2 d3 e"
-if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c p"; shift; fi
+dsf=1
+# v2 renders at 2x and sips scales it down: the scaled iframes' text came out soft at 1x (Codex, round 7).
+if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c c2 p" dsf=2; shift; fi
 port=${1:-8078}
 chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 profile=$(mktemp -d)
@@ -20,10 +22,24 @@ sleep 1
 shoot() { # name width height query [motion]
   # Reduced motion keeps every frame still. The lock (shot 2) needs motion on, or it has no bubbles; frames.html sets them.
   rm=--force-prefers-reduced-motion budget=6000; [ "${5:-}" = motion ] && rm=--no-default-browser-check budget=9000
-  # A profile per shot: sharing one cut 23px off the bottom of shot 2's panel (round 3, 2026-11-09).
-  "$chrome" --headless --disable-gpu --user-data-dir="$profile/$1" --hide-scrollbars $rm \
-    --force-dark-mode --window-size="$2,$3" --virtual-time-budget=$budget --screenshot="$out/$1.png" --log-net-log="$profile/net-$1.json" \
-    "http://127.0.0.1:$port/store/art/$page?$4" >/dev/null 2>&1
+  # At 2x the welcome page needs longer to draw before the screenshot.
+  [ "$dsf" = 1 ] || budget=$((budget + 6000))
+  # v2's screenshots have notes, drawn only once the page in the strip is ready. At 2x the page now and then isn't
+  # ready in time, so a shot without notes is taken again, up to four times.
+  tries=0
+  while :; do
+    tries=$((tries + 1))
+    # A profile per shot: sharing one cut 23px off the bottom of shot 2's panel (round 3, 2026-11-09).
+    rm -rf "$profile/$1"
+    "$chrome" --headless --disable-gpu --user-data-dir="$profile/$1" --hide-scrollbars $rm \
+      --force-dark-mode --window-size="$2,$3" --force-device-scale-factor=$dsf --virtual-time-budget=$budget --screenshot="$out/$1.png" --log-net-log="$profile/net-$1.json" \
+      "http://127.0.0.1:$port/store/art/$page?$4" >/dev/null 2>&1
+    [ "$dsf" = 1 ] || sips -z "$3" "$2" "$out/$1.png" >/dev/null
+    case "$page$1" in frames-v2.htmlscreenshot-*) ;; *) break ;; esac
+    python3 store/art/has-notes.py "$out/$1.png" && break
+    [ $tries -lt 4 ] || { echo "capture: $1 has no notes after $tries tries" >&2; exit 1; }
+    echo "capture: $1 had no notes, trying again" >&2
+  done
   size=$(sips -g pixelWidth -g pixelHeight "$out/$1.png" | awk '/pixel/ {printf "%s ", $2}')
   [ "$size" = "$2 $3 " ] || { echo "capture: $1 is $size, not $2x$3" >&2; exit 1; }
   # Chrome's own network log sees every request. A YouTube host in it means a real thumbnail or logo got in.

@@ -223,6 +223,24 @@ Codex: AI look met on every image, tile c meets both targets. Claude: AI look mo
 
 Round 7 changes, from both reports: the drawn thumbnail redrawn (a lumpy storm instead of ovals, uneven rain, the rider on the crest against a break of light; Codex said the rider vanished and the ovals read as stock); the channel "Trail Days" (a real festival, Claude) is now "Wet Gravel Club"; screenshot 1 shows Stash unpressed (the `card` scenario); notes at 20px; no payment words ("buys", "cost"); the lock's paused player enlarged under the water so the strip has no dark band at its edge; a fixed subline line; crops centered. Each round's images go to `rounds/round-N/` from the judges' copies, which are exactly what was scored.
 
+### Round 7, 2026-11-09 (v2)
+
+Reports: `reviews/round-7-codex.md`, `reviews/round-7-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 7 | 4 |
+| 2 Lock | 8 | 2 | 7 | 3 |
+| 3 Modes | 8 | 2 | 7 | 4 |
+| 4 Settings | 7 | 2 | 6 | 4 |
+| 5 History | 8 | 2 | 6 | 4 |
+| Tile c | 8 | 1 | 6 | 4 |
+| Tile p | 9 | 1 | 4 | 5 |
+
+Noise: the Claude judge gave 3 on four screenshots in round 6 and 4 on the same frames, barely changed, in round 7. One run per round is noisy by about a point, so a single round's dip or gain doesn't mean much on its own.
+
+Round 8 changes: every leader runs level from the middle of its note; notes are placed top to bottom by target; the drip mark moves to the top so notes can sit by low targets; the tour's coach ring and Done's rings are hidden, and focus is cleared so no control looks pressed; bigger bubbles plus a note explaining the water; 4 shows all of Watch time under "Easy to tighten. Slow to loosen."; 5's card fills the strip edge to edge; tile c2 (larger, tagline on two lines). v2 now captures at 2x and scales down with `sips`, since Codex found the lock's text soft; `has-notes.py` retries a 2x capture whose page wasn't ready in time (it happened about one shot in four).
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.
