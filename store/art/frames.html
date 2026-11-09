@@ -14,22 +14,21 @@
   :root { --bg: #0a1422; --text: #f1f1f1; --muted: #9fb0c4; --blue: #42a5f6; --gold: #fdc905; }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font-family: Roboto, Arial, sans-serif; overflow: hidden; }
-  .shot { position: relative; width: 1280px; height: 800px;
-    background: radial-gradient(900px 600px at 0% 100%, rgba(66, 165, 246, 0.16), transparent 70%), var(--bg); }
+  .shot { position: relative; width: 1280px; height: 800px; overflow: hidden; background: var(--bg); }
   .copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 400px; display: flex; flex-direction: column; justify-content: center; }
   .brand { position: absolute; left: 72px; bottom: 56px; display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
   .mask { display: inline-block; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
   .drop { --src: url(/src/icons/drop.svg); color: var(--blue); aspect-ratio: 600 / 893; }
   .card { --src: url(/src/icons/card.svg); color: var(--gold); aspect-ratio: 600 / 697; }
   .brand .drop { height: 30px; }
-  h1 { margin: 0 0 20px; font-size: 46px; line-height: 1.12; font-weight: 500; letter-spacing: -1px; }
+  h1 { white-space: pre-line; margin: 0 0 20px; font-size: 46px; line-height: 1.12; font-weight: 500; letter-spacing: -1px; }
   .copy p { margin: 0; font-size: 20px; line-height: 1.45; color: var(--muted); }
-  .panel { position: absolute; right: 48px; top: 48px; width: 728px; height: 704px; border-radius: 18px; overflow: hidden;
-    background: #0f0f0f; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); }
+  /* The page runs off the right and bottom edges, like a window cropped, rather than a card floating in a gradient. */
+  .panel { position: absolute; right: 0; top: 64px; width: 744px; height: 736px; border-top-left-radius: 12px; overflow: hidden;
+    background: #0f0f0f; border: solid rgba(255, 255, 255, 0.1); border-width: 1px 0 0 1px; }
   .panel iframe { position: absolute; border: 0; transform-origin: 0 0; background: #0f0f0f; }
 
-  .tile { position: relative; width: 440px; height: 280px; overflow: hidden;
-    background: radial-gradient(360px 260px at 20% 100%, rgba(66, 165, 246, 0.22), transparent 70%), var(--bg); }
+  .tile { position: relative; width: 440px; height: 280px; overflow: hidden; background: var(--bg); }
   .tile .word { font-weight: 700; letter-spacing: -2px; }
 </style>
 </head>
@@ -41,50 +40,88 @@
   /**
    * Each shot: the caption, the harness page, the iframe's size and offset in the panel, and what to do inside it once
    * it's drawn: CSS to hide harness parts or tour notes, and an optional step (a click, a scroll).
-   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x?: number, y?: number, scale?: number, css?: string, ready: string, step?: (d: Document) => void}>}
+   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x?: number, y?: number, scale?: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void}>}
    */
   const SHOTS = {
     1: {
       h: 'One video at a time.',
-      p: 'drip swaps YouTube\'s endless home feed for a single recommendation you choose to reveal.',
+      p: 'drip replaces the home feed with one video, and only when you ask for it.',
       src: '/dev/home.html?scenario=saved&theme=dark&reduced=1&videos=store',
-      w: 728, h2: 760, y: -40,
+      w: 620, h2: 656, x: -10, y: -120, scale: 1.25,
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
       ready: '.drip-thumb img.is-loaded',
     },
     2: {
-      h: 'When the glass runs dry, the video stops.',
-      p: 'Spend another drop for 15 more minutes, or call it a day.',
+      h: 'Out of minutes?\nThe lock comes up.',
+      p: 'Limits are optional. With one on, a drop buys 15 more minutes, or you call it a day.',
       src: '/dev/page.html?page=welcome#tour-4',
-      w: 1280, h2: 800, x: -545, y: -328, scale: 1.42,
-      css: '.co-layer { display: none !important; } .tour-stage { border-color: transparent !important; }',
-      ready: '#drip-lock',
+      // The tour's stage alone, filling the panel. It sits at 362 to 921 across and 231 to 729 down in the page; x and y are panel pixels, before the scale.
+      w: 1280, h2: 800, x: -590, y: -347, scale: 1.5,
+      motion: true,
+      css: '.co-layer, .tour-again { display: none !important; } .tour-stage { border-color: transparent !important; }',
+      ready: '#drip-lock .drip-lock-sub',
+      // The tour runs on a fresh state, so its lock says "0m watched today". The default day is 4 drops of 15 minutes.
+      // Headless Chrome doesn't advance animation time in the iframe, so every animation is set by hand: the water, page
+      // fades, and the panel's rise finished, and the bubbles placed up the water so it reads as water. sea() places the
+      // bubbles at random; these fix them, so every capture is the same.
+      step: (d) => setTimeout(() => {
+        /** @type {HTMLElement} */ (d.querySelector('#drip-lock .drip-lock-sub')).textContent = '1h watched today';
+        const BUBBLES = [[8, 9, 0.62], [17, 5, 0.3], [29, 7, 0.82], [71, 6, 0.2], [80, 10, 0.55], [88, 5, 0.74], [93, 7, 0.36], [50, 4, 0.9]];
+        d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
+          const [x, size] = BUBBLES[i % BUBBLES.length];
+          const b = /** @type {HTMLElement} */ (el);
+          b.style.setProperty('--x', `${x}%`);
+          b.style.setProperty('--size', `${size}px`);
+          b.style.setProperty('--rise', '10s');
+          b.style.setProperty('--delay', '0s');
+        });
+        d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
+          for (const a of el.getAnimations()) {
+            if (/bubble-rise/.test(/** @type {CSSAnimation} */ (a).animationName)) a.currentTime = 10000 * BUBBLES[i % BUBBLES.length][2];
+          }
+        });
+        d.getAnimations().forEach((a) => {
+          const name = /** @type {CSSAnimation} */ (a).animationName || '';
+          if (/bubble-rise/.test(name)) { a.pause(); return; }
+          if (/swim|bob|sway/.test(name)) a.currentTime = 3000;
+          else { try { a.finish(); } catch { a.currentTime = 5000; } }
+          a.pause();
+        });
+      }, 600),
     },
     3: {
-      h: 'Pick how much drip does.',
-      p: 'A search box alone, one video at a time, or a daily allowance of watch time.',
+      h: 'Start with search only, or go further.',
+      p: 'Quiet hides the feeds. Curated adds one video at a time. Full drip adds a daily limit.',
       src: '/dev/page.html?page=welcome',
-      w: 728, h2: 800, x: -10, y: -20,
+      w: 680, h2: 713, x: -17, y: -120, scale: 1.15,
       css: '',
       ready: 'input[type=radio], [role=radio]',
     },
     4: {
       h: 'Set your own limits.',
-      p: 'Tightening one applies now. Loosening one waits for tomorrow, so a late night can\'t talk you out of it.',
+      p: 'Stricter settings apply now. Looser ones wait until tomorrow.',
       src: '/dev/page.html?page=options&settled=1&sample=1',
-      w: 728, h2: 1000, y: -30,
+      // From the tabs to the end of the Watch time section.
+      w: 728, h2: 712, x: -26, y: -108, scale: 1.1,
       css: '',
       ready: '[role=tab]',
+      // The frame is shorter than the page, so keep it scrolled to the top.
+      step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
     },
     5: {
       h: 'See where the time went.',
-      p: 'Minutes each day, drops and cards spent, and the reasons you gave for every unlock.',
+      p: 'Minutes each day against the week before, and the drops and cards you used.',
       src: '/dev/page.html?page=options&settled=1&sample=1#history',
-      w: 728, h2: 1100, x: 18, y: -66, scale: 0.95,
+      // From the tabs to the end of the week's card. The unlock reasons below it don't fit at a readable size.
+      w: 728, h2: 840, x: 8, y: -96,
       css: '',
       ready: '[data-k=earlier]',
-      // This week starts on Sunday, so early in the week the chart is mostly empty. Last week is a full one.
-      step: (d) => /** @type {HTMLElement} */ (d.querySelector('[data-k=earlier]')).click(),
+      // This week starts on Sunday, so early in the week the chart is mostly empty. Last week is a full one. The frame is
+      // shorter than the tab, so the page scrolls to #history on its own; put it back at the top.
+      step: (d) => {
+        /** @type {HTMLElement} */ (d.querySelector('[data-k=earlier]')).click();
+        setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300);
+      },
     },
   };
 
@@ -145,8 +182,8 @@
           </div>`,
       // The drop alone, centered, wordmark beside it.
       c: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:16px">
-            <span class="mask drop" style="height:96px"></span>
-            <div class="word" style="font-size:84px;line-height:1">drip</div>
+            <span class="mask drop" style="height:106px"></span>
+            <div class="word" style="font-size:92px;line-height:1">drip</div>
           </div>`,
     };
     document.body.innerHTML = tiles[/** @type {'a'|'b'|'c'} */ (tile)] || '';

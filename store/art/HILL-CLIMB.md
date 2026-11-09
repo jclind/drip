@@ -70,6 +70,40 @@ Also from round 0:
 - Screenshot 3: the page's own "drip / Make every drop count." heading repeats the frame's mark. Consider cropping it off.
 - Order: keep it if screenshot 2 says limits are optional, or else move the mode choice ahead of the lock.
 
+### Round 1, 2026-11-09
+
+PRs 101 and 102 merged, so main is merged into `store/art` and the lock is a real capture. Reports: `reviews/round-1-codex.md` and `reviews/round-1-claude.md`, prompt `reviews/round-1-prompt.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 3 | 7 | 4 |
+| 2 Lock | 7 | 2 | 5 | 4 |
+| 3 Modes | 7 | 2 | 6 | 4 |
+| 4 Settings | 7 | 2 | 6 | 5 |
+| 5 History | 8 | 2 | 7 | 4 |
+| Tile c | 8 | 1 | 5 | 5 |
+
+What changed: flat navy background, and the panel runs off the right and bottom edges with no shadow. 1 at 1.25x with the space above the counter cut. 2 says limits are optional, shows "1h watched today", fills the panel with the tour's stage, and places the bubbles by hand. 3 drops the page's own heading and footer, with new caption copy. 4 ends after Watch time. 5 starts at the tabs, ends after the week's card, and its subline no longer promises unlock reasons. Tile c's group is 10% larger. capture.sh now shoots only tile c, and shot 2 with motion on.
+
+Found while doing it:
+- Headless Chrome doesn't advance animation time inside the iframe; every animation sits at 0ms. Shot 2 sets each one's time by hand.
+- Stopping the water partway (currentTime on `tour-water-rise`) changed nothing visible. Not solved; both judges still say the water doesn't read as water.
+- frames.html x and y are panel pixels, applied before the scale.
+
+Fixes for round 2, checked against the images and code:
+1. Lock font (Claude): real. The welcome page doesn't load Roboto, so the tour's lock falls back to Arial. On YouTube the lock is Roboto (`drip.css` line 15). Inject the Roboto stylesheet into the iframe for shot 2.
+2. Shot 1 counters (Claude): 15 drops and 12 cards don't fit a 4-drop, 10-card day. Check the `saved` scenario in `dev/home.html` and pick numbers that do.
+3. Shot 2 (both): the blue spark on "Done for now" (the orbit) and the clipped "ch" at the right edge. Hide the orbit, shift or crop the page under the lock. Make the water read as water: find why the rise's time had no effect. "a drop buys" becomes "a drop adds" (Codex: "buys" suggests payment).
+4. Shot 4 (Codex): "Looser ones wait until tomorrow" ignores the first 24 hours that shot 3 shows. Qualify it. Both: "Set your own limits." is generic.
+5. Shot 5 (both): orphan "went." and the card 13px from the bottom edge. Codex's "See your week." fixes both.
+6. Shot 1 copy (Codex): name YouTube in the subline.
+7. Content column: 4 starts at x=619, 5 at x=643. Use the same scale and x.
+
+Rejected or deferred:
+- Tile c (Claude): add a tagline or the card. Codex says the tile's simplicity is its strength, and Jesse picked it. Deferred to Jesse.
+- Shot 1 "Stashed" pressed (Claude): that's the sample state of a saved video; changing it means a different scenario. Low impact, skip for now.
+- Shot 3 crop to the three cards (Claude): Codex says keep all three with context. Kept.
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.
@@ -78,4 +112,4 @@ Also from round 0:
 ## Other state
 
 - jesselind PR 32 (privacy page brackets and new bullet) is merged into `development`. PR 33 promotes it to `release`; Jesse merges it.
-- Local commits on `store/art`, not pushed yet: `be8a2fe` (LISTING.md, PRIVACY.md), `1a08f6f` (frames and first images), and the picks commit after it.
+- Local commits on `store/art`, not pushed yet: `be8a2fe` (LISTING.md, PRIVACY.md), `1a08f6f` (frames and first images), the picks and plan commits, the merge of main (PRs 101 and 102, merged 2026-11-09), and round 1.
