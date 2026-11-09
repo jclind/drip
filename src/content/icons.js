@@ -17,8 +17,8 @@
   const NAMES = [
     'arrow-right', 'arrow-up-right', 'arrow', 'ban', 'card', 'check', 'chevron-down', 'chevron-left', 'chevron-right',
     'circle-arrow-down', 'circle-arrow-up', 'clock-line', 'clock', 'download', 'drop', 'ellipsis-vertical', 'history',
-    'house', 'list-video', 'menu', 'minus', 'pause', 'play-line', 'play', 'plus', 'save-outline', 'save', 'search',
-    'settings', 'smartphone', 'square-play', 'thumbs-up', 'unlock', 'users', 'x',
+    'house', 'list-video', 'menu', 'minus', 'pause', 'play-line', 'play', 'plus', 'save-outline', 'save', 'search-fill', 'search',
+    'settings', 'smartphone', 'square-play-fill', 'square-play', 'thumbs-up', 'unlock', 'users', 'x',
   ];
 
   /** Settles once the page is shown: at once, or when a prerendered page is activated. */

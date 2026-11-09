@@ -92,7 +92,7 @@ const PARTS = [
     ],
   },
   {
-    id: 'search', title: 'Search', icon: 'search',
+    id: 'search', title: 'Search', icon: 'search-fill',
     toggle: { key: 'searchCap', label: 'Search', kind: 'toggle' },
     summary: (d) => (d.searchCap ? 'Stops at 10 results' : ''),
     fields: [],
@@ -108,7 +108,7 @@ const PARTS = [
     ],
   },
   {
-    id: 'youtube', title: 'YouTube', icon: 'square-play',
+    id: 'youtube', title: 'YouTube', icon: 'square-play-fill',
     fields: [
       // Q16.
       { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle' },
