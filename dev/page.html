@@ -36,7 +36,8 @@
           // &sample=1 fills two weeks of log and turns on Dry hours, for the store images (store/ART-PLAN.md).
           if (params.get('sample') === '1') {
             state.settings.dryHours = true;
-            const minutes = [41, 58, 33, 47, 62, 29, 38, 44, 52, 36, 61, 27, 49, 23];
+            // Last week (the 6th to 12th) averages 41 and its Friday runs to 80, so the chart uses its height (round 10).
+            const minutes = [41, 58, 33, 47, 62, 29, 29, 44, 42, 36, 80, 27, 49, 23];
             minutes.forEach((m, i) => {
               const day = D.addDays(state.day, i - minutes.length + 1);
               state.log[day] = { watchedSec: m * 60, watchSpent: Math.ceil(m / 15), recSpent: 4 + (i % 4), saved: i % 2, watched: 1 + (i % 2), passed: 4 + (i % 4) - (i % 2) - 1 - (i % 2), needThis: [] };

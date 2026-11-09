@@ -40,8 +40,8 @@
   .legend .drop { height: 34px; justify-self: center; }
   .legend .card { height: 30px; justify-self: center; transform: rotate(8deg); }
   /* The lock's water, carried across the paper on screenshot 2. The crest is the path drip.css masks the lock with. */
-  .water { position: absolute; left: 0; width: 560px; bottom: 0; background: rgba(66, 165, 246, 0.2); }
-  .water::before { content: ""; position: absolute; left: 0; right: 0; top: -26px; height: 26px; background: rgba(66, 165, 246, 0.2);
+  .water { position: absolute; left: 0; width: 560px; bottom: 0; background: rgba(38, 140, 170, 0.26); }
+  .water::before { content: ""; position: absolute; left: 0; right: 0; top: -26px; height: 26px; background: rgba(38, 140, 170, 0.26);
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") -120px 0 / 640px 26px repeat-x;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") -120px 0 / 640px 26px repeat-x; }
 
@@ -67,26 +67,29 @@
    * scale), CSS to put in the page, what has to exist before the step runs, an optional step, and notes. A note
    * names its target by selector or by exact text, and sits in the left column at the target's height when there's
    * room.
-   * @typedef {{sel?: string, text?: string, say: string, top?: boolean}} Note
+   * @typedef {{sel?: string, text?: string, say: string, top?: boolean, under?: boolean, at?: number}} Note
+   * A note with `at` has no target: it sits at that height with no leader, for a line about the whole page. One with
+   * `under` sits below its target and reaches up to the target's bottom edge with a right-angled leader, for a target
+   * whose row has other things to its left.
    * A shot's legend sits under the caption with no leader: drip's own drop and card, and what each one is.
    * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x: number, y: number, scale: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void, notes?: Note[], legend?: boolean, bg?: string, water?: number, legendY?: number}>}
    */
   const SHOTS = {
     1: {
       h: 'One video\nat a time.',
-      p: 'drip hides YouTube\'s home feed and\npicks one video from it for you.',
+      p: 'drip hides YouTube\'s home feed\nand shows one pick at a time.',
       src: '/dev/home.html?scenario=card&theme=dark&reduced=1&videos=store',
-      w: 620, h2: 656, x: -105, y: -177, scale: 1.5,
+      w: 620, h2: 656, x: -105, y: -205, scale: 1.5,
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
       ready: '.drip-thumb img.is-loaded',
-      legend: true, legendY: 440,
+      legend: true,
       notes: [
-        { sel: '.drip-next', say: 'Not this one? The next\npick costs a card.', top: true },
+        { sel: '.drip-next', say: 'Not this one? The next pick costs a card.', under: true },
       ],
     },
     2: {
-      h: 'When the time\nruns out.',
-      p: 'Your video pauses at the daily\nlimit, if you set one.',
+      h: 'When time\nruns out.',
+      p: 'Set a daily limit and the video\npauses when it\'s spent.',
       src: '/dev/page.html?page=welcome#tour-4',
       // The tour's stage alone, full height, cropped past its blurred edges. It sits at 362 to 921 across and 231 to 729
       // down in the page.
@@ -114,7 +117,7 @@
         // [left %, size px, how far up], kept low where the water is deep and clear of the panel.
         // The crop shows about 12% to 88% across and loses the bottom 3%, so these stay inside it, low in the water, a few
         // sizes, larger than sea()'s so they read as bubbles in a still.
-        const BUBBLES = [[22, 16, 0.2], [28, 10, 0.1], [34, 13, 0.28], [68, 12, 0.08], [75, 18, 0.18], [80, 10, 0.12], [44, 11, 0.06], [58, 14, 0.15]];
+        const BUBBLES = [[22, 16, 0.2], [28, 10, 0.1], [34, 13, 0.28], [68, 12, 0.08], [75, 18, 0.18], [85, 10, 0.04], [44, 11, 0.06], [58, 14, 0.15]];
         d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
           const [x, size] = BUBBLES[i % BUBBLES.length];
           const b = /** @type {HTMLElement} */ (el);
@@ -143,35 +146,35 @@
       }, 600),
       notes: [
         { sel: '#drip-lock .drip-lock-add', say: 'Spend a saved drop\nfor 15 more minutes.' },
-        { sel: '#drip-lock .drip-bubble:nth-child(2)', say: 'Water rises over the video\nas the minutes run out.' },
+        { at: 690, say: 'Water rises over the video\nas the minutes run out.' },
       ],
     },
     3: {
       h: 'Choose\nhow strict.',
-      p: 'Search only, one video at a time,\nor optional daily limits.',
+      p: 'Search only, one pick at a time,\nor daily watch limits.',
       src: '/dev/page.html?page=welcome',
-      w: 680, h2: 713, x: -32, y: -88, scale: 1.15,
+      w: 680, h2: 713, x: -32, y: -40, scale: 1.15,
       // The page's own logo and tagline repeat the frame's mark.
       css: '.hero { visibility: hidden !important; }',
       ready: 'input[type=radio], [role=radio]',
       notes: [
-        { sel: '[data-mode=curated]', say: 'Switch freely for\nthe first 24 hours.' },
-        { text: 'Customize', say: 'Customize picks which\nlimits are on.' },
+        { at: 336, say: 'Switch freely for\nthe first 24 hours.' },
+        { text: 'Customize', say: 'Choose which limits apply.' },
       ],
     },
     4: {
       h: 'Easy to tighten.\nSlow to loosen.',
-      p: 'Cut your limit and it applies now.\nRaise it and it waits for tomorrow.',
+      p: 'Cut your limit and it applies now.\nRaise it and it waits for the 4am reset.',
       src: '/dev/page.html?page=options&settled=1&sample=1&pending=1',
-      // From the tabs to the end of Watch time. The page's own "drip" title repeats the mark, so it's hidden. The
+      // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden. The
       // sample raised drops from 4 to 5, so the row shows the waiting change.
-      w: 728, h2: 720, x: -81, y: -98, scale: 1.22,
+      w: 728, h2: 590, x: -81, y: -9, scale: 1.22,
       css: 'h1 { visibility: hidden !important; }',
       ready: '[role=tab]',
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
       notes: [
-        { text: 'Drops per day', say: 'Raised from 4 to 5. Starts at 4am.' },
-        { text: 'Dry hours', say: 'No drops from\n11pm to 6am.' },
+        { text: 'Drops per day', say: 'Raised from 4 to 5.\nUndo any time before then.' },
+        { text: 'Dry hours', say: 'Turn dry hours on\nand they start tonight.' },
       ],
     },
     5: {
@@ -216,7 +219,7 @@
     const d = /** @type {Document} */ (frame.contentDocument);
     const root = /** @type {HTMLElement} */ (document.querySelector('.shot'));
     const minY = /** @type {HTMLElement} */ (document.querySelector('.copy')).getBoundingClientRect().bottom + 12;
-    const maxY = 740;
+    const maxY = 752;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'leaders');
     svg.setAttribute('width', '1280');
@@ -234,11 +237,19 @@
       next = ly0 + legend.getBoundingClientRect().height + 40;
     }
     // Placed top to bottom by target, so no two leaders cross.
-    const placed = shot.notes.map((n) => ({ n, el: target(d, n) })).filter((p) => p.el).map(({ n, el }) => {
+    for (const n of shot.notes.filter((q) => q.at !== undefined)) {
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = n.say;
+      note.style.top = `${n.at}px`;
+      root.append(note);
+    }
+    const placed = shot.notes.filter((q) => q.at === undefined).map((n) => ({ n, el: target(d, n) })).filter((p) => p.el).map(({ n, el }) => {
       const r = /** @type {Element} */ (el).getBoundingClientRect();
-      // A note points at the target's left edge, 12px clear of it, or with top set, at its top edge near the left.
-      const tx = PANEL_LEFT + shot.x + (n.top ? r.left + 36 : r.left) * shot.scale - (n.top ? 0 : 12);
-      const ty = shot.y + (n.top ? r.top : r.top + r.height / 2) * shot.scale - (n.top ? 8 : 0);
+      // A note points at the target's left edge, 12px clear of it; with top set, at its top edge near the left; with
+      // under set, at its bottom edge near the left, from a note below it.
+      const tx = PANEL_LEFT + shot.x + (n.top || n.under ? r.left + 36 : r.left) * shot.scale - (n.top || n.under ? 0 : 12);
+      const ty = shot.y + (n.top ? r.top : n.under ? r.bottom : r.top + r.height / 2) * shot.scale + (n.top ? -8 : n.under ? 6 : 0);
       return { n, tx, ty };
     }).sort((a, b) => a.ty - b.ty);
     for (const { n, tx, ty } of placed) {
@@ -247,15 +258,17 @@
       note.textContent = n.say;
       root.append(note);
       const h = note.getBoundingClientRect().height;
-      const top = Math.min(maxY, Math.max(next, ty - h / 2));
+      const want = n.under ? ty + 30 : ty - h / 2;
+      const top = Math.min(maxY, Math.max(next, want));
       note.style.top = `${top}px`;
       next = top + h + 22;
-      // The line leaves the note's middle, runs level, then bends to the target when the note couldn't sit level with it.
+      // The line leaves the note's middle, runs level, then bends to the target when the note couldn't sit level with
+      // it. An under note's line runs level below the row and turns straight up into the target.
       const ly = top + h / 2;
       const lx = 72 + Math.min(380, measure(note)) + 14;
       const bend = PANEL_LEFT - 24;
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', `M${lx} ${ly} H${bend} L${tx} ${ty}`);
+      path.setAttribute('d', n.under ? `M${lx} ${ly} H${tx} V${ty}` : `M${lx} ${ly} H${bend} L${tx} ${ty}`);
       path.setAttribute('fill', 'none');
       path.setAttribute('stroke', '#1b74c9');
       path.setAttribute('stroke-width', '1.5');

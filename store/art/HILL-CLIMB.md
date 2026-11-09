@@ -277,6 +277,24 @@ Claude's design reached 8 on 1 and 4. Its suggestion for AI look: one detail of 
 
 Round 10 changes: on 2 the water spills across the paper as a band with drip's own crest (the path `drip.css` masks the lock with), and "Limits are optional." becomes "if you set one"; 1's note points at Reveal next ("Not this one? The next pick costs a card."), the legend sits lower, and the sample shows 84K views instead of 1.2M; 3 matches 4's margins, with notes on the first-24-hours rule and on the Customize link itself; 4 shows all of Watch time, with notes as plain sentences; 5 is labeled a sample week ("41 minutes a day, down from 48") and scaled so the card's corners fall outside the strip; tile c3 tucks the gold card behind the drop. Codex's order change (modes second) still isn't taken: Claude keeps saying 1 then 2 tells the story.
 
+### Round 10, 2026-11-09 (v2)
+
+Reports: `reviews/round-10-codex.md`, `reviews/round-10-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 8 | 3 |
+| 2 Lock | 8 | 2 | 7 | 3 |
+| 3 Modes | 8 | 1 | 7 | 3 |
+| 4 Settings | 7 | 1 | 7 | 3 |
+| 5 History | 8 | 1 | 8 | 2 |
+| Tile c2 | 9 | 1 | 7 | 3 |
+| Tile c3 | 8 | 1 | 6 | 4 |
+
+First image to meet the AI-look target from both judges: screenshot 5. Both judges prefer tile c2 over c3.
+
+Round 11 changes: two new kinds of note in `frames-v2.html`. A note with `at` has no leader, for a line about the whole page (3's 24-hour note, 2's water note sitting in the water band). One with `under` sits below its target and reaches up with a right-angled leader, so 1's card note lands on Reveal next without crossing Stash. 4 crops to Dry hours' end; its second note is about tightening ("Turn dry hours on and they start tonight", which applies at once per DESIGN.md Q32); one time wording ("the 4am reset"). 5's sample keeps the 41-minute average but Friday runs to 80, so the bars use the chart. Rejected: Codex's ask to point 4's first note at the pending chip, since a level line to the chip runs through the "Drops per day" label.
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.
