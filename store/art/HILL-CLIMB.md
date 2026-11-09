@@ -259,6 +259,24 @@ Tile c2 meets the target with Codex. Claude: 3 on every screenshot. Its reason t
 
 Round 9 changes, aimed at that: a legend on screenshot 1 with drip's real drop and card icons ("A drop is 15 minutes of watching. A card reveals one new video."); screenshot 4's sample raises drops from 4 to 5 after day one (`dev/page.html` `&pending=1`), so the page shows its own "4 drops until 4:00am · Undo" chip under "Easy to tighten. Slow to loosen."; Saturday's sample uses 5 cards, not 7, so it doesn't mirror screenshot 1's counter; History ends above its summary line, with the strip in the card's gray; the lock keeps two notes; new headlines on 3 ("Choose how strict.") and 5 ("Where your hour went.").
 
+### Round 9, 2026-11-09 (v2)
+
+Reports: `reviews/round-9-codex.md`, `reviews/round-9-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 8 | 3 |
+| 2 Lock | 8 | 2 | 7 | 4 |
+| 3 Modes | 8 | 1 | 7 | 3 |
+| 4 Settings | 7 | 1 | 8 | 3 |
+| 5 History | 8 | 1 | 7 | 3 |
+| Tile c | 8 | 1 | 6 | 4 |
+| Tile c2 | 9 | 1 | 7 | 4 |
+
+Claude's design reached 8 on 1 and 4. Its suggestion for AI look: one detail of drip's own breaking the template, such as the lock's water carried into the caption panel, or the card tucked behind the drop on the tile.
+
+Round 10 changes: on 2 the water spills across the paper as a band with drip's own crest (the path `drip.css` masks the lock with), and "Limits are optional." becomes "if you set one"; 1's note points at Reveal next ("Not this one? The next pick costs a card."), the legend sits lower, and the sample shows 84K views instead of 1.2M; 3 matches 4's margins, with notes on the first-24-hours rule and on the Customize link itself; 4 shows all of Watch time, with notes as plain sentences; 5 is labeled a sample week ("41 minutes a day, down from 48") and scaled so the card's corners fall outside the strip; tile c3 tucks the gold card behind the drop. Codex's order change (modes second) still isn't taken: Claude keeps saying 1 then 2 tells the story.
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.

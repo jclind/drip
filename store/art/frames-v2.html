@@ -39,6 +39,11 @@
     font-size: 20px; line-height: 1.3; }
   .legend .drop { height: 34px; justify-self: center; }
   .legend .card { height: 30px; justify-self: center; transform: rotate(8deg); }
+  /* The lock's water, carried across the paper on screenshot 2. The crest is the path drip.css masks the lock with. */
+  .water { position: absolute; left: 0; width: 560px; bottom: 0; background: rgba(66, 165, 246, 0.2); }
+  .water::before { content: ""; position: absolute; left: 0; right: 0; top: -26px; height: 26px; background: rgba(66, 165, 246, 0.2);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") -120px 0 / 640px 26px repeat-x;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") -120px 0 / 640px 26px repeat-x; }
 
   .tile { position: relative; width: 440px; height: 280px; overflow: hidden; background: var(--paper); color: var(--ink); }
   .tile .word { font-weight: 700; letter-spacing: -3px; }
@@ -64,7 +69,7 @@
    * room.
    * @typedef {{sel?: string, text?: string, say: string, top?: boolean}} Note
    * A shot's legend sits under the caption with no leader: drip's own drop and card, and what each one is.
-   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x: number, y: number, scale: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void, notes?: Note[], legend?: boolean, bg?: string}>}
+   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x: number, y: number, scale: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void, notes?: Note[], legend?: boolean, bg?: string, water?: number, legendY?: number}>}
    */
   const SHOTS = {
     1: {
@@ -74,19 +79,19 @@
       w: 620, h2: 656, x: -105, y: -177, scale: 1.5,
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
       ready: '.drip-thumb img.is-loaded',
-      legend: true,
+      legend: true, legendY: 440,
       notes: [
-        { sel: '[data-k=save]', say: 'Stash it, or pass.\nEach new pick uses a card.' },
+        { sel: '.drip-next', say: 'Not this one? The next\npick costs a card.', top: true },
       ],
     },
     2: {
       h: 'When the time\nruns out.',
-      p: 'Your video pauses at the daily limit.\nLimits are optional.',
+      p: 'Your video pauses at the daily\nlimit, if you set one.',
       src: '/dev/page.html?page=welcome#tour-4',
       // The tour's stage alone, full height, cropped past its blurred edges. It sits at 362 to 921 across and 231 to 729
       // down in the page.
       w: 1280, h2: 800, x: -730, y: -416, scale: 1.7,
-      motion: true,
+      motion: true, water: 150,
       // Roboto, as on YouTube: the welcome page doesn't load it. The spark that circles "Done for now" only makes sense
       // moving, and the pill under the water showed as a clipped word, so both are hidden. The paused player gets
       // screenshot 1's ride, brightened so it shows through the lock's tint and blur.
@@ -109,7 +114,7 @@
         // [left %, size px, how far up], kept low where the water is deep and clear of the panel.
         // The crop shows about 12% to 88% across and loses the bottom 3%, so these stay inside it, low in the water, a few
         // sizes, larger than sea()'s so they read as bubbles in a still.
-        const BUBBLES = [[22, 16, 0.2], [28, 10, 0.1], [34, 13, 0.28], [68, 12, 0.08], [75, 18, 0.18], [80, 10, 0.27], [44, 11, 0.06], [58, 14, 0.15]];
+        const BUBBLES = [[22, 16, 0.2], [28, 10, 0.1], [34, 13, 0.28], [68, 12, 0.08], [75, 18, 0.18], [80, 10, 0.12], [44, 11, 0.06], [58, 14, 0.15]];
         d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
           const [x, size] = BUBBLES[i % BUBBLES.length];
           const b = /** @type {HTMLElement} */ (el);
@@ -138,43 +143,43 @@
       }, 600),
       notes: [
         { sel: '#drip-lock .drip-lock-add', say: 'Spend a saved drop\nfor 15 more minutes.' },
-        { sel: '#drip-lock .drip-bubble:nth-child(2)', say: 'Blue water fills the screen\nas the minutes run out.' },
+        { sel: '#drip-lock .drip-bubble:nth-child(2)', say: 'Water rises over the video\nas the minutes run out.' },
       ],
     },
     3: {
       h: 'Choose\nhow strict.',
       p: 'Search only, one video at a time,\nor optional daily limits.',
       src: '/dev/page.html?page=welcome',
-      w: 680, h2: 713, x: -49, y: -118, scale: 1.2,
+      w: 680, h2: 713, x: -32, y: -88, scale: 1.15,
       // The page's own logo and tagline repeat the frame's mark.
       css: '.hero { visibility: hidden !important; }',
       ready: 'input[type=radio], [role=radio]',
       notes: [
-        { sel: '[data-mode=curated]', say: 'Curated keeps one at a time,\nwith no daily limit.' },
-        { sel: '[data-mode=full]', say: 'Customize turns each part\nof Full drip on or off.' },
+        { sel: '[data-mode=curated]', say: 'Switch freely for\nthe first 24 hours.' },
+        { text: 'Customize', say: 'Customize picks which\nlimits are on.' },
       ],
     },
     4: {
       h: 'Easy to tighten.\nSlow to loosen.',
       p: 'Cut your limit and it applies now.\nRaise it and it waits for tomorrow.',
       src: '/dev/page.html?page=options&settled=1&sample=1&pending=1',
-      // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden. The
+      // From the tabs to the end of Watch time. The page's own "drip" title repeats the mark, so it's hidden. The
       // sample raised drops from 4 to 5, so the row shows the waiting change.
-      w: 728, h2: 584, x: -81, y: -40, scale: 1.22,
+      w: 728, h2: 720, x: -81, y: -98, scale: 1.22,
       css: 'h1 { visibility: hidden !important; }',
       ready: '[role=tab]',
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
       notes: [
-        { text: 'Drops per day', say: 'Raised from 4 to 5 drops.\nIt starts at 4am tomorrow.' },
-        { text: 'Dry hours', say: 'Dry hours: drops can\'t be\nspent from 11pm to 6am.' },
+        { text: 'Drops per day', say: 'Raised from 4 to 5. Starts at 4am.' },
+        { text: 'Dry hours', say: 'No drops from\n11pm to 6am.' },
       ],
     },
     5: {
-      h: 'Where your\nhour went.',
-      p: 'Down 7 minutes a day\nfrom the week before.',
+      h: 'Your week\nin minutes.',
+      p: 'A sample week: 41 minutes a day,\ndown from 48 the week before.',
       src: '/dev/page.html?page=options&settled=1&sample=1#history',
       // The week's card, scaled so its edges fall just outside the strip and its gray is the strip's background.
-      w: 728, h2: 762, x: -132, y: -258, scale: 1.35, bg: CARD_GRAY,
+      w: 728, h2: 770, x: -150, y: -276, scale: 1.4, bg: CARD_GRAY,
       // The capture ends above the summary line, which the crop would cut through, and the strip under it is the card's gray.
       css: '[role=tablist] { visibility: hidden !important; }',
       ready: '[data-k=earlier]',
@@ -186,7 +191,7 @@
       },
       notes: [
         { sel: '.avg-line', say: 'The dashed line is\nthe week before.' },
-        { text: 'Drops used', say: 'Pick a day to see\nits drops and cards.' },
+        { text: 'Saturday, Nov 7', say: 'Pick a day to see\nits drops and cards.' },
       ],
     },
   };
@@ -210,7 +215,7 @@
     const frame = /** @type {HTMLIFrameElement} */ (document.querySelector('iframe'));
     const d = /** @type {Document} */ (frame.contentDocument);
     const root = /** @type {HTMLElement} */ (document.querySelector('.shot'));
-    const minY = /** @type {HTMLElement} */ (document.querySelector('.copy')).getBoundingClientRect().bottom + 24;
+    const minY = /** @type {HTMLElement} */ (document.querySelector('.copy')).getBoundingClientRect().bottom + 12;
     const maxY = 740;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'leaders');
@@ -223,9 +228,10 @@
       legend.className = 'legend';
       legend.innerHTML = '<span class="mask drop"></span><span>A drop is 15 minutes of watching.</span>'
         + '<span class="mask card"></span><span>A card reveals one new video.</span>';
-      legend.style.top = `${minY + 8}px`;
+      const ly0 = shot.legendY ?? minY + 8;
+      legend.style.top = `${ly0}px`;
       root.append(legend);
-      next = minY + 8 + legend.getBoundingClientRect().height + 40;
+      next = ly0 + legend.getBoundingClientRect().height + 40;
     }
     // Placed top to bottom by target, so no two leaders cross.
     const placed = shot.notes.map((n) => ({ n, el: target(d, n) })).filter((p) => p.el).map(({ n, el }) => {
@@ -287,6 +293,12 @@
       width: `${shot.w}px`, height: `${shot.h2}px`, left: `${shot.x}px`, top: `${shot.y}px`, transform: `scale(${shot.scale})`,
     });
     frame.src = shot.src;
+    if (shot.water) {
+      const water = document.createElement('div');
+      water.className = 'water';
+      water.style.height = `${shot.water}px`;
+      /** @type {HTMLElement} */ (document.querySelector('.shot')).insertBefore(water, document.querySelector('.panel'));
+    }
     if (shot.bg) /** @type {HTMLElement} */ (document.querySelector('.panel')).style.background = shot.bg;
     // page.html rewrites its own document, so keep checking: put the style in whatever document is there now, and run
     // the step once the page has drawn what this shot needs. The notes go on after the step has settled.
@@ -326,13 +338,24 @@
               <div style="font-family:Newsreader,Georgia,serif;font-size:30px;line-height:1.05;margin-top:16px;letter-spacing:-0.4px">One video<br>at a time.</div>
             </div>
           </div>`,
+      // Round 10: c2 with the gold card tucked behind the drop, so the mark is drip's two tokens and not any water app's.
+      c3: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:24px">
+            <span style="position:relative;display:inline-block;width:96px;height:136px">
+              <span class="mask card" style="position:absolute;height:74px;left:46px;top:58px;transform:rotate(14deg)"></span>
+              <span class="mask drop" style="position:absolute;height:128px;left:0;top:0"></span>
+            </span>
+            <div>
+              <div class="word" style="font-size:104px;line-height:0.84">drip</div>
+              <div style="font-family:Newsreader,Georgia,serif;font-size:30px;line-height:1.05;margin-top:16px;letter-spacing:-0.4px">One video<br>at a time.</div>
+            </div>
+          </div>`,
       // The drop and the wordmark alone, on paper.
       p: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:16px">
             <span class="mask drop" style="height:106px"></span>
             <div class="word" style="font-size:92px;line-height:1">drip</div>
           </div>`,
     };
-    document.body.innerHTML = tiles[/** @type {'c'|'c2'|'p'} */ (tile)] || '';
+    document.body.innerHTML = tiles[/** @type {'c'|'c2'|'c3'|'p'} */ (tile)] || '';
     document.documentElement.dataset.ready = '1';
   }
 </script>

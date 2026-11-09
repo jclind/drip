@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 page=frames.html out=store/images tiles="c d d2 d3 e"
 dsf=1
 # v2 renders at 2x and sips scales it down: the scaled iframes' text came out soft at 1x (Codex, round 7).
-if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c c2 p" dsf=2; shift; fi
+if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c c2 c3 p" dsf=2; shift; fi
 port=${1:-8078}
 chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 profile=$(mktemp -d)
