@@ -35,7 +35,25 @@
     holding = false;
     hiddenAt = performance.now();
     root.removeAttribute(ATTR);
-    timer = setTimeout(show, FAILSAFE_MS);
+    timer = setTimeout(failsafe, FAILSAFE_MS);
+  }
+
+  /** Holds the dark screen up to HOLD_MS for the lock. Once is enough, and a page already shown stays shown. */
+  function hold() {
+    if (holding || root.hasAttribute(ATTR)) return;
+    holding = true;
+    clearTimeout(timer);
+    timer = setTimeout(show, Math.max(0, hiddenAt + HOLD_MS - performance.now()));
+  }
+
+  /**
+   * early.js marks <html> with data-drip-hold at document_start while a video is locked or not yet known. On a slow
+   * load watch.js, which runs later, may not have asked for the hold by 2.5 seconds, and the paused video showed
+   * before the lock (Codex, 2026-11-09).
+   */
+  function failsafe() {
+    if (location.pathname === '/watch' && root.hasAttribute('data-drip-hold')) hold();
+    else show();
   }
 
   function maybeShow() {
@@ -57,11 +75,6 @@
     theaterReady = true;
     maybeShow();
   });
-  document.addEventListener('drip-fade-hold', () => {
-    if (holding || root.hasAttribute(ATTR)) return;
-    holding = true;
-    clearTimeout(timer);
-    timer = setTimeout(show, Math.max(0, hiddenAt + HOLD_MS - performance.now()));
-  });
-  timer = setTimeout(show, FAILSAFE_MS);
+  document.addEventListener('drip-fade-hold', hold);
+  timer = setTimeout(failsafe, FAILSAFE_MS);
 })();
