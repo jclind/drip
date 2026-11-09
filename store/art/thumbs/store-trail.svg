@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b3445"/>
+      <stop offset="0.55" stop-color="#6b7486"/>
+      <stop offset="1" stop-color="#d9b98a"/>
+    </linearGradient>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#55607a"/>
+      <stop offset="1" stop-color="#3d4659"/>
+    </linearGradient>
+    <linearGradient id="mid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f5a4a"/>
+      <stop offset="1" stop-color="#26382e"/>
+    </linearGradient>
+    <linearGradient id="near" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a3a2c"/>
+      <stop offset="1" stop-color="#141c16"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.72" cy="0.62" r="0.35">
+      <stop offset="0" stop-color="#f3d39b" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#f3d39b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#sky)"/>
+  <rect width="1280" height="720" fill="url(#glow)"/>
+  <!-- storm clouds -->
+  <g fill="#1f2633" opacity="0.85">
+    <ellipse cx="220" cy="110" rx="320" ry="90"/>
+    <ellipse cx="560" cy="70" rx="300" ry="80"/>
+    <ellipse cx="980" cy="120" rx="380" ry="100"/>
+  </g>
+  <g fill="#2c3546" opacity="0.8">
+    <ellipse cx="380" cy="190" rx="260" ry="55"/>
+    <ellipse cx="820" cy="210" rx="300" ry="50"/>
+  </g>
+  <!-- rain on the left -->
+  <g stroke="#9aa6bb" stroke-width="2" opacity="0.35">
+    <line x1="80" y1="200" x2="60" y2="330"/><line x1="130" y1="210" x2="110" y2="340"/>
+    <line x1="180" y1="190" x2="160" y2="320"/><line x1="230" y1="215" x2="210" y2="345"/>
+    <line x1="280" y1="200" x2="260" y2="330"/><line x1="330" y1="220" x2="310" y2="350"/>
+    <line x1="380" y1="205" x2="360" y2="335"/>
+  </g>
+  <!-- ridges -->
+  <path d="M0 400 L140 330 L260 370 L420 280 L560 350 L700 300 L860 360 L1000 290 L1140 340 L1280 310 L1280 720 L0 720 Z" fill="url(#far)"/>
+  <path d="M0 480 L180 410 L330 450 L500 380 L650 440 L820 400 L980 460 L1120 420 L1280 450 L1280 720 L0 720 Z" fill="url(#mid)"/>
+  <path d="M0 720 L0 560 C 200 520 360 500 520 520 C 700 545 820 600 1000 590 C 1120 584 1200 560 1280 550 L1280 720 Z" fill="url(#near)"/>
+  <!-- the trail along the near ridge -->
+  <path d="M120 720 C 260 640 420 580 560 560 C 700 545 820 560 940 548" fill="none" stroke="#b89a6a" stroke-width="10" stroke-linecap="round" opacity="0.8"/>
+  <!-- rider -->
+  <g transform="translate(700 520)" fill="none" stroke="#0e1210" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="-22" cy="22" r="17"/>
+    <circle cx="26" cy="22" r="17"/>
+    <path d="M-22 22 L-4 -2 L18 -2 L26 22 M-4 -2 L4 22 L18 -2"/>
+    <path d="M-8 -6 L2 -30 L14 -14" stroke-width="7"/>
+    <circle cx="4" cy="-38" r="7" fill="#0e1210" stroke="none"/>
+  </g>
+</svg>

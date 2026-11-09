@@ -25,6 +25,7 @@
     http://localhost:8077/dev/home.html?scenario=card&theme=dark
   Scenarios are in SCENARIOS below. `click=<data-k>,...` clicks controls after load, 300ms apart, like click=reveal or click=x-<id>.
   `feed=signed-out` or `feed=history-off` shows the empty-feed nudge. Add `mode=curated` for Curated.
+  `videos=store` swaps in store/art/videos.js: made-up videos with local thumbnails, for the store images.
   `grid=0` leaves the grid empty, so a reveal stays loading for 6 seconds. `reduced=1` plays it as with reduced motion. The page moves its URL to "/" because
   home.js only mounts there, so reload from the address you opened. A tool that reloads the tab gets the folder listing.
 -->
@@ -36,6 +37,7 @@
 </ytd-browse>
 <div id="harness-bar"></div>
 <script src="/src/lib/state.js"></script>
+<script src="/store/art/videos.js"></script>
 <script>
   // @ts-check
   const params = new URLSearchParams(location.search);
@@ -57,8 +59,9 @@
     document.getElementById('masthead').append(signIn);
   }
 
-  // Real video ids, so thumbnails load. Titles and channels are made up, like the mockups.
-  const VIDEOS = [
+  // Real video ids, so thumbnails load. Titles and channels are made up, like the mockups. videos=store swaps in
+  // store/art/videos.js, with local thumbnails, for the store images.
+  const VIDEOS = /** @type {any} */ (globalThis).DripStoreVideos || [
     { id: 'aqz-KE-bpKQ', title: 'I Spent 30 Days Building a Cabin in the Woods With Only Hand Tools (Full Build)', channel: 'Rogi', length: '5:05' },
     { id: 'dQw4w9WgXcQ', title: 'Frontier AI doesn\'t need your help', channel: 'Less Bitter', length: '8:31' },
     { id: 'jNQXAC9IVRw', title: 'PLAY ME! じゃんけん (2000s liquid dnb mix for gaming and studying late at night)', channel: 'Noumena', length: '59:02' },

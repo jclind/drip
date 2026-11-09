@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>drip store frames</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<!--
+  The Chrome Web Store images, drawn from drip's real pages through the dev harness. Serve the repo root and open:
+    /store/art/frames.html?shot=1   (1 to 5, 1280x800)
+    /store/art/frames.html?tile=a   (a, b, or c, 440x280)
+  store/art/capture.sh screenshots every frame into store/images/. ART-PLAN.md has the reasons.
+-->
+<style>
+  :root { --bg: #0a1422; --text: #f1f1f1; --muted: #9fb0c4; --blue: #42a5f6; --gold: #fdc905; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: Roboto, Arial, sans-serif; overflow: hidden; }
+  .shot { position: relative; width: 1280px; height: 800px;
+    background: radial-gradient(900px 600px at 0% 100%, rgba(66, 165, 246, 0.16), transparent 70%), var(--bg); }
+  .copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 400px; display: flex; flex-direction: column; justify-content: center; }
+  .brand { position: absolute; left: 72px; bottom: 56px; display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .mask { display: inline-block; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
+  .drop { --src: url(/src/icons/drop.svg); color: var(--blue); aspect-ratio: 600 / 893; }
+  .card { --src: url(/src/icons/card.svg); color: var(--gold); aspect-ratio: 600 / 697; }
+  .brand .drop { height: 30px; }
+  h1 { margin: 0 0 20px; font-size: 46px; line-height: 1.12; font-weight: 500; letter-spacing: -1px; }
+  .copy p { margin: 0; font-size: 20px; line-height: 1.45; color: var(--muted); }
+  .panel { position: absolute; right: 48px; top: 48px; width: 728px; height: 704px; border-radius: 18px; overflow: hidden;
+    background: #0f0f0f; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); }
+  .panel iframe { position: absolute; border: 0; transform-origin: 0 0; background: #0f0f0f; }
+
+  .tile { position: relative; width: 440px; height: 280px; overflow: hidden;
+    background: radial-gradient(360px 260px at 20% 100%, rgba(66, 165, 246, 0.22), transparent 70%), var(--bg); }
+  .tile .word { font-weight: 700; letter-spacing: -2px; }
+</style>
+</head>
+<body>
+<script>
+  // @ts-check
+  const params = new URLSearchParams(location.search);
+
+  /**
+   * Each shot: the caption, the harness page, the iframe's size and offset in the panel, and what to do inside it once
+   * it's drawn: CSS to hide harness parts or tour notes, and an optional step (a click, a scroll).
+   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x?: number, y?: number, scale?: number, css?: string, ready: string, step?: (d: Document) => void}>}
+   */
+  const SHOTS = {
+    1: {
+      h: 'One video at a time.',
+      p: 'drip swaps YouTube\'s endless home feed for a single recommendation you choose to reveal.',
+      src: '/dev/home.html?scenario=saved&theme=dark&reduced=1&videos=store',
+      w: 728, h2: 760, y: -40,
+      css: '#masthead, #harness-bar { visibility: hidden !important; }',
+      ready: '.drip-thumb img.is-loaded',
+    },
+    2: {
+      h: 'When the glass runs dry, the video stops.',
+      p: 'Spend another drop for 15 more minutes, or call it a day.',
+      src: '/dev/page.html?page=welcome#tour-4',
+      w: 1280, h2: 800, x: -545, y: -328, scale: 1.42,
+      css: '.co-layer { display: none !important; } .tour-stage { border-color: transparent !important; }',
+      ready: '#drip-lock',
+    },
+    3: {
+      h: 'Pick how much drip does.',
+      p: 'A search box alone, one video at a time, or a daily allowance of watch time.',
+      src: '/dev/page.html?page=welcome',
+      w: 728, h2: 800, x: -10, y: -20,
+      css: '',
+      ready: 'input[type=radio], [role=radio]',
+    },
+    4: {
+      h: 'Set your own limits.',
+      p: 'Tightening one applies now. Loosening one waits for tomorrow, so a late night can\'t talk you out of it.',
+      src: '/dev/page.html?page=options&settled=1&sample=1',
+      w: 728, h2: 1000, y: -30,
+      css: '',
+      ready: '[role=tab]',
+    },
+    5: {
+      h: 'See where the time went.',
+      p: 'Minutes each day, drops and cards spent, and the reasons you gave for every unlock.',
+      src: '/dev/page.html?page=options&settled=1&sample=1#history',
+      w: 728, h2: 1100, x: 18, y: -66, scale: 0.95,
+      css: '',
+      ready: '[data-k=earlier]',
+      // This week starts on Sunday, so early in the week the chart is mostly empty. Last week is a full one.
+      step: (d) => /** @type {HTMLElement} */ (d.querySelector('[data-k=earlier]')).click(),
+    },
+  };
+
+  const shot = SHOTS[params.get('shot') || ''];
+  const tile = params.get('tile');
+
+  if (shot) {
+    document.body.innerHTML = `
+      <div class="shot">
+        <div class="copy"><h1></h1><p></p></div>
+        <div class="brand"><span class="mask drop"></span>drip</div>
+        <div class="panel"><iframe></iframe></div>
+      </div>`;
+    /** @type {HTMLElement} */ (document.querySelector('h1')).textContent = shot.h;
+    /** @type {HTMLElement} */ (document.querySelector('.copy p')).textContent = shot.p;
+    const frame = /** @type {HTMLIFrameElement} */ (document.querySelector('iframe'));
+    Object.assign(frame.style, {
+      width: `${shot.w}px`, height: `${shot.h2}px`, left: `${shot.x || 0}px`, top: `${shot.y || 0}px`,
+      transform: shot.scale ? `scale(${shot.scale})` : '',
+    });
+    frame.src = shot.src;
+    // page.html rewrites its own document, so keep checking: put the style in whatever document is there now, and run
+    // the step once the page has drawn what this shot needs.
+    let stepped = false;
+    const poll = setInterval(() => {
+      const d = frame.contentDocument;
+      if (!d || !d.head) return;
+      if (shot.css && !d.getElementById('store-frame-css')) {
+        const style = d.createElement('style');
+        style.id = 'store-frame-css';
+        style.textContent = shot.css;
+        d.head.append(style);
+      }
+      if (!stepped && d.querySelector(shot.ready)) {
+        stepped = true;
+        shot.step?.(d);
+        document.documentElement.dataset.ready = '1';
+      }
+    }, 100);
+    setTimeout(() => clearInterval(poll), 8000);
+  } else if (tile) {
+    const tiles = {
+      // The drop and the card side by side, the wordmark under them.
+      a: `<div class="tile" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+            <div style="display:flex;align-items:flex-end;gap:18px">
+              <span class="mask drop" style="height:104px"></span>
+              <span class="mask card" style="height:78px;transform:rotate(8deg)"></span>
+            </div>
+            <div class="word" style="font-size:54px;line-height:1">drip</div>
+          </div>`,
+      // The drop large on the left, wordmark and one line on the right.
+      b: `<div class="tile" style="display:flex;align-items:center;gap:26px;padding-left:56px">
+            <span class="mask drop" style="height:150px"></span>
+            <div>
+              <div class="word" style="font-size:72px;line-height:0.95">drip</div>
+              <div style="font-size:19px;color:var(--muted);margin-top:10px">One video at a time.</div>
+            </div>
+          </div>`,
+      // The drop alone, centered, wordmark beside it.
+      c: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:16px">
+            <span class="mask drop" style="height:96px"></span>
+            <div class="word" style="font-size:84px;line-height:1">drip</div>
+          </div>`,
+    };
+    document.body.innerHTML = tiles[/** @type {'a'|'b'|'c'} */ (tile)] || '';
+    document.documentElement.dataset.ready = '1';
+  }
+</script>
+</body>
+</html>

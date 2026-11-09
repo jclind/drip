@@ -33,6 +33,19 @@
           if (mode && D.MODES[mode]) Object.assign(state.settings, D.MODES[mode]);
           if (params.has('cards')) state.settings.cards = params.get('cards');
           for (const key of ['clock', 'stash', 'searchCap']) if (params.has(key)) state.settings[key] = params.get(key) === '1';
+          // &sample=1 fills two weeks of log and turns on Dry hours, for the store images (store/ART-PLAN.md).
+          if (params.get('sample') === '1') {
+            state.settings.dryHours = true;
+            const minutes = [41, 58, 33, 47, 62, 29, 38, 44, 52, 36, 61, 27, 49, 23];
+            minutes.forEach((m, i) => {
+              const day = D.addDays(state.day, i - minutes.length + 1);
+              state.log[day] = { watchedSec: m * 60, watchSpent: Math.ceil(m / 15), recSpent: 4 + (i % 4), saved: i % 2, watched: 1 + (i % 2), passed: 4 + (i % 4) - (i % 2) - 1 - (i % 2), needThis: [] };
+            });
+            const at = Date.now() - 3 * 3600000;
+            state.log[state.day].needThis.push({ videoId: 'store-bike', title: 'Truing a bike wheel at home, start to finish', reason: 'Fixing my wheel tonight, need the steps', at });
+            state.log[D.addDays(state.day, -2)].needThis.push({ videoId: 'store-knife', title: 'Sharpening on a single whetstone', reason: 'Class assignment due Friday', at: at - 2 * 86400000 });
+            state.tokens = { watch: 2, rec: 7 };
+          }
         }
         const res = msg.type === 'updateSettings' ? D.updateSettings(state, msg.changes, Date.now())
           : msg.type === 'cancelPending' ? D.cancelPending(state, msg.key) : { ok: true };
