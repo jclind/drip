@@ -36,8 +36,9 @@
           // &sample=1 fills two weeks of log and turns on Dry hours, for the store images (store/ART-PLAN.md).
           if (params.get('sample') === '1') {
             state.settings.dryHours = true;
-            // Last week (the 6th to 12th) averages 41 and its Friday runs to 80, so the chart uses its height (round 10).
-            const minutes = [41, 58, 33, 47, 62, 29, 29, 44, 42, 36, 80, 27, 49, 23];
+            // Last week (the 6th to 12th) averages 41 and its Friday runs to 77, so the chart uses its height (round 10).
+            // Saturday uses both its drops, 30 minutes, then takes an unlock (round 13).
+            const minutes = [41, 58, 33, 47, 62, 29, 29, 44, 42, 36, 77, 30, 49, 23];
             minutes.forEach((m, i) => {
               const day = D.addDays(state.day, i - minutes.length + 1);
               state.log[day] = { watchedSec: m * 60, watchSpent: Math.ceil(m / 15), recSpent: 4 + (i % 4), saved: i % 2, watched: 1 + (i % 2), passed: 4 + (i % 4) - (i % 2) - 1 - (i % 2), needThis: [] };
@@ -49,6 +50,7 @@
             state.tokens = { watch: 2, rec: 7 };
             // Saturday's cards differ from screenshot 1's 7 left, so the two images don't look copied (round 8).
             Object.assign(state.log[D.addDays(state.day, -2)], { recSpent: 5, saved: 1, watched: 2, passed: 2 });
+            state.log[D.addDays(state.day, -2)].needThis.push({ videoId: 'store-bread', title: 'Shaping a sourdough loaf', reason: 'Dough is proofing now', at: at - 2 * 86400000 });
           }
           // &pending=1 raises Drops per day from 4 to 5 a week after install, so the change waits for the reset (Q6):
           // the store's Settings image shows "Slow to loosen" happening.

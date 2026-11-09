@@ -337,7 +337,7 @@ Round 12 changes: all six round-11 fixes. 1 has "YouTube, one / video at a time.
 
 Scores are where round 10 left them. Codex lost a point on 2, 3, and 4; the Claude judge gained one on 4, 5, and c3 and put AI look at 3 on everything. The two now pull opposite ways on several items: Codex wants fewer notes (cut 3's Customize note, 4's Dry hours note, 5's Unlocks note) and the sample label back in 5's subline, which the Claude judge asked to move out in round 11. The Claude judge's AI-look reasons are the same each round: the cream-panel-plus-app layout and the vector look of the drawn thumbnail.
 
-Fixes for round 13, where the judges agree or one asks and the other doesn't object:
+Fixes for round 13, where the judges agree or one asks and the other doesn't object (applied in round 13):
 1. Screenshot 1 (both): move the legend down so the left column has no 280px gap; the subline says it's a Chrome extension (Codex). One detail in the thumbnail drawn for drip, such as the rider's jacket in drip's blue (Claude).
 2. Screenshot 2: "stops" instead of "pauses", the product's own word (Claude); the action note gives stopping equal weight, "Stop here, or spend a drop for 15 more minutes." (Codex); the water note shortened (Codex). Band color matched to the strip at the seam, not lightened (Claude, which reverses its round-11 ask).
 3. Screenshot 3 (both): note 1 says something the card doesn't, "The default: 4 drops and 10 cards a day."; the capture centered vertically.
@@ -346,6 +346,28 @@ Fixes for round 13, where the judges agree or one asks and the other doesn't obj
 6. Tile c3: show the card's full top edge and one corner (Claude), smaller than the drop (Codex).
 
 Rejected: lowering the lock's water (Claude; tried in rounds 1, 6, and 10, see Don't redo in the handoff); a History headline with the drop in it, "Down 7 minutes a day." (Claude), since Codex flags the decline as reading like a promised result.
+
+### Round 13, 2026-11-09 (v2)
+
+Reports: `reviews/round-13-codex.md`, `reviews/round-13-claude.md`, plus two reruns of the Claude judge on the same images, `round-13-claude-rerun-a.md` and `-rerun-b.md`.
+
+| Image | Codex design | Codex AI | Claude design (3 runs) | Claude AI (3 runs) |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 8, 8, 8 | 3, 3, 3 |
+| 2 Lock | 9 | 2 | 7, 7, 7 | 4, 3, 3 |
+| 3 Modes | 8 | 2 | 8, 8, 8 | 3, 3, 3 |
+| 4 Settings | 8 | 1 | 7, 7, 7 | 3, 3, 3 |
+| 5 History | 8 | 1 | 7, 8, 8 | 3, 3, 3 |
+| Tile c2 | 9 | 1 | 6, 8, 8 | 4, 2, 3 |
+| Tile c3 | 8 | 1 | 7, 7, 7 | 4, 3, 3 |
+
+Round 13 changes: all six listed fixes. 1's legend moves down to y 430, the subline names the Chrome extension, and the rider wears drip's blue. 2 says "stops", "Stop here, or spend a drop", and the band matches the strip's water exactly. 3 is centered with "The default: 4 drops and 10 cards a day." 4 has a general subline, a 60px higher crop that reaches "Finish video when time runs out", "Set to 5 drops. Stays at 4 until 4am." and "Add dry hours and they start tonight." 5's "Sample data." sits under the subline, and the sample's Saturday runs out at 30 minutes and takes an unlock (Friday drops to 77, so the week still averages 41). c3's card is smaller and turned -15 degrees.
+
+Codex now meets both targets on 2 and c2. The reruns answer whether the Claude judge's 3s are noise: on the screenshots they aren't. All three runs give AI look 3 to every screenshot, and design moves by at most a point. Only the tiles swing (c2 from 6/4 to 8/2). Rerun B names the cause: "every frame is the same beige-left, dark-right split with a serif headline, gray subline, and thin blue leader lines ending in dots, a common Figma launch-template idiom." That's the v2 layout itself, so copy and crop changes inside it won't take the Claude judge's AI look to 2.
+
+The Claude judge also reversed two of its round-12 asks: the legend (moved down at its request, now all three runs want it back under the subline) and "YouTube" in 1's headline (now a branding risk in all three runs; Codex this round agrees and suggests "One video at a time." with "for YouTube" in the subline).
+
+Agreed by every report this round, for a round 14 if there is one: take "YouTube" out of 1's headline; say the 4-to-5 change once on 4; note 3's dot sits on the card border next to the radio; 5's Unlocks leader skims the tile tops. A frame bug two runs caught: a two-line note's leader starts after its first line, so when the second line is longer the leader runs between the lines.
 
 ## How to run a round (v2)
 

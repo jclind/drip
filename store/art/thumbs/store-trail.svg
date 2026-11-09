@@ -61,7 +61,8 @@
     <circle cx="-24" cy="26" r="19"/>
     <circle cx="28" cy="26" r="19"/>
     <path d="M-24 26 L-4 0 L20 0 L28 26 M-4 0 L6 26 L20 0"/>
-    <path d="M-8 -4 L4 -32 L18 -14" stroke-width="7.5"/>
+    <!-- the jacket in drip's blue (round 13) -->
+    <path d="M-8 -4 L4 -32 L18 -14" stroke="#42a5f6" stroke-width="7.5"/>
     <circle cx="6" cy="-42" r="8" fill="#0b0e0c" stroke="none"/>
   </g>
 </svg>
