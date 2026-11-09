@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>drip store rounds</title>
+<!--
+  Every round of drip's store images in one page, for Jesse to look through. It reads the folders on its own: each
+  round's images in rounds/round-N/, the reviewers' score tables in reviews/round-N-<seat>.md, the divergent round's
+  two layouts in ../images-v3/, and the current set in ../images-v2/. Serve the worktree root and open
+  /store/art/gallery.html. Notes typed here stay in this browser only; "Copy my notes" puts them on the clipboard.
+-->
+<style>
+  :root { --bg: #f4f1ea; --ink: #1c1b19; --soft: #6b665d; --line: #ddd6c8; --card: #fffdf8; --blue: #1b74c9; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #151515; --ink: #ecebe7; --soft: #9a968e; --line: #2c2c2c; --card: #1d1d1d; --blue: #5aa8f0; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line); padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  h1 { font-size: 18px; margin: 0 12px 0 0; }
+  button, select { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button[aria-pressed="true"] { border-color: var(--blue); color: var(--blue); }
+  main { padding: 8px 20px 60px; max-width: 1500px; margin: 0 auto; }
+  section { border-bottom: 1px solid var(--line); padding: 22px 0; }
+  h2 { font-size: 17px; margin: 0 0 4px; }
+  .sub { color: var(--soft); font-size: 13px; margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  figure img { display: block; width: 100%; height: auto; cursor: zoom-in; }
+  figcaption { font-size: 12px; color: var(--soft); padding: 6px 10px; }
+  .scores { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 12px; }
+  .score { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12px; }
+  .score b { display: block; font-size: 12px; margin-bottom: 2px; }
+  .score table { border-collapse: collapse; }
+  .score td { padding: 1px 6px 1px 0; font-variant-numeric: tabular-nums; }
+  .score a { color: var(--blue); }
+  textarea { width: 100%; min-height: 44px; margin-top: 10px; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; resize: vertical; }
+  .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  #zoom { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88); display: none; align-items: center; justify-content: center; z-index: 5; cursor: zoom-out; }
+  #zoom img { max-width: 96vw; max-height: 92vh; }
+  #zoom.on { display: flex; }
+  @media (max-width: 600px) { header { padding: 10px 16px; } main { padding: 8px 16px 40px; } .grid, .strip { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>drip store images, every round</h1>
+  <button id="by-round" aria-pressed="true">By round</button>
+  <button id="by-image" aria-pressed="false">By image</button>
+  <select id="which" hidden></select>
+  <button id="copy">Copy my notes</button>
+  <span id="copied" class="sub" style="margin:0"></span>
+</header>
+<main id="main"></main>
+<div id="zoom"><img alt=""></div>
+<script>
+  // @ts-check
+  /** @typedef {{key: string, title: string, sub: string, dir: string, files: string[], reports: string[]}} Round */
+
+  const NOTES_KEY = 'drip-store-gallery-notes';
+  /** @returns {Record<string, string>} */
+  function loadNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); } catch { return {}; } }
+  /** @param {Record<string, string>} n */
+  function saveNotes(n) { try { localStorage.setItem(NOTES_KEY, JSON.stringify(n)); } catch { /* private window */ } }
+  const notes = loadNotes();
+
+  /** The hrefs in a python http.server directory listing. @param {string} url */
+  async function list(url) {
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const html = await r.text();
+    return [...html.matchAll(/href="([^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
+  }
+
+  /** What each round was, from HILL-CLIMB.md and STATE.md, in a few words. */
+  const ABOUT = {
+    0: 'first frames, v1 layout', 4: 'last v1 round', 5: 'v2 layout: paper panel, serif, page strip, notes',
+    11: 'end of the two-judge climb', 12: '', 13: 'two judges, plus two reruns of the Claude judge',
+    14: 'council round 1: Claude, Codex, Muse', 15: 'council round 2', 16: 'council round 3',
+    17: 'divergent round: two new layouts (A from the Claude seat, B from Codex)', 18: 'head-to-head: V vs A vs B, both seats picked V',
+    19: 'ship check: Claude and Codex say ship',
+  };
+
+  /** Image order: screenshots by number, then tiles. @param {string} f */
+  function rank(f) {
+    const m = f.match(/screenshot-(\d)/);
+    const set = f.startsWith('a-') ? 1 : f.startsWith('b-') ? 2 : 0;
+    return set * 100 + (m ? Number(m[1]) : 50) + (f.includes('tile') ? 10 : 0);
+  }
+
+  async function loadRounds() {
+    const dirs = (await list('rounds/')).filter((h) => /^round-\d+\/$/.test(h)).map((h) => Number(h.match(/\d+/)?.[0]));
+    const reviews = (await list('reviews/')).filter((h) => /^round-\d+-.+\.md$/.test(h) && !/prompt/.test(h));
+    /** @type {Round[]} */
+    const rounds = [];
+    for (const n of dirs) {
+      const files = (await list(`rounds/round-${n}/`)).filter((h) => h.endsWith('.png')).sort((a, b) => rank(a) - rank(b));
+      rounds.push({ key: `r${n}`, title: `Round ${n}`, sub: ABOUT[n] || '', dir: `rounds/round-${n}/`, files,
+        reports: reviews.filter((h) => h.startsWith(`round-${n}-`)) });
+    }
+    const v3 = (await list('../images-v3/')).filter((h) => h.endsWith('.png')).sort((a, b) => rank(a) - rank(b));
+    if (v3.length) rounds.push({ key: 'r17', title: 'Round 17', sub: ABOUT[17], dir: '../images-v3/', files: v3,
+      reports: reviews.filter((h) => h.startsWith('round-17-')) });
+    const now = (await list('../images-v2/')).filter((h) => /^(screenshot-\d|tile-c2)\.png$/.test(h)).sort((a, b) => rank(a) - rank(b));
+    rounds.push({ key: 'now', title: 'Now', sub: 'the current set, with every fix so far', dir: '../images-v2/', files: now, reports: [] });
+    const num = (/** @type {Round} */ r) => (r.key === 'now' ? 999 : Number(r.key.slice(1)));
+    return rounds.sort((a, b) => num(b) - num(a));
+  }
+
+  /** The first markdown table in a report, as rows of cells. @param {string} md */
+  function firstTable(md) {
+    const rows = [];
+    for (const line of md.split('\n')) {
+      if (/^\s*\|/.test(line)) {
+        if (/^\s*\|\s*-/.test(line)) continue;
+        rows.push(line.split('|').slice(1, -1).map((c) => c.trim()));
+      } else if (rows.length) break;
+    }
+    return rows;
+  }
+
+  /** @param {Round} r @param {HTMLElement} into */
+  async function scoreCards(r, into) {
+    for (const f of r.reports) {
+      const md = await (await fetch(`reviews/${f}`)).text();
+      const rows = firstTable(md);
+      if (!rows.length) continue;
+      const card = document.createElement('div');
+      card.className = 'score';
+      const seat = f.replace(/^round-\d+-/, '').replace(/\.md$/, '');
+      card.innerHTML = `<b>${seat} · <a href="reviews/${f}" target="_blank">report</a></b>`;
+      const t = document.createElement('table');
+      for (const row of rows.slice(0, 9)) {
+        const tr = document.createElement('tr');
+        for (const c of row.slice(0, 3)) { const td = document.createElement('td'); td.textContent = c.length > 40 ? `${c.slice(0, 40)}…` : c; tr.append(td); }
+        t.append(tr);
+      }
+      card.append(t);
+      into.append(card);
+    }
+  }
+
+  /** @param {HTMLElement} parent @param {string} src @param {string} label */
+  function figure(parent, src, label) {
+    const f = document.createElement('figure');
+    f.innerHTML = `<img loading="lazy" alt=""><figcaption></figcaption>`;
+    /** @type {HTMLImageElement} */ (f.querySelector('img')).src = src;
+    /** @type {HTMLElement} */ (f.querySelector('figcaption')).textContent = label;
+    parent.append(f);
+  }
+
+  /** @param {Round[]} rounds */
+  function byRound(rounds) {
+    const main = /** @type {HTMLElement} */ (document.getElementById('main'));
+    main.innerHTML = '';
+    for (const r of rounds) {
+      const s = document.createElement('section');
+      s.innerHTML = `<h2></h2><div class="sub"></div><div class="scores"></div><div class="grid"></div><textarea placeholder="Your take on this round"></textarea>`;
+      /** @type {HTMLElement} */ (s.querySelector('h2')).textContent = r.title;
+      /** @type {HTMLElement} */ (s.querySelector('.sub')).textContent = r.sub;
+      const grid = /** @type {HTMLElement} */ (s.querySelector('.grid'));
+      for (const f of r.files) figure(grid, r.dir + f, f.replace('.png', ''));
+      const ta = /** @type {HTMLTextAreaElement} */ (s.querySelector('textarea'));
+      ta.value = notes[r.key] || '';
+      ta.addEventListener('input', () => { notes[r.key] = ta.value; saveNotes(notes); });
+      main.append(s);
+      scoreCards(r, /** @type {HTMLElement} */ (s.querySelector('.scores')));
+    }
+  }
+
+  /** One image across every round, oldest first. @param {Round[]} rounds @param {string} which */
+  function byImage(rounds, which) {
+    const main = /** @type {HTMLElement} */ (document.getElementById('main'));
+    main.innerHTML = '';
+    const s = document.createElement('section');
+    s.innerHTML = `<div class="strip"></div>`;
+    const strip = /** @type {HTMLElement} */ (s.querySelector('.strip'));
+    for (const r of [...rounds].reverse()) {
+      for (const f of r.files) {
+        const isTile = f.includes('tile');
+        if (which === 'tile' ? !isTile : !f.includes(`screenshot-${which}`)) continue;
+        figure(strip, r.dir + f, `${r.title} · ${f.replace('.png', '')}`);
+      }
+    }
+    main.append(s);
+  }
+
+  (async () => {
+    const rounds = await loadRounds();
+    const which = /** @type {HTMLSelectElement} */ (document.getElementById('which'));
+    which.innerHTML = '<option value="1">1 Home</option><option value="2">2 Lock</option><option value="3">3 Modes</option><option value="4">4 Settings</option><option value="5">5 History</option><option value="tile">Tile</option>';
+    const roundBtn = /** @type {HTMLElement} */ (document.getElementById('by-round'));
+    const imageBtn = /** @type {HTMLElement} */ (document.getElementById('by-image'));
+    const show = (/** @type {'round' | 'image'} */ v) => {
+      roundBtn.setAttribute('aria-pressed', String(v === 'round'));
+      imageBtn.setAttribute('aria-pressed', String(v === 'image'));
+      which.hidden = v !== 'image';
+      if (v === 'round') byRound(rounds); else byImage(rounds, which.value);
+    };
+    roundBtn.addEventListener('click', () => show('round'));
+    imageBtn.addEventListener('click', () => show('image'));
+    which.addEventListener('change', () => show('image'));
+    document.getElementById('copy')?.addEventListener('click', async () => {
+      const text = rounds.filter((r) => notes[r.key]?.trim()).map((r) => `${r.title}: ${notes[r.key].trim()}`).join('\n');
+      const said = /** @type {HTMLElement} */ (document.getElementById('copied'));
+      if (!text) { said.textContent = 'No notes yet.'; return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        said.textContent = 'Copied.';
+      } catch {
+        // The tailnet address is plain http, where the clipboard API is off. Show the notes selected instead.
+        let box = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('notes-out'));
+        if (!box) {
+          box = document.createElement('textarea');
+          box.id = 'notes-out';
+          box.style.cssText = 'position:fixed;left:20px;right:20px;bottom:20px;height:180px;z-index:4';
+          document.body.append(box);
+        }
+        box.value = text;
+        box.focus();
+        box.select();
+        said.textContent = 'Selected below: press Cmd+C.';
+      }
+    });
+    show('round');
+    const zoom = /** @type {HTMLElement} */ (document.getElementById('zoom'));
+    document.addEventListener('click', (e) => {
+      const t = /** @type {HTMLElement} */ (e.target);
+      if (t.tagName === 'IMG' && t.closest('figure')) {
+        /** @type {HTMLImageElement} */ (zoom.querySelector('img')).src = /** @type {HTMLImageElement} */ (t).src;
+        zoom.classList.add('on');
+      } else if (t.closest('#zoom')) zoom.classList.remove('on');
+    });
+  })();
+</script>
+</body>
+</html>
