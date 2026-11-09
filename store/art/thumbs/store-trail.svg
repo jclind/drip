@@ -1,58 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <!-- Drawn by hand for the store images (round 7, 2026-11-09): a rider on a ridge, a storm coming in from the left,
+       and a break of light to the right that the rider is heading for. No real thumbnail. -->
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2b3445"/>
-      <stop offset="0.55" stop-color="#6b7486"/>
-      <stop offset="1" stop-color="#d9b98a"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#263042"/>
+      <stop offset="0.5" stop-color="#5d6677"/>
+      <stop offset="0.85" stop-color="#c9ab7c"/>
+      <stop offset="1" stop-color="#e8c891"/>
     </linearGradient>
+    <radialGradient id="glow" cx="0.74" cy="0.52" r="0.32">
+      <stop offset="0" stop-color="#ffe2a8" stop-opacity="0.95"/>
+      <stop offset="0.5" stop-color="#f3cf8e" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#f3cf8e" stop-opacity="0"/>
+    </radialGradient>
     <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#55607a"/>
-      <stop offset="1" stop-color="#3d4659"/>
+      <stop offset="0" stop-color="#5a6479"/>
+      <stop offset="1" stop-color="#434c60"/>
     </linearGradient>
     <linearGradient id="mid" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3f5a4a"/>
-      <stop offset="1" stop-color="#26382e"/>
+      <stop offset="0" stop-color="#3b5444"/>
+      <stop offset="1" stop-color="#22322a"/>
     </linearGradient>
     <linearGradient id="near" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2a3a2c"/>
-      <stop offset="1" stop-color="#141c16"/>
+      <stop offset="0" stop-color="#1f2b21"/>
+      <stop offset="1" stop-color="#0d130f"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.72" cy="0.62" r="0.35">
-      <stop offset="0" stop-color="#f3d39b" stop-opacity="0.75"/>
-      <stop offset="1" stop-color="#f3d39b" stop-opacity="0"/>
-    </radialGradient>
   </defs>
   <rect width="1280" height="720" fill="url(#sky)"/>
   <rect width="1280" height="720" fill="url(#glow)"/>
-  <!-- storm clouds -->
-  <g fill="#1f2633" opacity="0.85">
-    <ellipse cx="220" cy="110" rx="320" ry="90"/>
-    <ellipse cx="560" cy="70" rx="300" ry="80"/>
-    <ellipse cx="980" cy="120" rx="380" ry="100"/>
+  <!-- the storm: one heavy mass with a ragged underside, thinning to the right -->
+  <path d="M0 0 H1010 C 990 40 940 52 900 60 C 930 92 880 118 830 112 C 800 150 730 150 700 132 C 670 170 600 176 560 150
+           C 530 196 450 204 410 176 C 380 222 300 236 250 208 C 210 250 130 262 80 236 C 50 262 20 266 0 258 Z" fill="#1c2330" opacity="0.92"/>
+  <path d="M0 210 C 60 236 140 220 190 246 C 250 230 320 262 380 240 C 430 262 500 246 540 262 C 520 290 430 300 360 288
+           C 290 306 200 300 140 288 C 90 300 30 296 0 290 Z" fill="#2a3242" opacity="0.7"/>
+  <!-- rain under the storm, uneven -->
+  <g stroke="#a7b2c6" stroke-linecap="round" opacity="0.4">
+    <line x1="42" y1="286" x2="22" y2="382" stroke-width="2"/>
+    <line x1="96" y1="300" x2="80" y2="372" stroke-width="1.5"/>
+    <line x1="141" y1="296" x2="118" y2="420" stroke-width="2.5"/>
+    <line x1="203" y1="304" x2="190" y2="358" stroke-width="1.5"/>
+    <line x1="238" y1="300" x2="214" y2="404" stroke-width="2"/>
+    <line x1="296" y1="306" x2="281" y2="372" stroke-width="1.5"/>
+    <line x1="331" y1="298" x2="312" y2="388" stroke-width="2"/>
+    <line x1="390" y1="300" x2="378" y2="346" stroke-width="1.5"/>
+    <line x1="428" y1="294" x2="412" y2="370" stroke-width="2"/>
+    <line x1="472" y1="286" x2="464" y2="322" stroke-width="1.5"/>
   </g>
-  <g fill="#2c3546" opacity="0.8">
-    <ellipse cx="380" cy="190" rx="260" ry="55"/>
-    <ellipse cx="820" cy="210" rx="300" ry="50"/>
-  </g>
-  <!-- rain on the left -->
-  <g stroke="#9aa6bb" stroke-width="2" opacity="0.35">
-    <line x1="80" y1="200" x2="60" y2="330"/><line x1="130" y1="210" x2="110" y2="340"/>
-    <line x1="180" y1="190" x2="160" y2="320"/><line x1="230" y1="215" x2="210" y2="345"/>
-    <line x1="280" y1="200" x2="260" y2="330"/><line x1="330" y1="220" x2="310" y2="350"/>
-    <line x1="380" y1="205" x2="360" y2="335"/>
-  </g>
-  <!-- ridges -->
-  <path d="M0 400 L140 330 L260 370 L420 280 L560 350 L700 300 L860 360 L1000 290 L1140 340 L1280 310 L1280 720 L0 720 Z" fill="url(#far)"/>
-  <path d="M0 480 L180 410 L330 450 L500 380 L650 440 L820 400 L980 460 L1120 420 L1280 450 L1280 720 L0 720 Z" fill="url(#mid)"/>
-  <path d="M0 720 L0 560 C 200 520 360 500 520 520 C 700 545 820 600 1000 590 C 1120 584 1200 560 1280 550 L1280 720 Z" fill="url(#near)"/>
-  <!-- the trail along the near ridge -->
-  <path d="M120 720 C 260 640 420 580 560 560 C 700 545 820 560 940 548" fill="none" stroke="#b89a6a" stroke-width="10" stroke-linecap="round" opacity="0.8"/>
-  <!-- rider -->
-  <g transform="translate(700 520)" fill="none" stroke="#0e1210" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="-22" cy="22" r="17"/>
-    <circle cx="26" cy="22" r="17"/>
-    <path d="M-22 22 L-4 -2 L18 -2 L26 22 M-4 -2 L4 22 L18 -2"/>
-    <path d="M-8 -6 L2 -30 L14 -14" stroke-width="7"/>
-    <circle cx="4" cy="-38" r="7" fill="#0e1210" stroke="none"/>
+  <!-- far range -->
+  <path d="M0 410 L90 372 L150 388 L230 336 L300 362 L380 318 L450 352 L520 330 L600 366 L690 322 L760 348 L840 300
+           L910 334 L990 312 L1080 352 L1160 326 L1280 346 V720 H0 Z" fill="url(#far)"/>
+  <!-- the ridge the rider is on: its crest sits against the light -->
+  <path d="M0 500 C 120 470 220 452 330 446 C 430 440 520 420 610 404 C 680 392 740 382 800 384 C 880 388 950 410 1030 430
+           C 1120 452 1200 470 1280 478 V720 H0 Z" fill="url(#mid)"/>
+  <path d="M0 720 V600 C 160 572 300 566 460 584 C 620 602 760 640 940 632 C 1080 626 1180 600 1280 590 V720 Z" fill="url(#near)"/>
+  <!-- the trail climbing to the crest -->
+  <path d="M90 720 C 210 650 330 600 450 560 C 560 522 640 470 700 430 C 730 410 760 392 786 386" fill="none" stroke="#c4a573" stroke-width="9" stroke-linecap="round" opacity="0.85"/>
+  <path d="M786 386 C 840 384 900 398 960 414" fill="none" stroke="#c4a573" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+  <!-- the rider, on the crest, against the light -->
+  <g transform="translate(792 340)" fill="none" stroke="#0b0e0c" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="-24" cy="26" r="19"/>
+    <circle cx="28" cy="26" r="19"/>
+    <path d="M-24 26 L-4 0 L20 0 L28 26 M-4 0 L6 26 L20 0"/>
+    <path d="M-8 -4 L4 -32 L18 -14" stroke-width="7.5"/>
+    <circle cx="6" cy="-42" r="8" fill="#0b0e0c" stroke="none"/>
   </g>
 </svg>

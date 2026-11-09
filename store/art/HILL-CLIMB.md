@@ -205,6 +205,24 @@ Codex's AI look dropped to 2 or less on everything but 1. Claude's didn't move. 
 
 Round 6 changes: the judge prompt now asks, for any image below 9 or above 2, what would get it there. The Saturday unlock moves to Friday, a full day, in `dev/page.html`'s sample. Notes rewritten so they add what the page doesn't say. Tried again to stop the water partway: the paused player sits behind the lock's panel, so a crest high enough to clear the panel has only gray above it. Full water it is.
 
+### Round 6, 2026-11-09 (v2)
+
+Reports: `reviews/round-6-codex.md`, `reviews/round-6-claude.md`. The prompt now asks each judge what would get an image to 9 and 2.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 7 | 3 |
+| 2 Lock | 8 | 2 | 6 | 4 |
+| 3 Modes | 8 | 2 | 7 | 3 |
+| 4 Settings | 7 | 2 | 7 | 3 |
+| 5 History | 8 | 2 | 7 | 3 |
+| Tile c | 9 | 1 | 6 | 4 |
+| Tile p | 8 | 1 | 5 | 4 |
+
+Codex: AI look met on every image, tile c meets both targets. Claude: AI look moved from 4 to 3 on four screenshots, the first movement in six rounds.
+
+Round 7 changes, from both reports: the drawn thumbnail redrawn (a lumpy storm instead of ovals, uneven rain, the rider on the crest against a break of light; Codex said the rider vanished and the ovals read as stock); the channel "Trail Days" (a real festival, Claude) is now "Wet Gravel Club"; screenshot 1 shows Stash unpressed (the `card` scenario); notes at 20px; no payment words ("buys", "cost"); the lock's paused player enlarged under the water so the strip has no dark band at its edge; a fixed subline line; crops centered. Each round's images go to `rounds/round-N/` from the judges' copies, which are exactly what was scored.
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.

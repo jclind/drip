@@ -8,7 +8,7 @@
 
   /** @type {{id: string, title: string, channel: string, length: string, views?: string, age?: string}[]} */
   const videos = [
-    { id: 'store-trail', title: 'Riding the ridge trail before the storm', channel: 'Trail Days', length: '21:35', views: '1.2M views', age: '1w ago' },
+    { id: 'store-trail', title: 'Riding the ridge trail before the storm', channel: 'Wet Gravel Club', length: '21:35', views: '1.2M views', age: '1w ago' },
     { id: 'store-joinery', title: 'How Japanese joinery holds without nails', channel: 'Workshop Notes', length: '14:02', views: '214K views', age: '3d ago' },
     { id: 'store-bread', title: 'Sourdough with a schedule that fits a workday', channel: 'Kitchen Basics', length: '9:08', views: '48K views', age: '2mo ago' },
     { id: 'store-orbit', title: 'Why the Moon always shows the same face', channel: 'Slow Science', length: '12:47', views: '3.4M views', age: '5d ago' },

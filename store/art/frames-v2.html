@@ -20,7 +20,7 @@
   .shot { position: relative; width: 1280px; height: 800px; overflow: clip; background: var(--paper); }
   .copy { position: absolute; left: 72px; top: 92px; width: 430px; }
   h1 { margin: 0 0 18px; font-family: Newsreader, Georgia, serif; font-weight: 500; font-size: 54px; line-height: 1.04;
-    letter-spacing: -1.2px; white-space: pre-line; }
+    letter-spacing: -1.2px; white-space: pre-line; min-height: 112px; }
   .copy p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--soft); white-space: pre-line; }
   .brand { position: absolute; left: 72px; bottom: 54px; display: flex; align-items: center; gap: 9px; font-size: 24px;
     font-weight: 700; letter-spacing: -0.5px; }
@@ -31,7 +31,7 @@
   .panel { position: absolute; right: 0; top: 0; width: 720px; height: 800px; overflow: hidden; background: #0f0f0f; }
   .panel iframe { position: absolute; border: 0; transform-origin: 0 0; background: #0f0f0f; }
   /* Notes: a short line of text in the left column and a leader line to the thing it names. */
-  .note { position: absolute; left: 72px; width: 330px; font-size: 16px; line-height: 1.35; color: var(--ink); }
+  .note { position: absolute; left: 72px; width: 380px; font-size: 20px; line-height: 1.3; color: var(--ink); }
   .note b { font-weight: 500; }
   svg.leaders { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 
@@ -61,19 +61,19 @@
   const SHOTS = {
     1: {
       h: 'One video\nat a time.',
-      p: 'drip replaces YouTube\'s home feed\nwith one recommendation at a time.',
-      src: '/dev/home.html?scenario=saved&theme=dark&reduced=1&videos=store',
-      w: 620, h2: 656, x: -74, y: -138, scale: 1.4,
+      p: 'drip swaps YouTube\'s home feed\nfor one pick from it.',
+      src: '/dev/home.html?scenario=card&theme=dark&reduced=1&videos=store',
+      w: 620, h2: 656, x: -105, y: -177, scale: 1.5,
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
       ready: '.drip-thumb img.is-loaded',
       notes: [
-        { sel: '.drip-thumb', say: 'Revealed from your own home feed.' },
-        { sel: '.drip-next', say: 'One card reveals the next video.', top: true },
+        { sel: '.drip-thumb', say: 'From your own YouTube recommendations.' },
+        { sel: '.drip-next', say: 'The next one costs a card.', top: true },
       ],
     },
     2: {
       h: 'When the time\nruns out.',
-      p: 'The video pauses under rising water.\nLimits are optional.',
+      p: 'Your video pauses at the daily limit.\nLimits are optional.',
       src: '/dev/page.html?page=welcome#tour-4',
       // The tour's stage alone, full height, cropped past its blurred edges. It sits at 362 to 921 across and 231 to 729
       // down in the page.
@@ -87,7 +87,8 @@
         .co-layer, .tour-again, .tour-under #drip-pill, #drip-lock .drip-orbit, #drip-lock .drip-orbit-spark, #drip-lock .drip-orbit-star { display: none !important; }
         .tour-stage { border-color: transparent !important; border-radius: 0 !important; }
         .tour-player { background: url(/store/art/thumbs/store-trail.svg) center / cover !important; filter: brightness(1.8) saturate(1.3); }
-        .tour-player-play, .tour-player-bar { display: none !important; }`,
+        .tour-player-play, .tour-player-bar { display: none !important; }
+        .tour-under { transform: scale(1.6); } .tour-player { border-radius: 0 !important; }`,
       ready: '#drip-lock .drip-lock-sub',
       // The tour runs on a fresh state, so its lock says "0m watched today"; the default day is 4 drops of 15 minutes.
       // Headless Chrome doesn't advance animation time in the iframe, so every animation is set by hand, and the
@@ -124,43 +125,43 @@
         });
       }, 600),
       notes: [
-        { sel: '#drip-lock .drip-lock-add', say: 'A spare drop buys 15 more minutes.' },
-        { sel: '#drip-lock .drip-lock-link', say: 'Type a reason to unlock. Up to 3 a week.' },
+        { sel: '#drip-lock .drip-lock-add', say: 'One spare drop adds 15 minutes.' },
+        { sel: '#drip-lock .drip-lock-link', say: 'Or give a reason. Up to 3 unlocks a week.' },
       ],
     },
     3: {
       h: 'Pick a mode.',
-      p: 'Search only, one video at a time,\nor daily limits. Change it later.',
+      p: 'Search only, one video at a time,\nor a daily limit on top.',
       src: '/dev/page.html?page=welcome',
-      w: 680, h2: 713, x: -32, y: -36, scale: 1.15,
+      w: 680, h2: 713, x: -32, y: -80, scale: 1.15,
       // The page's own logo and tagline repeat the frame's mark.
       css: '.hero { visibility: hidden !important; }',
       ready: 'input[type=radio], [role=radio]',
       notes: [
-        { sel: '[data-mode=curated]', say: 'No clock, and no cost per video.' },
-        { sel: '[data-mode=full]', say: 'Default: an hour and 10 reveals a day.' },
+        { sel: '[data-mode=curated]', say: 'Curated has no daily limits at all.' },
+        { sel: '[data-mode=full]', say: 'A drop is 15 minutes. A card shows one more video.' },
       ],
     },
     4: {
-      h: 'Set a\ndaily limit.',
+      h: 'Four drops\na day.',
       p: 'Stricter settings apply now.\nLooser ones wait until tomorrow.',
       src: '/dev/page.html?page=options&settled=1&sample=1',
       // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden.
-      w: 728, h2: 588, x: -95, y: -16, scale: 1.25,
+      w: 728, h2: 588, x: -85, y: -45, scale: 1.22,
       css: 'h1 { visibility: hidden !important; }',
       ready: '[role=tab]',
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
       notes: [
-        { text: 'Drops per day', say: 'Four drops of 15 minutes is an hour a day.' },
-        { text: 'Dry hours', say: 'Drops can\'t be spent from 11pm to 6am.' },
+        { text: 'Drops per day', say: '4 drops of 15 minutes: an hour a day.' },
+        { text: 'Dry hours', say: 'From 11pm, minutes left go back as whole drops.' },
       ],
     },
     5: {
       h: 'See where\nthe time went.',
-      p: 'Last week, day by day,\nagainst the week before.',
+      p: 'Your week, one bar per day.',
       src: '/dev/page.html?page=options&settled=1&sample=1#history',
       // The week's card alone. The tabs and the unlock reasons don't fit with it at a size that reads.
-      w: 728, h2: 840, x: -59, y: -180, scale: 1.15,
+      w: 728, h2: 840, x: -78, y: -205, scale: 1.2,
       css: '[role=tablist] { visibility: hidden !important; }',
       ready: '[data-k=earlier]',
       // This week starts on Sunday, so early in the week the chart is mostly empty. Last week is a full one. The frame is
@@ -170,8 +171,8 @@
         setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300);
       },
       notes: [
-        { sel: '.avg-line', say: 'Dashed line: 48m a day the week before.' },
-        { text: 'Saturday, Nov 7', say: 'Tap a day to see its drops and cards here.' },
+        { sel: '.avg-line', say: 'The week before averaged 48 minutes.' },
+        { text: 'Saturday, Nov 7', say: 'Click a day to see what it used.' },
       ],
     },
   };
@@ -196,7 +197,7 @@
     const d = /** @type {Document} */ (frame.contentDocument);
     const root = /** @type {HTMLElement} */ (document.querySelector('.shot'));
     const minY = /** @type {HTMLElement} */ (document.querySelector('.copy')).getBoundingClientRect().bottom + 40;
-    const maxY = 650;
+    const maxY = 630;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'leaders');
     svg.setAttribute('width', '1280');
@@ -220,7 +221,7 @@
       next = top + h + 22;
       // The line leaves the note's first line, runs level, then bends to the target.
       const ly = top + 11;
-      const lx = 72 + Math.min(330, measure(note)) + 14;
+      const lx = 72 + Math.min(380, measure(note)) + 14;
       const bend = PANEL_LEFT - 24;
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', `M${lx} ${ly} H${bend} L${tx} ${ty}`);
@@ -244,7 +245,7 @@
     const range = document.createRange();
     range.selectNodeContents(note);
     const rects = [...range.getClientRects()];
-    return rects.length ? Math.max(...rects.filter((q) => Math.abs(q.top - rects[0].top) < 2).map((q) => q.right)) - 72 : 330;
+    return rects.length ? Math.max(...rects.filter((q) => Math.abs(q.top - rects[0].top) < 2).map((q) => q.right)) - 72 : 380;
   }
 
   if (shot) {
