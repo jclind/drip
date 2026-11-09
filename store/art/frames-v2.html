@@ -71,7 +71,7 @@
    * scale), CSS to put in the page, what has to exist before the step runs, an optional step, and notes. A note
    * names its target by selector or by exact text, and sits in the left column at the target's height when there's
    * room.
-   * @typedef {{sel?: string, text?: string, say: string, top?: boolean, under?: boolean, above?: number, at?: number, gap?: number, nodot?: boolean}} Note
+   * @typedef {{sel?: string, text?: string, say: string, top?: boolean, under?: boolean, above?: number, at?: number, gap?: number, nodot?: boolean, has?: string}} Note
    * A note with `at` has no target: it sits at that height with no leader, for a line about the whole page. One with
    * `under` sits below its target and reaches up to the target's bottom edge with a right-angled leader, for a target
    * whose row has other things to its left. One with `above` sits level with the gap that many page pixels over its
@@ -96,7 +96,7 @@
     },
     2: {
       h: 'When time\nruns out.',
-      p: 'Set a daily limit. When it\'s used up,\nthe video stops.',
+      p: 'An optional daily limit. When it\'s\nused up, the video stops.',
       src: '/dev/page.html?page=welcome#tour-4',
       // The tour's stage alone, full height, cropped past its blurred edges. It sits at 362 to 921 across and 231 to 729
       // down in the page.
@@ -159,7 +159,7 @@
     },
     3: {
       h: 'Three ways\nto use drip.',
-      p: 'Search only, one pick at a time,\nor daily watch limits.',
+      p: 'Start strict, or just\nhide the feed.',
       src: '/dev/page.html?page=welcome',
       w: 680, h2: 713, x: -32, y: -76, scale: 1.15,
       // The page's own logo and tagline repeat the frame's mark.
@@ -181,8 +181,7 @@
       ready: '[role=tab]',
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
       notes: [
-        { text: 'Drops per day', say: 'Raised to 5 drops.\nThe 5th waits for the reset.' },
-        { text: 'Dry hours', say: 'Dry hours start tonight:\n11pm to 6am.' },
+        { sel: '.chip', has: '4 drops', say: 'Raised to 5 drops. Today\nstays at 4 until 4:00am.', above: 9 },
       ],
     },
     5: {
@@ -215,6 +214,14 @@
 
   /** The element a note points at, by selector or by its exact text. @param {Document} d @param {Note} n */
   function target(d, n) {
+    // `has` picks, among the selector's visible matches, the first whose text contains it.
+    // Hidden copies are skipped: Settings repeats a section's chips in its folded header.
+    if (n.sel && n.has) {
+      return [...d.querySelectorAll(n.sel)].find((e) => {
+        const r = e.getBoundingClientRect();
+        return r.width > 0 && r.top > 0 && e.textContent?.includes(/** @type {string} */ (n.has));
+      }) || null;
+    }
     if (n.sel) return d.querySelector(n.sel);
     const all = [...d.querySelectorAll('body *')].filter((e) => e.textContent?.trim() === n.text);
     return all[all.length - 1] || null;

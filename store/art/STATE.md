@@ -13,11 +13,11 @@ The `/council` run on drip's store images, started 2026-11-09. `/council continu
 
 ## Current
 
-- Round: 17 done, the divergent round (Jesse picked it 2026-11-09 after round 16). Round 18 next: the head-to-head comparison.
-- Tactic: divergent, level 1. Claude and Codex each proposed one layout far from v2 (`reviews/round-17-divergent-claude.md`, `-codex.md`); Muse was out of quota. Both landed on one huge number per image on their own. Built as `frames-v3.html`: A, "one number per image" (paper, Fraunces numerals with a blue drop as the full stop, the page as a slab from the top right, a blue ring on the matching number in the UI), and B, "finite posters" (flat blue, gold, and ink, Anton symbols built around or behind the page, no notes). `capture.sh v3` writes `store/images-v3/a-*` and `b-*`. v2 stays as the third option.
-- Departures from the proposals, so the comparison is fair: A's captures run at 1.15 to 1.7 instead of 1.0 to 1.15, so the slabs aren't mostly empty; B's lock has a drawn water band, not a second crop of the real water; B's welcome box is the page's width, not 880px.
-- Muse: 86% of its 5-hour window at 17:02, resets about 21:04 on 2026-11-09.
-- Next step: round 18, Jesse's go. Each seat gets all three sets (v2, A, B) side by side and picks one per image and one overall, with the reason, then scores the set it picked. The winner becomes the base and fix rounds resume on it.
+- Round: 19 next (a fix round on V), waiting on Jesse.
+- Tactic: fix, on V. Round 18's head-to-head between V (v2), A, and B, run with Claude and Codex only (Jesse, 2026-11-09), went to V from both seats as a whole set. Codex took B for Settings alone; Claude took A for Modes and History and B for the tile, but said mixing sets looks like indecision. So the divergent round confirmed the base instead of replacing it, and showed the Claude seat's AI-look floor is not the layout alone: it still names V's split as the most common store layout, and it scored V lower in this round (design 6 to 8, AI look 3 to 5) than in the fix rounds.
+- Base: `frames-v2.html` with round 18's agreed fixes (this commit). A and B stay in `frames-v3.html` and `store/images-v3/`.
+- Muse: out of quota until about 21:04 on 2026-11-09; it hasn't seen A or B.
+- Next step: Jesse's call. Level 2 of the stall rule applies (a divergent round, and the Claude seat still stuck): another divergent round, a different goal, or different seats.
 
 ## Score history
 
@@ -38,12 +38,28 @@ Design/AI look per image. Rounds 12 and 13 are from the two-judge loop, for refe
 | 16 | Claude | 8/3 | 7/4 | 7/3 | 8/2 | 7/3 | 7/4 |
 | 16 | Codex | 9/1 | 8/2 | 8/1 | 8/1 | 9/1 | 9/1 |
 | 16 | Muse | 7/4 | 6/5 | 8/3 | 6/3 | 7/3 | 7/3 |
+| 18 | Claude (V, in comparison) | 7/4 | 8/3 | 7/4 | 8/3 | 6/5 | 6/5 |
+| 18 | Codex (V, in comparison) | 8/2 | 8/3 | 7/3 | 7/3 | 8/2 | 8/2 |
 
 Measured noise, Claude seat, identical images (round 13): one point on design, one on AI look, two on the tile.
 
 ## Decisions log
 
 What the next brief's "Decisions so far" draws on. Newest first.
+
+### Round 18: head-to-head, then triage on V
+
+Picks per image (Claude / Codex): 1 V/V, 2 V/V, 3 A/V, 4 V/B, 5 A/V, tile B/V. Overall: V from both.
+
+Applied on V, Agreed:
+- 2: the subline says the limit is optional: "An optional daily limit. When it's used up, the video stops." (Codex for the third round running; Claude: "Set a daily limit" reads as mandatory).
+- 3: the subline stops listing the modes the page already shows: "Start strict, or just hide the feed." (Codex: the subline repeats the page; Claude suggested this line).
+- 4: one message. The Dry hours note is gone, and the remaining note points at the "4 drops until 4:00am · Undo" chip, dropping onto it from the gap above its row: "Raised to 5 drops. Today stays at 4 until 4:00am." (Codex: focus on the delayed increase; Claude: end the leader on the chip, cut Dry hours). A note can now name a target by selector plus text (`has`), skipping hidden copies: Settings repeats a section's chips in its folded header.
+
+Considered, not applied (one seat, or the seats disagree):
+- Claude: one drawn element crossing the seam on every frame; the legend at the top with leaders to the counter; one water surface across 2; a Quiet note on 3; a note on 5's dashed line; the tile's drop falling into the wave. "The next pick costs a card" holds only in Full drip (the frame shows Full drip, so it stays).
+- Codex: a compact token key on 1; one note on 3 and no Customize leader; 5's subline as "down 15%"; a smaller wave on the tile.
+- The tile: Codex wants the wave smaller, Claude wants it bigger with the drop falling in.
 
 ### Round 16 triage
 
