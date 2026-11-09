@@ -387,8 +387,14 @@
     document.body.append(banner);
   }
 
+  /** The longest watchFor waits for a page to finish loading before it starts counting anyway. */
+  const LOAD_WAIT_MS = 60000;
+
   /**
-   * Reports a break when `selector` matches nothing for 10 seconds straight on a page where it should.
+   * Reports a break when `selector` matches nothing for 10 seconds straight on a page where it should. The 10 seconds
+   * start once the page has loaded: on slow 3G YouTube took longer than that to build the player, and the banner said
+   * drip was broken (Jesse, 2026-11-09). Loaded means the window's load event on a full load, and YouTube's
+   * navigate-finish after an in-page navigation, or LOAD_WAIT_MS if neither comes.
    * @param {keyof typeof BROKEN} what
    * @param {string} selector
    * @param {(pathname: string) => boolean} onPage
@@ -399,9 +405,21 @@
     let missingSince = -1;
     // One callback per outage. The banner itself shows once per page load (reportBroken).
     let reported = false;
-    document.addEventListener('yt-navigate-start', () => { missingSince = -1; });
+    /** When an in-page navigation started, by performance.now, until YouTube says it finished. -1 when none is pending. */
+    let navSince = -1;
+    const startedAt = performance.now();
+    document.addEventListener('yt-navigate-start', () => {
+      missingSince = -1;
+      navSince = performance.now();
+    });
+    document.addEventListener('yt-navigate-finish', () => { navSince = -1; });
+    const loading = () => {
+      const now = performance.now();
+      if (navSince >= 0) return now - navSince < LOAD_WAIT_MS;
+      return document.readyState !== 'complete' && now - startedAt < LOAD_WAIT_MS;
+    };
     setInterval(() => {
-      if (!onPage(location.pathname) || document.querySelector(selector)) {
+      if (!onPage(location.pathname) || document.querySelector(selector) || loading()) {
         missingSince = -1;
         reported = false;
         return;
