@@ -17,10 +17,10 @@ A fresh pass on the round-19 set, judged against 13 top Chrome Web Store extensi
 
 ## Current
 
-- Round: 3 next.
-- Tactic: fix for the set, divergent for screenshot 2 alone (each seat proposes one approach far from the current one; round 4 builds and compares them).
-- Base: `frames-v2.html` with ref round 2's screenshot 3 layout (this commit).
-- Next step: round 3.
+- Round: 4 next, the last before asking Jesse (his pace: up to 4 rounds).
+- Tactic: head-to-head for screenshot 2 (current, `frames-v4.html?v=a` Codex's, `?v=b` Claude's; images in `store/images-v4/`), fix for the rest.
+- Base: `frames-v2.html` with ref round 3's screenshot 4 crop (this commit).
+- Next step: round 4, then report to Jesse.
 
 ## Score history
 
@@ -33,10 +33,32 @@ Design/AI look per image, and the seat's median for the references.
 
 | 2 | Claude | 7 | 7/3 | 6/4 | 6/4 | 7/3 | 7/3 | 7/4 |
 | 2 | Codex | 8 | 8/2 | 7/2 | 7/2 | 7/2 | 8/1 | 8/1 |
+| 3 | Claude | 7 | 7/3 | 5/4 | 7/3 | 6/3 | 7/3 | 6/3 |
+| 3 | Codex | 8 | 8/2 | 6/2 | 8/2 | 7/2 | 8/2 | 8/1 |
 
-Below the references' middle in round 1: Codex 1, 2, 3, 4; Claude 2. Round 2: Codex 2, 3, 4; Claude 2, 3. Both seats: ship, no blocking fixes.
+Below the references' middle in round 1: Codex 1, 2, 3, 4; Claude 2. Round 2: Codex 2, 3, 4; Claude 2, 3. Both seats: ship, no blocking fixes. Round 3: both seats 2 and 4 (Claude called the tile, at 6, at the middle for a tile); both ship, no blocking fixes.
 
 ## Decisions log
+
+### Ref round 3
+
+Used: the Claude seat 93,965 tokens; Codex 53,363 tokens (25 images each).
+
+Compared with round 2: both called 3 better and everything else the same.
+
+Applied, Agreed (both seats):
+- 4: cropped to the tabs through Dry hours' line ("Paid watching stops. Whole drops return."), so Starts at, Ends at, and Finish video are out, and the capture is 13% bigger (scale 1.42, `h2` 488 cuts it). Codex asked for this in rounds 2 and 3; Claude agreed in round 3. Codex would also cut the Dry hours row; Claude keeps it, and the smaller cut went in. At 1.25x, as both asked, the rows (532 page px) don't fit the 720px strip, so 4 takes 3's 480px panel.
+
+Divergent, built for round 4 (`frames-v4.html`, `capture.sh v4`):
+- 2a, Codex's: no split. "When time runs out." on one line, drip's real counter at 0m (`home.html?scenario=zero`, labeled "Daily limit reached."), a short blue arrow, the real lock in a 750x454 box (labeled "Video paused."), "Sample state." at the bottom. No note.
+- 2b, Claude's: the paper column as now, and on the dark strip two 16:9 players: the tour's player step with the ride playing sharp and drip's real pill at 1m, and below it the real lock over the same ride. "Sample video." under the subline; the drop note with its leader to "+15m".
+- Building 2a: the counter's capture waits on `.drip-counts`, since the box clips the thumbnail and its lazy image never loads.
+
+Considered, not applied (one seat):
+- Codex: the tile's tagline naming YouTube ("One YouTube / video at a time."); 1's cyclist about twice as big (third round asking); shorter legend lines on 1 (third round; Claude disagreed again).
+- Claude: every frame on the 480px panel, each capture about 11% bigger, so the seam doesn't jump between frames (a reversal of keeping 560px on 1, 2, and 5; Codex said a changing width isn't a problem in itself). 5's subline "Sample week. Each day's drops, cards, and unlocks." The tile's tagline heavier and about 10% bigger (third round asking; Codex said not needed).
+
+Note for Jesse: 3 and 4 are on a 480px panel now and 1, 2, and 5 on 560px.
 
 ### Ref round 2
 

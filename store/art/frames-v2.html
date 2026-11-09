@@ -178,9 +178,12 @@
       h: 'Easy to tighten.\nSlow to loosen.',
       p: 'After your first 24 hours: tighten now,\nloosen at the daily reset.',
       src: '/dev/page.html?page=options&settled=1&sample=1&pending=1',
-      // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden. The
-      // sample raised drops from 4 to 5, so the row shows the waiting change.
-      w: 728, h2: 640, x: -98, y: -45, scale: 1.26,
+      // From the tabs through Dry hours' line, cut there by the frame's height: Starts at, Ends at, and Finish video
+      // were a second subject (both seats, ref round 3). The 480px panel lets the capture grow 13%; the rows are 532px
+      // wide and didn't fit bigger in the 720px strip. The page's own "drip" title repeats the mark, so it's hidden.
+      // The sample raised drops from 4 to 5, so the row shows the waiting change.
+      panel: 480,
+      w: 728, h2: 488, x: -114, y: -24, scale: 1.42,
       css: 'h1 { visibility: hidden !important; }',
       ready: '[role=tab]',
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),

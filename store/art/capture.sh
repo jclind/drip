@@ -2,7 +2,8 @@
 # Screenshots every store frame into store/images/, at the sizes the Chrome Web Store asks for. Runs headless Chrome on
 # air against a local server of this checkout. Usage: store/art/capture.sh [v2] [port]
 # Without v2 it shoots frames.html (rounds 0 to 4) into store/images/; with v2, frames-v2.html into store/images-v2/;
-# with v3, both layouts of frames-v3.html (the council's divergent round 17) into store/images-v3/, as a-* and b-*.
+# with v3, both layouts of frames-v3.html (the council's divergent round 17) into store/images-v3/, as a-* and b-*;
+# with v4, frames-v4.html's two screenshot 2 layouts (ref round 4) into store/images-v4/, as screenshot-2a and -2b.
 set -eu
 cd "$(dirname "$0")/../.."
 page=frames.html out=store/images tiles="c d d2 d3 e"
@@ -10,6 +11,7 @@ dsf=1
 # v2 renders at 2x and sips scales it down: the scaled iframes' text came out soft at 1x (Codex, round 7).
 if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c c2 c3 p" dsf=2; shift; fi
 v3=; if [ "${1:-}" = v3 ]; then page=frames-v3.html out=store/images-v3 dsf=2 v3=1; shift; fi
+v4=; if [ "${1:-}" = v4 ]; then page=frames-v4.html out=store/images-v4 dsf=2 v4=1; shift; fi
 port=${1:-8078}
 chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 profile=$(mktemp -d)
@@ -52,6 +54,10 @@ shoot() { # name width height query [motion]
   echo "$out/$1.png"
 }
 
+if [ -n "$v4" ]; then
+  for v in a b; do shoot "screenshot-2$v" 1280 800 "v=$v" motion; done
+  exit 0
+fi
 if [ -n "$v3" ]; then
   for v in a b; do
     for n in 1 3 4 5; do shoot "$v-screenshot-$n" 1280 800 "v=$v&shot=$n"; done
