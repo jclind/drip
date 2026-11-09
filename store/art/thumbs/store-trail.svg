@@ -18,12 +18,12 @@
       <stop offset="1" stop-color="#434c60"/>
     </linearGradient>
     <linearGradient id="mid" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3b5444"/>
-      <stop offset="1" stop-color="#22322a"/>
+      <stop offset="0" stop-color="#4a6a52"/>
+      <stop offset="1" stop-color="#2d4335"/>
     </linearGradient>
     <linearGradient id="near" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1f2b21"/>
-      <stop offset="1" stop-color="#0d130f"/>
+      <stop offset="0" stop-color="#2c3c2e"/>
+      <stop offset="1" stop-color="#172119"/>
     </linearGradient>
   </defs>
   <rect width="1280" height="720" fill="url(#sky)"/>
@@ -54,7 +54,7 @@
            C 1120 452 1200 470 1280 478 V720 H0 Z" fill="url(#mid)"/>
   <path d="M0 720 V600 C 160 572 300 566 460 584 C 620 602 760 640 940 632 C 1080 626 1180 600 1280 590 V720 Z" fill="url(#near)"/>
   <!-- the trail climbing to the crest -->
-  <path d="M90 720 C 210 650 330 600 450 560 C 560 522 640 470 700 430 C 730 410 760 392 786 386" fill="none" stroke="#c4a573" stroke-width="9" stroke-linecap="round" opacity="0.85"/>
+  <path d="M90 720 C 210 650 330 600 450 560 C 560 522 640 470 700 430 C 730 410 760 392 786 386" fill="none" stroke="#dcbc80" stroke-width="9" stroke-linecap="round"/>
   <path d="M786 386 C 840 384 900 398 960 414" fill="none" stroke="#c4a573" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
   <!-- the rider, on the crest, against the light -->
   <g transform="translate(792 340)" fill="none" stroke="#0b0e0c" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">

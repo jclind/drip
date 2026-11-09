@@ -13,10 +13,11 @@ The `/council` run on drip's store images, started 2026-11-09. `/council continu
 
 ## Current
 
-- Round: 15 next (council round 2), waiting on Jesse's go.
-- Tactic: fix. No stall yet: round 14 is the first round with three seats.
-- Base: `frames-v2.html` with round 14's triage applied (this commit).
-- Next step: copy `reviews/round-14-prompt.md` to `round-15-prompt.md`, replace Decisions so far with round 14's, add round 14's images for the comparison, stage, run the three seats.
+- Round: 16 next (council round 3), waiting on Jesse's go.
+- Tactic: fix. No stall: Codex rose on 3 and 5 in round 15, Claude on 2 and 5.
+- Base: `frames-v2.html` with round 15's triage applied (this commit).
+- Muse: 66% of its 5-hour window used after round 15 (resets about 4.5 hours after 2026-11-09 17:00), 22% of its week. A 12-image round uses about 25% of the window, so round 16 fits and round 17 may not.
+- Next step: copy `reviews/round-15-prompt.md` to `round-16-prompt.md`, replace Decisions so far with round 15's, swap in round 15's images as the previous set, stage, run the three seats.
 
 ## Score history
 
@@ -31,12 +32,37 @@ Design/AI look per image. Rounds 12 and 13 are from the two-judge loop, for refe
 | 14 | Claude | 8/3 | 7/3 | 8/3 | 8/3 | 7/3 | 7/4 |
 | 14 | Codex | 9/2 | 8/2 | 8/2 | 8/2 | 8/2 | 9/1 |
 | 14 | Muse | 6/5 | 6/5 | 7/3 | 5/4 | 7/3 | 7/3 |
+| 15 | Claude | 8/3 | 8/3 | 7/3 | 8/3 | 8/3 | 7/3 |
+| 15 | Codex | 8/2 | 8/2 | 9/1 | 8/1 | 9/1 | 9/1 |
+| 15 | Muse | 7/5 | 6/5 | 7/3 | 8/2 | 7/3 | 6/4 |
 
 Measured noise, Claude seat, identical images (round 13): one point on design, one on AI look, two on the tile.
 
 ## Decisions log
 
 What the next brief's "Decisions so far" draws on. Newest first.
+
+### Round 15 triage
+
+Compared with round 14: Codex better on all six; Claude better on 2, 4, 5, c2, same on 1, worse on 3; Muse better on 1, 2, 4, 5, c2, worse on 3. Muse reversed itself on 3's headline: in round 14 it called "Choose how strict." a fragment, and in round 15 it asked for it back.
+
+Applied, Agreed:
+- 1: "A drop is 15 minutes by default." with no comma (all three). The drawn thumbnail's near and middle hills are lighter and the trail brighter (Codex asked for that; Muse asked for a redraw with texture; the smaller change went in).
+- 2: three bubbles instead of four, smaller, with softer rims (Codex, Muse). The drawn video under the lock moved again, so the navy patch at the top left is smaller and the green hill shows at the right (Claude called the patch a smudge; Muse wants the video recognizable).
+- 3: headline "Choose your limits." A reversal of round 14's "Choose what drip does.", which Claude and Muse both called worse; Codex suggested "Choose your limits." in round 13.
+- 4: second note "Dry hours: 11pm to 6am, starting tonight." (Codex; Claude asked for a shorter note).
+- 5: the note's leader now runs to the Drops used tile, and the note covers all three tiles: "Each day shows its drops, cards, and unlocks." (Claude and Muse: the old note talked about the tiles but pointed at the date).
+- c2: the water band is a lighter blue from the drop's family, so it reads as water and not a dark footer bar (Claude, Muse).
+
+Considered, not applied (one seat):
+- Codex: 2's subline says limits are optional (second round asking); 4's first note becomes "Raised to 5 a day. Starts at the next reset."
+- Claude: 1's leader without the elbow; 4's right margin, about 25px; 2's subline and water note overlap.
+- Muse: swap screenshots 3 and 5; drop 3's Customize leader; a flatter History week; the tile with a smaller drop, a bigger tagline, and "for YouTube"; 2's band and note as a normal note; 2's sample at 45m watched; 4 with Dry hours off.
+
+Rejected, with the reason:
+- Muse, again: 34m left next to 2 drops is a contradiction. It isn't (round 14).
+- Muse: 4's "Finish video when time runs out" row is cut off. It's fully in frame, its toggle at y 728 of 800.
+- Claude: the band in 2's caption panel doesn't match the strip's water at the seam. Sampled on round 16's test capture: band 28,58,64 against strip 34,63,66 at the top, 11,35,43 against 13,40,45 at the bottom.
 
 ### Round 14 triage
 
