@@ -420,8 +420,35 @@
     if (waitingForChannel(id)) return;
     // Not over the miniplayer, which drip hides: the lock would cover whatever page YouTube moved to.
     if (location.pathname === '/watch' && id) showLock();
-    // A locked video skips theater mode, so let fade.js show the page now.
-    theaterDone();
+    // A locked video skips theater mode, so fade.js can show the page once the water is up.
+    doneUnderWater();
+  }
+
+  /** How long a locked page waits for the lock's water (1.1s rise) before fade.js shows it anyway. */
+  const RISE_WAIT_MS = 1500;
+
+  /**
+   * Lets fade.js show a locked page once the lock's water has risen. The fade (0.8s) is shorter than the rise, so
+   * showing the page with the lock let the paused video or ad show above the water for about a second (Jesse,
+   * 2026-11-09). Now the water rises over the dark page and the page fades in under it. A lock that's already up, or
+   * no lock, shows the page at once. If the rise hasn't ended after RISE_WAIT_MS (a hidden tab), it shows anyway.
+   */
+  function doneUnderWater() {
+    const lock = liveLock();
+    if (!lock || lock.classList.contains('is-full') || reducedMotion()) return theaterDone();
+    let waiting = true;
+    const finish = () => {
+      if (!waiting) return;
+      waiting = false;
+      lock.removeEventListener('animationend', onEnd);
+      clearTimeout(timer);
+      theaterDone();
+    };
+    const onEnd = (/** @type {AnimationEvent} */ e) => {
+      if (e.target === lock && /water-rise$/.test(e.animationName)) finish();
+    };
+    lock.addEventListener('animationend', onEnd);
+    const timer = setTimeout(finish, RISE_WAIT_MS);
   }
 
   /** Whether unsent time should go to the worker now rather than wait for SEND_EVERY seconds. */

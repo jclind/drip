@@ -314,6 +314,7 @@ Done for now as built, 2026-11-07. Jesse wanted the button "even more visually e
 - Running out no longer cuts straight to the panel. Blue water rises up the window over 1.1 seconds with a wavy crest, blurring the frame as it climbs, and the panel surfaces once it's most of the way up. Buying minutes or an unlock drains the water back down in 0.6 seconds. The water is a mask on `#drip-lock` itself, because its `view-transition-name` keeps a child's `backdrop-filter` from seeing the page (Jesse asked for a smoother way into the lock, 2026-10-10).
 
 - Under the lock's water, faint bubbles drift up at random sizes and speeds, and two small fish cross now and then, one every minute or so, at different depths and directions. The overlay's mask covers them, so they only show where the water has risen. Reduced motion hides them (Jesse asked for something underwater, 2026-10-10).
+- Arriving on a locked watch page, the water rises over the dark page and the page fades in under it once the water is up. The lock and the fade used to start together, and since the fade (0.8s) beats the rise (1.1s), the paused video or ad showed above the water for about a second (Jesse, 2026-11-09). If the rise hasn't ended after 1.5 seconds, the page shows anyway. Reduced motion has no rise, so it shows at once.
 - More motion ideas are in IDEAS.md, "Motion and small touches".
 
 Grace on the pill as built (2026-10-14). Built from `designs/motion/8-grace.html` in the motion mockups, with Outline set to "Faded".
