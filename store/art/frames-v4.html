@@ -28,7 +28,7 @@
   .foot { position: absolute; left: 72px; font-size: 15px; color: var(--soft); }
   .box { position: absolute; overflow: hidden; background: #0f0f0f; }
   .box iframe { position: absolute; border: 0; transform-origin: 0 0; background: #0f0f0f; }
-  .strip { position: absolute; right: 0; top: 0; width: 720px; height: 800px; background: #0f0f0f; }
+  .strip { position: absolute; right: 0; top: 0; width: 800px; height: 800px; background: #0f0f0f; }
   svg.lines { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 </style>
 </head>
@@ -230,14 +230,15 @@
     strip.className = 'strip';
     root.append(strip);
     // The tour's player sits at 376 to 904 across and 332 to 628 down; 640 wide is a scale of 1.212.
-    const before = capture(root, PLAYER, { left: 600, top: 28, width: 640, height: 360, scale: 640 / 528, px: 376, py: 330, radius: 12 });
+    // The strip is 800px since ref round 5 (one panel width for the set); the players stay 640 wide, centered.
+    const before = capture(root, PLAYER, { left: 560, top: 28, width: 640, height: 360, scale: 640 / 528, px: 376, py: 330, radius: 12 });
     // The lock's panel, about 380 page px wide, fills 76% of a 640px player at 1.285.
-    const after = capture(root, LOCK, { left: 600, top: 412, width: 640, height: 360, scale: 1.285, px: 641 - 320 / 1.285, py: 480 - 180 / 1.285, radius: 12 });
+    const after = capture(root, LOCK, { left: 560, top: 412, width: 640, height: 360, scale: 1.285, px: 641 - 320 / 1.285, py: 480 - 180 / 1.285, radius: 12 });
     Promise.all([before, after]).then(([, a]) => {
       // A small arrow in the gap between the players, so "1m left" then "paused" reads as a sequence (both seats, ref
       // round 4: Claude asked for an arrow, Codex for labels; the arrow adds no text).
-      line(svg, 'M920 392 V406', true);
-      line(svg, 'M914 401 L920 407 L926 401', true);
+      line(svg, 'M880 392 V406', true);
+      line(svg, 'M874 401 L880 407 L886 401', true);
       const add15 = place(/** @type {any} */ (a), '#drip-lock .drip-lock-add');
       if (add15) {
         const note = add(root, 'note', 'Or spend a drop\nfor 15 more minutes.', {});

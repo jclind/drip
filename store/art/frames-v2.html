@@ -57,8 +57,11 @@
 <script>
   // @ts-check
   const params = new URLSearchParams(location.search);
-  /** Where the strip starts; a shot's `panel` moves it (screenshot 3, ref round 2). */
-  let PANEL_LEFT = 560;
+  /**
+   * Where the strip starts. Every frame uses 480 since ref round 5 (Jesse: one width for all); 3 and 4 needed it for
+   * bigger captures in rounds 2 and 3. A shot's `panel` can still move it.
+   */
+  let PANEL_LEFT = 480;
   /** History's card color, measured from a capture. */
   const CARD_GRAY = 'rgb(39, 39, 39)';
   /**
@@ -87,7 +90,8 @@
       h: 'One video\nat a time.',
       p: 'A Chrome extension for YouTube that\nreplaces the home feed with one pick.',
       src: '/dev/home.html?scenario=card&theme=dark&reduced=1&videos=store',
-      w: 620, h2: 656, x: -120, y: -196, scale: 1.55,
+      // On the 800px strip since ref round 5: 3% bigger, the most the card's height allows, and centered across.
+      w: 620, h2: 656, x: -96, y: -215, scale: 1.6,
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
       ready: '.drip-thumb img.is-loaded',
       legend: true, legendY: 430,
@@ -166,7 +170,6 @@
       // 80px narrower and the capture 11% bigger, so the cards' descriptions read at carousel size (both seats).
       p: '',
       src: '/dev/page.html?page=welcome',
-      panel: 480,
       w: 680, h2: 713, x: -36, y: -84, scale: 1.278,
       // The page's own logo and tagline repeat the frame's mark.
       css: '.hero { visibility: hidden !important; }',
@@ -183,7 +186,6 @@
       // were a second subject (both seats, ref round 3). The 480px panel lets the capture grow 13%; the rows are 532px
       // wide and didn't fit bigger in the 720px strip. The page's own "drip" title repeats the mark, so it's hidden.
       // The sample raised drops from 4 to 5, so the row shows the waiting change.
-      panel: 480,
       w: 728, h2: 488, x: -114, y: -24, scale: 1.42,
       css: 'h1 { visibility: hidden !important; }',
       ready: '[role=tab]',
@@ -198,7 +200,8 @@
       p: 'Sample week. Each day\'s minutes,\ndrops, and cards used.',
       src: '/dev/page.html?page=options&settled=1&sample=1#history',
       // The week's card, scaled so its edges fall just outside the strip and its gray is the strip's background.
-      w: 728, h2: 770, x: -137, y: -264, scale: 1.36, bg: CARD_GRAY,
+      // On the 800px strip since ref round 5: 4% bigger, the most the week's height allows, and centered.
+      w: 728, h2: 770, x: -116, y: -291, scale: 1.42, bg: CARD_GRAY,
       // The capture ends above the summary line, which the crop would cut through, and the strip under it is the card's gray.
       // At this scale the card is narrower than the strip, so the page behind it takes the card's gray and the card loses
       // its corners: one surface edge to edge.

@@ -17,10 +17,15 @@ A fresh pass on the round-19 set, judged against 13 top Chrome Web Store extensi
 
 ## Current
 
-- Round: 4 done; paused for Jesse (his pace: up to 4 rounds, then ask).
-- Goal: met by Claude on every image; met by Codex on every image but the tile, which it puts below the middle because the tagline doesn't name YouTube. Neither seat has a blocking fix.
-- Base: `frames-v2.html` for 1, 3, 4, 5 and the tile, `frames-v4.html?v=b` for screenshot 2 (`capture.sh v2` shoots it there), with ref round 4's fixes (this commit).
-- Waiting on Jesse: whether the tile's tagline names YouTube; whether all five frames go to the 480px panel (the seats split); another round, or stop here.
+- Round: 5 next. Jesse said run another round (2026-11-09); ask him again after it.
+- Tactic: fix.
+- Base: every frame on the 480px panel (this commit). `rounds/ref-4-applied/` is the set after round 4's fixes, before this change.
+- Next step: round 5, with Jesse's two decisions in the brief as the owner's, then report to him.
+
+## Jesse's decisions (2026-11-09, after ref round 4)
+
+- The tile's tagline stays without YouTube ("keep it out probably").
+- One caption panel width for all five frames, "whatever is standard for chrome extensions". The store sets no such width, only the 1280x800 size; the references' text columns run about 35 to 45% of the frame. 480px (37.5%) went in, since 3 and 4 need it for their bigger captures. 1 and 5 grew 3 to 4%, the most their height allows; 2b's players stay 640 wide, centered.
 
 ## Score history
 
