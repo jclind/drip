@@ -311,13 +311,41 @@ Reports: `reviews/round-11-codex.md`, `reviews/round-11-claude.md`.
 
 Met by both judges on AI look: screenshot 4 this round (5 last round; the Claude judge swings about a point between runs). Codex meets every target on 2, 3, and tile c2. The tiles are split: Codex picks c2, Claude picks c3 once its card clears the tagline.
 
-Fixes for round 12, from both reports, not yet applied:
+Fixes for round 12, from both reports (applied in round 12):
 1. Screenshot 1 (both): the subline repeats "at a time"; Codex wants "YouTube" in the headline. Claude: raise the note to a 58px bottom margin with the dot touching Reveal next's bottom edge, and shift the capture down about 25px.
 2. Screenshot 2 (Claude): the paper's water band doesn't match the strip's water at the seam; sample the strip's water near the bottom, lighten 15 to 20%, and flatten the crest's last 80px. Fewer, bluer bubbles. Subline: "Set a daily limit. When it's used up, the video pauses."
 3. Screenshot 3 (Claude): cut the leaderless 24-hour note; point a note at Full drip's description instead; "Or set your own mix." on Customize (no second "Choose").
 4. Screenshot 4 (both): "Raised from 4 to 5. Still 4 until the 4am reset." Claude: "Dry hours block watching overnight. Turn them on and they start tonight."
 5. Screenshot 5 (both): cut "The dashed line is the week before."; Claude would point a note at the Unlocks tile instead. Subline without "A sample week:" up front (Claude would move it to a small footnote; Codex wants it kept explicit). About 40px under the tiles.
 6. Tile c3 (Claude): move the card off the tagline, tilt 10 to 12 degrees, taller than wide; tagline 15% larger.
+
+### Round 12, 2026-11-09 (v2)
+
+Reports: `reviews/round-12-codex.md`, `reviews/round-12-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 8 | 3 |
+| 2 Lock | 8 | 2 | 7 | 3 |
+| 3 Modes | 8 | 1 | 7 | 3 |
+| 4 Settings | 7 | 1 | 8 | 3 |
+| 5 History | 8 | 1 | 8 | 3 |
+| Tile c2 | 9 | 1 | 7 | 3 |
+| Tile c3 | 8 | 1 | 8 | 3 |
+
+Round 12 changes: all six round-11 fixes. 1 has "YouTube, one / video at a time." with a subline that doesn't repeat it, the capture 25px lower, and a new `above` note whose leader runs level through the gap over Reveal next and drops onto its top edge. 2's band takes the strip's own water color with a crest that runs flat into the seam, its note is in paper ink, four bluer bubbles at set sizes, and the drawn video is cropped so the rider's dark shape sits above the panel (the lock's real 20px blur keeps it a shape). The bubbles are now placed with a fixed transform and their animation off: a paused rise came out about 4 seconds later in one capture than in another. 3 drops the 24-hour note for one on the Full drip radio, and "Or set your own mix." 4's notes are "Still 4 until the 4am reset." and the Dry hours rule with its hours. 5 drops the dashed-line note for one on the Unlocks tile, "Sample data." moves to a footnote, the capture scales to 1.36 for a 40px bottom margin, and the page behind the card takes the card's gray. Tiles: taglines 34px; c3's card peeks out up and to the left at -11 degrees.
+
+Scores are where round 10 left them. Codex lost a point on 2, 3, and 4; the Claude judge gained one on 4, 5, and c3 and put AI look at 3 on everything. The two now pull opposite ways on several items: Codex wants fewer notes (cut 3's Customize note, 4's Dry hours note, 5's Unlocks note) and the sample label back in 5's subline, which the Claude judge asked to move out in round 11. The Claude judge's AI-look reasons are the same each round: the cream-panel-plus-app layout and the vector look of the drawn thumbnail.
+
+Fixes for round 13, where the judges agree or one asks and the other doesn't object:
+1. Screenshot 1 (both): move the legend down so the left column has no 280px gap; the subline says it's a Chrome extension (Codex). One detail in the thumbnail drawn for drip, such as the rider's jacket in drip's blue (Claude).
+2. Screenshot 2: "stops" instead of "pauses", the product's own word (Claude); the action note gives stopping equal weight, "Stop here, or spend a drop for 15 more minutes." (Codex); the water note shortened (Codex). Band color matched to the strip at the seam, not lightened (Claude, which reverses its round-11 ask).
+3. Screenshot 3 (both): note 1 says something the card doesn't, "The default: 4 drops and 10 cards a day."; the capture centered vertically.
+4. Screenshot 4 (both): the 4-to-5 fact in one place, a general subline, a tighter crop with less dead black at the top.
+5. Screenshot 5: "Sample data." right under the subline, next to the numbers (Codex's concern, Claude's footnote form); Saturday's sample gets 1 unlock so the Unlocks note points at a nonzero (Claude).
+6. Tile c3: show the card's full top edge and one corner (Claude), smaller than the drop (Codex).
+
+Rejected: lowering the lock's water (Claude; tried in rounds 1, 6, and 10, see Don't redo in the handoff); a History headline with the drop in it, "Down 7 minutes a day." (Claude), since Codex flags the decline as reading like a promised result.
 
 ## How to run a round (v2)
 
