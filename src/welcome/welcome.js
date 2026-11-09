@@ -12,7 +12,7 @@
   /** @type {any} */
   const DripStash = /** @type {any} */ (globalThis).DripStash;
   /** @type {any} */
-  const { h, icon, price, hourLabel, dayTimeLabel, cardMenu, updateCardMenu, blockedCardView } = /** @type {any} */ (globalThis).DripUI;
+  const { h, icon, price, hourLabel, dayTimeLabel, lockFoot, orbiter, cardMenu, updateCardMenu, blockedCardView } = /** @type {any} */ (globalThis).DripUI;
   /** @type {any} */
   const DripReveal = /** @type {any} */ (globalThis).DripReveal;
   /** @type {any} */
@@ -1011,6 +1011,9 @@
   /** @type {ReturnType<typeof setInterval> | undefined} */
   let ringTimer;
 
+  /** The spark that runs around the tour lock's "Done for now", as on the real lock (common.js orbitLap). */
+  const startOrbit = orbiter(() => /** @type {HTMLElement | null} */ (document.querySelector('#drip-lock .drip-done')), ring);
+
   /** @param {HTMLElement} button */
   function ring(button) {
     const panel = button.closest('.drip-lock-panel');
@@ -1185,9 +1188,8 @@
             h('div', { class: 'drip-reason-row' },
               h('button', { class: 'drip-lock-link', onclick: () => { reasonOpen = false; note = ''; redraw(); coach.did('cancel'); } }, 'Cancel'),
               h('button', { class: 'drip-b drip-b-gray', onclick: unlock }, icon('unlock'), h('span', {}, 'Unlock this video'))))
-          : h('div', {},
-            h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`),
-            needBack > 0 && h('div', { class: 'drip-lock-note' }, `Next unlock back ${dayTimeLabel(needBack, now)}.`));
+          : lockFoot(hourLabel(s.resetHour), needBack > 0 ? dayTimeLabel(needBack, now, true) : '');
+      startOrbit();
       return h('div', { class: 'drip-lock-panel', role: 'group', 'aria-label': 'The lock' },
         h('h2', { class: 'drip-lock-title' }, canBuy ? 'Time for a breather.' : "You've had your fill."),
         h('div', { class: 'drip-lock-sub' }, watchedLine()),
@@ -1198,7 +1200,7 @@
           h('button', {
             class: 'drip-b drip-b-primary drip-done', onclick: done,
             onpointerenter: startRings, onpointerleave: stopRings, onfocus: startRings, onblur: stopRings,
-          }, h('span', {}, 'Done for now'))),
+          }, h('span', { class: 'drip-done-water', 'aria-hidden': 'true' }), h('span', {}, 'Done for now'))),
         note && h('div', { class: 'drip-lock-note', role: 'status' }, note),
         unlocks);
     };

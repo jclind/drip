@@ -210,14 +210,14 @@ ytd-search ytd-continuation-item-renderer[data-drip-hold] {
 
 /* Fade each page in (fade.js). Hidden instantly, shown with a slow fade. On a full load YouTube builds the player in
    body > #player, outside ytd-app, and moves it in a few seconds later (seen 2026-10-06), so that fades too. The
-   animation is a failsafe, so the page still appears after 7 seconds if fade.js doesn't run. Skipped for people who
-   ask for reduced motion. */
+   animation is a failsafe, so the page still appears after 5 seconds if fade.js doesn't run. It must outlast fade.js's
+   HOLD_MS (4.5s), or a locked page would show before its lock. Skipped for people who ask for reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-drip-shown]) ytd-app,
   html:not([data-drip-shown]) body > #player {
     opacity: 0;
     transition: none;
-    animation: drip-failsafe 1ms 7s forwards;
+    animation: drip-failsafe 1ms 5s forwards;
   }
 
   html[data-drip-shown] ytd-app,
@@ -236,4 +236,12 @@ ytd-search ytd-continuation-item-renderer[data-drip-hold] {
   @keyframes drip-failsafe {
     to { opacity: 1; }
   }
+}
+
+/* A locked video's player stays hidden until the lock is up. On slow 3G the page shows at fade.js's 4.5-second cap,
+   before watch.js has run, and the paused video or ad showed until the water rose over it (Jesse, 2026-11-09).
+   early.js marks <html> with data-drip-hold while the video is locked, or not yet known, and takes it off once it's
+   allowed. A player drip can't find is left alone (Q25). The ambient glow paints from the video, so it goes too. */
+html[data-drip-hold]:not([data-drip-broken]):not(:has(#drip-lock)) :is(#movie_player, #cinematics) {
+  visibility: hidden !important;
 }
