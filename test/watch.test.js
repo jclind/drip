@@ -193,6 +193,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   const document = {
     title: 'Test video - YouTube',
     documentElement: root,
+    readyState: 'complete',
     body,
     activeElement: null,
     fullscreenElement: null,
@@ -256,7 +257,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     /** Runs every timer once, as one second passing would. */
     second: async () => { for (const fn of [...intervals.values()]) await fn(); await settle(); },
     broken: () => document.getElementById('drip-broken'),
-    video, root, body, location,
+    video, root, body, location, document,
     media: [video],
     pill: () => document.getElementById('drip-pill'),
     locked: () => !!document.getElementById('drip-lock'),
@@ -1272,6 +1273,22 @@ test('a watch page with no player for 10 seconds says drip is broken and locks n
   assert.match(tab.broken().textContent, /video player/);
   assert.equal(tab.locked(), false);
   assert.ok(tab.root.hasAttribute('data-drip-broken'), 'guard.js lets play() through');
+});
+
+test('a slow load with no player yet waits for the page to finish loading before it says drip is broken', async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, 'aaa');
+  // Slow 3G: YouTube was still building the player after 10 seconds (Jesse, 2026-11-09).
+  tab.document.readyState = 'interactive';
+  tab.noPlayer = true;
+  await settle();
+  for (let i = 0; i < 20; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.broken(), null, 'not while the page is loading');
+  tab.document.readyState = 'complete';
+  for (let i = 0; i < 9; i++) { world.advance(1); await tab.second(); }
+  assert.equal(tab.broken(), null, 'not before 10 seconds after loading');
+  for (let i = 0; i < 2; i++) { world.advance(1); await tab.second(); }
+  assert.ok(tab.broken());
 });
 
 test('a missed video selector fails open without pausing through YouTube controls on later ticks (Q25, A18)', async () => {
