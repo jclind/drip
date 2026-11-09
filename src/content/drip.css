@@ -148,13 +148,14 @@ html:has(#drip-lock:not(.is-draining, .is-surfacing)) #cinematics {
 
 /* Once the water is up, YouTube's page is hidden under it and the still is all that shows. Signed out, the page around
    the player kept changing behind the blur every few seconds, and hiding it stopped that (Jesse, 2026-11-09). It
-   shows again as the water drains or falls away. Reduced motion has no rise, so no is-full. */
-html:has(#drip-lock.is-full:not(.is-draining, .is-surfacing)) :is(ytd-app, body > #player) {
+   shows again as the water drains or falls away. Reduced motion has no rise, so no is-full. A lock without a still
+   leaves the page showing, blurred, rather than a blank backdrop (Codex, 2026-11-09). */
+html:has(#drip-lock.is-full:not(.is-draining, .is-surfacing) > .drip-frame) :is(ytd-app, body > #player) {
   visibility: hidden !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html:has(#drip-lock:not(.is-draining, .is-surfacing)) :is(ytd-app, body > #player) {
+  html:has(#drip-lock:not(.is-draining, .is-surfacing) > .drip-frame) :is(ytd-app, body > #player) {
     visibility: hidden !important;
   }
 }

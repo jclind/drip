@@ -442,13 +442,16 @@
   function doneUnderWater() {
     const lock = liveLock();
     if (!lock || lock.classList.contains('is-full') || reducedMotion()) return theaterDone();
+    const href = location.href;
     let waiting = true;
     const finish = () => {
       if (!waiting) return;
       waiting = false;
       lock.removeEventListener('animationend', onEnd);
       clearTimeout(timer);
-      theaterDone();
+      // Back to another page before the rise ended: that page shows when it's ready, not when this timer runs out
+      // (Codex, 2026-11-09).
+      if (lock.isConnected && location.href === href) theaterDone();
     };
     const onEnd = (/** @type {AnimationEvent} */ e) => {
       if (e.target === lock && /water-rise$/.test(e.animationName)) finish();
@@ -689,10 +692,16 @@
       paint(img, (p.width - w) / 2, (p.height - h2) / 2, w, h2);
     };
     // No thumbnail: the lock blurs the live player again, as it did before the still.
-    img.onerror = () => frame.remove();
+    img.onerror = () => {
+      thumbFailed = id;
+      frame.remove();
+    };
     img.src = `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
     return frame;
   }
+
+  /** The video whose thumbnail failed to load, so the lock doesn't fetch it again every tick. */
+  let thumbFailed = '';
 
   /** Each still's tint, to paint again when YouTube's theme changes under the lock. */
   const retint = new WeakMap();
@@ -742,12 +751,7 @@
       const old = lock.querySelector('.drip-lock-panel');
       if (old) old.replaceWith(panel);
       else lock.append(panel);
-      // A lock that came up before the video had a frame, or that stayed up into another video, takes a new still.
-      const still = /** @type {HTMLElement | null} */ (lock.querySelector('.drip-frame'));
-      if (!still || still.dataset.video !== videoId()) {
-        const fresh = frozenFrame();
-        if (fresh) still ? still.replaceWith(fresh) : lock.prepend(fresh);
-      }
+      freshStill(lock);
       return;
     }
     // A lock still draining away goes at once, and a new one rises.
@@ -771,6 +775,17 @@
       document.body.append(lock);
       if (x !== null) DripPour.riseFrom(lock, x);
     });
+  }
+
+  /**
+   * A lock that came up before the player had a size, or that stayed up into another video, takes a new still.
+   * @param {HTMLElement} lock
+   */
+  function freshStill(lock) {
+    const still = /** @type {HTMLElement | null} */ (lock.querySelector('.drip-frame'));
+    if (still ? still.dataset.video === videoId() : thumbFailed === videoId()) return;
+    const fresh = frozenFrame();
+    if (fresh) still ? still.replaceWith(fresh) : lock.prepend(fresh);
   }
 
   /**
@@ -1114,7 +1129,11 @@
       : firstWatch ? `Each drop buys ${Drip.formatMinutes(s.minutesPerToken * 60)} of watching.` : watchedLine();
     const existing = liveLock();
     const view = JSON.stringify([videoId(), canBuy, hasDrops, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, headline, line]);
-    if (existing && lockView === view) return;
+    if (existing && lockView === view) {
+      // The panel is the same, but a lock without a still keeps trying for one on each tick (Codex, 2026-11-09).
+      freshStill(existing);
+      return;
+    }
     lockView = view;
     lockVideoId = videoId();
     const active = document.activeElement;
