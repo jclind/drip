@@ -566,6 +566,156 @@ html[dark] .rung:not([aria-checked="true"]) .mini {
   background: #f03;
 }
 
+/* What the player plays: a small sea at dusk (welcome.js, seaScene). */
+.tour-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The scene moves only while the player plays, so a pause freezes it and the lock rises over a still frame. The sink
+   and the surfacing are the exceptions, with selectors specific enough to win. */
+.tour-player:not(.is-playing) .tour-scene * {
+  animation-play-state: paused;
+}
+
+.tour-player-play,
+.tour-player-bar,
+.tour-player-speed {
+  z-index: 1;
+}
+
+/* The tour's speed, small and quiet over the bar's right end, only while it plays. */
+.tour-player-speed {
+  position: absolute;
+  right: 12px;
+  bottom: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+
+.tour-player.is-playing .tour-player-speed {
+  opacity: 1;
+}
+
+.tour-wave {
+  animation: tour-roll 9s linear infinite;
+}
+
+.tour-wave-mid {
+  animation-duration: 6.5s;
+}
+
+.tour-wave-front {
+  animation-duration: 4.5s;
+}
+
+@keyframes tour-roll {
+  to { transform: translateX(-80px); }
+}
+
+/* --drained goes from 0 to 1 as the glass empties. The sea rises and the sun sets with it. */
+.tour-sea {
+  transform: translateY(calc(var(--drained, 0) * -26px));
+  transition: transform 300ms linear;
+}
+
+.tour-sun {
+  transform: translateY(calc(var(--drained, 0) * 22px));
+  transition: transform 300ms linear;
+}
+
+.tour-cloud {
+  animation: tour-drift 30s linear infinite;
+}
+
+.tour-cloud-2 {
+  animation-duration: 42s;
+  animation-delay: -12s;
+}
+
+.tour-cloud-3 {
+  animation-duration: 36s;
+  animation-delay: -20s;
+}
+
+@keyframes tour-drift {
+  from { transform: translateX(-60px); }
+  to { transform: translateX(380px); }
+}
+
+.tour-boat {
+  animation: tour-bob 2.4s ease-in-out infinite alternate;
+}
+
+@keyframes tour-bob {
+  from { transform: translateY(-1px) rotate(-4deg); }
+  to { transform: translateY(2px) rotate(4deg); }
+}
+
+/* The boat lists in the last 40% of the glass. At 0 it sinks while the last drop falls (780ms), before the lock
+   rises, so it's seen: under the lock it's behind the blur and the panel. */
+.tour-scene {
+  --boat-float: translate(120px, 114px);
+  --boat-sunk: translate(138px, 245px) rotate(40deg);
+}
+
+.tour-boat-at {
+  transform: var(--boat-float) rotate(calc(max(0, var(--drained, 0) - 0.6) * 45deg));
+  transition: transform 300ms linear;
+}
+
+.tour-player .tour-scene.is-sinking .tour-boat-at {
+  animation: tour-sink 0.7s cubic-bezier(0.5, 0, 0.75, 0.4) both;
+  animation-play-state: running;
+}
+
+.tour-player .tour-scene.is-surfacing .tour-boat-at {
+  animation: tour-surface 0.6s cubic-bezier(0.2, 0.6, 0.3, 1) both;
+  animation-play-state: running;
+}
+
+.tour-scene.is-sinking .tour-boat,
+.tour-scene.is-surfacing .tour-boat,
+.tour-scene.is-sunk .tour-boat {
+  animation: none;
+}
+
+.tour-scene.is-sunk .tour-boat-at {
+  transform: var(--boat-sunk);
+  transition: none;
+}
+
+/* From the full list at 0, (1 - 0.6) * 45deg. */
+@keyframes tour-sink {
+  from { transform: var(--boat-float) rotate(18deg); }
+  30% { transform: translate(123px, 122px) rotate(26deg); }
+  to { transform: var(--boat-sunk); }
+}
+
+@keyframes tour-surface {
+  from { transform: var(--boat-sunk); }
+  to { transform: var(--boat-float); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-scene *,
+  .tour-player-speed {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .tour-scene.is-sinking .tour-boat-at {
+    transform: var(--boat-sunk);
+  }
+}
+
 /* The lock, inside the stage instead of the window. Its water rises the stage's height, not the window's: welcome.js
    sets --tour-depth to it. */
 .tour-stage #drip-lock {
