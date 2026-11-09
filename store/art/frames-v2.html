@@ -71,18 +71,19 @@
    * scale), CSS to put in the page, what has to exist before the step runs, an optional step, and notes. A note
    * names its target by selector or by exact text, and sits in the left column at the target's height when there's
    * room.
-   * @typedef {{sel?: string, text?: string, say: string, top?: boolean, under?: boolean, above?: number, at?: number}} Note
+   * @typedef {{sel?: string, text?: string, say: string, top?: boolean, under?: boolean, above?: number, at?: number, gap?: number}} Note
    * A note with `at` has no target: it sits at that height with no leader, for a line about the whole page. One with
    * `under` sits below its target and reaches up to the target's bottom edge with a right-angled leader, for a target
    * whose row has other things to its left. One with `above` sits level with the gap that many page pixels over its
    * target and drops straight down onto the target's top edge, for a target with a row above it and others to its left.
+   * `gap` sets how far short of a side target the leader stops (12px by default).
    * A shot's legend sits under the caption with no leader: drip's own drop and card, and what each one is.
    * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x: number, y: number, scale: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void, notes?: Note[], legend?: boolean, bg?: string, water?: number, legendY?: number, foot?: string}>}
    */
   const SHOTS = {
     1: {
-      h: 'YouTube, one\nvideo at a time.',
-      p: 'A Chrome extension that replaces the\nendless home feed with one pick.',
+      h: 'One video\nat a time.',
+      p: 'A Chrome extension for YouTube that\nreplaces the home feed with one pick.',
       src: '/dev/home.html?scenario=card&theme=dark&reduced=1&videos=store',
       w: 620, h2: 656, x: -105, y: -180, scale: 1.5,
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
@@ -162,13 +163,13 @@
       css: '.hero { visibility: hidden !important; }',
       ready: 'input[type=radio], [role=radio]',
       notes: [
-        { sel: '[data-mode=full] .dot', say: 'The default: 4 drops\nand 10 cards a day.' },
+        { sel: '[data-mode=full] .dot', gap: 8, say: 'The default: 4 drops\nand 10 cards a day.' },
         { text: 'Customize', say: 'Or set your own mix.' },
       ],
     },
     4: {
       h: 'Easy to tighten.\nSlow to loosen.',
-      p: 'Stricter settings apply now.\nLooser ones wait for the 4am reset.',
+      p: 'Stricter settings apply now.\nLooser ones wait for the daily reset.',
       src: '/dev/page.html?page=options&settled=1&sample=1&pending=1',
       // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden. The
       // sample raised drops from 4 to 5, so the row shows the waiting change.
@@ -177,7 +178,7 @@
       ready: '[role=tab]',
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
       notes: [
-        { text: 'Drops per day', say: 'Set to 5 drops.\nStays at 4 until 4am.' },
+        { text: 'Drops per day', say: 'Raised to 5 drops.\nStill 4 until 4:00am.' },
         { text: 'Dry hours', say: 'Add dry hours and\nthey start tonight.' },
       ],
     },
@@ -203,7 +204,6 @@
       },
       notes: [
         { text: 'Saturday, Nov 7', say: 'Pick a day to see\nits drops and cards.' },
-        { sel: '.tile:has(.tile-lock)', say: 'Unlocks are "I need this one"\npasses, 3 a week by default.', above: 11 },
       ],
     },
   };
@@ -258,7 +258,7 @@
       // A note points at the target's left edge, 12px clear of it; with top set, at its top edge near the left; with
       // under set, at its bottom edge near the left, from a note below it.
       const corner = n.top || n.under || n.above !== undefined;
-      const tx = PANEL_LEFT + shot.x + (corner ? r.left + 36 : r.left) * shot.scale - (corner ? 0 : 12);
+      const tx = PANEL_LEFT + shot.x + (corner ? r.left + 36 : r.left) * shot.scale - (corner ? 0 : n.gap ?? 12);
       const edge = n.top ? r.top - 8 / shot.scale : n.under ? r.bottom : n.above !== undefined ? r.top : r.top + r.height / 2;
       const ty = shot.y + edge * shot.scale;
       return { n, tx, ty };
@@ -296,12 +296,16 @@
     }
   }
 
-  /** The width of a note's first line of text. @param {HTMLElement} note */
+  /**
+   * The width of a note's longest line, so its leader starts past all of its text. Round 14: it measured the first line
+   * only, and a longer second line ran into the leader.
+   * @param {HTMLElement} note
+   */
   function measure(note) {
     const range = document.createRange();
     range.selectNodeContents(note);
     const rects = [...range.getClientRects()];
-    return rects.length ? Math.max(...rects.filter((q) => Math.abs(q.top - rects[0].top) < 2).map((q) => q.right)) - 72 : 380;
+    return rects.length ? Math.max(...rects.map((q) => q.right)) - 72 : 380;
   }
 
   if (shot) {
