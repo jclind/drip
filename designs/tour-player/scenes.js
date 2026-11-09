@@ -153,18 +153,19 @@
 
     let lastMinute = Infinity;
     let played = false;
-    /** @param {{ playing: boolean, at: number, length: number, left: number, fraction: number, glass: SVGSVGElement | null, box: HTMLElement }} s */
+    /** @param {{ playing: boolean, unlocked: boolean, at: number, length: number, left: number, fraction: number, glass: SVGSVGElement | null, box: HTMLElement }} s */
     function update(s) {
       const at = opts.under ? lastAt : s.at;
       if (!opts.under) lastAt = s.at;
       const progress = Math.min(1, at / s.length);
       // Nothing has drained until this player has played: arriving with an empty glass isn't the end of a video.
       if (s.playing) played = true;
-      const drained = opts.under ? 1 : played ? 1 - s.fraction : 0;
+      // An unlocked video plays free, so the sea stays calm.
+      const drained = opts.under ? 1 : s.unlocked || !played ? 0 : 1 - s.fraction;
       root.style.setProperty('--progress', progress.toFixed(4));
       root.style.setProperty('--drained', drained.toFixed(4));
 
-      if (v === 'a' && !opts.under) root.classList.toggle('is-sinking', played && s.fraction <= 0);
+      if (v === 'a' && !opts.under) root.classList.toggle('is-sinking', played && !s.unlocked && s.fraction <= 0);
 
       if (v === 'c') {
         const time = root.querySelector('.sc-time');

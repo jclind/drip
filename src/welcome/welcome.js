@@ -904,7 +904,7 @@
       bar.style.width = `${Math.min(100, (at / length) * 100)}%`;
       box.classList.toggle('is-playing', isPlaying);
       pill.update(isPlaying);
-      scene?.update({ playing: isPlaying, at, length, left: sand.watchSecondsLeft, fraction: DripGlass.fraction(sand), glass: pillGlass, box });
+      scene?.update({ playing: isPlaying, unlocked: sand.unlocked.includes(video.id), at, length, left: sand.watchSecondsLeft, fraction: DripGlass.fraction(sand), glass: pillGlass, box });
       if (buttonShown !== String(isPlaying)) {
         buttonShown = String(isPlaying);
         button.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
