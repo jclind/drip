@@ -22,6 +22,15 @@
   const Drip = /** @type {any} */ (globalThis).Drip;
 
   /**
+   * Whether drip is still loaded for this tab. After drip reloads or updates, its scripts in tabs that were already open
+   * keep running, cut off from the extension, and most chrome.* calls throw "Extension context invalidated", which
+   * Chrome lists under Errors on drip's card. chrome.runtime.id is gone in such a tab, and checking it never throws.
+   */
+  function alive() {
+    return !!chrome.runtime?.id;
+  }
+
+  /**
    * Sends a message to the service worker. Reports an invalid extension context separately from other failures.
    * @param {object} msg
    * @returns {Promise<any>}
@@ -30,7 +39,7 @@
     try {
       return await chrome.runtime.sendMessage(msg);
     } catch (err) {
-      const disconnected = !chrome.runtime?.id || /extension context invalidated/i.test(String(err));
+      const disconnected = !alive() || /extension context invalidated/i.test(String(err));
       return { ok: false, error: disconnected ? 'disconnected' : 'send-failed' };
     }
   }
@@ -364,7 +373,8 @@
    * @param {string} selector The selector that matched nothing, for the report.
    */
   function reportBroken(what, selector) {
-    if (brokenSeen.has(what)) return;
+    // getManifest below throws in a tab whose drip was reloaded, and that tab's markup isn't drip's to judge any more.
+    if (!alive() || brokenSeen.has(what)) return;
     brokenSeen.add(what);
     const details = [
       `drip ${chrome.runtime.getManifest().version}`,
@@ -418,7 +428,11 @@
       if (navSince >= 0) return now - navSince < LOAD_WAIT_MS;
       return document.readyState !== 'complete' && now - startedAt < LOAD_WAIT_MS;
     };
-    setInterval(() => {
+    const timer = setInterval(() => {
+      if (!alive()) {
+        clearInterval(timer);
+        return;
+      }
       if (!onPage(location.pathname) || document.querySelector(selector) || loading()) {
         missingSince = -1;
         reported = false;
@@ -454,5 +468,5 @@
     });
   }
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, dayTimeLabel, lockFoot, orbiter, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, dayTimeLabel, lockFoot, orbiter, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor, alive };
 })();

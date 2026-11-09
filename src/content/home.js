@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, reportBroken, watchFor, alive } = /** @type {any} */ (globalThis).DripUI;
   const DripMorph = /** @type {any} */ (globalThis).DripMorph;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
@@ -369,6 +369,12 @@
         // No videos and no empty-feed nudge: the grid's markup changed (Q25).
         const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
         if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
+          // In a tab whose drip was reloaded, the page asks for a refresh instead of reporting a break.
+          if (!alive()) {
+            disconnected = true;
+            message = errorText('');
+            return null;
+          }
           reportBroken('grid', SEL.item);
           message = errorText('pool-empty');
           return null;
@@ -376,9 +382,9 @@
       } catch (err) {
         // A read that throws never got as far as asking the worker, so nothing was spent. Without this the reveal ended
         // with no message, and Reveal next's half-dealt card stayed on the old thumbnail (Codex, 2026-10-16). In a tab
-        // whose drip was reloaded, reportBroken is what throws, and the page asks for a refresh instead.
+        // whose drip was reloaded, the page asks for a refresh instead.
         console.error('drip: reading the feed failed', err);
-        if (!chrome.runtime?.id) disconnected = true;
+        if (!alive()) disconnected = true;
         message = errorText('');
         return null;
       }

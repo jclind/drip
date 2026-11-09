@@ -1659,7 +1659,7 @@ test('a second Watch while the watch page loads goes there again without asking 
   assert.equal(tab.message(), '');
 });
 
-test('a feed read that throws in a tab whose drip was reloaded asks for a refresh', async () => {
+test('a feed read in a tab whose drip was reloaded asks for a refresh, with nothing thrown', async () => {
   const world = makeWorld();
   const tab = await makeTab(world, { reduced: true, grid: [] });
   // What Chrome does to a content script whose extension was reloaded: the id goes, and its APIs throw.
@@ -1670,7 +1670,7 @@ test('a feed read that throws in a tab whose drip was reloaded asks for a refres
   await tab.advance(40000);
   assert.equal(world.count('reveal'), 0);
   assert.match(tab.root().textContent, /drip was updated\. Refresh this page\./);
-  assert.equal(tab.logged.length, 1);
+  assert.equal(tab.logged.length, 0);
 });
 
 test('+15m that fails says why, and a later press works (reduced motion)', async () => {
