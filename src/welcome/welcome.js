@@ -899,6 +899,12 @@
   // player under the lock shows it sunk. Everything moves only while the player plays (welcome.css).
   /** @type {string | undefined} */
   let seaMarkup;
+  /**
+   * Where the last sea's waves and clouds were in their loops. The lock step draws a new player under the water, and
+   * without this its sea would start its loops over, so the sky and waves jumped as the lock rose (Jesse, 2026-11-09).
+   * @type {number[]}
+   */
+  let seaClock = [];
   function seaPicture() {
     return seaMarkup ??= `
     <defs><linearGradient id="tour-sky" x1="0" y1="0" x2="0" y2="1">
@@ -950,8 +956,16 @@
     svg.addEventListener('animationend', (e) => {
       if (/** @type {AnimationEvent} */ (e).animationName === 'tour-surface') svg.classList.remove('is-surfacing');
     });
+    const loops = () => [...svg.querySelectorAll('.tour-wave, .tour-cloud')].map((el) => el.getAnimations()[0]);
+    /** Picks up the waves and clouds where the last sea left them. Call it once the scene is on the page. */
+    function resume() {
+      loops().forEach((a, i) => {
+        if (a && seaClock[i] !== undefined) a.currentTime = seaClock[i];
+      });
+    }
     /** @param {boolean} playing @param {boolean} unlocked @param {number} fraction */
     function update(playing, unlocked, fraction) {
+      if (svg.isConnected) seaClock = loops().map((a) => Number(a?.currentTime ?? 0));
       if (playing) played = true;
       // An unlocked video plays free, so its sea stays calm. With reduced motion the sea holds still too: --drained
       // moving every tick would step the sea, sun, and boat along with no transition.
@@ -965,7 +979,7 @@
       if (!reducedMotion()) svg.style.setProperty('--drained', '1');
       setSinking(true);
     }
-    return { el: svg, update, sink };
+    return { el: svg, update, sink, resume };
   }
 
   /**
@@ -1042,7 +1056,7 @@
       h('div', { class: 'tour-player-bar', 'aria-hidden': 'true' }, bar), pill.el);
     draw();
     if (opts.autoplay) play();
-    return { el: box, stop };
+    return { el: box, stop, resume: scene.resume };
   }
 
   function showPlayer() {
@@ -1162,7 +1176,7 @@
     /** @type {{el: HTMLElement, stop: () => void} | null} */
     let under = null;
 
-    /** @param {HTMLElement} el @param {{el: HTMLElement, stop: () => void} | null} [p] */
+    /** @param {HTMLElement} el @param {{el: HTMLElement, stop: () => void, resume?: () => void} | null} [p] */
     const setUnder = (el, p = null) => {
       under?.stop();
       under = p;
@@ -1170,6 +1184,7 @@
       const wrap = h('div', { class: 'tour-under' }, el);
       if (old) old.replaceWith(wrap);
       else stage.prepend(wrap);
+      p?.resume?.();
     };
 
     const lockAgain = () => {
