@@ -122,3 +122,4 @@ The marquee (1400x560) is optional and only shows if the store features drip. Sk
 - Screenshot 5 shows last week, because this week starts on Sunday and is mostly empty early in the week. The frame clicks the History tab's earlier-week arrow.
 - Screenshot 2 is a draft. It's the tour's lock, which says "0m watched today" because the tour runs on a fresh state. Recapture after PR 101 merges, since 101 changes the lock and welcome.js.
 - Screenshot 1's thumbnail is a drawn placeholder (`store/art/thumbs/store-trail.svg`) until Jesse picks a picture.
+- Jesse's picks, 2026-11-09: screenshot 1 keeps the drawn ridge thumbnail, and the promo tile is `tile-c.png` (the drop beside "drip").
