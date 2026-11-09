@@ -897,8 +897,10 @@
   // What the tour's player plays: a small sea at dusk (DESIGN.md, "Tour player as built"). The sea creeps up and the sun
   // sets as the minutes drain, the boat lists in the last few, and at 0 it sinks before the lock's water rises. The
   // player under the lock shows it sunk. Everything moves only while the player plays (welcome.css).
+  /** @type {string | undefined} */
+  let seaMarkup;
   function seaPicture() {
-    return `
+    return seaMarkup ??= `
     <defs><linearGradient id="tour-sky" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#27466b"/><stop offset=".55" stop-color="#c98a6c"/><stop offset="1" stop-color="#f3c99a"/>
     </linearGradient></defs>
@@ -936,15 +938,34 @@
     svg.innerHTML = seaPicture();
     // Arriving with an empty glass isn't the end of a video, so nothing drains until this player has played.
     let played = false;
+    let sinking = false;
+    /** @param {boolean} on */
+    function setSinking(on) {
+      if (on === sinking) return;
+      sinking = on;
+      svg.classList.toggle('is-sinking', on);
+      // Play pressed while the last drop falls buys more minutes (Q18), and the boat comes back up instead of jumping.
+      if (!on && !reducedMotion()) svg.classList.add('is-surfacing');
+    }
+    svg.addEventListener('animationend', (e) => {
+      if (/** @type {AnimationEvent} */ (e).animationName === 'tour-surface') svg.classList.remove('is-surfacing');
+    });
     /** @param {boolean} playing @param {boolean} unlocked @param {number} fraction */
     function update(playing, unlocked, fraction) {
       if (playing) played = true;
-      // An unlocked video plays free, so its sea stays calm.
-      const drained = under ? 1 : unlocked || !played ? 0 : 1 - fraction;
+      // An unlocked video plays free, so its sea stays calm. With reduced motion the sea holds still too: --drained
+      // moving every tick would step the sea, sun, and boat along with no transition.
+      const drained = under ? 1 : unlocked || !played || reducedMotion() ? 0 : 1 - fraction;
       svg.style.setProperty('--drained', drained.toFixed(4));
-      svg.classList.toggle('is-sinking', !under && played && !unlocked && fraction <= 0);
+      setSinking(!under && played && !unlocked && fraction <= 0);
     }
-    return { el: svg, update };
+    /** Play pressed with an empty glass and no drop to buy: the boat goes down before the lock, as it does at 0. */
+    function sink() {
+      played = true;
+      if (!reducedMotion()) svg.style.setProperty('--drained', '1');
+      setSinking(true);
+    }
+    return { el: svg, update, sink };
   }
 
   /**
@@ -996,6 +1017,7 @@
       // Watch at 0 minutes buys a drop's minutes first (Q18).
       Drip.buyIfOut(sand, video.id);
       if (sand.watchSecondsLeft <= 0 && !sand.unlocked.includes(video.id)) {
+        scene.sink();
         opts.onEmpty?.();
         return;
       }
