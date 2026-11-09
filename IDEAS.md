@@ -102,7 +102,7 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 
 ## Known races
 
-- An older worker reply can overwrite newer saved state on a page (Codex, 2026-11-04). Tab A's status request is answered from a snapshot with 0 minutes, tab B buys minutes, A hears B's storage change and drops its lock, then A's older reply lands and `state = res.state` puts the 0-minute snapshot back, so the lock rises again. Every `state = res.state` in watch.js has it, and it predates Dry hours. The fix is a revision number the worker bumps on each save, and pages keep whichever state is newest.
+- An older worker reply can overwrite newer saved state on a page (Codex, 2026-11-04). Tab A's status request is answered from a snapshot with 0 minutes, tab B buys minutes, A hears B's storage change and drops its lock, then A's older reply lands and `state = res.state` puts the 0-minute snapshot back, so the lock rises again. Every `state = res.state` in watch.js has it, and it predates Dry hours. The fix is a revision number the worker bumps on each save, and pages keep whichever state is newest. Fixed 2026-11-09: `rev` in the saved state, and `Drip.isOlder` and `Drip.newer` on every page that takes a reply or a storage change.
 
 ## Efficiency
 

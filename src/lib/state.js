@@ -3,6 +3,8 @@
 /**
  * @typedef {Object} State
  * @property {number} version
+ * @property {number} rev Goes up by one on every save (background.js withState), so a page can tell an older reply from
+ *   the state it already has (isOlder).
  * @property {Settings} settings
  * @property {{effectiveDay: string, changes: Partial<Settings>} | null} pending
  * @property {string} day
@@ -174,7 +176,7 @@
   /** @param {number} now @returns {State} */
   function initialState(now) {
     return {
-      version: 1, settings: { ...DEFAULT_SETTINGS }, pending: null,
+      version: 1, rev: 0, settings: { ...DEFAULT_SETTINGS }, pending: null,
       day: dayKey(now, DEFAULT_SETTINGS.resetHour),
       tokens: { watch: DEFAULT_SETTINGS.watchTokensPerDay, rec: DEFAULT_SETTINGS.recTokensPerDay },
       watchSecondsLeft: 0, watchSecondsBought: 0, current: null, backlog: [], seen: [], unlocked: [], log: {},
@@ -226,6 +228,7 @@
     const state = initialState(now);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return state;
     const stored = /** @type {Partial<State>} */ (raw);
+    state.rev = count(stored.rev, 0);
     state.settings = { ...DEFAULT_SETTINGS, ...cleanSettings(stored.settings) };
     state.day = typeof stored.day === 'string' ? stored.day : dayKey(now, state.settings.resetHour);
     state.tokens = {
@@ -1803,7 +1806,23 @@
     };
   }
 
+  /**
+   * Whether `next` is an older save than `current`. Messages and storage events reach a page in any order, so a reply
+   * answered from an earlier snapshot can land after a newer save from another tab. Taking it would put back the old
+   * state, and a lock the other tab's +15m had lifted rose again (IDEAS.md "Known races", Codex, 2026-11-04).
+   * @param {any} next @param {any} current
+   */
+  function isOlder(next, current) {
+    return !!next && !!current && typeof next.rev === 'number' && typeof current.rev === 'number' && next.rev < current.rev;
+  }
+
+  /** The newer of the state a page has and one that just arrived. @param {any} current @param {any} next */
+  function newer(current, next) {
+    return isOlder(next, current) ? current : next;
+  }
+
   /** @type {any} */ (globalThis).Drip = {
+    isOlder, newer,
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUses, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
