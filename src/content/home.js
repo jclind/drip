@@ -238,7 +238,7 @@
   /** @param {any} res */
   function absorb(res) {
     if (res && res.error === 'disconnected') disconnected = true;
-    if (res && res.state) state = res.state;
+    if (res && res.state) state = Drip.newer(state, res.state);
     return res;
   }
 
@@ -1790,6 +1790,7 @@
   }
 
   onState((next) => {
+    if (Drip.isOlder(next, state)) return;
     state = next;
     // The stash turned off with its full-stash list open: the list goes with its button (Codex, 2026-10-15).
     if (state && state.settings.stash === false) swapFor = '';

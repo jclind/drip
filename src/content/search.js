@@ -98,7 +98,7 @@
       const res = await send({ type: 'addBacklog', video: current });
       // A full stash asks which video to swap out instead (Q28).
       if (res && !res.ok && res.error === 'stash-full') {
-        if (res.state) state = res.state;
+        if (res.state) state = Drip.newer(state, res.state);
         // detail is 0 for a click from the keyboard (Enter or Space).
         openSwap(button, current, e.detail === 0);
       }
@@ -149,7 +149,7 @@
     const res = await send({ type: 'swapBacklog', video, dropId: drop.id });
     // The video picked went from the stash in the meantime: the list comes back with what's there now.
     if (res && !res.ok && res.error === 'not-stashed' && res.state) {
-      state = res.state;
+      state = Drip.newer(state, res.state);
       if (button.isConnected && Drip.swapFollow([], state, video.id) !== 'close') openSwap(button, video, false);
       return;
     }
@@ -249,12 +249,13 @@
   }
 
   onState((next) => {
+    if (Drip.isOlder(next, state)) return;
     state = next;
     followSwap();
     apply();
   });
   send({ type: 'get' }).then((res) => {
-    if (res && res.state) state = res.state;
+    if (res && res.state) state = Drip.newer(state, res.state);
     apply();
   });
   watchFor('search', SEL.results, (/** @type {string} */ path) => path === '/results');

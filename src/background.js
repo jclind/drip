@@ -169,12 +169,17 @@ function withState(fn, toolbarTick) {
     const saved = session[CLOCK_KEY];
     const clock = { lastChargeEnd: Number(saved?.lastChargeEnd) || 0, ticks: Array.isArray(saved?.ticks) ? saved.ticks : [] };
     const clockBefore = stableJson(clock);
+    // Read before fn, so the count goes on from the saved one whatever fn does to the state.
+    const rev = state.rev;
     const result = fn(state, now, clock);
     // And after, so the change that turns Dry hours on over the current hour takes the minutes back at once.
     Drip.enterDry(state, now);
     // A failed state write throws before the clock is saved, so the tab's resent time is charged again.
     const stateChanged = stableJson(state) !== before;
-    if (stateChanged) await chrome.storage.local.set({ [KEY]: state });
+    if (stateChanged) {
+      state.rev = rev + 1;
+      await chrome.storage.local.set({ [KEY]: state });
+    }
     // Once the state is saved, the charge stuck, so a clock that fails to save mustn't fail the message: the tab
     // would resend time already charged (Codex, 2026-10-14). That loses only the clock, as a stopped worker used to.
     if (stableJson(clock) !== clockBefore) await chrome.storage.session.set({ [CLOCK_KEY]: clock }).catch(() => {});

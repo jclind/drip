@@ -27,7 +27,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'swapFollow', 'editsSince', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUses', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
     'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
-    'exportData', 'importData', 'resetData',
+    'exportData', 'importData', 'resetData', 'isOlder', 'newer',
     'ALLOW_MAX', 'channelId', 'cleanChannel', 'sameChannel', 'allowChannel', 'removeAllowed', 'blockChannel', 'unblockChannel',
     'cancelChannelPending', 'seenChannel', 'channelFromPage', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels', 'allowCount', 'isAllowedOrWaiting',
   ].sort());
@@ -127,7 +127,7 @@ test('UTC date math crosses months, leap days, years, and DST dates', () => {
 test('initialState has the specified shape and independent mutable values', () => {
   const state = fresh();
   assert.deepEqual(state, {
-    version: 1, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
+    version: 1, rev: 0, settings: { ...D.DEFAULT_SETTINGS }, pending: null, day: '2026-10-05',
     tokens: { watch: 4, rec: 10 }, watchSecondsLeft: 0, watchSecondsBought: 0,
     current: null, backlog: [], seen: [], unlocked: [], log: {}, refill: null, drySeen: 0, boughtAt: 0, dropsBought: 0, dryBack: null, installedAt: time(5),
     channels: { allow: [], block: [] }, channelsPending: null, allowedToday: [], firstDayOff: false, firstDayEnded: false, ticksIn: [],
@@ -1366,4 +1366,19 @@ test('a reset hour moved from 11pm to midnight keeps the refill under the day it
   assert.equal(D.rollDay(state, time(5, 23, 1)), true);
   assert.ok(state.refill);
   assert.equal(state.refill.day, state.day);
+});
+
+test('isOlder and newer keep the state with the higher revision, and hydrate keeps it', () => {
+  const now = new Date(2026, 9, 6, 12).getTime();
+  const a = { ...D.initialState(now), rev: 4 };
+  const b = { ...D.initialState(now), rev: 5 };
+  assert.equal(D.isOlder(a, b), true);
+  assert.equal(D.isOlder(b, a), false);
+  assert.equal(D.isOlder(b, { ...b }), false, 'the same save is not older');
+  assert.equal(D.isOlder(a, null), false, 'anything beats no state');
+  assert.equal(D.isOlder({ version: 1 }, b), false, 'state saved before revisions is taken');
+  assert.equal(D.newer(b, a), b);
+  assert.equal(D.newer(a, b), b);
+  assert.equal(D.hydrate(b, now).rev, 5);
+  assert.equal(D.hydrate({ version: 1 }, now).rev, 0);
 });

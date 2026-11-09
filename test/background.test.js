@@ -772,3 +772,19 @@ test('the worker sends content scripts the text of the icons they ask for, and n
   assert.equal(res.icons.clock, fs.readFileSync(path.join(SRC, 'icons', 'clock.svg'), 'utf8'));
   assert.deepEqual(Object.keys((await w.send({ type: 'icons', names: 'clock' })).icons), []);
 });
+
+test('every save bumps the revision by one, and a message that changes nothing leaves it', async () => {
+  const w = worker();
+  const first = await w.send({ type: 'get' });
+  const rev = w.store.drip.rev;
+  assert.equal(first.state.rev, rev);
+  const again = await w.send({ type: 'get' });
+  assert.equal(w.store.drip.rev, rev);
+  assert.equal(again.state.rev, rev);
+  const bought = await w.send({ type: 'spendWatch' });
+  assert.equal(bought.ok, true);
+  assert.equal(w.store.drip.rev, rev + 1);
+  assert.equal(bought.state.rev, rev + 1);
+  await w.send({ type: 'spendWatch' });
+  assert.equal(w.store.drip.rev, rev + 2);
+});

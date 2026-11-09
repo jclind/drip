@@ -557,7 +557,7 @@ function draftChanged() {
 
 /** @param {any} res */
 function absorb(res) {
-  if (res && res.state) state = res.state;
+  if (res && res.state) state = Drip.newer(state, res.state);
   return res;
 }
 
@@ -1237,7 +1237,7 @@ window.addEventListener('beforeunload', (e) => {
 
 // Another tab or the day reset changed the state. Keep everything current without wiping an edit in progress.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes.drip || !state || sample) return;
+  if (area !== 'local' || !changes.drip || !state || sample || Drip.isOlder(changes.drip.newValue, state)) return;
   const before = JSON.stringify([state.settings, state.pending]);
   const kept = edits();
   const today = state.day;

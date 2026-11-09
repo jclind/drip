@@ -338,6 +338,8 @@ function makeWorld() {
       else if (msg.type === 'allowedVideo') result = D.allowedVideo(world.state, msg.videoId, msg.channel);
       else result = { ok: true };
       D.enterDry(world.state, now);
+      // As background.js does on every save.
+      world.state.rev += 1;
       const saved = structuredClone(world.state);
       for (const fn of world.listeners) fn({ drip: { newValue: saved } }, 'local');
       return { ...result, state: saved };
@@ -975,6 +977,32 @@ test('a tick answered just before Dry hours but arriving after them leaves the l
   }
   assert.ok(tab.locked());
   assert.equal(tab.lockRemovals(), 0);
+});
+
+test('an older status reply that lands after another tab bought minutes leaves the lock down (Codex, 2026-11-04)', async () => {
+  const { world, tab } = await setup(0);
+  assert.ok(tab.locked());
+  // The worker answers this tab's status from the state with 0 minutes, and the reply is slow to arrive.
+  const handle = world.handle;
+  /** @type {(v?: any) => void} */
+  let release = () => {};
+  const gate = new Promise((resolve) => { release = resolve; });
+  world.handle = async (/** @type {any} */ msg) => {
+    const res = await handle(msg);
+    if (msg.type === 'status') await gate;
+    return res;
+  };
+  const second = tab.second();
+  await settle();
+  // Meanwhile another tab buys 15 minutes. Its save reaches this tab first, and the lock drains.
+  await handle({ type: 'spendWatch' });
+  await settle();
+  assert.equal(tab.locked(), false);
+  // The old reply lands. Before the revision number, its 0-minute state brought the lock back.
+  release();
+  await second;
+  await settle();
+  assert.equal(tab.locked(), false);
 });
 
 test('an unlocked video plays on when Dry hours start', async () => {
