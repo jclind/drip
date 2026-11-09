@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send: sendMessage, h, onState, hourLabel, dayTimeLabel, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send: sendMessage, h, onState, hourLabel, dayTimeLabel, lockFoot, orbiter, icon, price, KEPT_KEY, pausePlayer, watchFor } = /** @type {any} */ (globalThis).DripUI;
   const DripMorph = /** @type {any} */ (globalThis).DripMorph;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
@@ -106,20 +106,24 @@
     if (theaterTimer !== null && theaterFor === id) return;
     if (theaterTimer !== null) clearInterval(theaterTimer);
     theaterTimer = null;
-    if (!id || theaterHandled.has(id) || (locked && !inGrace())) {
+    // A locked video skips theater mode. applyStatus tells fade.js when the lock is up: on a full load YouTube's
+    // navigate-finish lands here while the lock may still be waiting on the channel, and showing the page then showed
+    // the paused video with no lock (Jesse, 2026-11-09, with allowed channels).
+    if (locked && !inGrace()) return;
+    if (!id || theaterHandled.has(id)) {
       theaterDone();
       return;
     }
     if (!state) return;
     const deadline = performance.now() + 10000;
     let clickedAt = -Infinity;
-    function stop() {
+    function stop(show = true) {
       if (theaterTimer !== null) clearInterval(theaterTimer);
       theaterTimer = null;
-      theaterDone();
+      if (show) theaterDone();
     }
     function attempt() {
-      if (locked && !inGrace()) return stop();
+      if (locked && !inGrace()) return stop(false);
       const currentId = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
       if (disconnected || currentId !== id) return stop();
       if (performance.now() >= deadline) {
@@ -420,8 +424,38 @@
     if (waitingForChannel(id)) return;
     // Not over the miniplayer, which drip hides: the lock would cover whatever page YouTube moved to.
     if (location.pathname === '/watch' && id) showLock();
-    // A locked video skips theater mode, so let fade.js show the page now.
-    theaterDone();
+    // A locked video skips theater mode, so fade.js can show the page once the water is up.
+    doneUnderWater();
+  }
+
+  /** How long a locked page waits for the lock's water (1.1s rise) before fade.js shows it anyway. */
+  const RISE_WAIT_MS = 1500;
+
+  /**
+   * Lets fade.js show a locked page once the lock's water has risen. The fade (0.8s) is shorter than the rise, so
+   * showing the page with the lock let the paused video or ad show above the water for about a second (Jesse,
+   * 2026-11-09). Now the water rises over the dark page and the page fades in under it. A lock that's already up, or
+   * no lock, shows the page at once. If the rise hasn't ended after RISE_WAIT_MS (a hidden tab), it shows anyway.
+   */
+  function doneUnderWater() {
+    const lock = liveLock();
+    if (!lock || lock.classList.contains('is-full') || reducedMotion()) return theaterDone();
+    const href = location.href;
+    let waiting = true;
+    const finish = () => {
+      if (!waiting) return;
+      waiting = false;
+      lock.removeEventListener('animationend', onEnd);
+      clearTimeout(timer);
+      // Back to another page before the rise ended: that page shows when it's ready, not when this timer runs out
+      // (Codex, 2026-11-09).
+      if (lock.isConnected && location.href === href) theaterDone();
+    };
+    const onEnd = (/** @type {AnimationEvent} */ e) => {
+      if (e.target === lock && /water-rise$/.test(e.animationName)) finish();
+    };
+    lock.addEventListener('animationend', onEnd);
+    const timer = setTimeout(finish, RISE_WAIT_MS);
   }
 
   /** Whether unsent time should go to the worker now rather than wait for SEND_EVERY seconds. */
@@ -577,6 +611,130 @@
   }
 
   /**
+   * A still of the player, for the lock's background (DESIGN.md "Lock screen": the paused frame, blurred and tinted).
+   * The lock used to blur the live player through its backdrop-filter, so whatever YouTube loaded into the paused
+   * player, an ad, its thumbnail, or the next stream, showed through and changed under the blur. dev/flash-log.js put
+   * those changes right after the video's "emptied" (Jesse, 2026-11-07). The still covers the whole player, and drip.css
+   * hides the live video under it. It's the paused frame where the video is on screen, drawn where it sits, or else the
+   * video's thumbnail: before playback YouTube parks the video above the player and shows the thumbnail. Null when
+   * there's no player to cover.
+   * @returns {HTMLElement | null}
+   */
+  function frozenFrame() {
+    const player = document.querySelector(SEL.player);
+    // The tests' stand-in player has no layout.
+    if (!player || typeof player.getBoundingClientRect !== 'function') return null;
+    const p = player.getBoundingClientRect();
+    if (p.width < 2 || p.height < 2) return null;
+    // It's blurred 20px, so a small copy is plenty.
+    const scale = Math.min(1, 640 / p.width);
+    /** @param {HTMLCanvasElement} c */
+    const size = (c) => {
+      c.width = Math.round(p.width * scale);
+      c.height = Math.round(p.height * scale);
+      return c;
+    };
+    const canvas = size(document.createElement('canvas'));
+    // The picture untinted, so a theme switch can tint it again without drawing the video, which may have changed.
+    const base = size(document.createElement('canvas'));
+    const ctx = canvas.getContext?.('2d');
+    const bctx = base.getContext?.('2d');
+    if (!ctx || !bctx) return null;
+    // The overlay's own tint (drip.css --drip-tint) is painted into the still, so the still needs no layer of its own
+    // over it. A tint layer reaching past the still's edge tinted that strip twice and showed as a box (Jesse,
+    // 2026-11-07).
+    const tint = () => {
+      const dark = document.documentElement.hasAttribute('dark');
+      ctx.filter = 'none';
+      ctx.drawImage(base, 0, 0);
+      ctx.fillStyle = dark ? 'rgba(3, 22, 46, 0.6)' : 'rgba(150, 195, 240, 0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+    // saturate(1.2) matches the overlay's backdrop-filter.
+    /** @param {CanvasImageSource | null} source @param {number} x @param {number} y @param {number} w @param {number} h */
+    const paint = (source, x, y, w, h) => {
+      bctx.filter = 'none';
+      bctx.fillStyle = '#000';
+      bctx.fillRect(0, 0, base.width, base.height);
+      if (source) {
+        bctx.filter = 'saturate(1.2)';
+        bctx.drawImage(source, x * scale, y * scale, w * scale, h * scale);
+        bctx.filter = 'none';
+      }
+      tint();
+    };
+    const frame = h('div', { class: 'drip-frame', 'aria-hidden': 'true', 'data-video': videoId() }, canvas);
+    frame.style.cssText = `left:${p.left}px;top:${p.top}px;width:${p.width}px;height:${p.height}px`;
+    retint.set(frame, tint);
+    const video = /** @type {HTMLVideoElement | null} */ (document.querySelector(SEL.video));
+    const v = typeof video?.getBoundingClientRect === 'function' ? video.getBoundingClientRect() : null;
+    const onScreen = !!video && !!v && video.readyState >= 2 && !!video.videoWidth
+      && v.bottom > p.top + p.height / 2 && v.top < p.bottom - p.height / 2;
+    if (video && v && onScreen) {
+      try {
+        paint(video, v.left - p.left, v.top - p.top, v.width, v.height);
+        return frame;
+      } catch {
+        // Falls through to the thumbnail.
+      }
+    }
+    // Before playback YouTube parks the video above the player and shows the thumbnail, cropped to fill.
+    const id = videoId();
+    if (!id) return null;
+    paint(null, 0, 0, 0, 0);
+    const img = new Image();
+    img.onload = () => {
+      const fill = Math.max(p.width / img.naturalWidth, p.height / img.naturalHeight);
+      const w = img.naturalWidth * fill;
+      const h2 = img.naturalHeight * fill;
+      paint(img, (p.width - w) / 2, (p.height - h2) / 2, w, h2);
+    };
+    // No thumbnail: the lock blurs the live player again, as it did before the still.
+    img.onerror = () => {
+      thumbFailed = id;
+      frame.remove();
+    };
+    img.src = `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
+    return frame;
+  }
+
+  /** The video whose thumbnail failed to load, so the lock doesn't fetch it again every tick. */
+  let thumbFailed = '';
+
+  /** Each still's tint, to paint again when YouTube's theme changes under the lock. */
+  const retint = new WeakMap();
+
+  /** The still follows the player when the window resizes, zooms, or scrolls. It's blurred, so stretching it is fine. */
+  function moveStill() {
+    const still = /** @type {HTMLElement | null} */ (document.querySelector('#drip-lock .drip-frame'));
+    const player = document.querySelector(SEL.player);
+    if (!still || !player) return;
+    const p = player.getBoundingClientRect();
+    if (p.width < 2 || p.height < 2) return;
+    still.style.cssText = `left:${p.left}px;top:${p.top}px;width:${p.width}px;height:${p.height}px`;
+  }
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    let queued = false;
+    const queue = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        moveStill();
+      });
+    };
+    window.addEventListener('resize', queue);
+    window.addEventListener('scroll', queue, { passive: true });
+  }
+  if (typeof MutationObserver === 'function') {
+    new MutationObserver(() => {
+      const still = document.querySelector('#drip-lock .drip-frame');
+      if (still) retint.get(still)?.();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['dark'] });
+  }
+
+  /**
    * Puts a panel in the lock overlay. A new overlay plays the water rising and then the panel surfacing. A panel swapped
    * into an overlay that's already up just replaces the old one, so the water doesn't rise again.
    * @param {HTMLElement} panel
@@ -591,6 +749,7 @@
       const old = lock.querySelector('.drip-lock-panel');
       if (old) old.replaceWith(panel);
       else lock.append(panel);
+      freshStill(lock);
       return;
     }
     // A lock still draining away goes at once, and a new one rises.
@@ -599,7 +758,7 @@
     // Only running out drops the last of the water. The "drip was updated" notice goes up at once.
     const glass = locked && !disconnected ? lastDropGlass() : null;
     if (!glass) {
-      document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), panel));
+      document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, frozenFrame(), sea(), panel));
       return;
     }
     // The pill's last water falls as a drop, and the lock's water rises from where it lands (pour.js).
@@ -610,10 +769,21 @@
       if (falling !== fall) return;
       falling = null;
       if (!locked || location.pathname !== '/watch') return;
-      const lock = h('div', { id: 'drip-lock', class: 'drip-ui' }, sea(), fall.panel);
+      const lock = h('div', { id: 'drip-lock', class: 'drip-ui' }, frozenFrame(), sea(), fall.panel);
       document.body.append(lock);
       if (x !== null) DripPour.riseFrom(lock, x);
     });
+  }
+
+  /**
+   * A lock that came up before the player had a size, or that stayed up into another video, takes a new still.
+   * @param {HTMLElement} lock
+   */
+  function freshStill(lock) {
+    const still = /** @type {HTMLElement | null} */ (lock.querySelector('.drip-frame'));
+    if (still ? still.dataset.video === videoId() : thumbFailed === videoId()) return;
+    const fresh = frozenFrame();
+    if (fresh) still ? still.replaceWith(fresh) : lock.prepend(fresh);
   }
 
   /**
@@ -775,6 +945,9 @@
     ringTimer = undefined;
     ringButton = null;
   }
+
+  /** The spark that runs around "Done for now" every few seconds (common.js orbitLap). */
+  const startOrbit = orbiter(() => /** @type {HTMLElement | null} */ (document.querySelector('#drip-lock .drip-done')), ring);
 
   /** The click's rings play this long before the water starts to fall. */
   const LEAVE_MS = 700;
@@ -940,7 +1113,7 @@
     // When the next unlock comes back, once the week's are used (Q20).
     const needBack = Drip.needThisBack(state, now);
     // The label, not the time, goes in the view key, so "tomorrow" turns into "today" at midnight (Codex, 2026-11-04).
-    const backLabel = needBack > 0 ? dayTimeLabel(needBack, now) : '';
+    const backLabel = needBack > 0 ? dayTimeLabel(needBack, now, true) : '';
     // In Dry hours no drop can be bought, and the line under the title says when they end (Q32).
     const dryEnd = Drip.dryUntil(state, now);
     // Drops stop selling 5 minutes before, since the minutes would stop at the start.
@@ -954,7 +1127,11 @@
       : firstWatch ? `Each drop buys ${Drip.formatMinutes(s.minutesPerToken * 60)} of watching.` : watchedLine();
     const existing = liveLock();
     const view = JSON.stringify([videoId(), canBuy, hasDrops, needLeft, backLabel, s.minutesPerToken, s.resetHour, reasonOpen, lockMessage, headline, line]);
-    if (existing && lockView === view) return;
+    if (existing && lockView === view) {
+      // The panel is the same, but a lock without a still keeps trying for one on each tick (Codex, 2026-11-09).
+      freshStill(existing);
+      return;
+    }
     lockView = view;
     lockVideoId = videoId();
     const active = document.activeElement;
@@ -975,11 +1152,7 @@
           h('div', { class: 'drip-reason-row' },
             h('button', { class: 'drip-lock-link', 'data-k': 'cancel', onclick: closeReason }, 'Cancel'),
             h('button', { class: 'drip-b drip-b-gray', 'data-k': 'unlock', onclick: () => onNeedThis(reason.value) }, icon('unlock'), h('span', {}, 'Unlock this video'))))
-        : !hasDrops || backLabel
-          ? h('div', {},
-            !hasDrops && h('div', { class: 'drip-lock-note' }, `The glass refills at ${hourLabel(s.resetHour)}.`),
-            backLabel && h('div', { class: 'drip-lock-note' }, `Next unlock back ${backLabel}.`))
-          : null;
+        : lockFoot(hasDrops ? '' : hourLabel(s.resetHour), backLabel);
     const panel = h(
       'div',
       { class: 'drip-lock-panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drip-lock-title' },
@@ -991,11 +1164,12 @@
         h('button', {
           class: 'drip-b drip-b-primary drip-done', 'data-k': 'done', onclick: onDone,
           onpointerenter: startRings, onpointerleave: stopRings, onfocus: startRings, onblur: stopRings,
-        }, h('span', {}, 'Done for now'))),
+        }, h('span', { class: 'drip-done-water', 'aria-hidden': 'true' }), h('span', {}, 'Done for now'))),
       lockMessage && h('div', { class: 'drip-lock-note', role: 'status' }, lockMessage),
       unlocks,
     );
     placeLockPanel(panel);
+    startOrbit();
     if (focused && reasonOpen && needLeft > 0) {
       reason.focus();
       reason.setSelectionRange(selectionStart, selectionEnd);

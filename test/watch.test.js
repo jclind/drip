@@ -653,7 +653,7 @@ test('the lock screen says what can still happen: buy minutes, unlock, or nothin
   assert.match(tab.lockText(), /Done for now/);
   assert.match(tab.lockText(), /I need this one · 3 left this week/);
   assert.doesNotMatch(tab.lockText(), /token/i);
-  assert.doesNotMatch(tab.lockText(), /Next unlock back/);
+  assert.doesNotMatch(tab.lockText(), /Unlock back/);
 
   world.state.tokens.watch = 0;
   world.state.log['2026-09-29'] = { ...structuredClone(world.state.log[world.state.day]), watchedSec: 3000 };
@@ -665,8 +665,8 @@ test('the lock screen says what can still happen: buy minutes, unlock, or nothin
   assert.match(tab.lockText(), /^You've had your fill\./);
   assert.match(tab.lockText(), /· 50m last Tuesday/);
   assert.doesNotMatch(tab.lockText(), /\+15m|I need this one/);
-  assert.match(tab.lockText(), /The glass refills at 4:00am\./);
-  assert.match(tab.lockText(), /Next unlock back Friday at 9:14pm\./);
+  assert.match(tab.lockText(), /Refills 4:00am/);
+  assert.match(tab.lockText(), /Unlock back Fri 9:14pm/);
 });
 
 for (const dry of [false, true]) {
@@ -679,8 +679,8 @@ for (const dry of [false, true]) {
     await tab.second();
     assert.ok(tab.locked());
     assert.ok(world.state.tokens.watch > 0);
-    assert.doesNotMatch(tab.lockText(), /refills|I need this one/);
-    assert.match(tab.lockText(), /Next unlock back next Tuesday at 11:57am\./);
+    assert.doesNotMatch(tab.lockText(), /Refills|I need this one/);
+    assert.match(tab.lockText(), /Unlock back next Tue 11:57am/);
     if (dry) assert.match(tab.lockText(), /Dry until 1:00pm\./);
     else assert.match(tab.lockText(), /\+15m/);
   });
@@ -693,7 +693,7 @@ test('with drops left and unlocks disabled, the lock has no empty notes wrapper'
   await settle();
   await tab.second();
   assert.ok(tab.locked());
-  assert.doesNotMatch(tab.lockText(), /refills|Next unlock back|I need this one/);
+  assert.doesNotMatch(tab.lockText(), /Refills|Unlock back|I need this one/);
   const panel = tab.body.querySelector('.drip-lock-panel');
   assert.ok(panel);
   assert.deepEqual(panel.children.filter((el) => el instanceof FakeElement).map((el) => el.className), ['drip-lock-title', 'drip-lock-sub', 'drip-lock-actions']);
@@ -707,10 +707,10 @@ test('a lock left open past midnight turns "tomorrow" into "today" (Codex, 2026-
   world.state.log['2026-09-30'] = { ...structuredClone(world.D.logDay(world.state)), needThis: [{ videoId: 'x', title: '', reason: 'Class', at }] };
   world.state.log[world.state.day] = { ...structuredClone(world.D.logDay(world.state)), needThis: [1, 2].map((n) => ({ videoId: `v${n}`, title: '', reason: 'Class', at: world.epoch - n * 60e3 })) };
   await play(world, tab, 5);
-  assert.match(tab.lockText(), /Next unlock back tomorrow at 9:14am\./);
+  assert.match(tab.lockText(), /Unlock back tomorrow 9:14am/);
   world.advance(12 * 3600 + 60);
   for (let i = 0; i < 30; i++) await tab.second();
-  assert.match(tab.lockText(), /Next unlock back today at 9:14am\./);
+  assert.match(tab.lockText(), /Unlock back today 9:14am/);
 });
 
 test("a failed unlock says the week's unlocks are used", async () => {
@@ -723,7 +723,7 @@ test("a failed unlock says the week's unlocks are used", async () => {
   await tab.press('unlock');
   assert.match(tab.lockText(), /You've used this week's unlocks\./);
   assert.doesNotMatch(tab.lockText(), /left this week|Unlock this video/, 'the lock stops offering one');
-  assert.match(tab.lockText(), /Next unlock back next Tuesday at 11:57am\./);
+  assert.match(tab.lockText(), /Unlock back next Tue 11:57am/);
 });
 
 test("time played before a navigation is charged to the video it played on (finding 12)", async () => {

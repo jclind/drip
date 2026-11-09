@@ -85,20 +85,162 @@
   }
 
   /**
-   * "today at 9:14pm", "tomorrow at 9:14pm", "Friday at 9:14pm", or "next Wednesday at 9:14pm" a week out.
-   * @param {number} ms @param {number} now
+   * "today at 9:14pm", "tomorrow at 9:14pm", "Friday at 9:14pm", or "next Wednesday at 9:14pm" a week out. Short, for
+   * the lock's footer: "today 9:14pm", "Fri 9:14pm", "next Wed 9:14pm".
+   * @param {number} ms @param {number} now @param {boolean} [short]
    */
-  function dayTimeLabel(ms, now) {
+  function dayTimeLabel(ms, now, short = false) {
     const date = new Date(ms);
     const hour = date.getHours();
     const time = `${hour % 12 === 0 ? 12 : hour % 12}:${String(date.getMinutes()).padStart(2, '0')}${hour < 12 ? 'am' : 'pm'}`;
     const today = new Date(now);
     const days = Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
       - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000);
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const weekday = date.toLocaleDateString('en-US', { weekday: short ? 'short' : 'long' });
     // A week out lands on today's weekday, where a bare "Wednesday" would read as today.
     const day = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : days >= 7 ? `next ${weekday}` : weekday;
-    return `${day} at ${time}`;
+    return short ? `${day} ${time}` : `${day} at ${time}`;
+  }
+
+  /**
+   * The lock's footer (DESIGN.md "Lock screen", Jesse's pick B, 2026-11-07): a rule, then when the glass refills on the
+   * left and when the next unlock returns on the right, each after its icon. One alone is centered.
+   * @param {string} refill "4:00am", or '' to leave it out @param {string} back "Fri 9:14pm", or ''
+   */
+  function lockFoot(refill, back) {
+    if (!refill && !back) return null;
+    return h('div', { class: `drip-lock-foot${refill && back ? '' : ' is-one'}` },
+      refill && h('span', { class: 'drip-lock-fact' }, icon('drop', 'drip-token-drop'), h('span', {}, `Refills ${refill}`)),
+      back && h('span', { class: 'drip-lock-fact' }, icon('unlock'), h('span', {}, `Unlock back ${back}`)));
+  }
+
+  /** How often the spark runs around "Done for now" while nobody points at it. */
+  const ORBIT_EVERY_MS = 3600;
+  /** The first lap, once the lock's panel has surfaced (it rises 0.65s in and takes 0.46s). */
+  const ORBIT_FIRST_MS = 1400;
+  /** One lap, and the moment the ring leaves as the spark gets home. */
+  const LAP_MS = 1300;
+  const RING_AT_MS = 1150;
+
+  /**
+   * The point a fraction t of the way around a w × h pill with corner radius r, clockwise from the left end of the top
+   * edge.
+   * @param {number} t @param {number} w @param {number} h @param {number} r
+   * @returns {[number, number]}
+   */
+  function pillPoint(t, w, h, r) {
+    const flat = w - 2 * r;
+    const side = h - 2 * r;
+    const arc = (Math.PI / 2) * r;
+    let d = (((t % 1) + 1) % 1) * (2 * flat + 2 * side + 4 * arc);
+    /** @type {[number, number, number, number][]} corner centers and start angles */
+    const corners = [[w - r, r, -90, 0], [w - r, h - r, 0, 0], [r, h - r, 90, 0], [r, r, 180, 0]];
+    const edges = [[r, 0, 1, 0, flat], [w, r, 0, 1, side], [w - r, h, -1, 0, flat], [0, h - r, 0, -1, side]];
+    for (let i = 0; i < 4; i++) {
+      const [x, y, dx, dy, len] = edges[i];
+      if (d <= len) return [x + dx * d, y + dy * d];
+      d -= len;
+      if (d <= arc) {
+        const [cx, cy, start] = corners[i];
+        const a = ((start + (d / arc) * 90) * Math.PI) / 180;
+        return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+      }
+      d -= arc;
+    }
+    return [r, 0];
+  }
+
+  /** @param {string} color "rgb(…)" or "rgba(…)" @param {number} alpha */
+  function withAlpha(color, alpha) {
+    const [r = 0, g = 0, b = 0] = (color.match(/[\d.]+/g) || []).map(Number);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  /**
+   * One lap around "Done for now" (Jesse's pick Z2, 2026-11-07): a glowing blue spark runs once around the button's edge,
+   * shedding small pale blue stars, and as it gets home one ring leaves the button. It's all drawn in the panel, so the
+   * button's face never moves. Everything animates left, top, size, and color, never transform or opacity, to keep
+   * animated layers from coming and going under the lock's blurred overlay. That was a guess at why the overlay
+   * dropped for a frame (Jesse, 2026-11-07), and the drops went on after it.
+   * @param {HTMLElement} button @param {(button: HTMLElement) => void} ring
+   */
+  function orbitLap(button, ring) {
+    const panel = button.closest('.drip-lock-panel');
+    if (!panel) return;
+    const p = panel.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+    const x0 = b.left - p.left;
+    const y0 = b.top - p.top;
+    const r = b.height / 2;
+    const spark = h('span', { class: 'drip-orbit-spark', 'aria-hidden': 'true' });
+    panel.append(spark);
+    const core = getComputedStyle(spark).backgroundColor;
+    const glow = '0 0 6px 2px rgba(66, 165, 246, A), 0 0 14px 4px rgba(66, 165, 246, B)';
+    const look = (/** @type {number} */ a) => ({
+      backgroundColor: withAlpha(core, a), boxShadow: glow.replace('A', String(0.9 * a)).replace('B', String(0.45 * a)),
+    });
+    // The lap's easing, applied to where the spark is, so left and top can be keyframed linearly.
+    const ease = (/** @type {number} */ t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+    const steps = 48;
+    /** @type {Keyframe[]} */
+    const frames = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const [x, y] = pillPoint(ease(t), b.width, b.height, r);
+      const a = t < 0.1 ? t / 0.1 : t > 0.85 ? (1 - t) / 0.15 : 1;
+      frames.push({ offset: t, left: `${x0 + x}px`, top: `${y0 + y}px`, ...look(a) });
+    }
+    const lap = spark.animate(frames, { duration: LAP_MS, fill: 'both' });
+    lap.finished.then(() => spark.remove(), () => spark.remove());
+    let shed = 0;
+    const timer = setInterval(() => {
+      if (++shed > 9 || !spark.isConnected) return clearInterval(timer);
+      const left = parseFloat(getComputedStyle(spark).left);
+      const top = parseFloat(getComputedStyle(spark).top);
+      const size = 4 + Math.round(Math.random() * 3);
+      const star = h('span', { class: 'drip-orbit-star', 'aria-hidden': 'true' });
+      panel.append(star);
+      const tint = getComputedStyle(star).backgroundColor;
+      star.animate([
+        { left: `${left}px`, top: `${top}px`, width: `${size}px`, height: `${size}px`, backgroundColor: withAlpha(tint, 0.9) },
+        { left: `${left + Math.random() * 12 - 6}px`, top: `${top + Math.random() * 12 - 8}px`, width: '0px', height: '0px',
+          backgroundColor: withAlpha(tint, 0) }],
+      { duration: 600, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'both' }).finished.then(() => star.remove(), () => star.remove());
+    }, 120);
+    setTimeout(() => {
+      if (button.isConnected && !button.matches(':hover, :focus-visible') && !button.classList.contains('is-leaving')) ring(button);
+    }, RING_AT_MS);
+  }
+
+  /**
+   * Runs orbitLap every ORBIT_EVERY_MS on whichever "Done for now" find returns, and stops once there's none. A lap is
+   * skipped while the pointer or focus is on the button (the water pour has the stage), while it's leaving, while it or
+   * the tab is hidden, and with reduced motion.
+   * @param {() => HTMLElement | null} find @param {(button: HTMLElement) => void} ring
+   * @returns {() => void} starts it, if it isn't running
+   */
+  function orbiter(find, ring) {
+    /** @type {ReturnType<typeof setInterval> | undefined} */
+    let timer;
+    const tick = () => {
+      const button = find();
+      if (!button) {
+        clearInterval(timer);
+        timer = undefined;
+        return;
+      }
+      if (document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches || !button.getClientRects().length
+        || button.classList.contains('is-leaving') || button.matches(':hover, :focus-visible')) return;
+      orbitLap(button, ring);
+    };
+    return () => {
+      if (timer !== undefined) return;
+      // A placeholder until the first lap, so a rebuild in the meantime doesn't start a second timer.
+      timer = setTimeout(() => {
+        tick();
+        if (timer !== undefined) timer = setInterval(tick, ORBIT_EVERY_MS);
+      }, ORBIT_FIRST_MS);
+    };
   }
 
   /** @param {string} id */
@@ -283,5 +425,16 @@
   // sessionStorage key for the drops left unspent when the lock screen's "Done for now" goes home (watch.js, home.js).
   const KEPT_KEY = 'drip-kept';
 
-  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, dayTimeLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
+  // Once the lock's water is all the way up, its wave mask and clip-path cover nothing, so drip.css takes them off
+  // (#drip-lock.is-full) until it drains. Chrome showed the page unmasked on a drain's last frames, so masked, clipped
+  // and blurred together is a suspect for the other glitch too: now and then the whole overlay dropped for a frame
+  // while the lock sat still, on YouTube and in the welcome tour (Jesse, 2026-11-07). Not proved; dev/mask-ab.js tests it.
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('animationend', (e) => {
+      const lock = /** @type {HTMLElement | null} */ (e.target);
+      if (lock && lock.id === 'drip-lock' && /water-rise$/.test(e.animationName)) lock.classList.add('is-full');
+    });
+  }
+
+  /** @type {any} */ (globalThis).DripUI = { send, h, onState, hourLabel, dayTimeLabel, lockFoot, orbiter, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, pausePlayer, reportBroken, watchFor };
 })();

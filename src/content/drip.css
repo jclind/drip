@@ -72,7 +72,6 @@ a.drip-btn {
   /* The rings around "Done for now", darker here, where the page is light. */
   --drip-ring: rgba(25, 118, 210, 0.6);
   --drip-tint: rgba(150, 195, 240, 0.45);
-  --drip-shimmer: rgba(255, 255, 255, 0.3);
   position: fixed;
   inset: 0;
   z-index: 100000;
@@ -98,9 +97,67 @@ a.drip-btn {
   animation: drip-water-rise 1100ms cubic-bezier(0.35, 0.6, 0.25, 1) both, drip-crest 1100ms linear;
 }
 
+/* The water is all the way up: the mask and clip come off until it drains (common.js says why). */
+#drip-lock.is-full:not(.is-draining, .is-surfacing) {
+  -webkit-mask: none;
+  mask: none;
+  clip-path: none;
+}
+
 #drip-lock.is-draining {
   pointer-events: none;
   animation: drip-water-drain 600ms cubic-bezier(0.55, 0, 0.75, 0.45) both, drip-crest 600ms linear;
+}
+
+/* A still of the player (watch.js frozenFrame), with the overlay's tint and saturation painted in and blurred here the
+   way the overlay's backdrop-filter does the rest of the page. Its blurred edges fade into the page as the live
+   video's did. The live video under it is hidden while the lock is up, so nothing YouTube loads into the paused player
+   shows through. It comes back as the water drains. */
+#drip-lock .drip-frame {
+  position: absolute;
+  pointer-events: none;
+}
+
+#drip-lock .drip-frame > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: blur(20px);
+}
+
+html:has(#drip-lock:not(.is-draining, .is-surfacing) > .drip-frame) #movie_player video.html5-main-video {
+  visibility: hidden !important;
+}
+
+/* While the lock is up the page under it stays put (Jesse, 2026-11-08). Scrolling did nothing but slide the blurred
+   page around. The gutter keeps the scroll bar's width, so nothing under the lock reflows. YouTube's ambient glow
+   (#cinematics) is off too: it paints from the video, so it kept changing with the ads under the still, and in the
+   default view it reaches past the window's edge, which let the page scroll sideways. */
+html:has(#drip-lock:not(.is-draining, .is-surfacing)) {
+  overflow: hidden !important;
+  scrollbar-gutter: stable;
+}
+
+html:has(#drip-lock:not(.is-draining, .is-surfacing)) body {
+  overflow: visible !important;
+}
+
+html:has(#drip-lock:not(.is-draining, .is-surfacing)) #cinematics {
+  display: none !important;
+}
+
+/* Once the water is up, YouTube's page is hidden under it and the still is all that shows. Signed out, the page around
+   the player kept changing behind the blur every few seconds, and hiding it stopped that (Jesse, 2026-11-09). It
+   shows again as the water drains or falls away. Reduced motion has no rise, so no is-full. A lock without a still
+   leaves the page showing, blurred, rather than a blank backdrop (Codex, 2026-11-09). */
+html:has(#drip-lock.is-full:not(.is-draining, .is-surfacing) > .drip-frame) :is(ytd-app, body > #player) {
+  visibility: hidden !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(#drip-lock:not(.is-draining, .is-surfacing) > .drip-frame) :is(ytd-app, body > #player) {
+    visibility: hidden !important;
+  }
 }
 
 /* Under the water, behind the panel: faint bubbles rising and two small fish crossing now and then (watch.js sea()).
@@ -192,8 +249,6 @@ html[dark] #drip-lock {
   --drip-panel: #121212;
   --drip-ring: rgba(66, 165, 246, 0.75);
   --drip-tint: rgba(3, 22, 46, 0.6);
-  /* The primary button is white in dark mode, so its shimmer is a pale blue to show up on it. */
-  --drip-shimmer: rgba(66, 165, 246, 0.3);
 }
 
 #drip-lock .drip-lock-panel {
@@ -241,27 +296,93 @@ html[dark] #drip-lock {
   height: 17px;
 }
 
-/* "Done for now" is the only thing on drip's screens that moves on its own: a slow shimmer every few seconds. */
+/* "Done for now" (Jesse's picks, 2026-11-07). At rest its face is still: every 3.6 seconds a blue spark runs once around
+   its edge (common.js orbitLap, the .drip-orbit rules below). Hover or keyboard focus pours blue water in from the
+   bottom, the words turn white, and the surface drifts. --drip-water-top is the wave's top edge. */
+@property --drip-water-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 46px;
+}
+
+@property --drip-wave-x {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
 #drip-lock .drip-done {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  transition: color 300ms ease;
 }
 
-#drip-lock .drip-done::after {
-  content: "";
+#drip-lock .drip-done-water {
+  --drip-water-top: calc(var(--drip-btn-h) + 4px);
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(105deg, transparent 30%, var(--drip-shimmer) 50%, transparent 70%);
-  transform: translateX(-100%);
-  animation: drip-done-shimmer 5s ease-in-out 1.2s infinite;
+  background: #1976d2;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") var(--drip-wave-x) var(--drip-water-top) / 160px 8px repeat-x,
+    linear-gradient(#000, #000) 0 calc(var(--drip-water-top) + 7px) / 100% 200% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 26' preserveAspectRatio='none'%3E%3Cpath d='M0 14C80 2 160 2 240 12S400 26 480 14 600 2 640 12V26H0Z'/%3E%3C/svg%3E") var(--drip-wave-x) var(--drip-water-top) / 160px 8px repeat-x,
+    linear-gradient(#000, #000) 0 calc(var(--drip-water-top) + 7px) / 100% 200% no-repeat;
+  transition: --drip-water-top 600ms cubic-bezier(0.3, 0.7, 0.2, 1);
   pointer-events: none;
 }
 
-#drip-lock .drip-done.is-leaving::after {
-  animation: none;
-  opacity: 0;
+/* White on #1976d2 is 4.6:1. */
+#drip-lock .drip-done:is(:hover, :focus-visible) {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 40, 90, 0.35);
+}
+
+#drip-lock .drip-done:is(:hover, :focus-visible) .drip-done-water {
+  --drip-water-top: -12px;
+  animation: drip-wave-drift 2.5s linear infinite;
+}
+
+/* The spark's track is a copy of the button's box in the panel, so the spark can glow past the button's edge. */
+#drip-lock .drip-orbit {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+#drip-lock .drip-orbit-spark {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px 2px rgba(66, 165, 246, 0.9), 0 0 14px 4px rgba(66, 165, 246, 0.45);
+  translate: -50% -50%;
+}
+
+html:not([dark]) #drip-lock .drip-orbit-spark {
+  background: var(--drip-blue);
+}
+
+/* The small pale blue stars the spark sheds as it goes. They and the spark move by left and top, never transform or
+   opacity (see drip-done-ring). */
+#drip-lock .drip-orbit-star {
+  position: absolute;
+  translate: -50% -50%;
+  z-index: 2;
+  background: #6cb8f7;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #drip-lock .drip-done-water {
+    transition: none;
+  }
+
+  #drip-lock .drip-done:is(:hover, :focus-visible) .drip-done-water {
+    animation: none;
+  }
 }
 
 /* Hover or keyboard focus: a ring leaves the button every 1.4 seconds and fades 8px out (watch.js startRings).
@@ -328,9 +449,43 @@ html[dark] #drip-lock {
   font-weight: 500;
 }
 
-/* "Next unlock back ..." sits right under the glass line, as one note. */
-#drip-lock .drip-lock-note + .drip-lock-note {
-  margin-top: 4px;
+/* The footer (Jesse's pick B, 2026-11-07): a rule, then when the glass refills on the left and when the next unlock
+   returns on the right, each after its icon. One alone is centered. common.js lockFoot. */
+#drip-lock .drip-lock-foot {
+  display: flex;
+  align-self: stretch;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--drip-rule);
+  color: var(--drip-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#drip-lock .drip-lock-foot.is-one {
+  justify-content: center;
+}
+
+#drip-lock .drip-lock-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* A long "Unlock back next Tue 11:57am" wraps inside its own half and stays at the right edge. */
+#drip-lock .drip-lock-fact + .drip-lock-fact {
+  text-align: right;
+}
+
+/* The drop and the lock carry their weight low, so centered on the line they look low next to the caps. 1px up
+   lines their middles up with the text's (Jesse, 2026-11-07). */
+#drip-lock .drip-lock-fact .drip-i {
+  width: 14px;
+  height: 15px;
+  margin-top: -2px;
 }
 
 /* "I need this one" opens a plain box with no animation. Justifying should take a little effort. */
@@ -2090,14 +2245,22 @@ html[dark] #drip-home .drip-menu {
   }
 }
 
+@keyframes drip-wave-drift {
+  to {
+    --drip-wave-x: 160px;
+  }
+}
+
+/* The ring fades by its outline color, not opacity, to keep animated layers from coming and going under the lock's
+   blurred overlay. That was a guess at why the overlay dropped for a frame (Jesse, 2026-11-07), not a proven cause. */
 @keyframes drip-done-ring {
   from {
-    opacity: 0.85;
+    outline-color: var(--drip-ring);
     outline-offset: 0;
   }
 
   to {
-    opacity: 0;
+    outline-color: transparent;
     outline-offset: 8px;
   }
 }
@@ -2135,10 +2298,14 @@ html[dark] #drip-home .drip-menu {
     outline: none;
   }
 
+  /* No rise, so no animationend to add is-full (common.js): the mask and clip come off here instead. */
   #drip-lock,
   #drip-lock.is-draining,
   #drip-lock.is-surfacing {
     animation: none;
+    -webkit-mask: none;
+    mask: none;
+    clip-path: none;
   }
 
   #drip-lock.is-draining {
