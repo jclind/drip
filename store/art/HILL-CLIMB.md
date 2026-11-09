@@ -295,6 +295,39 @@ First image to meet the AI-look target from both judges: screenshot 5. Both judg
 
 Round 11 changes: two new kinds of note in `frames-v2.html`. A note with `at` has no leader, for a line about the whole page (3's 24-hour note, 2's water note sitting in the water band). One with `under` sits below its target and reaches up with a right-angled leader, so 1's card note lands on Reveal next without crossing Stash. 4 crops to Dry hours' end; its second note is about tightening ("Turn dry hours on and they start tonight", which applies at once per DESIGN.md Q32); one time wording ("the 4am reset"). 5's sample keeps the 41-minute average but Friday runs to 80, so the bars use the chart. Rejected: Codex's ask to point 4's first note at the pending chip, since a level line to the chip runs through the "Drops per day" label.
 
+### Round 11, 2026-11-09 (v2)
+
+Reports: `reviews/round-11-codex.md`, `reviews/round-11-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 8 | 3 |
+| 2 Lock | 9 | 2 | 7 | 3 |
+| 3 Modes | 9 | 1 | 7 | 3 |
+| 4 Settings | 8 | 1 | 8 | 2 |
+| 5 History | 8 | 1 | 7 | 3 |
+| Tile c2 | 9 | 1 | 7 | 4 |
+| Tile c3 | 8 | 1 | 7 | 3 |
+
+Met by both judges on AI look: screenshot 4 this round (5 last round; the Claude judge swings about a point between runs). Codex meets every target on 2, 3, and tile c2. The tiles are split: Codex picks c2, Claude picks c3 once its card clears the tagline.
+
+Fixes for round 12, from both reports, not yet applied:
+1. Screenshot 1 (both): the subline repeats "at a time"; Codex wants "YouTube" in the headline. Claude: raise the note to a 58px bottom margin with the dot touching Reveal next's bottom edge, and shift the capture down about 25px.
+2. Screenshot 2 (Claude): the paper's water band doesn't match the strip's water at the seam; sample the strip's water near the bottom, lighten 15 to 20%, and flatten the crest's last 80px. Fewer, bluer bubbles. Subline: "Set a daily limit. When it's used up, the video pauses."
+3. Screenshot 3 (Claude): cut the leaderless 24-hour note; point a note at Full drip's description instead; "Or set your own mix." on Customize (no second "Choose").
+4. Screenshot 4 (both): "Raised from 4 to 5. Still 4 until the 4am reset." Claude: "Dry hours block watching overnight. Turn them on and they start tonight."
+5. Screenshot 5 (both): cut "The dashed line is the week before."; Claude would point a note at the Unlocks tile instead. Subline without "A sample week:" up front (Claude would move it to a small footnote; Codex wants it kept explicit). About 40px under the tiles.
+6. Tile c3 (Claude): move the card off the tagline, tilt 10 to 12 degrees, taller than wide; tagline 15% larger.
+
+## How to run a round (v2)
+
+1. Edit `store/art/frames-v2.html` (and `dev/page.html` or `store/art/videos.js` for sample data).
+2. `store/art/capture.sh v2` writes `store/images-v2/`. It renders at 2x and scales down with `sips`, and retries a screenshot up to four times when `has-notes.py` finds no notes (the page wasn't ready; about one shot in four needs a retry). Look at every image before judging.
+3. Copy the last round's prompt to `reviews/round-N-prompt.md`, changing only the image list and round notes. Stage the prompt and the seven images in a scratch folder, `judgeN/`.
+4. Codex, from that folder: `codex exec --skip-git-repo-check -s read-only -o report.md -i screenshot-1.png ... -i tile-c3.png - < prompt.md > codex.log 2>&1`, in the background. Add a line to `~/codex-trial/log.md`.
+5. Claude: a fresh `general-purpose` Agent told to read only the staged prompt and images.
+6. Save both reports verbatim as `reviews/round-N-codex.md` and `round-N-claude.md`, copy the staged images to `rounds/round-N/`, add the round here, commit.
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.
