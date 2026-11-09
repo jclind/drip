@@ -13,11 +13,11 @@ The `/council` run on drip's store images, started 2026-11-09. `/council continu
 
 ## Current
 
-- Round: 17 next (council round 4), waiting on Jesse.
-- Tactic: fix, but a divergent round is due. Not a stall by the skill's rule, since Codex keeps rising (1, 5, c2 at 9/1 in round 16). The Claude seat is flat: rounds 14 to 16 all sit at design 7 to 8 and AI look 3 to 4, inside its measured noise, and every Claude report names the cream-panel-plus-app layout as the cause. Fix rounds have started to swing: screenshot 3's headline changed in every round from 14 to 17, the lock's bubbles went smaller then the Claude seat asked for a bigger one, and the video under the lock moved four times.
-- Base: `frames-v2.html` with round 16's triage applied (this commit).
-- Muse: 86% of its 5-hour window after round 16 (resets about 21:40 on 2026-11-09), 28% of its week. Round 16's report stopped partway, likely at a limit. Round 17 can't include Muse until the reset.
-- Next step: Jesse's call between a fix round 17 with Claude and Codex now, and a divergent round (each seat proposes a layout far from v2; two or three get built beside it and compared head to head).
+- Round: 17 done, the divergent round (Jesse picked it 2026-11-09 after round 16). Round 18 next: the head-to-head comparison.
+- Tactic: divergent, level 1. Claude and Codex each proposed one layout far from v2 (`reviews/round-17-divergent-claude.md`, `-codex.md`); Muse was out of quota. Both landed on one huge number per image on their own. Built as `frames-v3.html`: A, "one number per image" (paper, Fraunces numerals with a blue drop as the full stop, the page as a slab from the top right, a blue ring on the matching number in the UI), and B, "finite posters" (flat blue, gold, and ink, Anton symbols built around or behind the page, no notes). `capture.sh v3` writes `store/images-v3/a-*` and `b-*`. v2 stays as the third option.
+- Departures from the proposals, so the comparison is fair: A's captures run at 1.15 to 1.7 instead of 1.0 to 1.15, so the slabs aren't mostly empty; B's lock has a drawn water band, not a second crop of the real water; B's welcome box is the page's width, not 880px.
+- Muse: 86% of its 5-hour window at 17:02, resets about 21:04 on 2026-11-09.
+- Next step: round 18, Jesse's go. Each seat gets all three sets (v2, A, B) side by side and picks one per image and one overall, with the reason, then scores the set it picked. The winner becomes the base and fix rounds resume on it.
 
 ## Score history
 
