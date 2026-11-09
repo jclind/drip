@@ -104,6 +104,38 @@ Rejected or deferred:
 - Shot 1 "Stashed" pressed (Claude): that's the sample state of a saved video; changing it means a different scenario. Low impact, skip for now.
 - Shot 3 crop to the three cards (Claude): Codex says keep all three with context. Kept.
 
+### Round 2, 2026-11-09
+
+Jesse: go with the judges' tile recommendations, and keep every demo for a look at the end. Each round's images are now in `rounds/round-N/` (round 0 pulled from `1a08f6f`). Tiles d (c with "One video at a time.") and e (c with the card) are new and scored; c is unchanged. Reports: `reviews/round-2-codex.md` and `reviews/round-2-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 2 | 7 | 4 |
+| 2 Lock | 7 | 2 | 5 | 4 |
+| 3 Modes | 7 | 3 | 6 | 4 |
+| 4 Settings | 7 | 2 | 6 | 3 |
+| 5 History | 8 | 2 | 7 | 4 |
+| Tile c | 8 | 1 | 6 | 4 |
+| Tile d | 7 | 2 | 7 | 4 |
+| Tile e | 7 | 2 | 5 | 5 |
+
+What changed: 1 names YouTube and shows 2 drops and 7 cards (`dev/home.html`, videos=store). 2 loads Roboto into the tour, hides the orbit spark and the pill under the water, says "adds", not "buys". 3 to 5 have new captions and crops; 4 is at 1.2x through Dry hours, 5 at 0.96x with a bottom margin.
+
+Found: the tour sets `--tour-depth` inside a view transition, and headless Chrome reads 0px there, so the water rose from 0 and was always full. With the depth set by hand, stopping the rise partway worked, but the tour's player above the line is a plain gray box, so the crest read as a header bar. Rejected; the water stays all the way up.
+
+Fixes for round 3, checked against the images:
+1. Shot 2 (both): the panel ends at y=772 instead of bleeding off the bottom, a light line at the right edge near y=635, and a bubble clipped at the right edge. Claude: put the ride illustration from shot 1 in the tour's player under the lock, so it covers a video. That also gives the water something to sit over. Subline: "With one on" makes readers backtrack.
+2. Shot 3 (both): the caption skips Curated. Claude: the subline repeats the panel.
+3. One capture scale (both): History's text is smallest; 1's card is narrow. Claude: same left inset for 1, 3, 4, 5, and the tabs at the same height in 4 and 5.
+4. Shot 4 (both): "drops" and "dry hours" go unexplained. Explain them in the subline; Claude says drop the panel's "drip" title.
+5. Shot 5 (both): the subline reads like a feature list.
+6. Shot 1 (both): say what a card does. Codex: "One card reveals one video."
+7. Claude: the panel edge is lost against the frame navy at thumbnail size, and sublines are too dim.
+
+Disagreements:
+- Tiles: Codex keeps c and would drop d and e. Claude picks d with a tagline about 1.6x larger and the drop back at c's size, and drops e. Next: d2 with Claude's changes, keeping c, d, and e.
+- Order: Codex wants 1, 3, 2, 4, 5 (modes before the lock). Claude says 1 then 2 tells the story. HILL-CLIMB round 0 said to keep the order if 2 says limits are optional, which it does. Kept.
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.

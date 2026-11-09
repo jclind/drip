@@ -81,6 +81,8 @@
   s.watchSecondsBought = 60 * 60;
   s.watchSecondsLeft = 34 * 60;
   s.backlog = VIDEOS.slice(1, 9).reverse();
+  // The store images show a default day partway through: 2 drops and 7 cards left of 4 and 10, as on History.
+  if (params.get('videos') === 'store') s.tokens = { watch: 2, rec: 7 };
   const SCENARIOS = {
     empty() {},
     card() { s.current = VIDEOS[0]; s.seen.push(VIDEOS[0].id); },

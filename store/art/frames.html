@@ -45,7 +45,7 @@
   const SHOTS = {
     1: {
       h: 'One video at a time.',
-      p: 'drip replaces the home feed with one video, and only when you ask for it.',
+      p: 'drip swaps YouTube\'s home feed for one video, shown only when you ask.',
       src: '/dev/home.html?scenario=saved&theme=dark&reduced=1&videos=store',
       w: 620, h2: 656, x: -10, y: -120, scale: 1.25,
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
@@ -53,12 +53,18 @@
     },
     2: {
       h: 'Out of minutes?\nThe lock comes up.',
-      p: 'Limits are optional. With one on, a drop buys 15 more minutes, or you call it a day.',
+      p: 'Limits are optional. With one on, a drop adds 15 more minutes, or you call it a day.',
       src: '/dev/page.html?page=welcome#tour-4',
       // The tour's stage alone, filling the panel. It sits at 362 to 921 across and 231 to 729 down in the page; x and y are panel pixels, before the scale.
       w: 1280, h2: 800, x: -590, y: -347, scale: 1.5,
       motion: true,
-      css: '.co-layer, .tour-again { display: none !important; } .tour-stage { border-color: transparent !important; }',
+      // Roboto, as on YouTube: the welcome page doesn't load it, so its lock fell back to Arial. The spark that circles
+      // "Done for now" reads as a glitch in a still, and the pill under the water showed as a clipped word, so both are
+      // hidden.
+      css: `@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        #drip-lock, #drip-lock * { font-family: Roboto, Arial, sans-serif !important; }
+        .co-layer, .tour-again, .tour-under #drip-pill, #drip-lock .drip-orbit, #drip-lock .drip-orbit-spark, #drip-lock .drip-orbit-star { display: none !important; }
+        .tour-stage { border-color: transparent !important; }`,
       ready: '#drip-lock .drip-lock-sub',
       // The tour runs on a fresh state, so its lock says "0m watched today". The default day is 4 drops of 15 minutes.
       // Headless Chrome doesn't advance animation time in the iframe, so every animation is set by hand: the water, page
@@ -80,6 +86,9 @@
             if (/bubble-rise/.test(/** @type {CSSAnimation} */ (a).animationName)) a.currentTime = 10000 * BUBBLES[i % BUBBLES.length][2];
           }
         });
+        // Round 2 tried stopping the water partway (with --tour-depth set by hand, since headless Chrome reads the stage
+        // as 0px tall when the tour sets it). Above the line the tour's player is a plain gray box, so the crest read as
+        // a header bar, not water. The water stays all the way up.
         d.getAnimations().forEach((a) => {
           const name = /** @type {CSSAnimation} */ (a).animationName || '';
           if (/bubble-rise/.test(name)) { a.pause(); return; }
@@ -90,30 +99,30 @@
       }, 600),
     },
     3: {
-      h: 'Start with search only, or go further.',
-      p: 'Quiet hides the feeds. Curated adds one video at a time. Full drip adds a daily limit.',
+      h: 'Search only,\nor add limits.',
+      p: 'Pick now, switch later in Settings.',
       src: '/dev/page.html?page=welcome',
       w: 680, h2: 713, x: -17, y: -120, scale: 1.15,
       css: '',
       ready: 'input[type=radio], [role=radio]',
     },
     4: {
-      h: 'Set your own limits.',
-      p: 'Stricter settings apply now. Looser ones wait until tomorrow.',
+      h: 'Choose your drops and dry hours.',
+      p: 'After day one, stricter settings apply at once. Looser ones wait until tomorrow.',
       src: '/dev/page.html?page=options&settled=1&sample=1',
-      // From the tabs to the end of the Watch time section.
-      w: 728, h2: 712, x: -26, y: -108, scale: 1.1,
+      // From the title through Dry hours' end time, larger, so the rows read in the carousel.
+      w: 728, h2: 596, x: -65, y: -23, scale: 1.2,
       css: '',
       ready: '[role=tab]',
       // The frame is shorter than the page, so keep it scrolled to the top.
       step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
     },
     5: {
-      h: 'See where the time went.',
-      p: 'Minutes each day against the week before, and the drops and cards you used.',
+      h: 'See your week.',
+      p: 'Daily watch time against the week before, and the drops and cards you used.',
       src: '/dev/page.html?page=options&settled=1&sample=1#history',
       // From the tabs to the end of the week's card. The unlock reasons below it don't fit at a readable size.
-      w: 728, h2: 840, x: 8, y: -96,
+      w: 728, h2: 840, x: 22, y: -91, scale: 0.96,
       css: '',
       ready: '[data-k=earlier]',
       // This week starts on Sunday, so early in the week the chart is mostly empty. Last week is a full one. The frame is
@@ -186,7 +195,26 @@
             <div class="word" style="font-size:92px;line-height:1">drip</div>
           </div>`,
     };
-    document.body.innerHTML = tiles[/** @type {'a'|'b'|'c'} */ (tile)] || '';
+    // Round 2 (2026-11-09): c with one cue to what drip does, as the Claude judge asked. Jesse wants c kept as well.
+    Object.assign(tiles, {
+      // c with a line under the wordmark.
+      d: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:22px">
+            <span class="mask drop" style="height:112px"></span>
+            <div>
+              <div class="word" style="font-size:86px;line-height:0.9;letter-spacing:-3px">drip</div>
+              <div style="font-size:18px;color:var(--muted);margin-top:8px">One video at a time.</div>
+            </div>
+          </div>`,
+      // c with the gold card beside the drop.
+      e: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:16px">
+            <div style="display:flex;align-items:flex-end;gap:6px">
+              <span class="mask drop" style="height:100px"></span>
+              <span class="mask card" style="height:62px;transform:rotate(10deg);margin-bottom:2px"></span>
+            </div>
+            <div class="word" style="font-size:88px;line-height:1;letter-spacing:-3px">drip</div>
+          </div>`,
+    });
+    document.body.innerHTML = tiles[/** @type {'a'|'b'|'c'|'d'|'e'} */ (tile)] || '';
     document.documentElement.dataset.ready = '1';
   }
 </script>
