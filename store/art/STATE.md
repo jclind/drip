@@ -17,10 +17,10 @@ A fresh pass on the round-19 set, judged against 13 top Chrome Web Store extensi
 
 ## Current
 
-- Round: 2 next.
-- Tactic: fix.
-- Base: `frames-v2.html` with ref round 1's cuts (this commit).
-- Next step: round 2 on the new set, with ref round 1's set alongside for the comparison and the decisions below in the brief.
+- Round: 3 next.
+- Tactic: fix for the set, divergent for screenshot 2 alone (each seat proposes one approach far from the current one; round 4 builds and compares them).
+- Base: `frames-v2.html` with ref round 2's screenshot 3 layout (this commit).
+- Next step: round 3.
 
 ## Score history
 
@@ -31,9 +31,28 @@ Design/AI look per image, and the seat's median for the references.
 | 1 | Claude | 7/4 | 8/3 | 6/4 | 7/3 | 7/3 | 7/3 | 7/3 |
 | 1 | Codex | 8/5 | 7/2 | 7/2 | 7/2 | 7/2 | 8/2 | 8/1 |
 
-Below the references' middle in round 1: Codex 1, 2, 3, 4; Claude 2.
+| 2 | Claude | 7 | 7/3 | 6/4 | 6/4 | 7/3 | 7/3 | 7/4 |
+| 2 | Codex | 8 | 8/2 | 7/2 | 7/2 | 7/2 | 8/1 | 8/1 |
+
+Below the references' middle in round 1: Codex 1, 2, 3, 4; Claude 2. Round 2: Codex 2, 3, 4; Claude 2, 3. Both seats: ship, no blocking fixes.
 
 ## Decisions log
+
+### Ref round 2
+
+Used: the Claude seat 90,003 tokens; Codex 43,253 tokens (25 images each).
+
+Compared with round 1: both seats called 1, 2, 3, and 5 better (Claude: 4 the same, Codex: 4 slightly better); the tile the same.
+
+Applied, Agreed (both seats):
+- 3: no subline (it repeated the Recommended badge), and the caption panel is 480px wide instead of 560, with the capture 11% bigger (scale 1.278), so the cards' descriptions read at carousel size. `frames-v2.html` takes a per-shot `panel` for this.
+
+Not applied, the seats split:
+- 2's capture scale: Claude asked about 10% up, Codex about 10% down. Both tried (variants 2b at 1.87 and 2c at 1.6, not kept): at 1.87 the lock's panel reaches the seam and the right edge; below about 1.66 the tour stage's edge shows at the right and bottom. Neither fits, and 2 stays below the middle for both seats, so round 3 asks each seat for one approach far from the current one.
+
+Considered, not applied (one seat):
+- Codex: 4 cropped tighter around Watch time, without Dry hours (second round asking); 1's legend as "Drop: 15 minutes by default." and "Card: reveal one new video." (Claude disagreed); a larger cyclist and more detail in 1's thumbnail (second round); 5's subline "A sample week of watch time."
+- Claude: drip's real header counter at zero in 2's cream panel; captions bigger (sublines 19 to 22px, headlines 15% up) and the subline gray darker; 1's "Sample video." as a note with a leader to the channel row, worded "Sample video and channel."; the tile's tagline in semibold (second round asking; Codex said not needed).
 
 ### Ref round 1
 

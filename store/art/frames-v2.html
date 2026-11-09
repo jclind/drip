@@ -57,7 +57,8 @@
 <script>
   // @ts-check
   const params = new URLSearchParams(location.search);
-  const PANEL_LEFT = 560;
+  /** Where the strip starts; a shot's `panel` moves it (screenshot 3, ref round 2). */
+  let PANEL_LEFT = 560;
   /** History's card color, measured from a capture. */
   const CARD_GRAY = 'rgb(39, 39, 39)';
   /**
@@ -79,7 +80,7 @@
    * `gap` sets how far short of a side target the leader stops (12px by default). `nodot` ends the leader with no dot,
    * for a target that is itself a dot.
    * A shot's legend sits under the caption with no leader: drip's own drop and card, and what each one is.
-   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x: number, y: number, scale: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void, notes?: Note[], legend?: boolean, bg?: string, water?: number, legendY?: number, foot?: string}>}
+   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x: number, y: number, scale: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void, notes?: Note[], legend?: boolean, bg?: string, panel?: number, water?: number, legendY?: number, foot?: string}>}
    */
   const SHOTS = {
     1: {
@@ -160,9 +161,12 @@
     },
     3: {
       h: 'Three ways\nto use drip.',
-      p: 'Start with Full drip,\nor choose a lighter mode.',
+      // No subline: the Recommended badge and the three cards say it (both seats, ref round 2). The caption panel is
+      // 80px narrower and the capture 11% bigger, so the cards' descriptions read at carousel size (both seats).
+      p: '',
       src: '/dev/page.html?page=welcome',
-      w: 680, h2: 713, x: -32, y: -76, scale: 1.15,
+      panel: 480,
+      w: 680, h2: 713, x: -36, y: -84, scale: 1.278,
       // The page's own logo and tagline repeat the frame's mark.
       css: '.hero { visibility: hidden !important; }',
       ready: 'input[type=radio], [role=radio]',
@@ -208,6 +212,7 @@
   };
 
   const shot = SHOTS[params.get('shot') || ''];
+  if (shot?.panel) PANEL_LEFT = shot.panel;
   const tile = params.get('tile');
 
   /** The element a note points at, by selector or by its exact text. @param {Document} d @param {Note} n */
@@ -326,6 +331,7 @@
     /** @type {HTMLElement} */ (document.querySelector('h1')).textContent = shot.h;
     /** @type {HTMLElement} */ (document.querySelector('.copy p')).textContent = shot.p;
     const frame = /** @type {HTMLIFrameElement} */ (document.querySelector('iframe'));
+    /** @type {HTMLElement} */ (document.querySelector('.panel')).style.width = `${1280 - PANEL_LEFT}px`;
     Object.assign(frame.style, {
       width: `${shot.w}px`, height: `${shot.h2}px`, left: `${shot.x}px`, top: `${shot.y}px`, transform: `scale(${shot.scale})`,
     });
