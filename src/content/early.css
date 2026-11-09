@@ -210,14 +210,14 @@ ytd-search ytd-continuation-item-renderer[data-drip-hold] {
 
 /* Fade each page in (fade.js). Hidden instantly, shown with a slow fade. On a full load YouTube builds the player in
    body > #player, outside ytd-app, and moves it in a few seconds later (seen 2026-10-06), so that fades too. The
-   animation is a failsafe, so the page still appears after 7 seconds if fade.js doesn't run. Skipped for people who
-   ask for reduced motion. */
+   animation is a failsafe, so the page still appears after 5 seconds if fade.js doesn't run. It must outlast fade.js's
+   HOLD_MS (4.5s), or a locked page would show before its lock. Skipped for people who ask for reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-drip-shown]) ytd-app,
   html:not([data-drip-shown]) body > #player {
     opacity: 0;
     transition: none;
-    animation: drip-failsafe 1ms 7s forwards;
+    animation: drip-failsafe 1ms 5s forwards;
   }
 
   html[data-drip-shown] ytd-app,

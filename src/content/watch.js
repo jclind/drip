@@ -420,6 +420,8 @@
     // Storage may arrive before our tick response. Only that response can grant grace.
     if (deferLock && graceAllowed(id)) return;
     pauseVideo();
+    // The lock may wait on the channel and then on the water, so fade.js keeps the page dark longer than usual.
+    if (location.pathname === '/watch') document.dispatchEvent(new CustomEvent('drip-fade-hold'));
     // The channel may be on the allow list. Held, not locked, until checkChannel knows.
     if (waitingForChannel(id)) return;
     // Not over the miniplayer, which drip hides: the lock would cover whatever page YouTube moved to.
