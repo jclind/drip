@@ -12,10 +12,9 @@ drip is a Chrome extension that replaces YouTube's endless home feed with a sear
 4. screenshot-4.png (1280x800): the Settings tab.
 5. screenshot-5.png (1280x800): the History tab.
 6. tile-c.png (440x280): the small promo tile the owner picked.
-7. tile-d.png (440x280): tile c with a short line under the wordmark.
-8. tile-e.png (440x280): tile c with the gold card beside the drop.
+7. tile-d2.png (440x280): tile c with a short line under the wordmark.
 
-Tiles c, d, and e are alternatives; only one will be used.
+Tiles c and d2 are alternatives; only one will be used.
 
 {ROUND_NOTES}
 

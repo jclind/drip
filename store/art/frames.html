@@ -11,10 +11,10 @@
   store/art/capture.sh screenshots every frame into store/images/. ART-PLAN.md has the reasons.
 -->
 <style>
-  :root { --bg: #0a1422; --text: #f1f1f1; --muted: #9fb0c4; --blue: #42a5f6; --gold: #fdc905; }
+  :root { --bg: #0a1422; --text: #f1f1f1; --muted: #b4c2d3; --blue: #42a5f6; --gold: #fdc905; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: Roboto, Arial, sans-serif; overflow: hidden; }
-  .shot { position: relative; width: 1280px; height: 800px; overflow: hidden; background: var(--bg); }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: Roboto, Arial, sans-serif; overflow: clip; }
+  .shot { position: relative; width: 1280px; height: 800px; overflow: clip; background: var(--bg); }
   .copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 400px; display: flex; flex-direction: column; justify-content: center; }
   .brand { position: absolute; left: 72px; bottom: 56px; display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
   .mask { display: inline-block; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
@@ -22,10 +22,10 @@
   .card { --src: url(/src/icons/card.svg); color: var(--gold); aspect-ratio: 600 / 697; }
   .brand .drop { height: 30px; }
   h1 { white-space: pre-line; margin: 0 0 20px; font-size: 46px; line-height: 1.12; font-weight: 500; letter-spacing: -1px; }
-  .copy p { margin: 0; font-size: 20px; line-height: 1.45; color: var(--muted); }
+  .copy p { white-space: pre-line; margin: 0; font-size: 20px; line-height: 1.45; color: var(--muted); }
   /* The page runs off the right and bottom edges, like a window cropped, rather than a card floating in a gradient. */
   .panel { position: absolute; right: 0; top: 64px; width: 744px; height: 736px; border-top-left-radius: 12px; overflow: hidden;
-    background: #0f0f0f; border: solid rgba(255, 255, 255, 0.1); border-width: 1px 0 0 1px; }
+    background: #0f0f0f; border: solid rgba(255, 255, 255, 0.2); border-width: 1px 0 0 1px; }
   .panel iframe { position: absolute; border: 0; transform-origin: 0 0; background: #0f0f0f; }
 
   .tile { position: relative; width: 440px; height: 280px; overflow: hidden; background: var(--bg); }
@@ -45,26 +45,28 @@
   const SHOTS = {
     1: {
       h: 'One video at a time.',
-      p: 'drip swaps YouTube\'s home feed for one video, shown only when you ask.',
+      p: 'drip swaps YouTube\'s home feed for one video. A card reveals the next.',
       src: '/dev/home.html?scenario=saved&theme=dark&reduced=1&videos=store',
-      w: 620, h2: 656, x: -10, y: -120, scale: 1.25,
+      w: 620, h2: 656, x: -62, y: -170, scale: 1.4,
       css: '#masthead, #harness-bar { visibility: hidden !important; }',
       ready: '.drip-thumb img.is-loaded',
     },
     2: {
       h: 'Out of minutes?\nThe lock comes up.',
-      p: 'Limits are optional. With one on, a drop adds 15 more minutes, or you call it a day.',
+      p: 'Limits are optional. A drop adds\n15 more minutes, or call it a day.',
       src: '/dev/page.html?page=welcome#tour-4',
       // The tour's stage alone, filling the panel. It sits at 362 to 921 across and 231 to 729 down in the page; x and y are panel pixels, before the scale.
       w: 1280, h2: 800, x: -590, y: -347, scale: 1.5,
       motion: true,
       // Roboto, as on YouTube: the welcome page doesn't load it, so its lock fell back to Arial. The spark that circles
       // "Done for now" reads as a glitch in a still, and the pill under the water showed as a clipped word, so both are
-      // hidden.
+      // hidden. The tour's paused player gets screenshot 1's ride, so the lock visibly covers a video.
       css: `@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
         #drip-lock, #drip-lock * { font-family: Roboto, Arial, sans-serif !important; }
         .co-layer, .tour-again, .tour-under #drip-pill, #drip-lock .drip-orbit, #drip-lock .drip-orbit-spark, #drip-lock .drip-orbit-star { display: none !important; }
-        .tour-stage { border-color: transparent !important; }`,
+        .tour-stage { border-color: transparent !important; }
+        .tour-player { background: url(/store/art/thumbs/store-trail.svg) center / cover !important; }
+        .tour-player-play, .tour-player-bar { display: none !important; }`,
       ready: '#drip-lock .drip-lock-sub',
       // The tour runs on a fresh state, so its lock says "0m watched today". The default day is 4 drops of 15 minutes.
       // Headless Chrome doesn't advance animation time in the iframe, so every animation is set by hand: the water, page
@@ -72,7 +74,8 @@
       // bubbles at random; these fix them, so every capture is the same.
       step: (d) => setTimeout(() => {
         /** @type {HTMLElement} */ (d.querySelector('#drip-lock .drip-lock-sub')).textContent = '1h watched today';
-        const BUBBLES = [[8, 9, 0.62], [17, 5, 0.3], [29, 7, 0.82], [71, 6, 0.2], [80, 10, 0.55], [88, 5, 0.74], [93, 7, 0.36], [50, 4, 0.9]];
+        // [left %, size px, how far up]. The crop shows about 6% to 94% across, so these stay inside it.
+        const BUBBLES = [[14, 9, 0.42], [22, 5, 0.18], [33, 7, 0.55], [68, 6, 0.12], [76, 10, 0.34], [84, 5, 0.5], [88, 7, 0.24], [52, 4, 0.6]];
         d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
           const [x, size] = BUBBLES[i % BUBBLES.length];
           const b = /** @type {HTMLElement} */ (el);
@@ -99,8 +102,8 @@
       }, 600),
     },
     3: {
-      h: 'Search only,\nor add limits.',
-      p: 'Pick now, switch later in Settings.',
+      h: 'How strict\nshould it be?',
+      p: 'Hide the feeds, get one video at a time, or add a daily limit.',
       src: '/dev/page.html?page=welcome',
       w: 680, h2: 713, x: -17, y: -120, scale: 1.15,
       css: '',
@@ -108,10 +111,10 @@
     },
     4: {
       h: 'Choose your drops and dry hours.',
-      p: 'After day one, stricter settings apply at once. Looser ones wait until tomorrow.',
+      p: 'A drop is 15 minutes of watching. Dry hours stop paid watching overnight.',
       src: '/dev/page.html?page=options&settled=1&sample=1',
-      // From the title through Dry hours' end time, larger, so the rows read in the carousel.
-      w: 728, h2: 596, x: -65, y: -23, scale: 1.2,
+      // From the tabs to the end of Watch time. Settings and History share a scale and column (round 3).
+      w: 728, h2: 716, x: -22, y: -100, scale: 1.08,
       css: '',
       ready: '[role=tab]',
       // The frame is shorter than the page, so keep it scrolled to the top.
@@ -119,11 +122,11 @@
     },
     5: {
       h: 'See your week.',
-      p: 'Daily watch time against the week before, and the drops and cards you used.',
+      p: 'Compare each day\'s watch time\nwith the week before.',
       src: '/dev/page.html?page=options&settled=1&sample=1#history',
-      // From the tabs to the end of the week's card. The unlock reasons below it don't fit at a readable size.
-      w: 728, h2: 840, x: 22, y: -91, scale: 0.96,
-      css: '',
+      // The week's card alone, at Settings' scale and column. The tabs and the unlock reasons don't fit with it.
+      w: 728, h2: 840, x: -22, y: -178, scale: 1.08,
+      css: '[role=tablist] { visibility: hidden !important; }',
       ready: '[data-k=earlier]',
       // This week starts on Sunday, so early in the week the chart is mostly empty. Last week is a full one. The frame is
       // shorter than the tab, so the page scrolls to #history on its own; put it back at the top.
@@ -205,6 +208,14 @@
               <div style="font-size:18px;color:var(--muted);margin-top:8px">One video at a time.</div>
             </div>
           </div>`,
+      // Round 3: d with the line about 1.3x larger and brighter, the drop back at c's size, centered on the text block.
+      d2: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:20px">
+            <span class="mask drop" style="height:100px"></span>
+            <div>
+              <div class="word" style="font-size:78px;line-height:0.9;letter-spacing:-3px">drip</div>
+              <div style="font-size:23px;font-weight:500;color:#d5dee8;margin-top:8px;letter-spacing:-0.2px">One video at a time.</div>
+            </div>
+          </div>`,
       // c with the gold card beside the drop.
       e: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:16px">
             <div style="display:flex;align-items:flex-end;gap:6px">
@@ -214,7 +225,7 @@
             <div class="word" style="font-size:88px;line-height:1;letter-spacing:-3px">drip</div>
           </div>`,
     });
-    document.body.innerHTML = tiles[/** @type {'a'|'b'|'c'|'d'|'e'} */ (tile)] || '';
+    document.body.innerHTML = tiles[/** @type {'a'|'b'|'c'|'d'|'d2'|'e'} */ (tile)] || '';
     document.documentElement.dataset.ready = '1';
   }
 </script>

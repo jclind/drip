@@ -136,6 +136,33 @@ Disagreements:
 - Tiles: Codex keeps c and would drop d and e. Claude picks d with a tagline about 1.6x larger and the drop back at c's size, and drops e. Next: d2 with Claude's changes, keeping c, d, and e.
 - Order: Codex wants 1, 3, 2, 4, 5 (modes before the lock). Claude says 1 then 2 tells the story. HILL-CLIMB round 0 said to keep the order if 2 says limits are optional, which it does. Kept.
 
+### Round 3, 2026-11-09
+
+Scored: screenshots 1 to 5, tiles c and d2 (d with a bigger, brighter line and the drop back at c's size). Tiles d and e stay in `store/images/` and `rounds/round-2/` but aren't scored any more; both judges said to drop e. Reports: `reviews/round-3-codex.md` and `reviews/round-3-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 3 | 8 | 3 |
+| 2 Lock | 8 | 2 | 6 | 4 |
+| 3 Modes | 7 | 3 | 7 | 3 |
+| 4 Settings | 6 | 3 | 6 | 4 |
+| 5 History | 8 | 2 | 7 | 4 |
+| Tile c | 8 | 1 | 5 | 5 |
+| Tile d2 | 7 | 2 | 6 | 4 |
+
+What changed: lighter panel border and sublines. 1 at 1.4x, and the subline says what a card does. 2 has screenshot 1's ride in the paused player under the lock, bubbles kept inside the crop, and a reworded subline. 3 has a caption that covers all three modes. 4 and 5 share a scale (1.08x) and column; 5 shows the week's card alone. Copy on 4 explains drops and Dry hours.
+
+Found: capture.sh shared one Chrome profile across shots, and that cut 23px off the bottom of shot 2's panel. Each shot now gets its own profile.
+
+Fixes for round 4, checked against the images:
+1. Shot 4 (both): "paid watching" reads as a paid tier. "drops and dry hours" is jargon in a headline. Crop tighter on Watch time and scale up; let "I need this one" fall off.
+2. Shot 5 (both): the dashed line is last week's average, so "compare each day with the week before" is wrong. Claude: the card in a panel reads as a second template; scale up so it fills the panel.
+3. Shot 1 (both): the button row sits about 30px off the bottom edge. Give it 50 to 60px.
+4. Shot 2: Claude says the water and the video under it still don't read, and the bubbles in the top third look like dust. Codex wants a plainer headline and "a spare drop" (4 used, yet +15m is offered).
+5. Shot 3 (Claude): "How strict should it be?" repeats the panel's "How much should drip do?".
+
+Still split: tiles. Codex keeps c (8/1); Claude prefers d2 with the line 15 to 20% larger (c 5/5, d2 6/4).
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.
