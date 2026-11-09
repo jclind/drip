@@ -237,3 +237,11 @@ ytd-search ytd-continuation-item-renderer[data-drip-hold] {
     to { opacity: 1; }
   }
 }
+
+/* A locked video's player stays hidden until the lock is up. On slow 3G the page shows at fade.js's 4.5-second cap,
+   before watch.js has run, and the paused video or ad showed until the water rose over it (Jesse, 2026-11-09).
+   early.js marks <html> with data-drip-hold while the video is locked, or not yet known, and takes it off once it's
+   allowed. A player drip can't find is left alone (Q25). The ambient glow paints from the video, so it goes too. */
+html[data-drip-hold]:not([data-drip-broken]):not(:has(#drip-lock)) :is(#movie_player, #cinematics) {
+  visibility: hidden !important;
+}
