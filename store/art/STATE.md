@@ -17,10 +17,10 @@ A fresh pass on the round-19 set, judged against 13 top Chrome Web Store extensi
 
 ## Current
 
-- Round: 4 next, the last before asking Jesse (his pace: up to 4 rounds).
-- Tactic: head-to-head for screenshot 2 (current, `frames-v4.html?v=a` Codex's, `?v=b` Claude's; images in `store/images-v4/`), fix for the rest.
-- Base: `frames-v2.html` with ref round 3's screenshot 4 crop (this commit).
-- Next step: round 4, then report to Jesse.
+- Round: 4 done; paused for Jesse (his pace: up to 4 rounds, then ask).
+- Goal: met by Claude on every image; met by Codex on every image but the tile, which it puts below the middle because the tagline doesn't name YouTube. Neither seat has a blocking fix.
+- Base: `frames-v2.html` for 1, 3, 4, 5 and the tile, `frames-v4.html?v=b` for screenshot 2 (`capture.sh v2` shoots it there), with ref round 4's fixes (this commit).
+- Waiting on Jesse: whether the tile's tagline names YouTube; whether all five frames go to the 480px panel (the seats split); another round, or stop here.
 
 ## Score history
 
@@ -35,10 +35,31 @@ Design/AI look per image, and the seat's median for the references.
 | 2 | Codex | 8 | 8/2 | 7/2 | 7/2 | 7/2 | 8/1 | 8/1 |
 | 3 | Claude | 7 | 7/3 | 5/4 | 7/3 | 6/3 | 7/3 | 6/3 |
 | 3 | Codex | 8 | 8/2 | 6/2 | 8/2 | 7/2 | 8/2 | 8/1 |
+| 4 | Claude | 7 | 7/3 | 2b 7/3 (2 6/4, 2a 6/4) | 7/3 | 7/3 | 7/3 | 7/3 |
+| 4 | Codex | 7 | 8/2 | 2b 7/2 (2 6/4, 2a 7/2) | 7/2 | 8/2 | 7/2 | 6/2 |
 
 Below the references' middle in round 1: Codex 1, 2, 3, 4; Claude 2. Round 2: Codex 2, 3, 4; Claude 2, 3. Both seats: ship, no blocking fixes. Round 3: both seats 2 and 4 (Claude called the tile, at 6, at the middle for a tile); both ship, no blocking fixes.
+Round 4, with 2b: Claude none; Codex the tile only. Both ship with 2b, no blocking fixes.
 
 ## Decisions log
+
+### Ref round 4
+
+Used: the Claude seat 95,237 tokens; Codex 56,709 tokens (27 images each).
+
+Compared with round 3: both called 4 better and 2b better than 2; the rest the same.
+
+Applied, Agreed (both seats):
+- 2: 2b ships as screenshot 2 (both picked it over 2 and 2a). `capture.sh v2` now shoots screenshot 2 from `frames-v4.html?v=b`; frames-v2.html's shot 2 is kept, marked not shipped. Both asked for a cue that the two players are a sequence: a small blue down arrow in the gap (Claude's; Codex asked for "Before" and "When time runs out." labels, which add text and repeat the headline).
+- 5: the subline says what the page records, not the chart's numbers: "Sample week. Each day's minutes, / drops, and cards used." (Claude's wording, shortened; Codex asked for "Sample history: watch time, drops, and cards used.").
+
+Not applied, the seats split:
+- One panel width for all five: Claude asked for 480px everywhere (the seam jumps twice in the carousel); Codex said keep the mixed widths. For Jesse.
+- The tile's tagline: Codex puts the tile below the middle because "One video at a time." doesn't say YouTube, and asks for "YouTube, one video at a time."; Claude says the store prints the name and summary beside the tile, so no. For Jesse.
+
+Considered, not applied (one seat):
+- Codex: 1's cyclist about 50% bigger (fourth round asking); "A card reveals one video." without "new".
+- Claude: 4's note cut to "Raised to 5 drops."; 4's capture moved up so its tabs start near y 115, level with 3's content.
 
 ### Ref round 3
 

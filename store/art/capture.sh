@@ -67,5 +67,10 @@ if [ -n "$v3" ]; then
   exit 0
 fi
 for n in 1 3 4 5; do shoot "screenshot-$n" 1280 800 "shot=$n"; done
-shoot screenshot-2 1280 800 shot=2 motion
+# Screenshot 2 is frames-v4.html's layout b since ref round 4 (both seats picked it over frames-v2.html's shot 2).
+if [ "$page" = frames-v2.html ]; then
+  page=frames-v4.html; shoot screenshot-2 1280 800 v=b motion; page=frames-v2.html
+else
+  shoot screenshot-2 1280 800 shot=2 motion
+fi
 for t in $tiles; do shoot "tile-$t" 440 280 "tile=$t"; done
