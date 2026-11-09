@@ -18,7 +18,7 @@ Tiles c and d3 are alternatives; only one will be used.
 
 {ROUND_NOTES}
 
-Each screenshot is a frame: a caption and subline on the left, the real extension page (rendered from the real code) in a panel on the right, and a small "drip" mark. Screenshots show in the store at full size in a carousel and as small thumbnails; the promo tile shows small in store search and category lists.
+{FRAME} Screenshots show in the store at full size in a carousel and as small thumbnails; the promo tile shows small in store search and category lists.
 
 ## What to report
 
@@ -33,6 +33,7 @@ Start with a scores table, exactly in this form, one row per image:
 - AI look: 1 to 10, where 1 looks made by a human designer with intent and 10 looks obviously AI-generated or templated.
 
 Then, for each image:
+- If it scores below 9 for design or above 2 for AI look, what specifically would get it to 9 and to 2. Be concrete enough to act on.
 - What pushes each score up or down (specific elements).
 - What works.
 - What to fix, ordered by impact. Name the element and the change, e.g. "subline wraps to 3 lines; shorten to fit 2". Fixes may only change the frame, the caption copy, the crop and scale of the captured page, the illustration, or the sample data shown. They can't change drip's own interface text or layout.

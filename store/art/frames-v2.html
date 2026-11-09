@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>drip store frames, v2</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&family=Roboto:wght@400;500;700&display=swap">
+<!--
+  The second layout for the store images (round 5, 2026-11-09). Rounds 0 to 4 used frames.html: a headline on the left
+  and the page in a rounded panel on a dark navy frame. Both judges named that structure as the template signal.
+  This one is a paper page: a serif headline at the top left, the real extension page as a full-height strip on the
+  right, and a few notes with leader lines pointing at real elements in it. Serve the repo root and open:
+    /store/art/frames-v2.html?shot=1   (1 to 5, 1280x800)
+    /store/art/frames-v2.html?tile=c   (440x280)
+  store/art/capture.sh v2 screenshots every frame into store/images-v2/.
+-->
+<style>
+  :root { --paper: #f1ede4; --ink: #1c1b19; --soft: #5b5750; --blue: #1b74c9; --drop: #42a5f6; --gold: #fdc905; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: Roboto, Arial, sans-serif; overflow: clip; }
+  .shot { position: relative; width: 1280px; height: 800px; overflow: clip; background: var(--paper); }
+  .copy { position: absolute; left: 72px; top: 92px; width: 430px; }
+  h1 { margin: 0 0 18px; font-family: Newsreader, Georgia, serif; font-weight: 500; font-size: 54px; line-height: 1.04;
+    letter-spacing: -1.2px; white-space: pre-line; }
+  .copy p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--soft); white-space: pre-line; }
+  .brand { position: absolute; left: 72px; bottom: 54px; display: flex; align-items: center; gap: 9px; font-size: 24px;
+    font-weight: 700; letter-spacing: -0.5px; }
+  .mask { display: inline-block; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
+  .drop { --src: url(/src/icons/drop.svg); color: var(--drop); aspect-ratio: 600 / 893; }
+  .brand .drop { height: 27px; }
+  /* The page, full height, flush right: a strip of the screen, not a card. */
+  .panel { position: absolute; right: 0; top: 0; width: 720px; height: 800px; overflow: hidden; background: #0f0f0f; }
+  .panel iframe { position: absolute; border: 0; transform-origin: 0 0; background: #0f0f0f; }
+  /* Notes: a short line of text in the left column and a leader line to the thing it names. */
+  .note { position: absolute; left: 72px; width: 330px; font-size: 16px; line-height: 1.35; color: var(--ink); }
+  .note b { font-weight: 500; }
+  svg.leaders { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+
+  .tile { position: relative; width: 440px; height: 280px; overflow: hidden; background: var(--paper); color: var(--ink); }
+  .tile .word { font-weight: 700; letter-spacing: -3px; }
+</style>
+</head>
+<body>
+<script>
+  // @ts-check
+  const params = new URLSearchParams(location.search);
+  const PANEL_LEFT = 560;
+  /**
+   * Where shot 2 stops the lock's 1100ms rise: at the end. Round 6 tried partway, but the paused player sits behind the
+   * lock's panel, so any crest high enough to clear the panel has only the stage's gray above it.
+   */
+  const WATER_AT = 1100;
+
+  /**
+   * Each shot: the caption, the harness page, the iframe's size and offset in the panel (panel pixels, before the
+   * scale), CSS to put in the page, what has to exist before the step runs, an optional step, and notes. A note
+   * names its target by selector or by exact text, and sits in the left column at the target's height when there's
+   * room.
+   * @typedef {{sel?: string, text?: string, say: string, top?: boolean}} Note
+   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x: number, y: number, scale: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void, notes?: Note[]}>}
+   */
+  const SHOTS = {
+    1: {
+      h: 'One video\nat a time.',
+      p: 'drip replaces YouTube\'s home feed\nwith one recommendation at a time.',
+      src: '/dev/home.html?scenario=saved&theme=dark&reduced=1&videos=store',
+      w: 620, h2: 656, x: -74, y: -138, scale: 1.4,
+      css: '#masthead, #harness-bar { visibility: hidden !important; }',
+      ready: '.drip-thumb img.is-loaded',
+      notes: [
+        { sel: '.drip-thumb', say: 'Revealed from your own home feed.' },
+        { sel: '.drip-next', say: 'One card reveals the next video.', top: true },
+      ],
+    },
+    2: {
+      h: 'When the time\nruns out.',
+      p: 'The video pauses under rising water.\nLimits are optional.',
+      src: '/dev/page.html?page=welcome#tour-4',
+      // The tour's stage alone, full height, cropped past its blurred edges. It sits at 362 to 921 across and 231 to 729
+      // down in the page.
+      w: 1280, h2: 800, x: -730, y: -416, scale: 1.7,
+      motion: true,
+      // Roboto, as on YouTube: the welcome page doesn't load it. The spark that circles "Done for now" only makes sense
+      // moving, and the pill under the water showed as a clipped word, so both are hidden. The paused player gets
+      // screenshot 1's ride, brightened so it shows through the lock's tint and blur.
+      css: `@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        #drip-lock, #drip-lock * { font-family: Roboto, Arial, sans-serif !important; }
+        .co-layer, .tour-again, .tour-under #drip-pill, #drip-lock .drip-orbit, #drip-lock .drip-orbit-spark, #drip-lock .drip-orbit-star { display: none !important; }
+        .tour-stage { border-color: transparent !important; border-radius: 0 !important; }
+        .tour-player { background: url(/store/art/thumbs/store-trail.svg) center / cover !important; filter: brightness(1.8) saturate(1.3); }
+        .tour-player-play, .tour-player-bar { display: none !important; }`,
+      ready: '#drip-lock .drip-lock-sub',
+      // The tour runs on a fresh state, so its lock says "0m watched today"; the default day is 4 drops of 15 minutes.
+      // Headless Chrome doesn't advance animation time in the iframe, so every animation is set by hand, and the
+      // bubbles, which sea() places at random, are fixed so every capture is the same.
+      step: (d) => setTimeout(() => {
+        /** @type {HTMLElement} */ (d.querySelector('#drip-lock .drip-lock-sub')).textContent = '1h watched today';
+        // [left %, size px, how far up], kept low where the water is deep and clear of the panel.
+        // The crop shows about 12% to 88% across and loses the bottom 3%, so these stay inside it.
+        const BUBBLES = [[20, 11, 0.24], [25, 7, 0.12], [31, 9, 0.33], [70, 8, 0.1], [76, 12, 0.2], [81, 6, 0.3], [84, 9, 0.14], [50, 6, 0.09]];
+        d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
+          const [x, size] = BUBBLES[i % BUBBLES.length];
+          const b = /** @type {HTMLElement} */ (el);
+          b.style.setProperty('--x', `${x}%`);
+          b.style.setProperty('--size', `${size}px`);
+          b.style.setProperty('--rise', '10s');
+          b.style.setProperty('--delay', '0s');
+        });
+        d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
+          for (const a of el.getAnimations()) {
+            if (/bubble-rise/.test(/** @type {CSSAnimation} */ (a).animationName)) a.currentTime = 10000 * BUBBLES[i % BUBBLES.length][2];
+          }
+        });
+        // The tour sets --tour-depth inside a view transition, where headless Chrome reads 0px. Set it properly, so the
+        // rise's time means what it says.
+        const lock = /** @type {HTMLElement} */ (d.getElementById('drip-lock'));
+        lock.style.setProperty('--tour-depth', `${lock.offsetHeight}px`);
+        d.getAnimations().forEach((a) => {
+          const name = /** @type {CSSAnimation} */ (a).animationName || '';
+          if (/bubble-rise/.test(name)) { a.pause(); return; }
+          if (/water-rise|crest/.test(name)) { a.currentTime = WATER_AT; a.pause(); return; }
+          if (/swim|bob|sway/.test(name)) a.currentTime = 3000;
+          else { try { a.finish(); } catch { a.currentTime = 5000; } }
+          a.pause();
+        });
+      }, 600),
+      notes: [
+        { sel: '#drip-lock .drip-lock-add', say: 'A spare drop buys 15 more minutes.' },
+        { sel: '#drip-lock .drip-lock-link', say: 'Type a reason to unlock. Up to 3 a week.' },
+      ],
+    },
+    3: {
+      h: 'Pick a mode.',
+      p: 'Search only, one video at a time,\nor daily limits. Change it later.',
+      src: '/dev/page.html?page=welcome',
+      w: 680, h2: 713, x: -32, y: -36, scale: 1.15,
+      // The page's own logo and tagline repeat the frame's mark.
+      css: '.hero { visibility: hidden !important; }',
+      ready: 'input[type=radio], [role=radio]',
+      notes: [
+        { sel: '[data-mode=curated]', say: 'No clock, and no cost per video.' },
+        { sel: '[data-mode=full]', say: 'Default: an hour and 10 reveals a day.' },
+      ],
+    },
+    4: {
+      h: 'Set a\ndaily limit.',
+      p: 'Stricter settings apply now.\nLooser ones wait until tomorrow.',
+      src: '/dev/page.html?page=options&settled=1&sample=1',
+      // From the tabs through Dry hours' end time. The page's own "drip" title repeats the mark, so it's hidden.
+      w: 728, h2: 588, x: -95, y: -16, scale: 1.25,
+      css: 'h1 { visibility: hidden !important; }',
+      ready: '[role=tab]',
+      step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
+      notes: [
+        { text: 'Drops per day', say: 'Four drops of 15 minutes is an hour a day.' },
+        { text: 'Dry hours', say: 'Drops can\'t be spent from 11pm to 6am.' },
+      ],
+    },
+    5: {
+      h: 'See where\nthe time went.',
+      p: 'Last week, day by day,\nagainst the week before.',
+      src: '/dev/page.html?page=options&settled=1&sample=1#history',
+      // The week's card alone. The tabs and the unlock reasons don't fit with it at a size that reads.
+      w: 728, h2: 840, x: -59, y: -180, scale: 1.15,
+      css: '[role=tablist] { visibility: hidden !important; }',
+      ready: '[data-k=earlier]',
+      // This week starts on Sunday, so early in the week the chart is mostly empty. Last week is a full one. The frame is
+      // shorter than the tab, so the page scrolls to #history on its own; put it back at the top.
+      step: (d) => {
+        /** @type {HTMLElement} */ (d.querySelector('[data-k=earlier]')).click();
+        setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300);
+      },
+      notes: [
+        { sel: '.avg-line', say: 'Dashed line: 48m a day the week before.' },
+        { text: 'Saturday, Nov 7', say: 'Tap a day to see its drops and cards here.' },
+      ],
+    },
+  };
+
+  const shot = SHOTS[params.get('shot') || ''];
+  const tile = params.get('tile');
+
+  /** The element a note points at, by selector or by its exact text. @param {Document} d @param {Note} n */
+  function target(d, n) {
+    if (n.sel) return d.querySelector(n.sel);
+    const all = [...d.querySelectorAll('body *')].filter((e) => e.textContent?.trim() === n.text);
+    return all[all.length - 1] || null;
+  }
+
+  /**
+   * Puts each note in the left column at its target's height, below the caption, and draws a line from the note to
+   * the target's left edge. Notes that would overlap move down.
+   */
+  function drawNotes() {
+    if (!shot?.notes) return;
+    const frame = /** @type {HTMLIFrameElement} */ (document.querySelector('iframe'));
+    const d = /** @type {Document} */ (frame.contentDocument);
+    const root = /** @type {HTMLElement} */ (document.querySelector('.shot'));
+    const minY = /** @type {HTMLElement} */ (document.querySelector('.copy')).getBoundingClientRect().bottom + 40;
+    const maxY = 650;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'leaders');
+    svg.setAttribute('width', '1280');
+    svg.setAttribute('height', '800');
+    root.append(svg);
+    let next = minY;
+    for (const n of shot.notes) {
+      const el = target(d, n);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      // A note points at the target's left edge, 12px clear of it, or with top set, at its top edge near the left.
+      const tx = PANEL_LEFT + shot.x + (n.top ? r.left + 36 : r.left) * shot.scale - (n.top ? 0 : 12);
+      const ty = shot.y + (n.top ? r.top : r.top + r.height / 2) * shot.scale - (n.top ? 8 : 0);
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = n.say;
+      root.append(note);
+      const h = note.getBoundingClientRect().height;
+      const top = Math.min(maxY, Math.max(next, ty - h / 2));
+      note.style.top = `${top}px`;
+      next = top + h + 22;
+      // The line leaves the note's first line, runs level, then bends to the target.
+      const ly = top + 11;
+      const lx = 72 + Math.min(330, measure(note)) + 14;
+      const bend = PANEL_LEFT - 24;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M${lx} ${ly} H${bend} L${tx} ${ty}`);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', '#1b74c9');
+      path.setAttribute('stroke-width', '1.5');
+      svg.append(path);
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', String(tx));
+      dot.setAttribute('cy', String(ty));
+      dot.setAttribute('r', '4');
+      dot.setAttribute('fill', '#42a5f6');
+      dot.setAttribute('stroke', '#f1ede4');
+      dot.setAttribute('stroke-width', '1.5');
+      svg.append(dot);
+    }
+  }
+
+  /** The width of a note's first line of text. @param {HTMLElement} note */
+  function measure(note) {
+    const range = document.createRange();
+    range.selectNodeContents(note);
+    const rects = [...range.getClientRects()];
+    return rects.length ? Math.max(...rects.filter((q) => Math.abs(q.top - rects[0].top) < 2).map((q) => q.right)) - 72 : 330;
+  }
+
+  if (shot) {
+    document.body.innerHTML = `
+      <div class="shot">
+        <div class="copy"><h1></h1><p></p></div>
+        <div class="brand"><span class="mask drop"></span>drip</div>
+        <div class="panel"><iframe></iframe></div>
+      </div>`;
+    /** @type {HTMLElement} */ (document.querySelector('h1')).textContent = shot.h;
+    /** @type {HTMLElement} */ (document.querySelector('.copy p')).textContent = shot.p;
+    const frame = /** @type {HTMLIFrameElement} */ (document.querySelector('iframe'));
+    Object.assign(frame.style, {
+      width: `${shot.w}px`, height: `${shot.h2}px`, left: `${shot.x}px`, top: `${shot.y}px`, transform: `scale(${shot.scale})`,
+    });
+    frame.src = shot.src;
+    // page.html rewrites its own document, so keep checking: put the style in whatever document is there now, and run
+    // the step once the page has drawn what this shot needs. The notes go on after the step has settled.
+    let stepped = false;
+    const poll = setInterval(() => {
+      const d = frame.contentDocument;
+      if (!d || !d.head) return;
+      if (shot.css && !d.getElementById('store-frame-css')) {
+        const style = d.createElement('style');
+        style.id = 'store-frame-css';
+        style.textContent = shot.css;
+        d.head.append(style);
+      }
+      if (!stepped && d.querySelector(shot.ready)) {
+        stepped = true;
+        shot.step?.(d);
+        setTimeout(drawNotes, 1500);
+        document.documentElement.dataset.ready = '1';
+      }
+    }, 100);
+    setTimeout(() => clearInterval(poll), 8000);
+  } else if (tile) {
+    const tiles = {
+      // The drop and the wordmark on paper, with the line from screenshot 1 in the headline's serif.
+      c: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:18px;padding-bottom:6px">
+            <span class="mask drop" style="height:104px"></span>
+            <div>
+              <div class="word" style="font-size:86px;line-height:0.86">drip</div>
+              <div style="font-family:Newsreader,Georgia,serif;font-size:31px;margin-top:6px;letter-spacing:-0.4px">One video at a time.</div>
+            </div>
+          </div>`,
+      // The drop and the wordmark alone, on paper.
+      p: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:16px">
+            <span class="mask drop" style="height:106px"></span>
+            <div class="word" style="font-size:92px;line-height:1">drip</div>
+          </div>`,
+    };
+    document.body.innerHTML = tiles[/** @type {'c'|'p'} */ (tile)] || '';
+    document.documentElement.dataset.ready = '1';
+  }
+</script>
+</body>
+</html>

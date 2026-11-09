@@ -185,6 +185,26 @@ Errors of mine the judges caught: 5's subline said "last week's average", but th
 
 Open fixes if the frame stays: 3's headline, 4's "Each drop is 15 minutes" (the setting can change it), 5's subline, 1 "Spend a card to reveal the next video", the right-edge seam on 2, the gap under d3's wordmark. Claude also wants the drawn thumbnail reworked (uneven rain, a warmer light, a clearer rider) and "Stash" unpressed.
 
+### Round 5, 2026-11-09: a new layout (v2)
+
+Jesse, after round 4: free rein, the goal is both judges' numbers meeting the target, keep track along the way. So rounds now run back to back without waiting for an OK, each one logged here.
+
+The frame in rounds 0 to 4 (`frames.html`, `store/images/`) stays as it is. Round 5 starts a second layout, `frames-v2.html`, captured with `capture.sh v2` into `store/images-v2/`: a paper background, a serif headline (Newsreader) at the top left, the real page as a full-height strip on the right with no rounded card, and one or two notes with leader lines to real elements. The judge prompt's description of the frame changes with it (`{FRAME}` in `judge-prompt.md`). Tiles: c (drop, wordmark, serif line) and p (drop and wordmark), both on paper. Reports: `reviews/round-5-codex.md`, `reviews/round-5-claude.md`.
+
+| Image | Codex design | Codex AI | Claude design | Claude AI |
+|---|---|---|---|---|
+| 1 Home | 8 | 3 | 7 | 4 |
+| 2 Lock | 8 | 2 | 6 | 4 |
+| 3 Modes | 7 | 2 | 6 | 5 |
+| 4 Settings | 6 | 2 | 7 | 4 |
+| 5 History | 8 | 2 | 7 | 4 |
+| Tile c | 8 | 1 | 6 | 5 |
+| Tile p | 7 | 1 | 5 | 6 |
+
+Codex's AI look dropped to 2 or less on everything but 1. Claude's didn't move. Real catches: 1's note line crossed the Stashed pill; "a single video you chose to see" is wrong (you choose to reveal); the notes on 3 and 5 repeated text already on screen; Saturday in the History sample had an unlock with only 2 of 4 drops spent, which the lock can't produce.
+
+Round 6 changes: the judge prompt now asks, for any image below 9 or above 2, what would get it there. The Saturday unlock moves to Friday, a full day, in `dev/page.html`'s sample. Notes rewritten so they add what the page doesn't say. Tried again to stop the water partway: the paused player sits behind the lock's panel, so a crest high enough to clear the panel has only gray above it. Full water it is.
+
 ## Open questions for Jesse (from 2026-11-09, not answered yet)
 
 1. Reword two strings in drip's own UI? "Paid watching stops" (Dry hours, in Settings) can read as a paid service, and "I need this one" doesn't tell a newcomer it's an unlock. These touch `src/`, so they'd be a separate PR after 101 and 102.

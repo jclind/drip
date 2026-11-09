@@ -43,7 +43,8 @@
             });
             const at = Date.now() - 3 * 3600000;
             state.log[state.day].needThis.push({ videoId: 'store-bike', title: 'Truing a bike wheel at home, start to finish', reason: 'Fixing my wheel tonight, need the steps', at });
-            state.log[D.addDays(state.day, -2)].needThis.push({ videoId: 'store-knife', title: 'Sharpening on a single whetstone', reason: 'Class assignment due Friday', at: at - 2 * 86400000 });
+            // On a full day: an unlock only comes up once the minutes run out (round 5).
+            state.log[D.addDays(state.day, -3)].needThis.push({ videoId: 'store-knife', title: 'Sharpening on a single whetstone', reason: 'Class assignment due tonight', at: at - 3 * 86400000 });
             state.tokens = { watch: 2, rec: 7 };
           }
         }

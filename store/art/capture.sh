@@ -1,13 +1,15 @@
 #!/bin/sh
-# Screenshots every store frame from frames.html into store/images/, at the sizes the Chrome Web Store asks for.
-# Runs headless Chrome on air against a local server of this checkout. Usage: store/art/capture.sh [port]
+# Screenshots every store frame into store/images/, at the sizes the Chrome Web Store asks for. Runs headless Chrome on
+# air against a local server of this checkout. Usage: store/art/capture.sh [v2] [port]
+# Without v2 it shoots frames.html (rounds 0 to 4) into store/images/; with v2, frames-v2.html into store/images-v2/.
 set -eu
 cd "$(dirname "$0")/../.."
+page=frames.html out=store/images tiles="c d d2 d3 e"
+if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c p"; shift; fi
 port=${1:-8078}
 chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 profile=$(mktemp -d)
 log=$(mktemp)
-out=store/images
 mkdir -p "$out"
 
 python3 -m http.server "$port" --bind 127.0.0.1 >"$log" 2>&1 &
@@ -21,7 +23,7 @@ shoot() { # name width height query [motion]
   # A profile per shot: sharing one cut 23px off the bottom of shot 2's panel (round 3, 2026-11-09).
   "$chrome" --headless --disable-gpu --user-data-dir="$profile/$1" --hide-scrollbars $rm \
     --force-dark-mode --window-size="$2,$3" --virtual-time-budget=$budget --screenshot="$out/$1.png" --log-net-log="$profile/net-$1.json" \
-    "http://127.0.0.1:$port/store/art/frames.html?$4" >/dev/null 2>&1
+    "http://127.0.0.1:$port/store/art/$page?$4" >/dev/null 2>&1
   size=$(sips -g pixelWidth -g pixelHeight "$out/$1.png" | awk '/pixel/ {printf "%s ", $2}')
   [ "$size" = "$2 $3 " ] || { echo "capture: $1 is $size, not $2x$3" >&2; exit 1; }
   # Chrome's own network log sees every request. A YouTube host in it means a real thumbnail or logo got in.
@@ -33,4 +35,4 @@ shoot() { # name width height query [motion]
 
 for n in 1 3 4 5; do shoot "screenshot-$n" 1280 800 "shot=$n"; done
 shoot screenshot-2 1280 800 shot=2 motion
-for t in c d d2 d3 e; do shoot "tile-$t" 440 280 "tile=$t"; done
+for t in $tiles; do shoot "tile-$t" 440 280 "tile=$t"; done
