@@ -5,7 +5,7 @@
 //      just before the lock's water rises.
 //   B, Drops leave the glass: each minute watched falls out of the pill's glass and pools at the bottom of the player.
 //   C, The video you picked: a short loop for the card watched in step 2, at 90× speed with a running timecode.
-// All three swap YouTube's red bar for water. Animations run only while playing, so a pause freezes the frame.
+// Animations run only while playing, so a pause freezes the frame. A shows a quiet ×90 while it plays.
 
 (() => {
   const params = new URLSearchParams(location.search);
@@ -45,7 +45,7 @@
     const wave = (/** @type {number} */ y, /** @type {number} */ amp) => {
       let d = `M0 ${y}`;
       for (let x = 0; x < 640; x += 80) d += ` q20 ${-amp} 40 0 t40 0`;
-      return `${d} V190 H0 Z`;
+      return `${d} V240 H0 Z`;
     };
     return `
       <svg class="sa" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
@@ -143,6 +143,7 @@
 
     if (v === 'a') {
       root.innerHTML = sea();
+      root.append(el('<span class="tp-speed">×90</span>'));
     } else if (v === 'b') {
       root.innerHTML = '<span class="sb-pic"></span><span class="sb-glow sb-g1"></span><span class="sb-glow sb-g2"></span>'
         + '<span class="sb-pool"><svg viewBox="0 0 160 10" preserveAspectRatio="none"><path d="M0 5q10-5 20 0t20 0 20 0 20 0 20 0 20 0 20 0 20 0V10H0Z"/></svg></span>';

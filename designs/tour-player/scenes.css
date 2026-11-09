@@ -13,52 +13,34 @@
   height: 100%;
 }
 
-/* Everything in a scene stands still unless the player plays, so a pause freezes the frame the lock rises over. */
-.tp-scene,
-.tp-scene * {
-  animation-play-state: paused;
-}
-
-.tour-player.is-playing .tp-scene,
-.tour-player.is-playing .tp-scene * {
-  animation-play-state: running;
+/* Everything in a scene stands still unless the player plays, so a pause freezes the frame the lock rises over.
+   !important, because each element's own animation shorthand resets the play state to running. */
+.tour-player:not(.is-playing) .tp-scene,
+.tour-player:not(.is-playing) .tp-scene * {
+  animation-play-state: paused !important;
 }
 
 /* The play button's dimming sits over the scene, not the other way round. */
 .tour-player-play,
-.tour-player-bar {
+.tour-player-bar,
+.tp-speed {
   z-index: 1;
 }
 
-/* All three: water in place of YouTube's red bar, with a crest at its tip. */
-.tour-player-bar {
-  height: 4px;
-}
-
-.tour-player-bar > span {
-  position: relative;
-  background: linear-gradient(90deg, #2f7fd0, #42a5f6);
-}
-
-.tour-player-bar > span::after {
-  content: "";
+/* The tour's speed, small and quiet beside the bar, only while it plays. */
+.tp-speed {
   position: absolute;
-  right: -5px;
-  top: -4px;
-  width: 10px;
-  height: 12px;
-  background: #42a5f6;
-  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  transform-origin: 50% 100%;
+  right: 12px;
+  bottom: 20px;
+  font: 500 11px/1 Roboto, Arial, sans-serif;
+  color: rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
 }
 
-.tour-player.is-playing .tour-player-bar > span::after {
-  animation: tp-crest 520ms ease-in-out infinite alternate;
-}
-
-@keyframes tp-crest {
-  from { transform: scale(0.8, 0.7) skewX(-8deg); }
-  to { transform: scale(1, 1.1) skewX(8deg); }
+.tour-player.is-playing .tp-speed {
+  opacity: 1;
 }
 
 /* A, Sinking boat */
@@ -107,9 +89,8 @@
   transition: transform 300ms linear;
 }
 
-.tp-a.is-sinking .sa-boat-at,
-.tp-a.is-sinking .sa-boat-at * {
-  animation-play-state: running;
+.tour-player .tp-a.is-sinking .sa-boat-at {
+  animation-play-state: running !important;
 }
 
 .tp-a.is-sinking .sa-boat-at {
@@ -259,8 +240,7 @@
 /* Reduced motion: each scene as a still frame. B's drops never start (scenes.js). */
 @media (prefers-reduced-motion: reduce) {
   .tp-scene,
-  .tp-scene *,
-  .tour-player-bar > span::after {
+  .tp-scene * {
     animation: none !important;
     transition: none !important;
   }
