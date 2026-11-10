@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "drip",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Replaces YouTube's endless home feed with a search box or one recommendation at a time, with optional watch time limits.",
   "minimum_chrome_version": "121",
   "permissions": ["storage"],
