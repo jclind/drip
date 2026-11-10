@@ -236,6 +236,15 @@ test('import results use nonzero pills, a channel clock tag, overflow and settin
   await p.importData({ app: 'drip', format: 1 });
   assert.equal(result.textContent, 'Imported');
   assert.equal(result.querySelector('.data-chip'), null);
+  // Channels past a list's size get the same line as the stash. One allow waits from the first import, so 4 more fit.
+  await p.importData({ app: 'drip', format: 1, channels: {
+    allow: Array.from({ length: 6 }, (_, n) => ({ ids: [`@allow${n}`], name: `Allow ${n}` })),
+    block: Array.from({ length: 103 }, (_, n) => ({ ids: [`@block${n}`], name: `Block ${n}` })),
+  } });
+  const lines = result.querySelectorAll('.muted').map((c) => c.textContent);
+  assert.deepEqual(lines.filter((line) => /didn't fit/.test(line)), [
+    "2 channels didn't fit in the allow list.", "3 channels didn't fit in the block list.",
+  ]);
 });
 
 test('import plural counts have no clock when channels apply at once', async () => {
@@ -279,6 +288,19 @@ test('export is only the check and title; import errors keep the existing explan
   assert.equal(result.classList.contains('is-success'), false);
   assert.deepEqual(result.querySelectorAll('li').map((c) => c.textContent), ['"drip-test.json" is from a newer version of drip.', 'Update drip, then import it again.', 'Nothing changed.']);
   assert.ok(result.querySelector('.drip-i-x'));
+});
+
+test("an import the worker couldn't save says the file didn't fit and nothing changed", async () => {
+  const p = page();
+  p.run(`send = async () => ({ ok: false, error: 'storage-full' })`);
+  await p.importData({ app: 'drip', format: 1, backlog: [{ id: 'a', title: 'A' }] });
+  const result = p.get('dataResult');
+  assert.equal(result.classList.contains('is-failed'), true);
+  assert.deepEqual(result.querySelectorAll('li').map((c) => c.textContent), ['"drip-test.json" didn\'t fit in drip\'s storage.', 'Nothing changed.']);
+  // No answer at all still says so.
+  p.run('send = async () => undefined');
+  await p.importData({ app: 'drip', format: 1 });
+  assert.deepEqual(result.querySelectorAll('li').map((c) => c.textContent), ["drip didn't answer.", 'Try again in a moment.']);
 });
 
 test('successful channel adds clear stale notes; invalid handles keep error notes', async () => {

@@ -206,6 +206,74 @@ test('import caps the text and the number of uses it brings in, like a click wou
   assert.equal(state.channels.block[0].name.length, 200);
 });
 
+/**
+ * The bytes chrome.storage.local counts for a value. Chrome writes `<` as `<`, six bytes for one character
+ * (checked in Chrome 157), so text of `<` is the worst case a file can bring.
+ * @param {unknown} value
+ */
+const storedBytes = (value) => Buffer.byteLength(JSON.stringify(value).replace(/</g, '\\u003C'));
+
+test('no file Import accepts fills more than a fifth of storage once cleaned, even after two imports', () => {
+  const worst = '<'.repeat(400);
+  const handles = (/** @type {string} */ tag) => [1, 2, 3, 4].map((n) => `@${tag}${n}${'é'.repeat(95)}`);
+  const channel = (/** @type {string} */ tag) => ({ ids: handles(tag), name: worst, avatar: `https://yt3.ggpht.com/${'a'.repeat(390)}` });
+  /** @param {number} from @param {number} to Which of the 89 days before today the file holds. */
+  const file = (from, to) => ({
+    app: 'drip', format: 1, settings: { stashMax: 50 },
+    backlog: Array.from({ length: 60 }, (_, n) => ({ id: `v${from}x${n}`, title: worst, channel: worst, length: worst, views: worst, age: worst, channelIds: handles(`v${n}`) })),
+    log: Object.fromEntries(Array.from({ length: 89 }, (_, n) => [D.addDays(D.dayKey(NOW, 4), -1 - n), {
+      watchedSec: 60, needThis: Array.from({ length: 30 }, (_, k) => ({ videoId: `u${n}x${k}${'-'.repeat(50)}`, title: worst, reason: worst, at: time(3) })),
+    }]).slice(from, to)),
+    channels: { allow: Array.from({ length: 10 }, (_, n) => channel(`a${n}`)), block: Array.from({ length: 150 }, (_, n) => channel(`b${n}`)) },
+  });
+  const files = [JSON.stringify(file(0, 45)), JSON.stringify(file(45, 89))];
+  for (const text of files) assert.ok(text.length < 5 * 1024 * 1024, 'under the 5 MB Import reads');
+  // A fresh install, so the file's stash size of 50 applies at once.
+  const state = D.initialState(NOW);
+  for (const text of files) D.importData(state, JSON.parse(text), NOW);
+  assert.equal(state.backlog.length, 50);
+  assert.equal(Object.keys(state.log).length, 89);
+  assert.ok(storedBytes(state) < 2 * 1024 * 1024, `${storedBytes(state)} bytes`);
+});
+
+test('import keeps at most the uses the weekly allowance could log in the 90 days, newest first', () => {
+  const state = settled();
+  const use = (/** @type {number} */ n) => ({ videoId: `u${n}`, title: 'T', reason: 'Class', at: time(3) });
+  state.log[D.addDays(state.day, -1)] = { ...D.logDay(state), needThis: [use(0), use(1)] };
+  const days = Array.from({ length: 30 }, (_, n) => D.addDays(state.day, -2 - n));
+  D.importData(state, { app: 'drip', format: 1, log: Object.fromEntries(days.map((day) => [day, { watchedSec: 60, needThis: Array.from({ length: 10 }, (_, k) => use(k)) }])) }, NOW);
+  const counts = days.map((day) => state.log[day].needThis.length);
+  // 13 weeks of the highest allowance, 20, is 260. Two were there, so 258 come in: 25 full days and 8 of the 26th.
+  assert.deepEqual(counts, [...Array(25).fill(10), 8, 0, 0, 0, 0]);
+  assert.ok(days.every((day) => state.log[day].watchedSec === 60), 'a day past the limit still keeps its numbers');
+});
+
+test('an imported "no" or "false" turns neither Dry hours nor grace mode on', () => {
+  const state = D.initialState(NOW);
+  const res = D.importData(state, { app: 'drip', format: 1, settings: { dryHours: 'no', graceMode: 'false', hideBell: 0 } }, NOW);
+  assert.deepEqual([res.applied, res.pending], [{}, {}]);
+  assert.deepEqual([state.settings.dryHours, state.settings.graceMode, state.settings.hideBell], [false, false, true]);
+});
+
+test('import holds each log number to what one day can hold', () => {
+  const state = settled();
+  const day = D.addDays(state.day, -1);
+  const huge = { watchedSec: 1e308, watchSpent: 1e300, recSpent: 1e300, saved: 1e300, passed: 1e300, watched: 1e300 };
+  D.importData(state, { app: 'drip', format: 1, log: {
+    [day]: { ...huge, needThis: [{ videoId: 'x', title: 'X', reason: 'Class', at: 1e300 }] },
+    [D.addDays(state.day, -2)]: { watchedSec: 3600, watchSpent: 4, recSpent: 10, saved: 2, passed: 7, watched: 1 },
+  } }, NOW);
+  // The longest day is 47 hours (Q12). The most drops a day can spend is the most a balance holds: 48 a day, kept 7
+  // days. Cards in Curated cost nothing, so their counts get one a second for the longest day.
+  const longest = 47 * 3600;
+  assert.deepEqual({ ...state.log[day], needThis: undefined }, { watchedSec: longest, watchSpent: 336, recSpent: longest, saved: longest, passed: longest, watched: longest, needThis: undefined });
+  assert.equal(D.formatMinutes(state.log[day].watchedSec), '47h');
+  assert.equal(state.log[day].needThis[0].at, NOW, 'a use from the future counts as made at the import');
+  assert.deepEqual(state.log[D.addDays(state.day, -2)], { watchedSec: 3600, watchSpent: 4, recSpent: 10, saved: 2, passed: 7, watched: 1, needThis: [] });
+  // A future time counted as now for as long as the day stayed in the log. Now it counts for a week.
+  assert.equal(D.needThisUsed(state, NOW + 7 * 86400e3), 0);
+});
+
 test('reset keeps the week of "I need this one" uses', () => {
   const state = settled();
   D.needThis(state, 'a', 'A', 'Study', NOW);

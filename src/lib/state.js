@@ -205,6 +205,12 @@
   const REASON_MAX = 300;
   /** The most "I need this one" uses one log day keeps: the highest weekly allowance Settings offers. */
   const USES_MAX = ranges.needThisPerWeek[1];
+  /**
+   * The most uses an import leaves in the whole log: the highest weekly allowance for each of the 13 weeks in the 90
+   * days the log keeps. Chrome counts some characters as six bytes, so 20 uses on each of 89 days could fill half of
+   * storage from a file of 1 MB.
+   */
+  const LOG_USES_MAX = USES_MAX * 13;
 
   /**
    * Text on one line, at most `max` characters: runs of whitespace become one space, and the ends are trimmed. A cut
@@ -242,13 +248,18 @@
     if (typeof v.id !== 'string' || !/^[\w-]{1,64}$/.test(v.id)) return null;
     /** @param {unknown} x */
     const str = (x) => line(x, TEXT_MAX);
+    const length = str(v.length);
+    // A length written as a time has to be one: an imported "9:99:99" added 10 hours to the stash's total. Text like
+    // "LIVE" stays.
     /** @type {Video} */
-    const video = { id: v.id, title: str(v.title), channel: str(v.channel), length: str(v.length) };
+    const video = { id: v.id, title: str(v.title), channel: str(v.channel), length: /^[\d:]+$/.test(length) && !/^\d+(:[0-5]\d){1,2}$/.test(length) ? '' : length };
     if (str(v.views)) video.views = str(v.views);
     if (str(v.age)) video.age = str(v.age);
-    if (seconds(v.durationSec)) video.durationSec = seconds(v.durationSec);
-    if (seconds(v.resumeSec)) video.resumeSec = video.durationSec ? Math.min(seconds(v.resumeSec), video.durationSec) : seconds(v.resumeSec);
-    if (seconds(v.addedAt)) video.addedAt = seconds(v.addedAt);
+    const duration = videoSec(v.durationSec);
+    const resume = videoSec(v.resumeSec);
+    if (duration) video.durationSec = duration;
+    if (resume) video.resumeSec = duration ? Math.min(resume, duration) : resume;
+    if (seconds(v.addedAt) && seconds(v.addedAt) <= TIME_MAX) video.addedAt = seconds(v.addedAt);
     const ids = cleanIds(v.channelIds);
     if (ids.length) video.channelIds = ids;
     return video;
@@ -257,6 +268,21 @@
   /** Whole seconds, or 0 for anything that isn't a positive finite number. @param {unknown} n */
   function seconds(n) {
     return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  }
+
+  /**
+   * The longest a stashed video's length or position may be, in seconds. YouTube keeps at most 12 hours of a video or
+   * a stream, so a week cuts only made-up numbers, like the 1e16 a tester's import put in the stash.
+   */
+  const VIDEO_SEC_MAX = 7 * 24 * 3600;
+  /** The latest time a Date can hold, in ms. A later stash time printed "NaN months ago". */
+  const TIME_MAX = 8.64e15;
+  /** The longest a day can be, in seconds: a later reset hour can make one 47 hours long (Q12). */
+  const DAY_SEC_MAX = 47 * 3600;
+
+  /** Whole seconds a video can have, or 0. @param {unknown} n */
+  function videoSec(n) {
+    return seconds(n) <= VIDEO_SEC_MAX ? seconds(n) : 0;
   }
 
   /** @param {unknown} n @param {number} fallback */
@@ -983,11 +1009,9 @@
         if (typeof value !== 'number' || !Number.isFinite(value)) continue;
         const [min, max] = ranges[key];
         Object.assign(cleaned, { [key]: Math.min(max, Math.max(min, Math.round(value))) });
-      } else if (key === 'graceMode' || key === 'dryHours') {
-        cleaned[key] = Boolean(value);
       } else if (key === 'feedSource' && (value === 'home' || value === 'subscriptions')) {
         cleaned.feedSource = value;
-      } else if ((key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell' || key === 'hideShorts' || key === 'streams') && typeof value === 'boolean') {
+      } else if ((key === 'graceMode' || key === 'dryHours' || key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell' || key === 'hideShorts' || key === 'streams') && typeof value === 'boolean') {
         cleaned[key] = value;
       } else if (key === 'cards' && (value === 'off' || value === 'unlimited' || value === 'limited')) {
         cleaned.cards = value;
@@ -1414,18 +1438,29 @@
   }
 
   /**
-   * One day of an imported log, with only the fields drip keeps and only numbers where it counts.
-   * @param {unknown} raw @returns {LogDay | null}
+   * The most each number in one log day can be. Watched time fits in the longest day. Drops spent fit in the most a
+   * balance holds, since a day refills once and drops handed back come off the count. Cards in Curated cost nothing,
+   * so their counts get one a second for the longest day.
    */
-  function cleanLogDay(raw) {
+  const LOG_MAX = {
+    watchedSec: DAY_SEC_MAX, watchSpent: ranges.watchTokensPerDay[1] * ranges.rolloverDays[1],
+    recSpent: DAY_SEC_MAX, saved: DAY_SEC_MAX, passed: DAY_SEC_MAX, watched: DAY_SEC_MAX,
+  };
+
+  /**
+   * One day of an imported log, with only the fields drip keeps and only numbers a day can hold. A use's time is never
+   * after `now`, since a future one would count against the week for as long as its day stays in the log.
+   * @param {unknown} raw @param {number} now @returns {LogDay | null}
+   */
+  function cleanLogDay(raw, now) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const d = /** @type {Record<string, any>} */ (raw);
     const day = emptyLog();
-    for (const key of /** @type {const} */ (['watchedSec', 'watchSpent', 'recSpent', 'saved', 'passed', 'watched'])) day[key] = count(d[key], 0);
+    for (const key of /** @type {const} */ (['watchedSec', 'watchSpent', 'recSpent', 'saved', 'passed', 'watched'])) day[key] = Math.min(count(d[key], 0), LOG_MAX[key]);
     if (Array.isArray(d.needThis)) {
       for (const use of d.needThis) {
         if (use && typeof use.videoId === 'string' && VIDEO_ID.test(use.videoId) && typeof use.reason === 'string') {
-          day.needThis.push({ videoId: use.videoId, title: line(use.title, TEXT_MAX), reason: line(use.reason, REASON_MAX), at: count(use.at, 0) });
+          day.needThis.push({ videoId: use.videoId, title: line(use.title, TEXT_MAX), reason: line(use.reason, REASON_MAX), at: Math.min(count(use.at, 0), now) });
         }
       }
     }
@@ -1471,12 +1506,16 @@
     }
     let days = 0;
     if (file.log && typeof file.log === 'object' && !Array.isArray(file.log)) {
-      for (const [day, entry] of Object.entries(file.log)) {
+      let room = LOG_USES_MAX - Object.values(state.log).reduce((n, entry) => n + (Array.isArray(entry?.needThis) ? entry.needThis.length : 0), 0);
+      // Newest first, so the uses that stay are the ones the weekly allowance counts.
+      for (const [day, entry] of Object.entries(file.log).sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))) {
         // A real calendar date, since History's week math throws on one like 2026-00-01, and within the 90 days the
         // log keeps, as rollDay would prune it (Codex, 2026-11-03).
         if (!realDay(day) || day >= state.day || day < addDays(state.day, -89) || state.log[day]) continue;
-        const cleaned = cleanLogDay(entry);
+        const cleaned = cleanLogDay(entry, now);
         if (!cleaned) continue;
+        cleaned.needThis = room > 0 ? cleaned.needThis.slice(-room) : [];
+        room -= cleaned.needThis.length;
         state.log[day] = cleaned;
         days++;
       }
@@ -1484,6 +1523,9 @@
     // The lists go through the same rules as a click: an allow waits, a block applies now, and nothing is removed.
     let channelsAdded = 0;
     let channelsWaiting = 0;
+    // Channels a full list turned away, so Import can say so, as it does for the stash.
+    let allowSkipped = 0;
+    let blockSkipped = 0;
     const lists = file.channels && typeof file.channels === 'object' ? file.channels : {};
     for (const raw of Array.isArray(lists.allow) ? lists.allow : []) {
       const channel = cleanChannel(raw);
@@ -1491,12 +1533,19 @@
       const allowed = allowChannel(state, channel, now);
       if (allowed.ok) channelsAdded++;
       if (allowed.ok && allowed.waits) channelsWaiting++;
+      if (allowed.error === 'allow-full') allowSkipped++;
     }
     for (const raw of Array.isArray(lists.block) ? lists.block : []) {
       const channel = cleanChannel(raw);
-      if (channel && !findChannel(state.channels.block, channel) && blockChannel(state, channel).ok) channelsAdded++;
+      if (!channel || findChannel(state.channels.block, channel)) continue;
+      const blocked = blockChannel(state, channel);
+      if (blocked.ok) channelsAdded++;
+      if (blocked.error === 'block-full') blockSkipped++;
     }
-    return { ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days, channelsAdded, channelsWaiting };
+    return {
+      ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days,
+      channelsAdded, channelsWaiting, allowSkipped, blockSkipped,
+    };
   }
 
   /**

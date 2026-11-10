@@ -623,6 +623,22 @@ test('cleanVideo keeps valid optional fields and drops bad ones', () => {
   assert.equal(state.backlog[0].resumeSec, 12);
 });
 
+test('cleanVideo drops a length or position no video has, and a stash time past what a date can hold', () => {
+  // From a tester's import: History and the stash printed numbers like 1e+16.
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 1e16, durationSec: 1e15 }), video('a'));
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 1e20 }), video('a'));
+  // A week is the most either may be. YouTube keeps at most 12 hours of a video or a stream.
+  const week = 7 * 24 * 3600;
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: week, durationSec: week }), { ...video('a'), resumeSec: week, durationSec: week });
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 60, durationSec: week + 1 }), { ...video('a'), resumeSec: 60 });
+  assert.deepEqual(D.cleanVideo({ ...video('a'), addedAt: 1e20 }), video('a'));
+  assert.deepEqual(D.cleanVideo({ ...video('a'), addedAt: time(5) }), { ...video('a'), addedAt: time(5) });
+  // A length that isn't a real time goes, since the stash adds lengths up. Real times and text like LIVE stay.
+  assert.equal(D.cleanVideo({ ...video('a'), length: '9:99:99' })?.length, '');
+  assert.equal(D.cleanVideo({ ...video('a'), length: '5' })?.length, '');
+  for (const length of ['0:45', '14:02', '1:02:03', '120:00', 'LIVE']) assert.equal(D.cleanVideo({ ...video('a'), length })?.length, length);
+});
+
 test('cleanVideo keeps at most 200 characters of each text field, on one line, so the stash and card stay small', () => {
   const long = 'w'.repeat(1e6);
   const clean = D.cleanVideo({ id: 'a', title: `A\n  title ${long}`, channel: long, length: long, views: long, age: long });
@@ -822,15 +838,20 @@ test('the old daily setting drops away from stored state, waiting changes, and i
 test('cleanSettings rounds and clamps every numeric range, drops unknown and invalid values', () => {
   assert.deepEqual(D.cleanSettings({ minutesPerToken: 0, recTokensPerDay: 500, watchTokensPerDay: 2.6, rolloverDays: 0, resetHour: 30, needThisPerWeek: -1, stashMax: 0, unknown: 5, feedSource: 'bad', graceMode: 1 }), {
     minutesPerToken: 1, recTokensPerDay: 100, watchTokensPerDay: 3,
-    rolloverDays: 1, resetHour: 23, needThisPerWeek: 0, stashMax: 1, graceMode: true,
+    rolloverDays: 1, resetHour: 23, needThisPerWeek: 0, stashMax: 1,
   });
-  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerWeek: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: 0 }), {
+  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerWeek: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: false }), {
     minutesPerToken: 120, recTokensPerDay: 0, watchTokensPerDay: 48,
     rolloverDays: 7, resetHour: 0, needThisPerWeek: 20, stashMax: 50, feedSource: 'subscriptions', graceMode: false,
   });
   assert.deepEqual(D.cleanSettings({ recTokensPerDay: NaN, minutesPerToken: Infinity, resetHour: '5', watchTokensPerDay: null }), {});
   assert.deepEqual(D.cleanSettings({ streams: true }), { streams: true });
   assert.deepEqual(D.cleanSettings({ streams: 'yes' }), {});
+  // Grace mode and Dry hours take only true or false, like every other switch: "false" and "no" are strings, which
+  // Boolean() turned on.
+  assert.deepEqual(D.cleanSettings({ graceMode: 'false', dryHours: 'no' }), {});
+  assert.deepEqual(D.cleanSettings({ graceMode: 0, dryHours: null }), {});
+  assert.deepEqual(D.cleanSettings({ graceMode: true, dryHours: false }), { graceMode: true, dryHours: false });
   assert.deepEqual(D.cleanSettings(undefined), {});
 });
 

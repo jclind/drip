@@ -1168,11 +1168,14 @@ async function importFile() {
   if (!res || !res.ok || !res.state) {
     if (res && res.error === 'bad-format') return refuse([`${which} is from a newer version of drip.`, 'Update drip, then import it again.', 'Nothing changed.']);
     if (res && res.error === 'not-drip') return refuse([`${which} isn't a drip export.`, wanted, 'Nothing changed.']);
+    if (res && res.error === 'storage-full') return refuse([`${which} didn't fit in drip's storage.`, 'Nothing changed.']);
     return refuse(["drip didn't answer.", 'Try again in a moment.']);
   }
   afterData(res, kept);
   dataDone('Imported', [
     ...(res.stashSkipped ? [`${plural(res.stashSkipped, "video didn't", "videos didn't")} fit in the stash.`] : []),
+    ...(res.allowSkipped ? [`${plural(res.allowSkipped, "channel didn't", "channels didn't")} fit in the allow list.`] : []),
+    ...(res.blockSkipped ? [`${plural(res.blockSkipped, "channel didn't", "channels didn't")} fit in the block list.`] : []),
     ...(waitsLine(res.pending) ? [waitsLine(res.pending)] : []),
   ], false, [
     ...(res.stashAdded ? [dataChip(`+${res.stashAdded} in stash`)] : []),
