@@ -1,7 +1,7 @@
 #!/bin/sh
-# Builds the zip for the Chrome Web Store: manifest.json, src/, and icons/ only, with the dev tools taken out by
-# bin/release-tree, which also checks the result. Refuses on uncommitted changes or a version that already has a git
-# tag.
+# Builds the zip for the Chrome Web Store: manifest.json, src/, and icons/ only, with the dev tools and the icon art
+# (icons/source) taken out by bin/release-tree, which also checks the result. Refuses on uncommitted changes or a
+# version that already has a git tag.
 # Usage: bin/build-release    Output: dist/drip-<version>.zip
 set -eu
 cd "$(dirname "$0")/.."

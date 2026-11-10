@@ -63,6 +63,20 @@ test('the store build has none of the dev tools', () => {
   }
 });
 
+test('the store build leaves out the icon art, which nothing references, and keeps the PNGs the manifest names', () => {
+  const dir = storeBuild();
+  try {
+    const files = release.files(dir);
+    assert.ok(fs.readdirSync(path.join(ROOT, 'icons/source')).some((f) => f.endsWith('.svg')), 'the checkout keeps the art');
+    assert.deepEqual(files.filter((f) => f.startsWith('icons/')), ['icons/128.png', 'icons/16.png', 'icons/32.png', 'icons/48.png']);
+    for (const f of files.filter((f) => /\.(js|json|html|css)$/.test(f))) {
+      assert.ok(!read(dir, f).includes('icons/source'), `${f} names icons/source`);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the unpacked tree keeps the dev tools, so the build has something to take out', () => {
   const worker = read(ROOT, 'src/background.js');
   assert.deepEqual([...worker.matchAll(/importScripts\('([^']+)'\)/g)].map((m) => m[1]),
@@ -84,12 +98,14 @@ test('the checks catch a build that is missing a file, has a script that does no
     fs.appendFileSync(path.join(dir, 'src/welcome/welcome.js'), "\nchrome.runtime.getURL('src/nope.html');\n");
     fs.mkdirSync(path.join(dir, 'src/devpanel'));
     fs.writeFileSync(path.join(dir, 'src/devpanel/panel.js'), '');
+    fs.mkdirSync(path.join(dir, 'icons/source'));
+    fs.writeFileSync(path.join(dir, 'icons/source/icon-16.svg'), '<svg/>');
     const problems = release.check(dir).join('\n');
     for (const want of [
       'src/popup/popup.html names popup.js', 'manifest.json names icons/48.png', 'manifest.json names src/content/early.css',
       'src/options/options.html names /src/icons/arrow-up-right.svg', "src/content/fade.js doesn't parse",
       'src/background.js names devpanel/worker.js', 'src/background.js still has runClock', 'src/background.js still has devpanel',
-      'src/welcome/welcome.js names src/nope.html', 'src/devpanel is in the build',
+      'src/welcome/welcome.js names src/nope.html', 'src/devpanel is in the build', 'icons/source is in the build',
     ]) assert.ok(problems.includes(want), `missing: ${want}\n${problems}`);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

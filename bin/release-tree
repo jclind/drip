@@ -8,8 +8,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-/** Folders the store build leaves out: the dev tools. */
-const LEFT_OUT = ['src/devpanel'];
+/**
+ * Folders the store build leaves out. src/devpanel is the dev tools. icons/source is the art the PNG icons are drawn
+ * from (DESIGN.md, "Toolbar glass as built"), which nothing in the extension loads.
+ */
+const LEFT_OUT = ['src/devpanel', 'icons/source'];
 
 // The worker's imports of src/devpanel and the comment above them (src/background.js).
 const DEV_IMPORTS = /(?:^\/\/[^\n]*\n)*(?:^importScripts\('devpanel\/[^']+'\);\n)+/gm;
