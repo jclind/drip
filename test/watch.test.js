@@ -1563,3 +1563,15 @@ test('a player that never takes the click is left alone after 10 seconds, even w
   for (let i = 0; i < 20; i++) { world.advance(1); await tab.second(); }
   assert.equal(tab.theaterButton.clicks, clicks);
 });
+
+test("early.css hides Ask's section in the expanded description, and keeps the sections DESIGN.md keeps", () => {
+  // Signed in on 2026-11-10, "Ask: Get answers, explore topics, and more" sat between "How this was made" and Chapters.
+  // The element names are YouTube's, from its list of description sections.
+  const css = fs.readFileSync(path.join(SRC, 'content/early.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const hidden = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter((m) => /display:\s*none/.test(m[2]))
+    .flatMap((m) => m[1].split(',').map((s) => s.trim()));
+  assert.ok(hidden.includes('ytd-watch-flexy yt-video-description-youchat-section-view-model'));
+  for (const kept of ['ytd-horizontal-card-list-renderer', 'ytd-video-description-transcript-section-renderer', 'ytd-video-description-header-renderer', 'ytd-item-section-renderer']) {
+    assert.ok(!hidden.some((s) => s.endsWith(kept) && s.includes('ytd-watch')), `${kept} stays`);
+  }
+});

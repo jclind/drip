@@ -49,7 +49,7 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["src/lib/state.js", "src/content/early.js"],
+      "js": ["src/lib/state.js", "src/content/early.js", "src/content/upnext.js"],
       "run_at": "document_start"
     },
     {

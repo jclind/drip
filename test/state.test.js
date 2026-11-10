@@ -29,7 +29,7 @@ test('API contains every contract name, and defaults are frozen', () => {
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'swapFollow', 'editsSince', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUses', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'waitingCount', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
-    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'toolbarGlass', 'toolbarPlaying',
+    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'upNextIsPick', 'earlyLocked', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData', 'REASON_MAX', 'isOlder', 'newer',
     'ALLOW_MAX', 'channelId', 'cleanChannel', 'sameChannel', 'allowChannel', 'removeAllowed', 'blockChannel', 'unblockChannel',
     'cancelChannelPending', 'applyChannelsPending', 'seenChannel', 'channelFromPage', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels', 'allowCount', 'isAllowedOrWaiting',
