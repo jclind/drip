@@ -479,7 +479,7 @@ function addFeedNudge(root) {
  *   kind's markup (gridMarks). inView: drip's home page is on screen, so drops land in the counter, and tab.landings
  *   records each landing. kept: what "Done for now" left in sessionStorage, "N" or "N:dryUntil" (watch.js onDone).
  */
-async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '', realReveal = false } = {}) {
+async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '', realReveal = false, offline = false } = {}) {
   let now = 0;
   world.time = () => EPOCH + now;
   /** @type {Map<number, {fn: Function, at: number, every: number}>} */
@@ -593,7 +593,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
   /** @type {any} */
   const context = {
     document, location, console: { ...console, error: (/** @type {any[]} */ ...args) => tab.logged.push(args) }, JSON, Math, Number, String, Boolean, Set, Map, WeakMap, Array, Object, Promise, Error,
-    URL, URLSearchParams, structuredClone, navigator: { userAgent: 'test', clipboard: { writeText: async () => {} } },
+    URL, URLSearchParams, structuredClone, navigator: { userAgent: 'test', onLine: !offline, clipboard: { writeText: async () => {} } },
     CSS: { escape: (/** @type {string} */ s) => s.replace(/["\\]/g, '\\$&') },
     innerHeight: 900,
     matchMedia: () => ({ matches: reduced }),
@@ -999,6 +999,17 @@ for (const reduced of [true, false]) {
     assert.match(banner.textContent, /YouTube probably changed its page, and drip needs an update/);
     assert.match(banner.textContent, /Send report/);
     assert.match(tab.message(), /Try again after a refresh/);
+    assert.equal(world.state.tokens.rec, 10);
+    assert.equal(world.count('reveal'), 0);
+  });
+
+  test(`Reveal while offline says so and asks for no report (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced, grid: [], realReveal: true, offline: true });
+    await tab.click('reveal');
+    await tab.advance(40000);
+    assert.equal(tab.document.getElementById('drip-broken'), null);
+    assert.match(tab.message(), /You're offline\. No card spent\./);
     assert.equal(world.state.tokens.rec, 10);
     assert.equal(world.count('reveal'), 0);
   });

@@ -51,6 +51,9 @@
     members: '.ytBadgeShapeCommerce, .badge-style-type-members-only',
     // The top bar's search box and voice search, which Quiet's home page moves into the middle of the page (Q29).
     searchBox: 'ytd-masthead #center',
+    // YouTube's "Connect to the internet" message. Offline, the home page has no grid, only this, in the column drip's
+    // page goes in (headless Chrome 157, 2026-11-10). early.css has the same selector.
+    offline: 'ytd-background-promo-renderer[icon-name*="OFFLINE"]',
   };
   const AGE = /\bago$/i;
   const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
@@ -345,6 +348,12 @@
     try {
       let pool;
       try {
+        // Offline, YouTube builds no grid, so an empty read looked like a markup change and drip asked for a report
+        // (Jesse, 2026-11-10).
+        if (offline()) {
+          message = "You're offline. No card spent.";
+          return null;
+        }
         const feed = emptyAtClick ? { pool: [], noRecommendations: true } : await readCandidates();
         pool = feed.pool;
         if (pool.length === 0 && feed.noRecommendations) {
@@ -1575,6 +1584,11 @@
   /** When the lock's water last started falling away (watch.js onDone). */
   let lockFellAt = 0;
   document.addEventListener('drip-lock-falling', () => { lockFellAt = Date.now(); });
+
+  /** The browser is offline, or YouTube's home page says it is. */
+  function offline() {
+    return navigator.onLine === false || !!document.querySelector(`${SEL.homeBrowse} ${SEL.offline}`);
+  }
 
   /** drip's home page is on screen. */
   function homeInView() {
