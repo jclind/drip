@@ -17,7 +17,7 @@
    * What welcome.js hands over: the stage, and the tour's numbers, read when a callout is drawn.
    * @typedef {{
    *   stage: HTMLElement, tour: HTMLElement, busy: () => boolean, dropTime: () => string, drops: () => number,
-   *   cards: () => number, counted: () => boolean, clock: () => boolean, stash: () => boolean, needLeft: () => number, resetLabel: () => string,
+   *   cards: () => number, dropsPerDay: () => number, cardsPerDay: () => number, counted: () => boolean, clock: () => boolean, stash: () => boolean, needLeft: () => number, resetLabel: () => string,
    *   carries: () => boolean, nextStep: () => string, last?: string,
    * }} Ctx
    */
@@ -100,8 +100,13 @@
   /** Each step's stops, in order. @type {Record<string, Stop[]>} */
   const STOPS = {
     home: [
-      { at: SEL.time, point: SEL.minutes, say: () => 'What you can watch today. Nothing until you spend a drop.', sides: TIME_SIDES },
-      { at: SEL.drops, say: (c) => `Your drops. New ones come at ${c.resetLabel()}.`, sides: STATS_SIDES },
+      // The step's facts live on the notes that point at them, since the line above the stage is only the step's name
+      // (design D, 2026-11-10): the drops' on the drop counter, the cards' on the card counter.
+      { at: SEL.time, point: SEL.minutes, say: () => 'What you can watch today. Nothing plays until you spend a drop.', sides: TIME_SIDES },
+      {
+        at: SEL.drops, sides: STATS_SIDES,
+        say: (c) => `You get ${plural(c.dropsPerDay(), 'drop')} a day, ${c.dropTime()} each. New ones come at ${c.resetLabel()}.`,
+      },
       {
         at: SEL.add, say: (c) => `Press +${c.dropTime()} to spend one.`, sides: ['below', 'left'], until: ['add'],
         // Reveal video is what comes next, and pressing it moves the tour on and deals.
@@ -115,7 +120,10 @@
       {
         at: SEL.revealBtn, say: pressReveal, sides: ['below', 'above'], until: ['reveal'],
         // Full drip shows what the card cost. Curated's cards are free, so it moves straight on to the card.
-        then: { at: SEL.cards, say: (c) => `That reveal used a card. ${cardsLeft(c)}`, sides: STATS_SIDES, need: (c) => c.counted() },
+        then: {
+          at: SEL.cards, sides: STATS_SIDES, need: (c) => c.counted(),
+          say: (c) => `That used one of your ${plural(c.cardsPerDay(), 'card')} a day. ${cardsLeft(c)}`,
+        },
       },
       {
         // From the left, so the arrow lands on Stash, the start of the row the sentence reads along.
