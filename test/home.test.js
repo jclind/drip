@@ -792,6 +792,21 @@ for (const { name, setup, priced } of stashPrices) {
   });
 }
 
+test('an imported stash row with no title shows as Untitled and still plays', async () => {
+  const world = makeWorld();
+  // A tester's file had title: {obj: 1}. A valid id is all a stash row needs: a watch page can stash a video before
+  // its title loads, and the row links to the video either way.
+  const res = world.D.importData(world.state, { app: 'drip', format: 1, backlog: [{ id: 's1', title: { obj: 1 }, channel: ['x'], length: 5 }] }, Date.now());
+  assert.equal(res.stashAdded, 1);
+  assert.deepEqual({ ...world.state.backlog[0], addedAt: undefined }, { id: 's1', title: '', channel: '', length: '', addedAt: undefined });
+  const tab = await makeTab(world);
+  if (!tab.button('play-s1')) await tab.click('saved-head');
+  const link = tab.button('play-s1');
+  assert.ok(link);
+  assert.equal(link.querySelector('.drip-saved-title').textContent, 'Untitled');
+  assert.equal(tab.button('x-s1').getAttribute('aria-label'), 'Remove video from stash');
+});
+
 test('a normal reveal starts the original deal and goo morph before the worker answers', async () => {
   const world = makeWorld();
   const tab = await makeTab(world, { reduced: false, realReveal: true });
