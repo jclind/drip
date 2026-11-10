@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>drip store frames, v3</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@400;600&family=Anton&family=Roboto:wght@700&display=swap">
+<!--
+  The council's divergent round (round 17, 2026-11-09). Two layouts far from v2's cream caption panel, built from the
+  seats' proposals in store/art/reviews/round-17-divergent-*.md:
+    ?v=a  "One number per image" (the Claude seat): warm paper, one huge Fraunces numeral with a blue drop for its full
+          stop, the real page as a slab from the top right, a blue ring on the place in it that holds the number.
+    ?v=b  "Finite posters" (Codex): flat blue, gold, and ink grounds, one huge symbol per image (1, 0, 3, minus and
+          plus, 7), the real page set inside or under it, no notes.
+  Serve the repo root and open /store/art/frames-v3.html?v=a&shot=1 (1 to 5) or ?v=a&tile=1.
+  store/art/capture.sh v3 screenshots both into store/images-v3/.
+-->
+<style>
+  :root { --paper: #efe8dc; --ink: #1d1b18; --soft: #6e665b; --drip: #3ea6ff; --b-blue: #3fa5f5; --b-gold: #ffd027; --b-ink: #111111; --b-white: #f7f7f2; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overflow: clip; }
+  .shot { position: relative; width: 1280px; height: 800px; overflow: clip; }
+  .tile { position: relative; width: 440px; height: 280px; overflow: clip; }
+  .cap { position: absolute; overflow: hidden; background: #0f0f0f; }
+  .cap iframe { position: absolute; border: 0; transform-origin: 0 0; background: transparent; }
+  svg.over { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+  .mask { display: inline-block; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
+  .drop { --src: url(/src/icons/drop.svg); aspect-ratio: 600 / 893; }
+  .card { --src: url(/src/icons/card.svg); aspect-ratio: 600 / 697; }
+
+  /* Variant A */
+  .a { background: var(--paper); color: var(--ink); }
+  .a .mark { position: absolute; left: 56px; top: 56px; display: flex; align-items: center; gap: 8px; font: 600 24px/1 Inter, sans-serif; letter-spacing: -0.4px; }
+  .a .mark .drop { height: 26px; color: var(--drip); }
+  .a .slab { border-radius: 0 0 0 28px; box-shadow: 0 30px 60px rgba(40, 30, 20, 0.18); }
+  .a .row { position: absolute; left: 56px; top: 0; display: flex; align-items: last baseline; }
+  .a .num { font-family: Fraunces, Georgia, serif; font-weight: 560; font-variation-settings: 'opsz' 144; font-size: 520px; line-height: 0.75; letter-spacing: -12px; }
+  .a .num i { font-style: italic; font-size: 160px; letter-spacing: 0; margin-left: 6px; }
+  .a .row > .drop { color: var(--drip); margin-left: 14px; }
+  .a .words { margin-left: 36px; max-width: 640px; }
+  .a .note { font: 400 19px/1.4 Inter, sans-serif; color: var(--soft); margin-bottom: 14px; }
+  .a .phrase { font-family: Fraunces, Georgia, serif; font-weight: 450; font-variation-settings: 'opsz' 72; font-size: 46px; line-height: 1.05; letter-spacing: -0.6px; }
+  .a .base { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
+
+  /* Variant B */
+  .b { font-family: Arial, Helvetica, sans-serif; }
+  .b .mark { position: absolute; left: 32px; top: 32px; display: flex; align-items: center; gap: 6px; font: 700 26px/1 Roboto, Arial, sans-serif; letter-spacing: -0.5px; }
+  .b .mark .drop { height: 28px; }
+  .b .t { position: absolute; font-weight: 700; font-size: 48px; line-height: 1.05; letter-spacing: -0.5px; }
+  .b .q { position: absolute; font-weight: 400; font-size: 24px; line-height: 1.25; }
+</style>
+</head>
+<body>
+<script>
+  // @ts-check
+  const params = new URLSearchParams(location.search);
+  const variant = params.get('v') === 'b' ? 'b' : 'a';
+  const shotN = params.get('shot');
+  const isTile = params.has('tile');
+  const CARD_GRAY = 'rgb(39, 39, 39)';
+  const WATER_AT = 1100;
+
+  /**
+   * A capture of one real drip page: which page, what to inject, what has to exist before the step, and the step.
+   * @typedef {{src: string, w: number, h2: number, css?: string, ready: string, step?: (d: Document) => void, bg?: string}} Page
+   */
+  /** @type {Record<string, Page>} */
+  const PAGES = {
+    home: {
+      src: '/dev/home.html?scenario=card&theme=dark&reduced=1&videos=store', w: 620, h2: 656,
+      css: '#masthead, #harness-bar { visibility: hidden !important; }', ready: '.drip-thumb img.is-loaded',
+    },
+    // The lock, as frames-v2.html shot 2 sets it up: see the comments there.
+    lock: {
+      src: '/dev/page.html?page=welcome#tour-4', w: 1280, h2: 800, bg: '#24494f',
+      css: `@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        #drip-lock, #drip-lock * { font-family: Roboto, Arial, sans-serif !important; }
+        .co-layer, .co-ring, .co-chip, .co-said, .co-head, .co-count, .tour-again, .tour-under #drip-pill, #drip-lock .drip-orbit, #drip-lock .drip-orbit-spark, #drip-lock .drip-orbit-star { display: none !important; }
+        .tour-stage { border-color: transparent !important; border-radius: 0 !important; }
+        .tour-player-play, .tour-player-bar { display: none !important; }
+        .tour-under { transform: scale(1.6); }
+        .tour-player { background: url(/store/art/thumbs/store-trail.svg) 55% 95% / 130% auto !important; border-radius: 0 !important; filter: brightness(2.2) contrast(1.2) saturate(1.3) !important; }
+        #drip-lock .drip-done-ring { display: none !important; }
+        html[dark] #drip-lock .drip-sea { --drip-bubble-line: rgba(150, 205, 255, 0.35) !important; --drip-bubble-shine: rgba(170, 220, 255, 0.3) !important; }`,
+      ready: '#drip-lock .drip-lock-sub',
+      step: (d) => setTimeout(() => {
+        /** @type {HTMLElement} */ (d.querySelector('#drip-lock .drip-lock-sub')).textContent = '1h watched today';
+        /** @type {HTMLElement | null} */ (d.activeElement)?.blur();
+        const BUBBLES = [[30, 14, 96], [63, 10, 78], [69, 7, 120]];
+        d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
+          const b = /** @type {HTMLElement} */ (el);
+          if (i >= BUBBLES.length) { b.style.display = 'none'; return; }
+          const [x, size, up] = BUBBLES[i];
+          b.style.setProperty('--x', `${x}%`);
+          b.style.setProperty('--size', `${size}px`);
+          b.style.animation = 'none';
+          b.style.opacity = '1';
+          b.style.transform = `translateY(-${up}px)`;
+        });
+        const lock = /** @type {HTMLElement} */ (d.getElementById('drip-lock'));
+        lock.style.setProperty('--tour-depth', `${lock.offsetHeight}px`);
+        d.getAnimations().forEach((a) => {
+          const name = /** @type {CSSAnimation} */ (a).animationName || '';
+          if (/bubble-rise/.test(name)) { a.pause(); return; }
+          if (/water-rise|crest/.test(name)) { a.currentTime = WATER_AT; a.pause(); return; }
+          if (/swim|bob|sway/.test(name)) a.currentTime = 3000;
+          else { try { a.finish(); } catch { a.currentTime = 5000; } }
+          a.pause();
+        });
+      }, 600),
+    },
+    welcome: {
+      src: '/dev/page.html?page=welcome', w: 680, h2: 713,
+      css: '.hero { visibility: hidden !important; }', ready: 'input[type=radio], [role=radio]',
+    },
+    settings: {
+      src: '/dev/page.html?page=options&settled=1&sample=1&pending=1', w: 728, h2: 640,
+      css: 'h1 { visibility: hidden !important; }', ready: '[role=tab]',
+      step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
+    },
+    history: {
+      src: '/dev/page.html?page=options&settled=1&sample=1#history', w: 728, h2: 770, bg: CARD_GRAY,
+      css: `[role=tablist] { visibility: hidden !important; }
+        html, body { background: ${CARD_GRAY} !important; }
+        #panel-history > .card:first-child { border-radius: 0 !important; border-color: transparent !important; box-shadow: none !important; }`,
+      ready: '[data-k=earlier]',
+      step: (d) => {
+        /** @type {HTMLElement} */ (d.querySelector('[data-k=earlier]')).click();
+        setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300);
+      },
+    },
+  };
+
+  /**
+   * A capture placed on the canvas: the page, the box it shows through, and where the page sits in that box (box
+   * pixels, before the scale). `ring` names an element to circle once the page is ready.
+   * @typedef {{page: string, box: [number, number, number, number], x: number, y: number, scale: number, cls?: string, clip?: string, ring?: string, bg?: string}} Cap
+   */
+
+  /** Builds a capture's box and iframe, and calls back with the iframe's document once its step has settled. @param {HTMLElement} root @param {Cap} c @param {(d: Document) => void} [done] */
+  function capture(root, c, done) {
+    const p = PAGES[c.page];
+    const box = document.createElement('div');
+    box.className = `cap ${c.cls || ''}`;
+    const [l, t, w, h] = c.box;
+    Object.assign(box.style, { left: `${l}px`, top: `${t}px`, width: `${w}px`, height: `${h}px`, background: c.bg || p.bg || '#0f0f0f' });
+    if (c.clip) box.style.clipPath = c.clip;
+    const frame = document.createElement('iframe');
+    Object.assign(frame.style, { width: `${p.w}px`, height: `${p.h2}px`, left: `${c.x}px`, top: `${c.y}px`, transform: `scale(${c.scale})` });
+    frame.src = p.src;
+    box.append(frame);
+    root.append(box);
+    let stepped = false;
+    const poll = setInterval(() => {
+      const d = frame.contentDocument;
+      if (!d || !d.head) return;
+      if (p.css && !d.getElementById('store-frame-css')) {
+        const style = d.createElement('style');
+        style.id = 'store-frame-css';
+        style.textContent = p.css;
+        d.head.append(style);
+      }
+      if (!stepped && d.querySelector(p.ready)) {
+        stepped = true;
+        p.step?.(d);
+        setTimeout(() => done?.(d), 1500);
+      }
+    }, 100);
+    setTimeout(() => clearInterval(poll), 9000);
+  }
+
+  /** A 3px blue rounded ring, 10px outside the named element, drawn over everything. @param {HTMLElement} root @param {Cap} c @param {Document} d */
+  function ring(root, c, d) {
+    if (!c.ring) return;
+    const el = d.querySelector(c.ring);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const [l, t] = c.box;
+    const x = l + c.x + r.left * c.scale - 10;
+    const y = t + c.y + r.top * c.scale - 10;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'over');
+    svg.innerHTML = `<rect x="${x}" y="${y}" width="${r.width * c.scale + 20}" height="${r.height * c.scale + 20}" rx="16" fill="none" stroke="#3ea6ff" stroke-width="3"/>`;
+    root.append(svg);
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Variant A: one number per image.
+
+  /** @type {Record<string, {num: string, unit?: string, phrase: string, note: string, cap: Cap}>} */
+  const A = {
+    1: { num: '1', phrase: 'video at a time.', note: 'Not this one? The next pick costs a card.',
+      cap: { page: 'home', box: [430, 0, 850, 545], x: -40, y: -418, scale: 1.5, ring: '.drip-next' } },
+    2: { num: '1', unit: 'h', phrase: 'then the water comes up.', note: 'With Full drip\'s default limit. Limits are optional.',
+      cap: { page: 'lock', box: [400, 0, 880, 550], x: -665, y: -498, scale: 1.7, ring: '#drip-lock .drip-lock-sub' } },
+    3: { num: '3', phrase: 'ways to use drip.', note: 'Search only, one pick at a time, or daily limits.',
+      cap: { page: 'welcome', box: [480, 0, 800, 550], x: 9, y: -170, scale: 1.15 } },
+    4: { num: '5', phrase: 'drops, from the next reset.', note: 'After day one, a looser limit waits for the 4:00am reset. A tighter one applies now.',
+      cap: { page: 'settings', box: [440, 0, 840, 512], x: -106, y: -111, scale: 1.45, ring: '.chip' } },
+    5: { num: '41', unit: 'm', phrase: 'a day, last week.', note: 'Sample week. Down 15% from the week before.',
+      cap: { page: 'history', box: [620, 0, 660, 545], x: -143, y: -221, scale: 1.3, ring: '.avg-row > div:first-child' } },
+  };
+
+  /** The numeral row: number, drop, then the note over the phrase, all on one baseline. @param {HTMLElement} root */
+  function numberRow(root, num, unit, phrase, note, size, baseline) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<span class="num" style="font-size:${size}px"><span class="base"></span></span><span class="mask drop" style="height:${Math.round(size * 0.14)}px"></span>`
+      + `<div class="words"><div class="note"></div><div class="phrase"></div></div>`;
+    const n = /** @type {HTMLElement} */ (row.querySelector('.num'));
+    n.prepend(num);
+    if (unit) { const i = document.createElement('i'); i.textContent = unit; n.append(i); }
+    /** @type {HTMLElement} */ (row.querySelector('.note')).textContent = note;
+    /** @type {HTMLElement} */ (row.querySelector('.phrase')).textContent = phrase;
+    if (!note) /** @type {HTMLElement} */ (row.querySelector('.note')).remove();
+    root.append(row);
+    document.fonts.ready.then(() => {
+      const b = /** @type {HTMLElement} */ (row.querySelector('.base')).getBoundingClientRect().bottom;
+      row.style.top = `${baseline - b}px`;
+    });
+    return row;
+  }
+
+  function buildA() {
+    const root = /** @type {HTMLElement} */ (document.querySelector('.shot, .tile'));
+    root.classList.add('a');
+    if (isTile) {
+      const cap = /** @type {Cap} */ ({ page: 'home', box: [170, 0, 270, 128], x: -125, y: -73, scale: 0.85 });
+      capture(root, cap);
+      /** @type {HTMLElement} */ (root.querySelector('.cap')).classList.add('slab');
+      /** @type {HTMLElement} */ (root.querySelector('.cap')).style.borderRadius = '0 0 0 18px';
+      const row = numberRow(root, '1', '', 'video at a time.', '', 260, 268);
+      row.style.left = '20px';
+      const words = /** @type {HTMLElement} */ (row.querySelector('.words'));
+      words.style.marginLeft = '18px';
+      words.insertAdjacentHTML('afterbegin', '<div style="font:600 20px/1 Inter,sans-serif;margin-bottom:8px">drip</div>');
+      /** @type {HTMLElement} */ (row.querySelector('.phrase')).style.fontSize = '26px';
+      return;
+    }
+    const s = A[shotN || '1'];
+    root.insertAdjacentHTML('beforeend', '<div class="mark"><span class="mask drop"></span>drip</div>');
+    capture(root, s.cap, (d) => ring(root, s.cap, d));
+    /** @type {HTMLElement} */ (root.querySelector('.cap')).classList.add('slab');
+    numberRow(root, s.num, s.unit, s.phrase, s.note, 520, 760);
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Variant B: finite posters.
+
+  /** @param {HTMLElement} root @param {string} color */
+  function markB(root, color) {
+    root.insertAdjacentHTML('beforeend', `<div class="mark" style="color:${color}"><span class="mask drop" style="color:${color === '#111111' ? '#111111' : '#f7f7f2'}"></span>drip</div>`);
+  }
+
+  /** Text on the canvas. @param {HTMLElement} root */
+  function text(root, cls, x, y, color, s, extra = '') {
+    const el = document.createElement('div');
+    el.className = cls;
+    el.style.cssText = `left:${x}px;top:${y}px;color:${color};${extra}`;
+    el.textContent = s;
+    root.append(el);
+  }
+
+  /** An Anton glyph scaled to fill a box's height, centered across it. @param {HTMLElement} root */
+  function glyph(root, ch, x, y, w, h, color) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'over');
+    svg.innerHTML = `<text x="0" y="0" font-family="Anton" font-size="100" fill="${color}">${ch}</text>`;
+    root.prepend(svg);
+    document.fonts.ready.then(() => {
+      const t = /** @type {SVGTextElement} */ (svg.querySelector('text'));
+      const bb = t.getBBox();
+      const k = h / bb.height;
+      t.setAttribute('transform', `translate(${x + (w - bb.width * k) / 2 - bb.x * k} ${y - bb.y * k}) scale(${k})`);
+    });
+  }
+
+  /** Shapes drawn under the capture. @param {HTMLElement} root */
+  function shapes(root, svgInner) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'over');
+    svg.setAttribute('width', '1280');
+    svg.setAttribute('height', '800');
+    svg.innerHTML = svgInner;
+    root.prepend(svg);
+  }
+
+  function buildB() {
+    const root = /** @type {HTMLElement} */ (document.querySelector('.shot, .tile'));
+    root.classList.add('b');
+    const ink = '#111111', blue = '#3fa5f5', gold = '#ffd027', white = '#f7f7f2';
+    if (isTile) {
+      root.style.background = blue;
+      shapes(root, `<g fill="${ink}"><polygon points="302,24 362,24 362,224 302,224"/><polygon points="302,24 302,82 252,110 252,58"/><rect x="262" y="222" width="140" height="34"/></g>`);
+      root.insertAdjacentHTML('beforeend', `<span class="mask card" style="position:absolute;left:310px;top:205px;height:60px;color:${gold};transform:rotate(10deg)"></span>`);
+      root.insertAdjacentHTML('beforeend', `<div style="position:absolute;left:28px;top:34px;display:flex;align-items:center;gap:8px;font:700 52px/1 Roboto,Arial,sans-serif;letter-spacing:-1.5px;color:${ink}"><span class="mask drop" style="height:54px;color:${white}"></span>drip</div>`);
+      text(root, 't', 28, 132, ink, 'One video\nat a time.', 'font-size:30px;white-space:pre-line');
+      return;
+    }
+    const n = shotN || '1';
+    if (n === '1') {
+      root.style.background = blue;
+      // The "1": a flag and a foot in ink, and the home page itself as the stem.
+      shapes(root, `<g fill="${ink}"><polygon points="390,48 390,196 160,300 160,152"/><rect x="160" y="728" width="960" height="56"/></g>`);
+      capture(root, { page: 'home', box: [390, 48, 580, 680], x: -138, y: -188, scale: 1.38 });
+      text(root, 't', 0, 736, white, 'One video at a time.', 'font-size:40px;width:1280px;text-align:center');
+      root.insertAdjacentHTML('beforeend', `<span class="mask card" style="position:absolute;left:48px;top:590px;height:64px;color:${gold}"></span>`);
+      text(root, 'q', 48, 664, ink, 'A card reveals\nthe next.', 'white-space:pre-line;font-weight:700');
+      markB(root, ink);
+    } else if (n === '2') {
+      root.style.background = ink;
+      // The "0": a thick blue ring; the lock shows through its opening, water and all.
+      shapes(root, `<path fill-rule="evenodd" fill="${blue}" d="M640 76 a470 325 0 1 0 0.1 0 Z M640 178 a380 219 0 1 1 -0.1 0 Z"/>
+        <path d="M0 724C140 706 290 702 440 716S760 742 920 724 1180 704 1280 714V800H0Z" fill="#2c6670"/>`);
+      capture(root, { page: 'lock', box: [260, 178, 760, 438], x: -503, y: -441, scale: 1.38, clip: 'ellipse(50% 50% at 50% 50%)' });
+      text(root, 't', 48, 94, white, 'Your limit.\nA stopping\npoint.', 'white-space:pre-line;font-size:40px');
+      text(root, 'q', 48, 752, white, 'Optional daily limits');
+      markB(root, white);
+    } else if (n === '3') {
+      root.style.background = gold;
+      glyph(root, '3', 944, 72, 288, 664, ink);
+      capture(root, { page: 'welcome', box: [262, 170, 702, 600], x: -38, y: -172, scale: 1.147 });
+      text(root, 't', 262, 90, ink, 'Choose your amount.');
+      markB(root, ink);
+    } else if (n === '4') {
+      root.style.background = blue;
+      shapes(root, `<g fill="${ink}"><rect x="72" y="124" width="420" height="72"/><rect x="800" y="124" width="340" height="72"/><rect x="934" y="58" width="72" height="204"/></g>`);
+      text(root, 't', 72, 280, ink, 'Tighter: now.');
+      text(root, 't', 440, 280, ink, 'Looser: next reset.', 'width:700px;text-align:right');
+      text(root, 'q', 440, 334, ink, 'After your first day.', 'width:700px;text-align:right');
+      capture(root, { page: 'settings', box: [140, 400, 1000, 300], x: -184, y: -488, scale: 1.88 });
+      markB(root, ink);
+    } else {
+      root.style.background = ink;
+      // The "7": a bar across the top and a stroke falling behind the page.
+      shapes(root, `<g fill="${blue}"><rect x="64" y="104" width="1152" height="94"/><polygon points="1104,198 1216,198 968,752 852,752"/></g>`);
+      text(root, 't', 96, 126, ink, 'See your week.');
+      capture(root, { page: 'history', box: [260, 218, 760, 550], x: 9, y: -220, scale: 1.022 });
+      text(root, 'q', 64, 230, white, 'Sample week', 'font-size:28px;font-weight:700');
+      text(root, 'q', 64, 600, white, '30 minutes on Saturday.', 'width:180px');
+      markB(root, white);
+    }
+  }
+
+  document.body.innerHTML = isTile ? '<div class="tile"></div>' : '<div class="shot"></div>';
+  if (variant === 'a') buildA(); else buildB();
+  setTimeout(() => { document.documentElement.dataset.ready = '1'; }, 4000);
+</script>
+</body>
+</html>

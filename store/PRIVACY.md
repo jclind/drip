@@ -1,6 +1,6 @@
 # drip privacy policy
 
-Draft, 2026-10-06, updated 2026-11-05. Published at https://jesselind.com/projects/drip/privacy, from jesselind's `src/pages/projects/drip/privacy.astro`. Change both together.
+Draft, 2026-10-06, updated 2026-11-09. Published at https://jesselind.com/projects/drip/privacy, from jesselind's `src/pages/projects/drip/privacy.astro`. Change both together.
 
 In short:
 
@@ -17,6 +17,7 @@ drip processes browsing activity and YouTube page content locally in your browse
 What it stores in your browser's extension storage (`chrome.storage.local`), all on your computer:
 
 - Your settings and token balances.
+- The ids of videos you unlocked today with "I need this one", and of today's videos from allowed channels with that channel's ids. Both clear at the day's reset.
 - The videos you've revealed (their ids, so the same video doesn't come up twice) and your stash (id, title, channel, length, views and age as the feed showed them, how far you got, and when you stashed it).
 - Your allowed and blocked channels: each one's name, handle or channel id, and the address of its picture.
 - A log of the last 90 days: minutes watched, tokens spent, videos saved, watched, or passed, and the reasons you typed for "I need this one", with each video's title.

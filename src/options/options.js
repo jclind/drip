@@ -59,12 +59,12 @@ const PARTS = [
       { key: 'minutesPerToken', label: 'Minutes per drop', kind: 'stepper', min: 1, max: 120, step: 5,
         format: (n) => `${n}m`, say: (n) => `${n}m`, spoken: (n) => plural(n, 'minute', 'minutes') },
       // Q32. The three keys wait for the reset as one range, so the row has one chip for all of them.
-      { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'Paid watching stops. Whole drops return.' },
+      { key: 'dryHours', label: 'Dry hours', kind: 'toggle', hint: 'No watching on drops. Unused drops come back.' },
       { key: 'dryFrom', label: 'Starts at', kind: 'hour', inRow: true },
       { key: 'dryTo', label: 'Ends at', kind: 'hour', inRow: true },
       { key: 'graceMode', label: 'Finish video when time runs out', kind: 'toggle' },
-      { key: 'needThisPerWeek', label: '"I need this one" per rolling 7 days', chipLabel: 'Unlocks', kind: 'stepper', min: 0, max: 20,
-        say: (n) => String(n), hint: 'Type a reason to unlock.' },
+      { key: 'needThisPerWeek', label: 'Unlocks per week', chipLabel: 'Unlocks', kind: 'stepper', min: 0, max: 20,
+        say: (n) => String(n), hint: 'Shown on the lock as "I need this one". Type a reason.' },
     ],
   },
   {

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>drip store frames, v4: screenshot 2 variants</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&family=Roboto:wght@400;500;700&display=swap">
+<!--
+  Two far-apart layouts for screenshot 2, one from each seat in the council's ref round 3, for a head-to-head against
+  frames-v2.html's current one in ref round 4. Each pairs the lock with a real capture of what came before it.
+    /store/art/frames-v4.html?v=a   Codex: drip's counter at 0m, an arrow, and the lock, on a full paper canvas
+    /store/art/frames-v4.html?v=b   Claude: the playing video with drip's pill above, the same video under the lock below
+  Every capture is drip's real code in an iframe, as in frames-v2.html.
+-->
+<style>
+  :root { --paper: #f1ede4; --ink: #1c1b19; --soft: #5b5750; --blue: #1b74c9; --drop: #42a5f6; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: Roboto, Arial, sans-serif; overflow: clip; }
+  .shot { position: relative; width: 1280px; height: 800px; overflow: clip; background: var(--paper); }
+  .brand { position: absolute; left: 72px; top: 44px; display: flex; align-items: center; gap: 9px; font-size: 24px;
+    font-weight: 700; letter-spacing: -0.5px; }
+  .mask { display: inline-block; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
+  .drop { --src: url(/src/icons/drop.svg); color: var(--drop); aspect-ratio: 600 / 893; height: 27px; }
+  h1 { position: absolute; left: 72px; top: 112px; margin: 0; font-family: Newsreader, Georgia, serif; font-weight: 500;
+    font-size: 54px; line-height: 1.04; letter-spacing: -1.2px; white-space: pre-line; }
+  .sub { position: absolute; left: 72px; margin: 0; font-size: 19px; line-height: 1.5; color: var(--soft); white-space: pre-line; }
+  .note { position: absolute; left: 72px; font-size: 20px; line-height: 1.3; white-space: pre-line; }
+  .label { position: absolute; font-size: 18px; font-weight: 500; color: var(--ink); }
+  .foot { position: absolute; left: 72px; font-size: 15px; color: var(--soft); }
+  .box { position: absolute; overflow: hidden; background: #0f0f0f; }
+  .box iframe { position: absolute; border: 0; transform-origin: 0 0; background: #0f0f0f; }
+  .strip { position: absolute; right: 0; top: 0; width: 800px; height: 800px; background: #0f0f0f; }
+  svg.lines { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+</style>
+</head>
+<body>
+<script>
+  // @ts-check
+  const params = new URLSearchParams(location.search);
+  const ROBOTO = `@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');`;
+
+  /**
+   * The lock as frames-v2.html's shot 2 draws it: the tour's lock step, coach and spark hidden, screenshot 1's ride in
+   * the paused player, the water all the way up, three bubbles placed by hand, "1h watched today".
+   */
+  const LOCK = {
+    src: '/dev/page.html?page=welcome#tour-4', vw: 1280, vh: 800, ready: '#drip-lock .drip-lock-sub',
+    css: `${ROBOTO}
+      #drip-lock, #drip-lock * { font-family: Roboto, Arial, sans-serif !important; }
+      .co-layer, .co-ring, .co-chip, .co-said, .co-head, .co-count, .tour-again, .tour-under #drip-pill, #drip-lock .drip-orbit, #drip-lock .drip-orbit-spark, #drip-lock .drip-orbit-star { display: none !important; }
+      .tour-stage { border-color: transparent !important; border-radius: 0 !important; }
+      .tour-player-play, .tour-player-bar { display: none !important; }
+      .tour-under { transform: scale(1.6); }
+      .tour-player { background: url(/store/art/thumbs/store-trail.svg) center / cover !important; border-radius: 0 !important; filter: brightness(2.2) contrast(1.2) saturate(1.3) !important; }
+      #drip-lock .drip-done-ring { display: none !important; }
+      html[dark] #drip-lock .drip-sea { --drip-bubble-line: rgba(150, 205, 255, 0.35) !important; --drip-bubble-shine: rgba(170, 220, 255, 0.3) !important; }
+      .tour-player { background-size: 130% auto !important; background-position: 55% 95% !important; }`,
+    /** @param {Document} d */
+    step: (d) => setTimeout(() => {
+      /** @type {HTMLElement} */ (d.querySelector('#drip-lock .drip-lock-sub')).textContent = '1h watched today';
+      /** @type {HTMLElement | null} */ (d.activeElement)?.blur();
+      const BUBBLES = [[30, 14, 96], [63, 10, 78], [69, 7, 120]];
+      d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
+        const b = /** @type {HTMLElement} */ (el);
+        if (i >= BUBBLES.length) { b.style.display = 'none'; return; }
+        const [x, size, up] = BUBBLES[i];
+        b.style.setProperty('--x', `${x}%`);
+        b.style.setProperty('--size', `${size}px`);
+        b.style.animation = 'none';
+        b.style.opacity = '1';
+        b.style.transform = `translateY(-${up}px)`;
+      });
+      const lock = /** @type {HTMLElement} */ (d.getElementById('drip-lock'));
+      lock.style.setProperty('--tour-depth', `${lock.offsetHeight}px`);
+      d.getAnimations().forEach((a) => {
+        const name = /** @type {CSSAnimation} */ (a).animationName || '';
+        if (/bubble-rise/.test(name)) { a.pause(); return; }
+        if (/water-rise|crest/.test(name)) { a.currentTime = 1100; a.pause(); return; }
+        if (/swim|bob|sway/.test(name)) a.currentTime = 3000;
+        else { try { a.finish(); } catch { a.currentTime = 5000; } }
+        a.pause();
+      });
+    }, 600),
+  };
+
+  /** The tour's player step with screenshot 1's ride playing, sharp, and drip's real pill at 1m. */
+  const PLAYER = {
+    src: '/dev/page.html?page=welcome#tour-3', vw: 1280, vh: 800, ready: '#drip-pill',
+    css: `${ROBOTO}
+      #drip-pill, #drip-pill * { font-family: Roboto, Arial, sans-serif !important; }
+      .co-layer, .co-ring, .co-chip, .co-said, .co-head, .co-count, .tour-player-play { display: none !important; }
+      .tour-player { background: url(/store/art/thumbs/store-trail.svg) center / cover !important; border-radius: 0 !important; }
+      /* The whole picture: the 130% crop was tuned for the old thumbnail's small rider (design-thumb, 2026-11-09). */
+      .tour-player { background-size: cover !important; background-position: center !important; }`,
+    /** @param {Document} d */
+    step: (d) => setTimeout(() => {
+      const m = d.querySelector('#drip-pill .drip-pill-minutes');
+      if (m) m.textContent = '1m';
+      /** @type {HTMLElement | null} */ (d.activeElement)?.blur();
+    }, 600),
+  };
+
+  /** drip's counter on the home page at 0m, with the day's 2 drops and 7 cards, as screenshot 1 shows it at 34m. */
+  const COUNTER = {
+    // Ready on the counter, not the thumbnail: the box clips the thumbnail out of view, so its lazy image never loads.
+    src: '/dev/home.html?scenario=zero&theme=dark&reduced=1&videos=store', vw: 620, vh: 656, ready: '.drip-counts',
+    css: '#masthead, #harness-bar { visibility: hidden !important; }',
+    step: () => {},
+  };
+
+  /**
+   * A capture in a clipped box: the page at its viewport size, scaled, with page point (px, py) at the box's (0, 0).
+   * @param {HTMLElement} root
+   * @param {{src: string, vw: number, vh: number, ready: string, css: string, step: (d: Document) => void}} c
+   * @param {{left: number, top: number, width: number, height: number, scale: number, px: number, py: number, radius?: number}} at
+   */
+  function capture(root, c, at) {
+    const box = document.createElement('div');
+    box.className = 'box';
+    Object.assign(box.style, { left: `${at.left}px`, top: `${at.top}px`, width: `${at.width}px`, height: `${at.height}px`, borderRadius: `${at.radius ?? 0}px` });
+    const frame = document.createElement('iframe');
+    Object.assign(frame.style, {
+      width: `${c.vw}px`, height: `${c.vh}px`, left: `${-at.px * at.scale}px`, top: `${-at.py * at.scale}px`, transform: `scale(${at.scale})`,
+    });
+    frame.src = c.src;
+    box.append(frame);
+    root.append(box);
+    return new Promise((done) => {
+      let stepped = false;
+      const poll = setInterval(() => {
+        const d = frame.contentDocument;
+        if (!d || !d.head) return;
+        if (c.css && !d.getElementById('store-frame-css')) {
+          const style = d.createElement('style');
+          style.id = 'store-frame-css';
+          style.textContent = c.css;
+          d.head.append(style);
+        }
+        if (!stepped && d.querySelector(c.ready)) {
+          stepped = true;
+          c.step(d);
+          setTimeout(() => done({ d, at }), 1500);
+        }
+      }, 100);
+      setTimeout(() => clearInterval(poll), 8000);
+    });
+  }
+
+  /**
+   * Where an element in a capture lands in the frame.
+   * @param {{d: Document, at: {left: number, top: number, scale: number, px: number, py: number}}} cap
+   * @param {string} sel
+   */
+  function place(cap, sel) {
+    const el = cap.d.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const { at } = cap;
+    return {
+      left: at.left + (r.left - at.px) * at.scale, top: at.top + (r.top - at.py) * at.scale,
+      right: at.left + (r.right - at.px) * at.scale, bottom: at.top + (r.bottom - at.py) * at.scale,
+    };
+  }
+
+  /** @param {HTMLElement} root @param {string} cls @param {string} text @param {Record<string, string>} style */
+  function add(root, cls, text, style) {
+    const el = document.createElement('div');
+    el.className = cls;
+    el.textContent = text;
+    Object.assign(el.style, style);
+    root.append(el);
+    return el;
+  }
+
+  /** @param {SVGSVGElement} svg @param {string} d @param {boolean} [head] */
+  function line(svg, d, head) {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', head ? '#42a5f6' : '#1b74c9');
+    p.setAttribute('stroke-width', head ? '3' : '1.5');
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    svg.append(p);
+  }
+
+  /** @param {SVGSVGElement} svg @param {number} x @param {number} y */
+  function dot(svg, x, y) {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', String(x));
+    c.setAttribute('cy', String(y));
+    c.setAttribute('r', '4');
+    c.setAttribute('fill', '#42a5f6');
+    c.setAttribute('stroke', '#f1ede4');
+    c.setAttribute('stroke-width', '1.5');
+    svg.append(c);
+  }
+
+  const root = /** @type {HTMLElement} */ (document.createElement('div'));
+  root.className = 'shot';
+  root.innerHTML = '<div class="brand"><span class="mask drop"></span>drip</div><h1></h1>';
+  document.body.append(root);
+  const svg = /** @type {SVGSVGElement} */ (document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
+  svg.setAttribute('class', 'lines');
+  svg.setAttribute('width', '1280');
+  svg.setAttribute('height', '800');
+  const h1 = /** @type {HTMLElement} */ (root.querySelector('h1'));
+
+  if (params.get('v') === 'a') {
+    // Codex's layout: no split. The counter at 0m on the left, a short arrow, the lock on the right, each labeled.
+    h1.textContent = 'When time runs out.';
+    add(root, 'sub', 'An optional daily limit. The video pauses when it runs out.', { top: '186px' });
+    add(root, 'label', 'Daily limit reached.', { left: '72px', top: '336px' });
+    add(root, 'label', 'Video paused.', { left: '470px', top: '262px' });
+    add(root, 'foot', 'Sample state.', { top: '752px' });
+    // The counter sits at about 212 to 400 across and 146 to 203 down in the home page; the box adds room around it.
+    const counter = capture(root, COUNTER, { left: 72, top: 370, width: 330, height: 122, scale: 1.5, px: 196, py: 134, radius: 18 });
+    // The lock's panel is centered at about (641, 480) in the tour page. At 1.8 the stage's blurred edge stays outside.
+    const lock = capture(root, LOCK, { left: 470, top: 296, width: 750, height: 454, scale: 1.8, px: 641 - 375 / 1.8, py: 480 - 227 / 1.8, radius: 18 });
+    Promise.all([counter, lock]).then(() => {
+      line(svg, 'M418 431 H452', true);
+      line(svg, 'M444 423 L453 431 L444 439', true);
+      root.append(svg);
+      document.documentElement.dataset.ready = '1';
+    });
+  } else if (params.get('v') === 'b') {
+    // Claude's layout: the paper column as now, and on a dark strip two 16:9 players, the same video before and after.
+    h1.textContent = 'When time\nruns out.';
+    add(root, 'sub', 'An optional daily limit.\nWhen it\'s used up, the video pauses.', { top: '242px' });
+    add(root, 'foot', 'Sample video.', { top: '316px' });
+    const strip = document.createElement('div');
+    strip.className = 'strip';
+    root.append(strip);
+    // The tour's player sits at 376 to 904 across and 332 to 628 down; 640 wide is a scale of 1.212.
+    // The strip is 800px since ref round 5 (one panel width for the set); the players stay 640 wide, centered.
+    const before = capture(root, PLAYER, { left: 560, top: 28, width: 640, height: 360, scale: 640 / 528, px: 376, py: 330, radius: 12 });
+    // The lock's panel, about 380 page px wide, fills 76% of a 640px player at 1.285.
+    const after = capture(root, LOCK, { left: 560, top: 412, width: 640, height: 360, scale: 1.285, px: 641 - 320 / 1.285, py: 480 - 180 / 1.285, radius: 12 });
+    Promise.all([before, after]).then(([, a]) => {
+      // A small arrow in the gap between the players, so "1m left" then "paused" reads as a sequence (both seats, ref
+      // round 4: Claude asked for an arrow, Codex for labels; the arrow adds no text).
+      line(svg, 'M880 392 V406', true);
+      line(svg, 'M874 401 L880 407 L886 401', true);
+      const add15 = place(/** @type {any} */ (a), '#drip-lock .drip-lock-add');
+      if (add15) {
+        const note = add(root, 'note', 'Or spend a drop\nfor 15 more minutes.', {});
+        const ty = (add15.top + add15.bottom) / 2;
+        note.style.top = `${ty - note.getBoundingClientRect().height / 2}px`;
+        const tx = add15.left - 12;
+        line(svg, `M290 ${ty} H${tx}`);
+        dot(svg, tx, ty);
+      }
+      root.append(svg);
+      document.documentElement.dataset.ready = '1';
+    });
+  }
+</script>
+</body>
+</html>

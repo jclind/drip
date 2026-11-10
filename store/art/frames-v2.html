@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>drip store frames, v2</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&family=Roboto:wght@400;500;700&display=swap">
+<!--
+  The second layout for the store images (round 5, 2026-11-09). Rounds 0 to 4 used frames.html: a headline on the left
+  and the page in a rounded panel on a dark navy frame. Both judges named that structure as the template signal.
+  This one is a paper page: a serif headline at the top left, the real extension page as a full-height strip on the
+  right, and a few notes with leader lines pointing at real elements in it. Serve the repo root and open:
+    /store/art/frames-v2.html?shot=1   (1 to 5, 1280x800)
+    /store/art/frames-v2.html?tile=c   (440x280)
+  store/art/capture.sh v2 screenshots every frame into store/images-v2/.
+-->
+<style>
+  :root { --paper: #f1ede4; --ink: #1c1b19; --soft: #5b5750; --blue: #1b74c9; --drop: #42a5f6; --gold: #fdc905; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: Roboto, Arial, sans-serif; overflow: clip; }
+  .shot { position: relative; width: 1280px; height: 800px; overflow: clip; background: var(--paper); }
+  .copy { position: absolute; left: 72px; top: 112px; width: 430px; }
+  h1 { margin: 0 0 18px; font-family: Newsreader, Georgia, serif; font-weight: 500; font-size: 54px; line-height: 1.04;
+    letter-spacing: -1.2px; white-space: pre-line; min-height: 112px; }
+  .copy p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--soft); white-space: pre-line; }
+  .brand { position: absolute; left: 72px; top: 44px; display: flex; align-items: center; gap: 9px; font-size: 24px;
+    font-weight: 700; letter-spacing: -0.5px; }
+  .mask { display: inline-block; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
+  .drop { --src: url(/src/icons/drop.svg); color: var(--drop); aspect-ratio: 600 / 893; }
+  .card { --src: url(/src/icons/card.svg); color: var(--gold); aspect-ratio: 600 / 697; }
+  .brand .drop { height: 27px; }
+  /* The page, full height, flush right: a strip of the screen, not a card. */
+  .panel { position: absolute; right: 0; top: 0; width: 720px; height: 800px; overflow: hidden; background: #0f0f0f; }
+  .panel iframe { position: absolute; border: 0; transform-origin: 0 0; background: #0f0f0f; }
+  /* Notes: a short line of text in the left column and a leader line to the thing it names. */
+  .note { position: absolute; left: 72px; width: 380px; font-size: 20px; line-height: 1.3; color: var(--ink); white-space: pre-line; }
+  .note b { font-weight: 500; }
+  svg.leaders { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+  .foot { position: absolute; left: 72px; font-size: 15px; color: var(--soft); }
+  .legend { position: absolute; left: 72px; display: grid; grid-template-columns: 34px auto; gap: 12px 12px; align-items: center;
+    font-size: 20px; line-height: 1.3; }
+  .legend .drop { height: 34px; justify-self: center; }
+  .legend .card { height: 30px; justify-self: center; transform: rotate(8deg); }
+  /* The lock's water, carried across the paper on screenshot 2. Its color is the strip's water at the seam, sampled from
+     a capture top and bottom, so the two halves read as one body (round 13; round 12 lightened it 20% and the seam
+     showed; round 17 resampled it greener after the thumbnail's hills got lighter). The crest runs flat for its last 80px so it meets the seam level. */
+  .water { position: absolute; left: 0; width: 560px; bottom: 0; background: linear-gradient(rgb(36, 68, 66), rgb(13, 40, 45)); }
+  .water::before { content: ""; position: absolute; left: 0; right: 0; top: -25px; height: 26px; background: rgb(36, 68, 66);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 26' preserveAspectRatio='none'%3E%3Cpath d='M0 13C70 3 150 3 230 11S370 24 450 15C490 11 520 12 560 12V26H0Z'/%3E%3C/svg%3E") 0 0 / 560px 26px no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 26' preserveAspectRatio='none'%3E%3Cpath d='M0 13C70 3 150 3 230 11S370 24 450 15C490 11 520 12 560 12V26H0Z'/%3E%3C/svg%3E") 0 0 / 560px 26px no-repeat; }
+  .water-note { color: var(--paper); }
+
+  .tile { position: relative; width: 440px; height: 280px; overflow: hidden; background: var(--paper); color: var(--ink); }
+  .tile .word { font-weight: 700; letter-spacing: -3px; }
+</style>
+</head>
+<body>
+<script>
+  // @ts-check
+  const params = new URLSearchParams(location.search);
+  /**
+   * Where the strip starts. Every frame uses 480 since ref round 5 (Jesse: one width for all); 3 and 4 needed it for
+   * bigger captures in rounds 2 and 3. A shot's `panel` can still move it.
+   */
+  let PANEL_LEFT = 480;
+  /** History's card color, measured from a capture. */
+  const CARD_GRAY = 'rgb(39, 39, 39)';
+  /**
+   * Where shot 2 stops the lock's 1100ms rise: at the end. Round 6 tried partway, but the paused player sits behind the
+   * lock's panel, so any crest high enough to clear the panel has only the stage's gray above it.
+   */
+  const WATER_AT = 1100;
+
+  /**
+   * Each shot: the caption, the harness page, the iframe's size and offset in the panel (panel pixels, before the
+   * scale), CSS to put in the page, what has to exist before the step runs, an optional step, and notes. A note
+   * names its target by selector or by exact text, and sits in the left column at the target's height when there's
+   * room.
+   * @typedef {{sel?: string, text?: string, say: string, top?: boolean, under?: boolean, above?: number, at?: number, gap?: number, nodot?: boolean, has?: string}} Note
+   * A note with `at` has no target: it sits at that height with no leader, for a line about the whole page. One with
+   * `under` sits below its target and reaches up to the target's bottom edge with a right-angled leader, for a target
+   * whose row has other things to its left. One with `above` sits level with the gap that many page pixels over its
+   * target and drops straight down onto the target's top edge, for a target with a row above it and others to its left.
+   * `gap` sets how far short of a side target the leader stops (12px by default). `nodot` ends the leader with no dot,
+   * for a target that is itself a dot.
+   * A shot's legend sits under the caption with no leader: drip's own drop and card, and what each one is.
+   * @type {Record<string, {h: string, p: string, src: string, w: number, h2: number, x: number, y: number, scale: number, motion?: boolean, css?: string, ready: string, step?: (d: Document) => void, notes?: Note[], legend?: boolean, bg?: string, panel?: number, water?: number, legendY?: number, foot?: string}>}
+   */
+  const SHOTS = {
+    1: {
+      h: 'One video\nat a time.',
+      p: 'A Chrome extension for YouTube that\nreplaces the home feed with one pick.',
+      src: '/dev/home.html?scenario=card&theme=dark&reduced=1&videos=store',
+      // On the 800px strip since ref round 5: 3% bigger, the most the card's height allows, and centered across.
+      w: 620, h2: 656, x: -96, y: -215, scale: 1.6,
+      css: '#masthead, #harness-bar { visibility: hidden !important; }',
+      ready: '.drip-thumb img.is-loaded',
+      legend: true, legendY: 430,
+      // The channel, views, and age look real, so the frame says they're sample (Codex, ref round 1). The note about
+      // the next pick is gone: the card's legend line and the button's "-1" already say it (both seats, ref round 1).
+      foot: 'Sample video.',
+      notes: [],
+    },
+    // Not shipped since ref round 4: screenshot 2 is frames-v4.html?v=b, which both seats picked head to head.
+    2: {
+      h: 'When time\nruns out.',
+      p: 'An optional daily limit.\nWhen it\'s used up, the video pauses.',
+      src: '/dev/page.html?page=welcome#tour-4',
+      // The tour's stage alone, full height, cropped past its blurred edges. It sits at 362 to 921 across and 231 to 729
+      // down in the page.
+      w: 1280, h2: 800, x: -730, y: -416, scale: 1.7,
+      // Ref round 1 took the drawn water band off the paper: its crest stopped at the seam with no surface beside it.
+      motion: true,
+      // Roboto, as on YouTube: the welcome page doesn't load it. The spark that circles "Done for now" only makes sense
+      // moving, and the pill under the water showed as a clipped word, so both are hidden. The paused player gets
+      // screenshot 1's ride, brightened so it shows through the lock's tint and blur.
+      css: `@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        #drip-lock, #drip-lock * { font-family: Roboto, Arial, sans-serif !important; }
+        .co-layer, .co-ring, .co-chip, .co-said, .co-head, .co-count, .tour-again, .tour-under #drip-pill, #drip-lock .drip-orbit, #drip-lock .drip-orbit-spark, #drip-lock .drip-orbit-star { display: none !important; }
+        .tour-stage { border-color: transparent !important; border-radius: 0 !important; }
+        .tour-player { background: url(/store/art/thumbs/store-trail.svg) center / cover !important; filter: brightness(1.8) saturate(1.3); }
+        .tour-player-play, .tour-player-bar { display: none !important; }
+        .tour-under { transform: scale(1.6); } .tour-player { border-radius: 0 !important; filter: brightness(2.2) contrast(1.2) saturate(1.3) !important; }
+        #drip-lock .drip-done-ring { display: none !important; }
+        html[dark] #drip-lock .drip-sea { --drip-bubble-line: rgba(150, 205, 255, 0.35) !important; --drip-bubble-shine: rgba(170, 220, 255, 0.3) !important; }
+        .tour-player { background-size: 130% auto !important; background-position: 55% 95% !important; }`,
+      ready: '#drip-lock .drip-lock-sub',
+      // The tour runs on a fresh state, so its lock says "0m watched today"; the default day is 4 drops of 15 minutes.
+      // Headless Chrome doesn't advance animation time in the iframe, so every animation is set by hand, and the
+      // bubbles, which sea() places at random, are fixed so every capture is the same.
+      step: (d) => setTimeout(() => {
+        /** @type {HTMLElement} */ (d.querySelector('#drip-lock .drip-lock-sub')).textContent = '1h watched today';
+        // The tour focuses "Done for now", and a focus ring in a still reads as a click someone made.
+        /** @type {HTMLElement | null} */ (d.activeElement)?.blur();
+        // [left %, size px, px up from the sea's floor], low under the panel. Round 12: four, at clearly different sizes;
+        // round 16: three, smaller, with softer rims (Codex and Muse called the big glossy one the most decorative thing).
+        // Round 12's note:
+        // the rest hidden. A paused rise animation came out at a different time from run to run, so each bubble's
+        // animation is off and its place is set outright.
+        const BUBBLES = [[30, 14, 96], [63, 10, 78], [69, 7, 120]];
+        d.querySelectorAll('#drip-lock .drip-bubble').forEach((el, i) => {
+          const b = /** @type {HTMLElement} */ (el);
+          if (i >= BUBBLES.length) { b.style.display = 'none'; return; }
+          const [x, size, up] = BUBBLES[i];
+          b.style.setProperty('--x', `${x}%`);
+          b.style.setProperty('--size', `${size}px`);
+          b.style.animation = 'none';
+          b.style.opacity = '1';
+          b.style.transform = `translateY(-${up}px)`;
+        });
+        // The tour sets --tour-depth inside a view transition, where headless Chrome reads 0px. Set it properly, so the
+        // rise's time means what it says.
+        const lock = /** @type {HTMLElement} */ (d.getElementById('drip-lock'));
+        lock.style.setProperty('--tour-depth', `${lock.offsetHeight}px`);
+        d.getAnimations().forEach((a) => {
+          const name = /** @type {CSSAnimation} */ (a).animationName || '';
+          if (/bubble-rise/.test(name)) { a.pause(); return; }
+          if (/water-rise|crest/.test(name)) { a.currentTime = WATER_AT; a.pause(); return; }
+          if (/swim|bob|sway/.test(name)) a.currentTime = 3000;
+          else { try { a.finish(); } catch { a.currentTime = 5000; } }
+          a.pause();
+        });
+      }, 600),
+      notes: [
+        { sel: '#drip-lock .drip-lock-add', say: 'Or spend a drop\nfor 15 more minutes.' },
+      ],
+    },
+    3: {
+      h: 'Three ways\nto use drip.',
+      // No subline: the Recommended badge and the three cards say it (both seats, ref round 2). The caption panel is
+      // 80px narrower and the capture 11% bigger, so the cards' descriptions read at carousel size (both seats).
+      p: '',
+      src: '/dev/page.html?page=welcome',
+      w: 680, h2: 713, x: -36, y: -84, scale: 1.278,
+      // The page's own logo and tagline repeat the frame's mark.
+      css: '.hero { visibility: hidden !important; }',
+      ready: 'input[type=radio], [role=radio]',
+      notes: [
+        { text: 'Customize', say: 'Or set your own mix.' },
+      ],
+    },
+    4: {
+      h: 'Easy to tighten.\nSlow to loosen.',
+      p: 'After your first 24 hours: tighten now,\nloosen at the daily reset.',
+      src: '/dev/page.html?page=options&settled=1&sample=1&pending=1',
+      // From the tabs through Dry hours' line, cut there by the frame's height: Starts at, Ends at, and Finish video
+      // were a second subject (both seats, ref round 3). The 480px panel lets the capture grow 13%; the rows are 532px
+      // wide and didn't fit bigger in the 720px strip. The page's own "drip" title repeats the mark, so it's hidden.
+      // The sample raised drops from 4 to 5, so the row shows the waiting change.
+      w: 728, h2: 488, x: -114, y: -24, scale: 1.42,
+      css: 'h1 { visibility: hidden !important; }',
+      ready: '[role=tab]',
+      step: (d) => setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300),
+      notes: [
+        // The chip it points at says the rest, "4 drops until 4:00am" (both seats, ref round 5).
+        { sel: '.chip', has: '4 drops', say: 'Raised to 5 drops.', above: 17 },
+      ],
+    },
+    5: {
+      h: 'Your week\nin minutes.',
+      // The subline said what the chart shows in bigger type; now it says what the page records (both seats, ref round 4).
+      p: 'Sample week. Each day\'s minutes,\ndrops, and cards used.',
+      src: '/dev/page.html?page=options&settled=1&sample=1#history',
+      // The week's card, scaled so its edges fall just outside the strip and its gray is the strip's background.
+      // On the 800px strip since ref round 5: 4% bigger, the most the week's height allows, and centered.
+      w: 728, h2: 770, x: -116, y: -291, scale: 1.42, bg: CARD_GRAY,
+      // The capture ends above the summary line, which the crop would cut through, and the strip under it is the card's gray.
+      // At this scale the card is narrower than the strip, so the page behind it takes the card's gray and the card loses
+      // its corners: one surface edge to edge.
+      css: `[role=tablist] { visibility: hidden !important; }
+        html, body { background: ${CARD_GRAY} !important; }
+        #panel-history > .card:first-child { border-radius: 0 !important; border-color: transparent !important; box-shadow: none !important; }`,
+      ready: '[data-k=earlier]',
+      // This week starts on Sunday, so early in the week the chart is mostly empty. Last week is a full one. The frame is
+      // shorter than the tab, so the page scrolls to #history on its own; put it back at the top.
+      step: (d) => {
+        /** @type {HTMLElement} */ (d.querySelector('[data-k=earlier]')).click();
+        setTimeout(() => d.scrollingElement?.scrollTo(0, 0), 300);
+      },
+      // No note: the Saturday tiles already show 30m and 2 drops (both seats, ref round 1).
+    },
+  };
+
+  const shot = SHOTS[params.get('shot') || ''];
+  if (shot?.panel) PANEL_LEFT = shot.panel;
+  const tile = params.get('tile');
+
+  /** The element a note points at, by selector or by its exact text. @param {Document} d @param {Note} n */
+  function target(d, n) {
+    // `has` picks, among the selector's visible matches, the first whose text contains it.
+    // Hidden copies are skipped: Settings repeats a section's chips in its folded header.
+    if (n.sel && n.has) {
+      return [...d.querySelectorAll(n.sel)].find((e) => {
+        const r = e.getBoundingClientRect();
+        return r.width > 0 && r.top > 0 && e.textContent?.includes(/** @type {string} */ (n.has));
+      }) || null;
+    }
+    if (n.sel) return d.querySelector(n.sel);
+    const all = [...d.querySelectorAll('body *')].filter((e) => e.textContent?.trim() === n.text);
+    return all[all.length - 1] || null;
+  }
+
+  /**
+   * Puts each note in the left column at its target's height, below the caption, and draws a line from the note to
+   * the target's left edge. Notes that would overlap move down.
+   */
+  function drawNotes() {
+    if (!shot?.notes) return;
+    const frame = /** @type {HTMLIFrameElement} */ (document.querySelector('iframe'));
+    const d = /** @type {Document} */ (frame.contentDocument);
+    const root = /** @type {HTMLElement} */ (document.querySelector('.shot'));
+    const minY = /** @type {HTMLElement} */ (document.querySelector('.copy')).getBoundingClientRect().bottom + 12;
+    const maxY = 752;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'leaders');
+    svg.setAttribute('width', '1280');
+    svg.setAttribute('height', '800');
+    root.append(svg);
+    let next = minY;
+    if (shot.legend) {
+      const legend = document.createElement('div');
+      legend.className = 'legend';
+      legend.innerHTML = '<span class="mask drop"></span><span>A drop is 15 minutes by default.</span>'
+        + '<span class="mask card"></span><span>A card reveals one new video.</span>';
+      const ly0 = shot.legendY ?? minY + 8;
+      legend.style.top = `${ly0}px`;
+      root.append(legend);
+      next = ly0 + legend.getBoundingClientRect().height + 40;
+    }
+    // Placed top to bottom by target, so no two leaders cross.
+    for (const n of shot.notes.filter((q) => q.at !== undefined)) {
+      const note = document.createElement('div');
+      note.className = shot.water && n.at > 800 - shot.water ? 'note water-note' : 'note';
+      note.textContent = n.say;
+      note.style.top = `${n.at}px`;
+      root.append(note);
+    }
+    const placed = shot.notes.filter((q) => q.at === undefined).map((n) => ({ n, el: target(d, n) })).filter((p) => p.el).map(({ n, el }) => {
+      const r = /** @type {Element} */ (el).getBoundingClientRect();
+      // A note points at the target's left edge, 12px clear of it; with top set, at its top edge near the left; with
+      // under set, at its bottom edge near the left, from a note below it.
+      const corner = n.top || n.under || n.above !== undefined;
+      const tx = PANEL_LEFT + shot.x + (corner ? r.left + 36 : r.left) * shot.scale - (corner ? 0 : n.gap ?? 12);
+      const edge = n.top ? r.top - 8 / shot.scale : n.under ? r.bottom : n.above !== undefined ? r.top : r.top + r.height / 2;
+      const ty = shot.y + edge * shot.scale;
+      return { n, tx, ty };
+    }).sort((a, b) => a.ty - b.ty);
+    for (const { n, tx, ty } of placed) {
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = n.say;
+      root.append(note);
+      const h = note.getBoundingClientRect().height;
+      const gap = n.above !== undefined ? ty - n.above * shot.scale : 0;
+      const want = n.under ? ty + 30 : n.above !== undefined ? gap - h / 2 : ty - h / 2;
+      const top = Math.min(maxY, Math.max(next, want));
+      note.style.top = `${top}px`;
+      next = top + h + 22;
+      // The line leaves the note's middle, runs level, then bends to the target when the note couldn't sit level with
+      // it. An under note's line runs level below the row and turns straight up into the target.
+      const ly = top + h / 2;
+      const lx = 72 + Math.min(380, measure(note)) + 14;
+      const bend = PANEL_LEFT - 24;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', n.under || n.above !== undefined ? `M${lx} ${ly} H${tx} V${ty}` : `M${lx} ${ly} H${bend} L${tx} ${ty}`);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', '#1b74c9');
+      path.setAttribute('stroke-width', '1.5');
+      svg.append(path);
+      if (n.nodot) continue;
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', String(tx));
+      dot.setAttribute('cy', String(ty));
+      dot.setAttribute('r', '4');
+      dot.setAttribute('fill', '#42a5f6');
+      dot.setAttribute('stroke', '#f1ede4');
+      dot.setAttribute('stroke-width', '1.5');
+      svg.append(dot);
+    }
+  }
+
+  /**
+   * The width of a note's longest line, so its leader starts past all of its text. Round 14: it measured the first line
+   * only, and a longer second line ran into the leader.
+   * @param {HTMLElement} note
+   */
+  function measure(note) {
+    const range = document.createRange();
+    range.selectNodeContents(note);
+    const rects = [...range.getClientRects()];
+    return rects.length ? Math.max(...rects.map((q) => q.right)) - 72 : 380;
+  }
+
+  if (shot) {
+    document.body.innerHTML = `
+      <div class="shot">
+        <div class="copy"><h1></h1><p></p></div>
+        <div class="brand"><span class="mask drop"></span>drip</div>
+        <div class="panel"><iframe></iframe></div>
+      </div>`;
+    /** @type {HTMLElement} */ (document.querySelector('h1')).textContent = shot.h;
+    /** @type {HTMLElement} */ (document.querySelector('.copy p')).textContent = shot.p;
+    const frame = /** @type {HTMLIFrameElement} */ (document.querySelector('iframe'));
+    /** @type {HTMLElement} */ (document.querySelector('.panel')).style.width = `${1280 - PANEL_LEFT}px`;
+    Object.assign(frame.style, {
+      width: `${shot.w}px`, height: `${shot.h2}px`, left: `${shot.x}px`, top: `${shot.y}px`, transform: `scale(${shot.scale})`,
+    });
+    frame.src = shot.src;
+    if (shot.water) {
+      const water = document.createElement('div');
+      water.className = 'water';
+      water.style.height = `${shot.water}px`;
+      /** @type {HTMLElement} */ (document.querySelector('.shot')).insertBefore(water, document.querySelector('.panel'));
+    }
+    if (shot.foot) {
+      const foot = document.createElement('div');
+      foot.className = 'foot';
+      foot.textContent = shot.foot;
+      // Right under the subline, next to the numbers it qualifies (round 13).
+      foot.style.top = `${/** @type {HTMLElement} */ (document.querySelector('.copy')).getBoundingClientRect().bottom + 10}px`;
+      /** @type {HTMLElement} */ (document.querySelector('.shot')).append(foot);
+    }
+    if (shot.bg) /** @type {HTMLElement} */ (document.querySelector('.panel')).style.background = shot.bg;
+    // page.html rewrites its own document, so keep checking: put the style in whatever document is there now, and run
+    // the step once the page has drawn what this shot needs. The notes go on after the step has settled.
+    let stepped = false;
+    const poll = setInterval(() => {
+      const d = frame.contentDocument;
+      if (!d || !d.head) return;
+      if (shot.css && !d.getElementById('store-frame-css')) {
+        const style = d.createElement('style');
+        style.id = 'store-frame-css';
+        style.textContent = shot.css;
+        d.head.append(style);
+      }
+      if (!stepped && d.querySelector(shot.ready)) {
+        stepped = true;
+        shot.step?.(d);
+        setTimeout(drawNotes, 1500);
+        document.documentElement.dataset.ready = '1';
+      }
+    }, 100);
+    setTimeout(() => clearInterval(poll), 8000);
+  } else if (tile) {
+    const tiles = {
+      // The drop and the wordmark on paper, with the line from screenshot 1 in the headline's serif.
+      c: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:18px;padding-bottom:6px">
+            <span class="mask drop" style="height:104px"></span>
+            <div>
+              <div class="word" style="font-size:86px;line-height:0.86">drip</div>
+              <div style="font-family:Newsreader,Georgia,serif;font-size:31px;margin-top:6px;letter-spacing:-0.4px">One video at a time.</div>
+            </div>
+          </div>`,
+      // Round 8: c larger, with the line on two lines so it stays inside the wordmark's width.
+      // Round 15: a deeper paper and the lock's water along the bottom edge, so the tile holds on the store's white page.
+      // Round 16: the water in the drop's own blue family, lighter, so it reads as water and not a dark footer bar.
+      c2: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:22px;padding-bottom:18px;background:#ebe4d6">
+            <svg style="position:absolute;left:0;bottom:0" width="440" height="30" viewBox="0 0 440 30" preserveAspectRatio="none"><path d="M0 14C70 5 150 5 220 12S370 22 440 13V30H0Z" fill="rgb(74, 150, 200)"/></svg>
+            <span class="mask drop" style="height:128px;margin-top:-14px"></span>
+            <div>
+              <div class="word" style="font-size:104px;line-height:0.84">drip</div>
+              <div style="font-family:Newsreader,Georgia,serif;font-size:34px;line-height:1.02;margin-top:14px;letter-spacing:-0.5px">One video<br>at a time.</div>
+            </div>
+          </div>`,
+      // Round 10: c2 with the gold card tucked behind the drop, so the mark is drip's two tokens and not any water app's.
+      // Round 12: the card peeks out up and to the left, away from the tagline, upright enough to read as a card.
+      c3: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:22px">
+            <span style="position:relative;display:inline-block;width:116px;height:136px">
+              <span class="mask card" style="position:absolute;height:64px;left:0;top:10px;transform:rotate(-15deg)"></span>
+              <span class="mask drop" style="position:absolute;height:128px;left:30px;top:8px"></span>
+            </span>
+            <div>
+              <div class="word" style="font-size:104px;line-height:0.84">drip</div>
+              <div style="font-family:Newsreader,Georgia,serif;font-size:34px;line-height:1.02;margin-top:14px;letter-spacing:-0.5px">One video<br>at a time.</div>
+            </div>
+          </div>`,
+      // The drop and the wordmark alone, on paper.
+      p: `<div class="tile" style="display:flex;align-items:center;justify-content:center;gap:16px">
+            <span class="mask drop" style="height:106px"></span>
+            <div class="word" style="font-size:92px;line-height:1">drip</div>
+          </div>`,
+    };
+    document.body.innerHTML = tiles[/** @type {'c'|'c2'|'c3'|'p'} */ (tile)] || '';
+    document.documentElement.dataset.ready = '1';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <!-- Drawn by hand for the store images: a rider climbing a ridge trail, a storm coming in from the left, and a break of
+       light to the right. No real thumbnail. Round 7 drew it with a small rider on the crest; the design-thumb round
+       (2026-11-09) made the rider about four times the size, and Jesse picked that version ("A, Closer"). -->
+<defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="0.6"><stop offset="0" stop-color="#263042"/><stop offset="0.5" stop-color="#5d6677"/><stop offset="0.85" stop-color="#c9ab7c"/><stop offset="1" stop-color="#e8c891"/></linearGradient>
+    <radialGradient id="glow" cx="0.74" cy="0.52" r="0.32"><stop offset="0" stop-color="#ffe2a8" stop-opacity="0.95"/><stop offset="0.5" stop-color="#f3cf8e" stop-opacity="0.35"/><stop offset="1" stop-color="#f3cf8e" stop-opacity="0"/></radialGradient>
+    <linearGradient id="mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a6a52"/><stop offset="1" stop-color="#2d4335"/></linearGradient>
+    <linearGradient id="near" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c3c2e"/><stop offset="1" stop-color="#172119"/></linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#sky)"/><rect width="1280" height="720" fill="url(#glow)"/><path d="M0 0 H1010 C 990 40 940 52 900 60 C 930 92 880 118 830 112 C 800 150 730 150 700 132 C 670 170 600 176 560 150
+           C 530 196 450 204 410 176 C 380 222 300 236 250 208 C 210 250 130 262 80 236 C 50 262 20 266 0 258 Z" fill="#1c2330" opacity="0.92"/><g stroke="#a7b2c6" stroke-linecap="round" opacity="0.4">
+<line x1="70" y1="362" x2="53" y2="453" stroke-width="2"/>
+<line x1="61" y1="351" x2="49" y2="419" stroke-width="2.4"/>
+<line x1="410" y1="271" x2="404" y2="304" stroke-width="2.4"/>
+<line x1="225" y1="351" x2="220" y2="382" stroke-width="2.4"/>
+<line x1="138" y1="356" x2="125" y2="434" stroke-width="1.2"/>
+<line x1="469" y1="264" x2="463" y2="296" stroke-width="1.2"/>
+<line x1="488" y1="306" x2="480" y2="353" stroke-width="2.4"/>
+<line x1="377" y1="323" x2="361" y2="414" stroke-width="2.4"/>
+<line x1="287" y1="301" x2="272" y2="386" stroke-width="2.4"/>
+<line x1="495" y1="371" x2="484" y2="434" stroke-width="1.2"/>
+<line x1="97" y1="379" x2="79" y2="478" stroke-width="1.2"/>
+<line x1="386" y1="367" x2="367" y2="475" stroke-width="2.4"/>
+<line x1="264" y1="369" x2="256" y2="414" stroke-width="2"/>
+<line x1="306" y1="366" x2="288" y2="464" stroke-width="2.4"/>
+<line x1="306" y1="264" x2="297" y2="314" stroke-width="2.4"/>
+<line x1="215" y1="281" x2="202" y2="355" stroke-width="2"/>
+<line x1="45" y1="340" x2="38" y2="378" stroke-width="1.6"/>
+<line x1="271" y1="307" x2="258" y2="376" stroke-width="1.2"/>
+<line x1="244" y1="297" x2="226" y2="395" stroke-width="2.4"/>
+<line x1="337" y1="280" x2="328" y2="328" stroke-width="1.2"/>
+<line x1="401" y1="325" x2="383" y2="424" stroke-width="1.6"/>
+<line x1="210" y1="301" x2="193" y2="399" stroke-width="2"/>
+<line x1="239" y1="292" x2="225" y2="366" stroke-width="1.2"/>
+<line x1="200" y1="363" x2="180" y2="469" stroke-width="1.6"/>
+<line x1="270" y1="327" x2="258" y2="391" stroke-width="1.2"/>
+<line x1="250" y1="304" x2="237" y2="378" stroke-width="2.4"/>
+</g>
+  <path d="M0 400 L120 360 L220 380 L330 330 L430 356 L560 318 L680 350 L800 300 L920 336 L1040 312 L1160 340 L1280 326 V720 H0 Z" fill="#4c5568"/>
+  <path d="M0 560 C 200 520 380 500 560 480 C 700 466 820 452 940 456 C 1060 462 1180 486 1280 500 V720 H0 Z" fill="url(#mid)"/>
+  <path d="M0 720 V650 C 240 620 520 640 760 676 C 960 700 1140 690 1280 670 V720 Z" fill="url(#near)"/>
+  <!-- the trail runs over the crest and down the far side, fading, so it doesn't stop in the grass -->
+  <linearGradient id="trailfade" gradientUnits="userSpaceOnUse" x1="980" y1="0" x2="1300" y2="0">
+    <stop offset="0" stop-color="#dcbc80"/><stop offset="1" stop-color="#c4a573" stop-opacity="0.45"/>
+  </linearGradient>
+  <path d="M40 720 C 220 660 420 600 600 560 C 700 538 800 500 900 470 C 960 452 1010 450 1060 452 C 1120 454 1170 462 1220 474 C 1250 481 1270 486 1300 492" fill="none" stroke="url(#trailfade)" stroke-width="16" stroke-linecap="round"/>
+
+    <g transform="translate(720 444) rotate(-16) scale(1.75)" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <circle cx="-62" cy="4" r="36" stroke="#0b0e0c" stroke-width="7"/>
+      <circle cx="62" cy="4" r="36" stroke="#0b0e0c" stroke-width="7"/>
+      <circle cx="-62" cy="4" r="4" fill="#0b0e0c"/>
+      <circle cx="62" cy="4" r="4" fill="#0b0e0c"/>
+      <path d="M-62 4 L0 6 L-14 -50 Z M-14 -50 L48 -46 L52 -30 L0 6 M52 -30 L62 4" stroke="#0b0e0c" stroke-width="6.0"/>
+      <path d="M48 -46 L52 -58 L68 -56 C 78 -54 78 -40 70 -38" stroke="#0b0e0c" stroke-width="5"/>
+      <path d="M-26 -55 L-2 -55" stroke="#0b0e0c" stroke-width="7"/>
+      <circle cx="0" cy="6" r="9" stroke="#0b0e0c" stroke-width="4"/>
+      <!-- far leg, then near leg -->
+      <path d="M-12 -62 L6 -30 L-10 16" stroke="#1b2230" stroke-width="13" opacity="0.85"/>
+      <path d="M-12 -62 L24 -40 L18 -2" stroke="#1b2230" stroke-width="14"/>
+      <path d="M12 -2 L28 -2" stroke="#0b0e0c" stroke-width="7"/>
+      <!-- torso in drip's blue, arm, head with helmet -->
+      <path d="M-12 -62 L32 -94" stroke="#42a5f6" stroke-width="20"/>
+      <path d="M32 -94 L52 -74 L68 -56" stroke="#42a5f6" stroke-width="10"/>
+      <circle cx="68" cy="-56" r="5" fill="#0b0e0c"/>
+      <circle cx="48" cy="-110" r="11" fill="#e0b48f"/>
+      <!-- a light helmet with vents and a strap, so it doesn't read as hair -->
+      <path d="M30 -110 C 30 -128 50 -135 64 -125 C 70 -121 73 -115 71 -110 Z" fill="#eef1f5" stroke="#0b0e0c" stroke-width="3"/>
+      <path d="M42 -129 L45 -115 M52 -131 L54 -115 M61 -127 L62 -114" stroke="#8d97a3" stroke-width="2.5"/>
+      <path d="M40 -109 L44 -99" stroke="#0b0e0c" stroke-width="2"/>
+      
+    </g>
+</svg>
