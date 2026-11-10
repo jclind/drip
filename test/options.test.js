@@ -70,6 +70,10 @@ function page() {
     matches(selector) {
       const parts = selector.match(/(?:\[[^\]]*\]|[^\s])+/g) || [];
       if (parts.length > 1) return this.matches(parts.at(-1)) && !!this.parent?.closest(parts.slice(0, -1).join(' '));
+      // :not(...) as in Chrome, so `[data-k="x"]:not([disabled])` skips a disabled control.
+      const nots = [...selector.matchAll(/:not\(([^)]*)\)/g)];
+      if (nots.some(([, inner]) => this.matches(inner))) return false;
+      selector = selector.replace(/:not\([^)]*\)/g, '');
       const attrs = [...selector.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)];
       if (attrs.some(([, k, v]) => !(k in this.attrs) || (v !== undefined && this.attrs[k] !== v))) return false;
       const simple = selector.replace(/\[[^\]]*\]/g, '');
@@ -277,6 +281,30 @@ test('reset results show removed counts, keep balances and history, and omit zer
   assert.equal(p.get('dataResult').textContent, 'Reset');
 });
 
+test('Saved. and Reset count Dry hours once, as their one chip does', async () => {
+  const p = page();
+  p.run('state.settings.dryHours = true; draft = Drip.planned(state); renderForm()');
+  // Ends at an hour sooner: one edit, and Dry hours wait as a range of three keys.
+  p.run('draft.dryTo = 5; draftChanged()');
+  assert.equal(p.get('result').textContent, '1 change not saved');
+  await p.run('save()');
+  assert.equal(p.run('Object.keys(state.pending.changes).sort().join()'), 'dryFrom,dryHours,dryTo', 'state still keeps all three');
+  assert.equal(p.get('result').textContent, 'Saved. 1 change starts at 4:00am.');
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 1);
+  // A second save names only what it left waiting, though Dry hours still wait too.
+  p.run('draft.minutesPerToken = 20; draftChanged()');
+  await p.run('save()');
+  assert.equal(p.get('result').textContent, 'Saved. 1 change starts at 4:00am.');
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 2);
+  p.run('state.pending = null; state.settings.watchTokensPerDay = 2; draft = Drip.planned(state); renderForm()');
+  await p.get('resetYes').click();
+  assert.equal(p.run('Object.keys(state.pending.changes).sort().join()'), 'dryFrom,dryHours,dryTo,watchTokensPerDay');
+  assert.match(p.get('dataResult').textContent, /2 changes start at 4:00am\./);
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 2);
+  assert.equal(p.run('Drip.waitingCount([])'), 0);
+  assert.equal(p.run('Drip.waitingCount(["dryHours", "dryFrom", "dryTo", "stashMax"])'), 2);
+});
+
 test('export is only the check and title; import errors keep the existing explanation panel', async () => {
   const p = page();
   await p.get('exportData').click();
@@ -316,6 +344,30 @@ test('successful channel adds clear stale notes; invalid handles keep error note
   p.document.querySelector('[data-k="allow-input"]').value = 'invalid';
   await p.run("addChannel('allow')");
   assert.match(p.run('channelsNote.allow'), /isn't a channel handle or link/);
+});
+
+test('the 5th allowed channel moves focus from the full field and button to the Allowed tab', async () => {
+  for (const from of ['allow-input', 'allow-add']) {
+    const p = page();
+    p.run(`state.channels.allow = ['@one', '@two', '@three'].map((id) => ({ ids: [id], name: '' })); renderForm()`);
+    const at = (/** @type {string} */ k) => p.document.querySelector(`[data-k="${k}"]`);
+    /** @param {string} handle */
+    const add = async (handle) => {
+      at('allow-input').value = handle;
+      at(from).focus();
+      if (from === 'allow-input') await p.run("addChannel('allow')");
+      else await at('allow-add').click();
+    };
+    await add('@four');
+    assert.equal(p.document.activeElement, at(from), `${from}: room left keeps focus where it was`);
+    await add('@five');
+    assert.equal(p.run('Drip.allowCount(state)'), 5);
+    assert.equal(at('allow-input').getAttribute('disabled'), '');
+    assert.equal(at('allow-add').getAttribute('disabled'), '');
+    // Focus fell to the page before, since the only fallback was the disabled field.
+    assert.equal(p.document.activeElement, at('tab-allow'), from);
+    assert.match(p.document.activeElement.textContent, /Allowed5\/5/);
+  }
 });
 
 test('page panels keep the form mounted, preserve drafts, and save from Channels and History', async () => {

@@ -583,7 +583,7 @@ function savedLine(waiting) {
   if (mode && waiting.some((k) => MODE_KEYS.includes(k)) && mode !== Drip.modeOf(state.settings)) {
     return `Saved. ${modeName(mode)} starts at ${resetLabel()}.`;
   }
-  return `Saved. ${plural(waiting.length, 'change starts', 'changes start')} at ${resetLabel()}.`;
+  return `Saved. ${plural(Drip.waitingCount(waiting), 'change starts', 'changes start')} at ${resetLabel()}.`;
 }
 
 async function save() {
@@ -1061,7 +1061,13 @@ function renderChannels(force = false) {
       tabButton('block', 'Blocked', String(blocked.length))),
     pane('allow', allowed),
     pane('block', blocked));
-  if (focused) /** @type {HTMLElement | null} */ (pad.querySelector(`[data-k="${focused}"]:not([disabled])`) || pad.querySelector(`[data-k="${focused.split('-')[0]}-input"]:not([disabled])`))?.focus();
+  if (focused) {
+    const list = focused.split('-')[0];
+    // The 5th allowed channel disables the field and its button, so focus on them goes to the list's tab, which says
+    // 5/5. Not the new tile's x, where a second Enter would cancel the channel just added.
+    /** @type {HTMLElement | null} */ (pad.querySelector(`[data-k="${focused}"]:not([disabled])`)
+      || pad.querySelector(`[data-k="${list}-input"]:not([disabled])`) || pad.querySelector(`[data-k="tab-${list}"]`))?.focus();
+  }
 }
 
 // Your data (RELEASE-PLAN.md, item 5): export, import, and reset. Import and reset go through the worker's rules, so a
@@ -1105,9 +1111,12 @@ function dataDone(title, lines = [], failed = false, chips = []) {
   box.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
-/** "2 changes start at 4:00am.", or '' when nothing waits. @param {Record<string, any> | undefined} pending */
+/**
+ * "2 changes start at 4:00am.", or '' when nothing waits. Dry hours count once, as their one chip does.
+ * @param {Record<string, any> | undefined} pending
+ */
 function waitsLine(pending) {
-  const n = Object.keys(pending || {}).length;
+  const n = Drip.waitingCount(Object.keys(pending || {}));
   return n ? `${plural(n, 'change starts', 'changes start')} at ${resetLabel()}.` : '';
 }
 

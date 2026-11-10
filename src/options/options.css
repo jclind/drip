@@ -1339,8 +1339,11 @@ button.data-info[aria-expanded="true"] {
   margin: 14px 0 20px;
 }
 
+/* One column the width of the pane. An auto column grew to the longest name, and .rows-inner's clip then cut the x
+   off every tile. */
 .channel-tiles {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   margin: 0;
   padding: 0;
