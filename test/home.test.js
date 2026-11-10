@@ -474,12 +474,12 @@ function addFeedNudge(root) {
 /**
  * One YouTube tab on the home page, running home.js.
  * @param {ReturnType<typeof makeWorld>} world
- * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string, realReveal?: boolean}} [opts] reduced: the browser asks for
+ * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string, realReveal?: boolean, offline?: boolean}} [opts] reduced: the browser asks for
  *   reduced motion, so nothing animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that
  *   kind's markup (gridMarks). inView: drip's home page is on screen, so drops land in the counter, and tab.landings
  *   records each landing. kept: what "Done for now" left in sessionStorage, "N" or "N:dryUntil" (watch.js onDone).
  */
-async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '', realReveal = false } = {}) {
+async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '', realReveal = false, offline = false } = {}) {
   let now = 0;
   world.time = () => EPOCH + now;
   /** @type {Map<number, {fn: Function, at: number, every: number}>} */
@@ -569,6 +569,8 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
   };
   const tab = {
     reduced,
+    /** navigator.onLine reads this, so a test can drop the connection mid-way. */
+    offline,
     document, location, world, errors, browse, runtime,
     flights: () => document.motions.filter((m) => m.classes.includes('drip-deal is-flying')),
     morphs: () => document.motions.filter((m) => m.el.parentElement?.classList.contains('drip-blobs')),
@@ -593,7 +595,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
   /** @type {any} */
   const context = {
     document, location, console: { ...console, error: (/** @type {any[]} */ ...args) => tab.logged.push(args) }, JSON, Math, Number, String, Boolean, Set, Map, WeakMap, Array, Object, Promise, Error,
-    URL, URLSearchParams, structuredClone, navigator: { userAgent: 'test', clipboard: { writeText: async () => {} } },
+    URL, URLSearchParams, structuredClone, navigator: { userAgent: 'test', get onLine() { return !tab.offline; }, clipboard: { writeText: async () => {} } },
     CSS: { escape: (/** @type {string} */ s) => s.replace(/["\\]/g, '\\$&') },
     innerHeight: 900,
     matchMedia: () => ({ matches: reduced }),
@@ -1001,6 +1003,57 @@ for (const reduced of [true, false]) {
     assert.match(tab.message(), /Try again after a refresh/);
     assert.equal(world.state.tokens.rec, 10);
     assert.equal(world.count('reveal'), 0);
+  });
+
+  test(`offline, drip's note takes the place of Reveal and +15m (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced, grid: [], offline: true });
+    await tab.advance(1000);
+    assert.match(tab.root().querySelector('.drip-offline').textContent, /You're offline\./);
+    assert.equal(tab.button('reveal'), null);
+    assert.equal(tab.button('add'), null);
+    assert.equal(tab.document.getElementById('drip-broken'), null);
+  });
+
+  test(`YouTube's offline message brings drip's note, and Retry presses YouTube's (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced, grid: [] });
+    assert.ok(tab.button('reveal'));
+    const promo = tab.document.createElement('ytd-background-promo-renderer');
+    promo.setAttribute('icon-name', 'offline-no-content:OFFLINE_NO_CONTENT');
+    const retry = tab.document.createElement('button');
+    let pressed = 0;
+    retry.addEventListener('click', () => { pressed++; });
+    promo.append(retry);
+    tab.browse.querySelector('#primary').append(promo);
+    await tab.advance(600);
+    assert.ok(tab.root().querySelector('.drip-offline'));
+    assert.equal(tab.button('reveal'), null);
+    await tab.click('retry');
+    assert.equal(pressed, 1);
+    // Retry worked: YouTube takes its message away, and Reveal comes back on the next check.
+    promo.remove();
+    await tab.advance(600);
+    assert.equal(tab.root().querySelector('.drip-offline'), null);
+    assert.ok(tab.button('reveal'));
+  });
+
+  test(`Reveal next while offline says so and asks for no report (${how})`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced, realReveal: true });
+    await tab.click('reveal');
+    await loadPicture(tab);
+    await tab.advance(100);
+    assert.equal(tab.cardTitle(), 'Video v1');
+    const cards = world.state.tokens.rec;
+    for (const item of tab.browse.querySelectorAll('ytd-rich-item-renderer')) item.remove();
+    tab.offline = true;
+    await tab.click('next');
+    await tab.advance(40000);
+    assert.equal(tab.document.getElementById('drip-broken'), null);
+    assert.match(tab.message(), /You're offline\. No card spent\./);
+    assert.equal(tab.cardTitle(), 'Video v1');
+    assert.equal(world.state.tokens.rec, cards);
   });
 
   for (const staleGrid of [false, true]) {
