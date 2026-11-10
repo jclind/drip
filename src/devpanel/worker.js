@@ -103,6 +103,10 @@
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
   }
 
+  // Set before the first clearDevClockIfOff below, which reads it through devStatus. A const read before its line
+  // throws, and that left the dev clock shifted after a worker restart with developer mode off.
+  const shipsPanel = (chrome.runtime.getManifest().content_scripts || []).some((c) => (c.js || []).some((f) => f.startsWith('src/devpanel/')));
+
   /** Developer mode off puts drip back on real time. */
   async function clearDevClockIfOff() {
     const C = /** @type {any} */ (globalThis).DripDevClock;
@@ -114,7 +118,6 @@
     if (area === 'local' && changes[DEV_KEY]) clearDevClockIfOff().catch(() => {});
   });
   clearDevClockIfOff().catch(() => {});
-  const shipsPanel = (chrome.runtime.getManifest().content_scripts || []).some((c) => (c.js || []).some((f) => f.startsWith('src/devpanel/')));
 
   /** @returns {Promise<{toggle: boolean, file: boolean, enabled: boolean}>} */
   async function devStatus() {
