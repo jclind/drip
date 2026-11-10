@@ -86,9 +86,28 @@
   const MIN_LIST = 130;
 
   /**
+   * Keeps the list inside the window sideways: no wider than the window less EDGE on each side, and moved in from an
+   * edge it would run past. A search result's list starts under its Stash button, which can be most of the way across
+   * a narrow window: in a 600px window it ended at 688px (release review, 2026-11-10). It starts from no shift each
+   * time, and clientWidth leaves out the scrollbar, which 100vw in drip.css counts.
+   * @param {HTMLElement} el
+   */
+  function fitAcross(el) {
+    el.style.translate = '';
+    el.style.maxWidth = '';
+    const width = document.documentElement.clientWidth;
+    if (el.offsetWidth > width - 2 * EDGE) el.style.maxWidth = `${Math.max(0, width - 2 * EDGE)}px`;
+    const box = el.getBoundingClientRect();
+    // Back in from the right edge, but never out past the left one.
+    const shift = Math.round(Math.max(EDGE - box.left, Math.min(0, width - EDGE - box.right)));
+    if (shift) el.style.translate = `${shift}px 0`;
+  }
+
+  /**
    * Opens the list below its button, or above it when there's more room there, and shortens it to fit the window, so
    * it never runs off the bottom of the screen and the page doesn't have to scroll to show it. Call it once the list
-   * is in the page. The card and search lists flip; the pill's always hangs down inside the player.
+   * is in the page. The card and search lists flip, and move in from a side of the window they'd run past; the pill's
+   * always hangs down inside the player, lined up under the pill.
    * @param {HTMLElement} el The list from picker(). @param {Element | null} anchor Its Stash button.
    */
   function place(el, anchor) {
@@ -96,11 +115,12 @@
     if (!list || !anchor) return;
     el.classList.remove('is-above');
     list.style.maxHeight = '';
+    const flips = el.dataset.flips !== 'false';
+    if (flips) fitAcross(el);
     const a = anchor.getBoundingClientRect();
     const chrome = el.offsetHeight - list.offsetHeight;
     const below = window.innerHeight - a.bottom - 8 - EDGE;
     const above = a.top - 8 - Math.max(EDGE, TOP_BAR + 8);
-    const flips = el.dataset.flips !== 'false';
     const up = flips && el.offsetHeight > below && above > below;
     el.classList.toggle('is-above', up);
     const room = (up ? above : below) - chrome;
