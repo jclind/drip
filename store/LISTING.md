@@ -1,10 +1,14 @@
 # Chrome Web Store listing answers
 
-Draft, 2026-10-06, checked against `main` on 2026-11-09 (97fc18e). The images are planned in `ART-PLAN.md`. The final set to upload is `store/images-v2/` (`screenshot-1.png` to `-5.png`, and `tile-c2.png` as the small promo tile).
+Draft, 2026-10-06, checked against the 1.0 fix branches on 2026-11-10. The images are planned in `ART-PLAN.md`. The final set to upload is `store/images-v2/` (`screenshot-1.png` to `-5.png`, and `tile-c2.png` as the small promo tile).
 
 ## Name
 
-drip (tentative, Q17). Google's branding rules don't allow "YouTube" in the name. Search the store for clashes before submitting; nobody has recorded that search yet.
+`drip: YouTube without the feed` (Q17, Jesse, 2026-11-10). The manifest's `name` holds it, and `short_name` is `drip`. Every page inside the extension still says drip alone.
+
+The YouTube API branding guidelines (https://developers.google.com/youtube/branding) say not to use YouTube "in conjunction with the overall name" of an app, and allow saying an app is for YouTube. They bind apps that call the YouTube API, which drip doesn't, and the store has many names of this kind, such as "Enhancer for YouTube". If a reviewer objects anyway, fall back to `drip` and resubmit.
+
+Jesse searched the store for "drip" on 2026-11-10 and got 15 results. Two share the name exactly: "Drip", a design token inspector, and "DRIP", a Twitter thread manager. Neither has a rating. The other 13 have "drip" inside a longer name, such as Textdrip, Sku Drip Fetcher, and Water Reminder Buddy - Drip. None of the 15 has anything to do with YouTube, video, or screen time. The store doesn't require a unique name, so the two matches don't block the upload, and the longer name sets drip apart from both.
 
 ## Category
 
@@ -40,7 +44,7 @@ Installing drip opens a welcome page with a mode picker and a tour.
 - With watch time on, playing videos use minutes bought with drops, and running out pauses the video behind a lock. Background audio counts, ads do not. Optional Dry hours stop watching on drops during a daily range. Allowed channels and "I need this one" unlocks play without using minutes. Embeds on other websites and music.youtube.com are outside drip's scope.
 - "I need this one" on the lock unlocks one video for the day, with a typed reason, 3 times a week.
 - With Stash on, you can keep videos for later from reveal cards, search, and watch pages.
-- Channel lists: an allowed channel's videos play without using minutes, and a blocked channel never comes up in a reveal. Allow from the channel's page or Settings, block from a reveal card's menu or Settings.
+- Channel lists: an allowed channel's videos play without using minutes, and a blocked channel never comes up in a reveal. Allow from Settings, or from the channel's page while watch time is on. Block from a reveal card's menu or Settings.
 - Settings has three tabs: Settings (modes, each part's limits, Dry hours, the YouTube switches, Export and Import), Channels (the allow and block lists), and History (today's use and a week's chart, with the reasons typed for each unlock).
 
 ## Description

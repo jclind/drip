@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "drip",
+  "name": "drip: YouTube without the feed",
+  "short_name": "drip",
   "version": "1.0.0",
   "description": "Replaces YouTube's endless home feed with a search box or one recommendation at a time, with optional watch time limits.",
   "minimum_chrome_version": "121",
@@ -29,9 +30,6 @@
     "48": "icons/48.png",
     "128": "icons/128.png"
   },
-  "web_accessible_resources": [
-    { "resources": ["src/icons/*.svg"], "matches": ["https://www.youtube.com/*"] }
-  ],
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
@@ -51,7 +49,7 @@
     },
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["src/lib/state.js", "src/content/early.js"],
+      "js": ["src/lib/state.js", "src/content/early.js", "src/content/upnext.js"],
       "run_at": "document_start"
     },
     {

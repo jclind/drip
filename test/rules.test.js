@@ -135,3 +135,19 @@ test('early lock uses the same day boundary as dayKey', () => {
   assert.equal(D.earlyLocked(state, time(6, 4), 'abc'), true);
 });
 
+test("YouTube's next video is its own pick outside a playlist, and the list's inside one (Q2)", () => {
+  const plain = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
+  const list = 'https://www.youtube.com/watch?v=2Hww7aqAs5o&list=PLKozl91Vtbkxs0R597UzSlLtsaQJLh-lu';
+  // The Next button's hrefs as YouTube wrote them on 2026-11-10.
+  assert.equal(D.upNextIsPick(plain, 'https://www.youtube.com/watch?v=RD_Jwka9NaY'), true);
+  assert.equal(D.upNextIsPick(list, 'https://www.youtube.com/watch?list=PLKozl91Vtbkxs0R597UzSlLtsaQJLh-lu&v=cPKkbFbfiTU'), false);
+  // A mix is a list too.
+  assert.equal(D.upNextIsPick('https://www.youtube.com/watch?v=abc&list=RDabc', '/watch?v=def&list=RDabc'), false);
+  // At a playlist's end the Next button can point past the list, to YouTube's pick.
+  assert.equal(D.upNextIsPick(list, 'https://www.youtube.com/watch?v=RD_Jwka9NaY'), true);
+  // No Next button: the page's own list decides.
+  assert.equal(D.upNextIsPick(plain, ''), true);
+  assert.equal(D.upNextIsPick(list, ''), false);
+  assert.equal(D.upNextIsPick('https://www.youtube.com/watch?v=abc&list=', ''), true);
+});
+

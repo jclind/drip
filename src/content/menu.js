@@ -90,7 +90,8 @@
 
   /**
    * A plain link would load a whole new page and lose the watch time watch.js hasn't sent yet, so guard.js hands
-   * YouTube's links to its in-page navigation. A new-tab click, or Studio's link, goes the plain way.
+   * YouTube's links to its in-page navigation. A new-tab click, Studio's link, and Downloads, which guard.js leaves alone,
+   * go the plain way.
    * @param {MouseEvent} e
    */
   function follow(e) {
@@ -109,8 +110,12 @@
     if (!root.hasAttribute('data-drip-menu') || !(e.target instanceof Element)) return;
     const button = e.target.closest(SEL.guideButton);
     if (!button) {
-      if (menu && !menu.contains(e.target)) close();
-      else if (menu) follow(e);
+      if (!menu) return;
+      if (menu.contains(e.target)) follow(e);
+      // Only the user's click outside closes it. Scripts click too: watch.js clicked YouTube's hidden autoplay switch
+      // every second in a new profile, and the menu closed by itself (release review, 2026-11-10). A test's plain
+      // event object has no isTrusted, so it counts as the user's.
+      else if (e.isTrusted !== false) close();
       return;
     }
     e.preventDefault();

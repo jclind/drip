@@ -190,6 +190,53 @@
     return { watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 0, passed: 0, watched: 0, needThis: [] };
   }
 
+  // Text from a page or a person goes into state, which every save and every state message carries whole, and
+  // chrome.storage.local holds 10 MB. So each piece has a cap, and the rules apply it where the text comes in.
+
+  /**
+   * The longest a title, channel name, or feed label may be. YouTube stops titles at 100 characters, so 200 cuts only
+   * what didn't come from YouTube. Channel lists use the same cap.
+   */
+  const TEXT_MAX = 200;
+  /**
+   * The longest an "I need this one" reason may be: a few sentences, which the Settings list shows in full. The lock's
+   * textarea has this as its maxlength, so the person sees the limit and nothing typed is cut.
+   */
+  const REASON_MAX = 300;
+  /** The most "I need this one" uses one log day keeps: the highest weekly allowance Settings offers. */
+  const USES_MAX = ranges.needThisPerWeek[1];
+  /**
+   * The most uses an import leaves in the whole log: the highest weekly allowance for each of the 13 weeks in the 90
+   * days the log keeps. Chrome counts some characters as six bytes, so 20 uses on each of 89 days could fill half of
+   * storage from a file of 1 MB.
+   */
+  const LOG_USES_MAX = USES_MAX * 13;
+
+  /**
+   * Text on one line, at most `max` characters: runs of whitespace become one space, and the ends are trimmed. A cut
+   * never splits a character in two, like an emoji. '' for anything that isn't a string.
+   * @param {unknown} x @param {number} max
+   */
+  function line(x, max) {
+    if (typeof x !== 'string') return '';
+    let text = x.replace(/\s+/g, ' ').trim();
+    if (text.length > max) text = text.slice(0, /[\uD800-\uDBFF]/.test(text[max - 1]) ? max - 1 : max).trimEnd();
+    return text;
+  }
+
+  /**
+   * A copy of a stored "I need this one" use with its video id, title, and reason cut to their caps. Other fields stay.
+   * @param {any} use
+   */
+  function capUse(use) {
+    if (!use || typeof use !== 'object') return use;
+    const out = { ...use };
+    if (typeof out.videoId === 'string') out.videoId = out.videoId.slice(0, 64);
+    if (typeof out.title === 'string') out.title = line(out.title, TEXT_MAX);
+    if (typeof out.reason === 'string') out.reason = line(out.reason, REASON_MAX);
+    return out;
+  }
+
   /**
    * A video record with string fields, or null when there's no usable id. Messages and storage both pass through this.
    * @param {unknown} raw
@@ -200,14 +247,19 @@
     const v = /** @type {Record<string, unknown>} */ (raw);
     if (typeof v.id !== 'string' || !/^[\w-]{1,64}$/.test(v.id)) return null;
     /** @param {unknown} x */
-    const str = (x) => (typeof x === 'string' ? x : '');
+    const str = (x) => line(x, TEXT_MAX);
+    const length = str(v.length);
+    // A length written as a time has to be one: an imported "9:99:99" added 10 hours to the stash's total. Text like
+    // "LIVE" stays.
     /** @type {Video} */
-    const video = { id: v.id, title: str(v.title), channel: str(v.channel), length: str(v.length) };
+    const video = { id: v.id, title: str(v.title), channel: str(v.channel), length: /^[\d:]+$/.test(length) && !/^\d+(:[0-5]\d){1,2}$/.test(length) ? '' : length };
     if (str(v.views)) video.views = str(v.views);
     if (str(v.age)) video.age = str(v.age);
-    if (seconds(v.durationSec)) video.durationSec = seconds(v.durationSec);
-    if (seconds(v.resumeSec)) video.resumeSec = video.durationSec ? Math.min(seconds(v.resumeSec), video.durationSec) : seconds(v.resumeSec);
-    if (seconds(v.addedAt)) video.addedAt = seconds(v.addedAt);
+    const duration = videoSec(v.durationSec);
+    const resume = videoSec(v.resumeSec);
+    if (duration) video.durationSec = duration;
+    if (resume) video.resumeSec = duration ? Math.min(resume, duration) : resume;
+    if (seconds(v.addedAt) && seconds(v.addedAt) <= TIME_MAX) video.addedAt = seconds(v.addedAt);
     const ids = cleanIds(v.channelIds);
     if (ids.length) video.channelIds = ids;
     return video;
@@ -216,6 +268,21 @@
   /** Whole seconds, or 0 for anything that isn't a positive finite number. @param {unknown} n */
   function seconds(n) {
     return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  }
+
+  /**
+   * The longest a stashed video's length or position may be, in seconds. YouTube keeps at most 12 hours of a video or
+   * a stream, so a week cuts only made-up numbers, like the 1e16 a tester's import put in the stash.
+   */
+  const VIDEO_SEC_MAX = 7 * 24 * 3600;
+  /** The latest time a Date can hold, in ms. A later stash time printed "NaN months ago". */
+  const TIME_MAX = 8.64e15;
+  /** The longest a day can be, in seconds: a later reset hour can make one 47 hours long (Q12). */
+  const DAY_SEC_MAX = 47 * 3600;
+
+  /** Whole seconds a video can have, or 0. @param {unknown} n */
+  function videoSec(n) {
+    return seconds(n) <= VIDEO_SEC_MAX ? seconds(n) : 0;
   }
 
   /** @param {unknown} n @param {number} fallback */
@@ -273,7 +340,9 @@
       .map((e) => ({ id: e.id, ids: cleanIds(e.ids) })).filter((e) => e.ids.length).slice(-ALLOWED_TODAY_MAX) : [];
     if (stored.log && typeof stored.log === 'object') {
       for (const [day, entry] of Object.entries(stored.log)) {
-        state.log[day] = { ...emptyLog(), ...entry, needThis: Array.isArray(entry?.needThis) ? entry.needThis.map(use => ({ ...use })) : [] };
+        // Old uses keep their shape, but a reason or title stored before the caps is cut down to them here, and the
+        // next save stores it that way.
+        state.log[day] = { ...emptyLog(), ...entry, needThis: Array.isArray(entry?.needThis) ? entry.needThis.map(capUse).slice(-USES_MAX) : [] };
       }
     }
     return state;
@@ -705,8 +774,8 @@
   /** @param {State} state @param {string} videoId @param {string} title @param {string} reason @param {number} now */
   function needThis(state, videoId, title, reason, now) {
     if (typeof videoId !== 'string' || !/^[\w-]{1,64}$/.test(videoId)) return { ok: false, error: 'bad-video' };
-    const trimmed = String(reason).trim();
-    title = String(title);
+    const trimmed = line(String(reason), REASON_MAX);
+    title = line(String(title), TEXT_MAX);
     if (trimmed.length < 3) return { ok: false, error: 'reason-required' };
     if (state.unlocked.includes(videoId)) return { ok: true };
     if (needThisLeft(state, now) < 1) return { ok: false, error: 'need-this-limit' };
@@ -940,11 +1009,9 @@
         if (typeof value !== 'number' || !Number.isFinite(value)) continue;
         const [min, max] = ranges[key];
         Object.assign(cleaned, { [key]: Math.min(max, Math.max(min, Math.round(value))) });
-      } else if (key === 'graceMode' || key === 'dryHours') {
-        cleaned[key] = Boolean(value);
       } else if (key === 'feedSource' && (value === 'home' || value === 'subscriptions')) {
         cleaned.feedSource = value;
-      } else if ((key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell' || key === 'hideShorts' || key === 'streams') && typeof value === 'boolean') {
+      } else if ((key === 'graceMode' || key === 'dryHours' || key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell' || key === 'hideShorts' || key === 'streams') && typeof value === 'boolean') {
         cleaned[key] = value;
       } else if (key === 'cards' && (value === 'off' || value === 'unlimited' || value === 'limited')) {
         cleaned.cards = value;
@@ -1032,6 +1099,16 @@
     state.tokens.watch = Math.min(state.tokens.watch, cap.watch);
     state.tokens.rec = Math.min(state.tokens.rec, cap.rec);
     return { ok: true, applied, pending };
+  }
+
+  /**
+   * How many changes wait, counted the way Settings shows them, one chip each. The three dry keys wait as one range
+   * (Q32), so they count once, and "Saved." never says 3 changes for a moved end hour.
+   * @param {string[]} keys The waiting keys, as updateSettings's `pending` names them.
+   */
+  function waitingCount(keys) {
+    const dry = /** @type {readonly string[]} */ (DRY_KEYS);
+    return keys.filter((key) => !dry.includes(key)).length + (keys.some((key) => dry.includes(key)) ? 1 : 0);
   }
 
   /** @param {State} state @param {string} key */
@@ -1193,6 +1270,25 @@
   }
 
   /**
+   * Whether YouTube's next video, from Shift+N or the player's Next button, is YouTube's own pick and not a playlist's
+   * next video. Playlists and mixes play on (Q2), so a next video with a list is allowed. The Next button's link says
+   * where it goes. Without one, a page with a list counts as a playlist.
+   * @param {string} pageUrl
+   * @param {string} nextHref The player's Next button's href, or '' when there's none.
+   */
+  function upNextIsPick(pageUrl, nextHref) {
+    /** @param {string} href */
+    const hasList = (href) => {
+      try {
+        return !!new URL(href, 'https://www.youtube.com/').searchParams.get('list');
+      } catch {
+        return false;
+      }
+    };
+    return nextHref ? !hasList(nextHref) : !hasList(pageUrl);
+  }
+
+  /**
    * Whether a watch page that's still loading must hold its video, read from raw storage before the worker answers.
    * Nothing is playing yet, so grace mode doesn't apply (Q3). A day that has rolled over counts as 0 minutes and no unlocks.
    * @param {unknown} raw
@@ -1219,59 +1315,6 @@
       ? { effectiveDay: stored.pending.effectiveDay, changes: cleanSettings(stored.pending.changes) } : null;
     if (dryUntil(/** @type {State} */ (/** @type {unknown} */ ({ settings: { ...DEFAULT_SETTINGS, ...settings }, pending: waiting })), now)) return true;
     return count(stored.watchSecondsLeft, 0) <= 0;
-  }
-
-  /**
-   * The dev panel's actions, for testing in a checkout with dev/ENABLED. The worker refuses them anywhere else, and
-   * bin/build-release leaves the panel out of the store build. Not a feature: nothing in DESIGN.md's rules applies.
-   * @param {State} state
-   * @param {string} action
-   * @param {number} now
-   */
-  function devAction(state, action, now) {
-    /** @param {'watch' | 'rec'} kind @param {number} n */
-    const setTokens = (kind, n) => { state.tokens[kind] = Math.max(0, n); };
-    switch (action) {
-      case 'minutes-0': state.watchSecondsLeft = 0; break;
-      case 'seconds-10': state.watchSecondsLeft = 10; break;
-      case 'minutes-1': state.watchSecondsLeft = 60; break;
-      case 'minutes+5': state.watchSecondsLeft += 5 * 60; break;
-      case 'minutes+15': state.watchSecondsLeft += 15 * 60; break;
-      case 'watch+1': setTokens('watch', state.tokens.watch + 1); break;
-      case 'watch-0': setTokens('watch', 0); break;
-      case 'rec+1': setTokens('rec', state.tokens.rec + 1); break;
-      case 'rec-0': setTokens('rec', 0); break;
-      case 'reset-now':
-        // Moves drip back a day without rolling it over, so the next message rolls it over the way a real reset
-        // does, and an open token page notices on its own 1-second check. A pending change moves back with it.
-        state.day = addDays(state.day, -1);
-        if (state.pending) state.pending.effectiveDay = addDays(state.pending.effectiveDay, -1);
-        if (state.channelsPending) state.channelsPending.effectiveDay = addDays(state.channelsPending.effectiveDay, -1);
-        break;
-      case 'apply-pending':
-        if (state.pending) Object.assign(state.settings, state.pending.changes);
-        state.pending = null;
-        applyChannelsPending(state);
-        break;
-      case 'grace-toggle':
-        state.settings.graceMode = !state.settings.graceMode;
-        cancelPending(state, 'graceMode');
-        break;
-      case 'clear-unlocks':
-        state.unlocked = [];
-        state.allowedToday = [];
-        // The week's count comes from the log (Q20), so its uses go too, or the lock would still say 0 left.
-        for (const entry of Object.values(state.log)) entry.needThis = entry.needThis.filter((use) => !(use.at > 0 && now - Math.min(use.at, now) < WEEK_MS));
-        break;
-      case 'first-day-off': state.firstDayOff = true; break;
-      case 'first-day-on': state.firstDayOff = false; break;
-      case 'clear-backlog': state.backlog = []; break;
-      case 'clear-seen': state.seen = []; state.current = null; break;
-      case 'clear-log': delete state.log[state.day]; break;
-      case 'fresh': Object.assign(state, initialState(now)); break;
-      default: return { ok: false, error: 'unknown-dev-action' };
-    }
-    return { ok: true };
   }
 
   /**
@@ -1371,21 +1414,33 @@
   }
 
   /**
-   * One day of an imported log, with only the fields drip keeps and only numbers where it counts.
-   * @param {unknown} raw @returns {LogDay | null}
+   * The most each number in one log day can be. Watched time fits in the longest day. Drops spent fit in the most a
+   * balance holds, since a day refills once and drops handed back come off the count. Cards in Curated cost nothing,
+   * so their counts get one a second for the longest day.
    */
-  function cleanLogDay(raw) {
+  const LOG_MAX = {
+    watchedSec: DAY_SEC_MAX, watchSpent: ranges.watchTokensPerDay[1] * ranges.rolloverDays[1],
+    recSpent: DAY_SEC_MAX, saved: DAY_SEC_MAX, passed: DAY_SEC_MAX, watched: DAY_SEC_MAX,
+  };
+
+  /**
+   * One day of an imported log, with only the fields drip keeps and only numbers a day can hold. A use's time is never
+   * after `now`, since a future one would count against the week for as long as its day stays in the log.
+   * @param {unknown} raw @param {number} now @returns {LogDay | null}
+   */
+  function cleanLogDay(raw, now) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const d = /** @type {Record<string, any>} */ (raw);
     const day = emptyLog();
-    for (const key of /** @type {const} */ (['watchedSec', 'watchSpent', 'recSpent', 'saved', 'passed', 'watched'])) day[key] = count(d[key], 0);
+    for (const key of /** @type {const} */ (['watchedSec', 'watchSpent', 'recSpent', 'saved', 'passed', 'watched'])) day[key] = Math.min(count(d[key], 0), LOG_MAX[key]);
     if (Array.isArray(d.needThis)) {
       for (const use of d.needThis) {
-        if (use && typeof use.videoId === 'string' && typeof use.reason === 'string') {
-          day.needThis.push({ videoId: use.videoId, title: typeof use.title === 'string' ? use.title : '', reason: use.reason, at: count(use.at, 0) });
+        if (use && typeof use.videoId === 'string' && VIDEO_ID.test(use.videoId) && typeof use.reason === 'string') {
+          day.needThis.push({ videoId: use.videoId, title: line(use.title, TEXT_MAX), reason: line(use.reason, REASON_MAX), at: Math.min(count(use.at, 0), now) });
         }
       }
     }
+    day.needThis = day.needThis.slice(-USES_MAX);
     return day;
   }
 
@@ -1427,12 +1482,16 @@
     }
     let days = 0;
     if (file.log && typeof file.log === 'object' && !Array.isArray(file.log)) {
-      for (const [day, entry] of Object.entries(file.log)) {
+      let room = LOG_USES_MAX - Object.values(state.log).reduce((n, entry) => n + (Array.isArray(entry?.needThis) ? entry.needThis.length : 0), 0);
+      // Newest first, so the uses that stay are the ones the weekly allowance counts.
+      for (const [day, entry] of Object.entries(file.log).sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))) {
         // A real calendar date, since History's week math throws on one like 2026-00-01, and within the 90 days the
         // log keeps, as rollDay would prune it (Codex, 2026-11-03).
         if (!realDay(day) || day >= state.day || day < addDays(state.day, -89) || state.log[day]) continue;
-        const cleaned = cleanLogDay(entry);
+        const cleaned = cleanLogDay(entry, now);
         if (!cleaned) continue;
+        cleaned.needThis = room > 0 ? cleaned.needThis.slice(-room) : [];
+        room -= cleaned.needThis.length;
         state.log[day] = cleaned;
         days++;
       }
@@ -1440,6 +1499,9 @@
     // The lists go through the same rules as a click: an allow waits, a block applies now, and nothing is removed.
     let channelsAdded = 0;
     let channelsWaiting = 0;
+    // Channels a full list turned away, so Import can say so, as it does for the stash.
+    let allowSkipped = 0;
+    let blockSkipped = 0;
     const lists = file.channels && typeof file.channels === 'object' ? file.channels : {};
     for (const raw of Array.isArray(lists.allow) ? lists.allow : []) {
       const channel = cleanChannel(raw);
@@ -1447,12 +1509,19 @@
       const allowed = allowChannel(state, channel, now);
       if (allowed.ok) channelsAdded++;
       if (allowed.ok && allowed.waits) channelsWaiting++;
+      if (allowed.error === 'allow-full') allowSkipped++;
     }
     for (const raw of Array.isArray(lists.block) ? lists.block : []) {
       const channel = cleanChannel(raw);
-      if (channel && !findChannel(state.channels.block, channel) && blockChannel(state, channel).ok) channelsAdded++;
+      if (!channel || findChannel(state.channels.block, channel)) continue;
+      const blocked = blockChannel(state, channel);
+      if (blocked.ok) channelsAdded++;
+      if (blocked.error === 'block-full') blockSkipped++;
     }
-    return { ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days, channelsAdded, channelsWaiting };
+    return {
+      ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days,
+      channelsAdded, channelsWaiting, allowSkipped, blockSkipped,
+    };
   }
 
   /**
@@ -1541,7 +1610,7 @@
     if (!raw || typeof raw !== 'object') return null;
     const c = /** @type {Record<string, unknown>} */ (raw);
     const ids = cleanIds(c.ids);
-    const name = typeof c.name === 'string' ? c.name.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    const name = line(c.name, TEXT_MAX);
     if (!ids.length && !name) return null;
     return typeof c.avatar === 'string' && AVATAR.test(c.avatar) ? { ids, name, avatar: c.avatar } : { ids, name };
   }
@@ -1597,7 +1666,7 @@
     if (p && !p.allow.length && !p.unblock.length) state.channelsPending = null;
   }
 
-  /** @param {State} state */
+  /** Puts the channel changes waiting for the reset into the lists. rollDay does it at the reset. @param {State} state */
   function applyChannelsPending(state) {
     const p = state.channelsPending;
     if (!p) return;
@@ -1826,10 +1895,11 @@
     DEFAULT_SETTINGS, MODES, modeOf, planned, settingsToSave, dayKey, addDays, daysBetween, initialState, hydrate,
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUses, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
-    isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
-    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
-    exportData, importData, resetData,
+    isLoosening, mayReveal, canDeal, updateSettings, waitingCount, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
+    watchedSummary, weekView, cardsLine, redirectTarget, upNextIsPick, earlyLocked, toolbarGlass, toolbarPlaying,
+    exportData, importData, resetData, REASON_MAX,
     ALLOW_MAX, channelId, cleanChannel, sameChannel, allowChannel, removeAllowed, blockChannel, unblockChannel,
-    cancelChannelPending, seenChannel, channelFromPage, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
+    cancelChannelPending, applyChannelsPending, seenChannel, channelFromPage, allowedVideo, isFree, freeToStart, plannedChannels, allowCount,
+    isAllowedOrWaiting,
   };
 })();

@@ -277,21 +277,18 @@
     // The first steps say the day's drops and cards, which had tiles of their own above the tour until 2026-10-15.
     {
       id: 'home', show: showHome, needs: () => parts.clock,
-      say: () => `You get ${plural(settings.watchTokensPerDay, 'drop')} a day, and each one is ${dropTime} of watching. Try +${dropTime}.`,
+      say: () => 'Drops',
     },
     {
       id: 'reveal', show: showReveal, needs: () => parts.cards !== 'off',
-      say: () => `${parts.cards === 'limited' ? `You get ${plural(settings.recTokensPerDay, 'card')} a day, and each one reveals a video.` : 'Reveal video shows one video at a time.'} ${parts.stash ? 'Watch it, stash it, or pass.' : 'Watch it or pass.'}`,
+      say: () => (parts.cards === 'limited' ? 'Cards' : 'One video at a time'),
     },
-    { id: 'player', say: () => 'Minutes only drain while a video plays. Press play.', show: showPlayer, needs: () => parts.clock },
-    { id: 'lock', say: () => 'When the glass runs dry, the lock comes up. Done for now takes you home.', show: showLock, needs: () => parts.clock },
-    { id: 'changes', say: () => (STEPS.length > 1 ? 'What else changes on YouTube.' : 'What changes on YouTube.'), show: showChanges, needs: () => true },
+    { id: 'player', say: () => 'Watching', show: showPlayer, needs: () => parts.clock },
+    { id: 'lock', say: () => 'The lock', show: showLock, needs: () => parts.clock },
+    { id: 'changes', say: () => (STEPS.length > 1 ? 'What else changes' : 'What changes on YouTube'), show: showChanges, needs: () => true },
   ];
   /** @type {Step[]} */
   let STEPS = ALL_STEPS.filter((s) => s.needs());
-  const dropTime = Drip.formatMinutes(settings.minutesPerToken * 60);
-  /** @param {number} n @param {string} word */
-  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   /** Where a step is in this tour, or the last step if the mode skips it. @param {string} id */
   const at = (id) => {
     const i = STEPS.findIndex((s) => s.id === id);
@@ -407,8 +404,12 @@
     if (step === STEPS.length - 1) location.href = 'https://www.youtube.com/';
     else go(step + 1);
   });
-  $('tour').addEventListener('keydown', (e) => {
-    if (/** @type {Element} */ (e.target).closest('textarea, input')) return;
+  // On the page, not the tour section: opening the tour focuses its title, which sits in the top bar outside the
+  // section, so the arrows have to work from there too (Codex, PR 111).
+  document.addEventListener('keydown', (e) => {
+    const target = /** @type {Element} */ (e.target);
+    if ($('tour').hidden || !target.closest?.('#tour, .hero .tour-head')) return;
+    if (target.closest('textarea, input')) return;
     if (e.key === 'ArrowRight' && !coach.next() && !lockBack() && step < STEPS.length - 1) go(step + 1);
     else if (e.key === 'ArrowLeft' && !coach.back() && step > 0) {
       backing = true;
@@ -447,6 +448,8 @@
     dropTime: () => Drip.formatMinutes(sand.settings.minutesPerToken * 60),
     drops: () => sand.tokens.watch,
     cards: () => sand.tokens.rec,
+    dropsPerDay: () => sand.settings.watchTokensPerDay,
+    cardsPerDay: () => sand.settings.recTokensPerDay,
     counted: () => parts.cards === 'limited',
     clock: () => parts.clock,
     stash: () => parts.stash,
@@ -1270,7 +1273,7 @@
       const needBack = Drip.needThisBack(sand, now);
       const canBuy = sand.tokens.watch > 0;
       /** @type {HTMLTextAreaElement} */
-      const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?' }));
+      const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?', maxlength: Drip.REASON_MAX }));
       const unlock = () => {
         const res = Drip.needThis(sand, playing().id, playing().title, reason.value, Date.now());
         if (res.ok) {
@@ -1421,8 +1424,12 @@
   }
 
   drawLadder();
-  retour(Math.max(0, hashStep()));
+  // The screen shows before the step draws, since a hidden stage measures 0. A reload on the lock step gave the water
+  // no depth, so +15m and Done for now drained it from nowhere. With step set first, showScreen leaves the drawing to
+  // retour.
+  step = Math.max(0, hashStep());
   showScreen();
+  retour(step);
   // A reopened page shows the mode that's saved. A new install has the defaults, which are Full drip.
   chrome.runtime.sendMessage({ type: 'get' }).then((/** @type {any} */ res) => {
     const saved = res && res.state && res.state.settings;

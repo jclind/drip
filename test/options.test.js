@@ -70,6 +70,10 @@ function page() {
     matches(selector) {
       const parts = selector.match(/(?:\[[^\]]*\]|[^\s])+/g) || [];
       if (parts.length > 1) return this.matches(parts.at(-1)) && !!this.parent?.closest(parts.slice(0, -1).join(' '));
+      // :not(...) as in Chrome, so `[data-k="x"]:not([disabled])` skips a disabled control.
+      const nots = [...selector.matchAll(/:not\(([^)]*)\)/g)];
+      if (nots.some(([, inner]) => this.matches(inner))) return false;
+      selector = selector.replace(/:not\([^)]*\)/g, '');
       const attrs = [...selector.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)];
       if (attrs.some(([, k, v]) => !(k in this.attrs) || (v !== undefined && this.attrs[k] !== v))) return false;
       const simple = selector.replace(/\[[^\]]*\]/g, '');
@@ -236,6 +240,15 @@ test('import results use nonzero pills, a channel clock tag, overflow and settin
   await p.importData({ app: 'drip', format: 1 });
   assert.equal(result.textContent, 'Imported');
   assert.equal(result.querySelector('.data-chip'), null);
+  // Channels past a list's size get the same line as the stash. One allow waits from the first import, so 4 more fit.
+  await p.importData({ app: 'drip', format: 1, channels: {
+    allow: Array.from({ length: 6 }, (_, n) => ({ ids: [`@allow${n}`], name: `Allow ${n}` })),
+    block: Array.from({ length: 103 }, (_, n) => ({ ids: [`@block${n}`], name: `Block ${n}` })),
+  } });
+  const lines = result.querySelectorAll('.muted').map((c) => c.textContent);
+  assert.deepEqual(lines.filter((line) => /didn't fit/.test(line)), [
+    "2 channels didn't fit in the allow list.", "3 channels didn't fit in the block list.",
+  ]);
 });
 
 test('import plural counts have no clock when channels apply at once', async () => {
@@ -268,6 +281,30 @@ test('reset results show removed counts, keep balances and history, and omit zer
   assert.equal(p.get('dataResult').textContent, 'Reset');
 });
 
+test('Saved. and Reset count Dry hours once, as their one chip does', async () => {
+  const p = page();
+  p.run('state.settings.dryHours = true; draft = Drip.planned(state); renderForm()');
+  // Ends at an hour sooner: one edit, and Dry hours wait as a range of three keys.
+  p.run('draft.dryTo = 5; draftChanged()');
+  assert.equal(p.get('result').textContent, '1 change not saved');
+  await p.run('save()');
+  assert.equal(p.run('Object.keys(state.pending.changes).sort().join()'), 'dryFrom,dryHours,dryTo', 'state still keeps all three');
+  assert.equal(p.get('result').textContent, 'Saved. 1 change starts at 4:00am.');
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 1);
+  // A second save names only what it left waiting, though Dry hours still wait too.
+  p.run('draft.minutesPerToken = 20; draftChanged()');
+  await p.run('save()');
+  assert.equal(p.get('result').textContent, 'Saved. 1 change starts at 4:00am.');
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 2);
+  p.run('state.pending = null; state.settings.watchTokensPerDay = 2; draft = Drip.planned(state); renderForm()');
+  await p.get('resetYes').click();
+  assert.equal(p.run('Object.keys(state.pending.changes).sort().join()'), 'dryFrom,dryHours,dryTo,watchTokensPerDay');
+  assert.match(p.get('dataResult').textContent, /2 changes start at 4:00am\./);
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 2);
+  assert.equal(p.run('Drip.waitingCount([])'), 0);
+  assert.equal(p.run('Drip.waitingCount(["dryHours", "dryFrom", "dryTo", "stashMax"])'), 2);
+});
+
 test('export is only the check and title; import errors keep the existing explanation panel', async () => {
   const p = page();
   await p.get('exportData').click();
@@ -279,6 +316,19 @@ test('export is only the check and title; import errors keep the existing explan
   assert.equal(result.classList.contains('is-success'), false);
   assert.deepEqual(result.querySelectorAll('li').map((c) => c.textContent), ['"drip-test.json" is from a newer version of drip.', 'Update drip, then import it again.', 'Nothing changed.']);
   assert.ok(result.querySelector('.drip-i-x'));
+});
+
+test("an import the worker couldn't save says the file didn't fit and nothing changed", async () => {
+  const p = page();
+  p.run(`send = async () => ({ ok: false, error: 'storage-full' })`);
+  await p.importData({ app: 'drip', format: 1, backlog: [{ id: 'a', title: 'A' }] });
+  const result = p.get('dataResult');
+  assert.equal(result.classList.contains('is-failed'), true);
+  assert.deepEqual(result.querySelectorAll('li').map((c) => c.textContent), ['"drip-test.json" didn\'t fit in drip\'s storage.', 'Nothing changed.']);
+  // No answer at all still says so.
+  p.run('send = async () => undefined');
+  await p.importData({ app: 'drip', format: 1 });
+  assert.deepEqual(result.querySelectorAll('li').map((c) => c.textContent), ["drip didn't answer.", 'Try again in a moment.']);
 });
 
 test('successful channel adds clear stale notes; invalid handles keep error notes', async () => {
@@ -294,6 +344,43 @@ test('successful channel adds clear stale notes; invalid handles keep error note
   p.document.querySelector('[data-k="allow-input"]').value = 'invalid';
   await p.run("addChannel('allow')");
   assert.match(p.run('channelsNote.allow'), /isn't a channel handle or link/);
+});
+
+test('the 5th allowed channel moves focus from the full field and button to the Allowed tab', async () => {
+  for (const from of ['allow-input', 'allow-add']) {
+    const p = page();
+    p.run(`state.channels.allow = ['@one', '@two', '@three'].map((id) => ({ ids: [id], name: '' })); renderForm()`);
+    const at = (/** @type {string} */ k) => p.document.querySelector(`[data-k="${k}"]`);
+    /** @param {string} handle */
+    const add = async (handle) => {
+      at('allow-input').value = handle;
+      at(from).focus();
+      if (from === 'allow-input') await p.run("addChannel('allow')");
+      else await at('allow-add').click();
+    };
+    await add('@four');
+    assert.equal(p.document.activeElement, at(from), `${from}: room left keeps focus where it was`);
+    await add('@five');
+    assert.equal(p.run('Drip.allowCount(state)'), 5);
+    assert.equal(at('allow-input').getAttribute('disabled'), '');
+    assert.equal(at('allow-add').getAttribute('disabled'), '');
+    // Focus fell to the page before, since the only fallback was the disabled field.
+    assert.equal(p.document.activeElement, at('tab-allow'), from);
+    assert.match(p.document.activeElement.textContent, /Allowed5\/5/);
+  }
+});
+
+test('the Allowed tab says the list does nothing while watch time is off, and the Blocked tab does not', () => {
+  const p = page();
+  p.run('renderForm()');
+  const note = () => p.document.querySelector('#channels-allow .channel-off');
+  assert.equal(note(), null);
+  p.run('state.settings.clock = false; renderChannels()');
+  assert.equal(note().textContent, "Watch time is off, so no video uses minutes. This list does nothing until it's on.");
+  assert.equal(p.document.querySelector('#channels-block .channel-off'), null);
+  assert.ok(p.document.querySelector('[data-k="allow-input"]'));
+  p.run('state.settings.clock = true; renderChannels()');
+  assert.equal(note(), null);
 });
 
 test('page panels keep the form mounted, preserve drafts, and save from Channels and History', async () => {

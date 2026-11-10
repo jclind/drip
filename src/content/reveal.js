@@ -448,7 +448,10 @@
    * @param {Options} o
    */
   async function reveal(o) {
-    const oldRow = /** @type {HTMLElement} */ (o.page.querySelector('.drip-actions'));
+    const oldRow = /** @type {HTMLElement | null} */ (o.page.querySelector('.drip-actions'));
+    // Offline, home.js's redraw just before this put the offline note where the buttons were. Nothing is asked of the
+    // worker, and the caller's redraw shows the note (release review, 2026-11-10).
+    if (!oldRow) return false;
     const empty = measureEmpty(oldRow);
     const wasOpen = o.page.classList.contains('is-open');
     o.page.querySelector('.drip-feed-space')?.remove();
@@ -520,7 +523,9 @@
    * @param {Options} o
    */
   async function revealEmpty(o) {
-    const oldRow = /** @type {HTMLElement} */ (o.page.querySelector('.drip-actions'));
+    const oldRow = /** @type {HTMLElement | null} */ (o.page.querySelector('.drip-actions'));
+    // Offline, as in reveal().
+    if (!oldRow) return false;
     const wasOpen = o.page.classList.contains('is-open');
     o.page.querySelector('.drip-feed-space')?.remove();
     const shell = o.card(null);

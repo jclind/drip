@@ -15,6 +15,11 @@
       <header class="hero">
         <h1 class="brand"><span class="brand-drop" id="brandDrop"></span>drip</h1>
         <p class="tagline">Make every drop count.</p>
+        <!-- On the tour screen the mode and Change share the brand's bar, and the tagline goes (design D, 2026-11-10). -->
+        <div class="tour-head">
+          <h2 class="tour-title" id="tourTitle" tabindex="-1">How Full drip works</h2>
+          <button class="linkish" id="changeMode" type="button">Change</button>
+        </div>
       </header>
 
       <!-- Two screens (DESIGN.md "Welcome page"): the mode choice, then the tour for the mix picked. One shows at a time. -->
@@ -27,10 +32,6 @@
       </section>
 
       <section class="tour screen" id="tour" aria-labelledby="tourTitle" hidden>
-        <div class="tour-head">
-          <h2 class="tour-title" id="tourTitle" tabindex="-1">How Full drip works</h2>
-          <button class="linkish" id="changeMode" type="button">Change</button>
-        </div>
         <p class="tour-say" id="say" aria-live="polite"></p>
         <div class="tour-stage" id="stage"></div>
         <div class="tour-controls">
@@ -43,13 +44,16 @@
         </div>
       </section>
 
+      <!-- Each note sits under the link it's about (design D, 2026-11-10). -->
       <footer class="foot">
-        <p class="foot-note">Refresh any YouTube tabs that were open before you installed drip.</p>
-        <div class="foot-links">
+        <div class="foot-col">
           <a class="foot-link" id="footYouTube" href="https://www.youtube.com/"></a>
-          <button class="foot-link" id="footSettings" type="button"></button>
+          <p class="foot-note">Refresh any YouTube tabs that were open before you installed drip.</p>
         </div>
-        <p class="foot-note">Everything drip knows stays in this browser.</p>
+        <div class="foot-col">
+          <button class="foot-link" id="footSettings" type="button"></button>
+          <p class="foot-note">Everything drip knows stays in this browser.</p>
+        </div>
       </footer>
     </main>
     <script src="../lib/state.js"></script>

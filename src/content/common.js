@@ -266,7 +266,8 @@
   function icon(name, cls = '') {
     const el = h('span', { class: `drip-i drip-i-${name} ${cls}`.trim(), 'aria-hidden': 'true' });
     const icons = /** @type {any} */ (globalThis).DripIcons;
-    // icons.js loads first in Chrome (manifest.json). The Node tests load common.js without it.
+    // On YouTube, icons.js loads first (manifest.json), because a youtube.com page can't load drip's files. The
+    // welcome page is drip's own page and can, so it and the Node tests load common.js without icons.js.
     if (icons) icons.paint(el, name);
     else el.style.setProperty('--drip-icon', `url("${chrome.runtime.getURL(`src/icons/${name}.svg`)}")`);
     return el;
