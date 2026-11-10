@@ -110,12 +110,15 @@ ytd-watch-flexy:not([playlist]):not([should-stamp-chat]):not([panel-expanded]):n
    2026-10-15). At full width the "..." menu doesn't hold these, so they're gone, not moved. Save is matched by its
    English label, so in another language it hides with the rest. In the expanded description, the game card (it links
    to the game's topic channel, a feed of other people's videos) and the channel card, which repeats the channel row.
-   Chapters, the transcript, and the details stay (checked on air 2026-10-15). */
+   Chapters, the transcript, and the details stay (checked on air 2026-10-15). Ask also has a section of its own in the
+   expanded description, with an "Ask questions" button (signed in, 2026-11-10). It's matched by its element name, from
+   YouTube's own list of description sections, under the video and in the description's side panel. */
 ytd-watch-metadata #sponsor-button,
 ytd-watch-flexy ytd-merch-shelf-renderer,
 ytd-watch-metadata #flexible-item-buttons > :not(ytd-download-button-renderer):not(:has(button[aria-label="Save to playlist"])),
 ytd-watch-metadata yt-video-attributes-section-view-model,
-ytd-watch-metadata ytd-video-description-infocards-section-renderer {
+ytd-watch-metadata ytd-video-description-infocards-section-renderer,
+ytd-watch-flexy yt-video-description-youchat-section-view-model {
   display: none !important;
 }
 
@@ -135,7 +138,9 @@ ytd-miniplayer,
 
 /* Shorts: the shelves on home, search, and channel pages, and the sidebar links, while the "Hide Shorts" setting is on
    (Q2, menu.js). /shorts/ URLs redirect in redirect.js whatever the setting. Search's Shorts shelves are
-   grid-shelf-view-models of Shorts lockups (checked 2026-11-02). A shown one counts as one of search's 10 results. */
+   grid-shelf-view-models of Shorts lockups (checked 2026-11-02). A shown one counts as one of search's 10 results.
+   search.js marks search's Shorts filter chip, which only finds what this hides (2026-11-10). */
+html[data-drip-hide-shorts] ytd-search yt-chip-cloud-chip-renderer[data-drip-shorts-chip],
 html[data-drip-hide-shorts] ytd-reel-shelf-renderer,
 html[data-drip-hide-shorts] grid-shelf-view-model:has(ytm-shorts-lockup-view-model),
 html[data-drip-hide-shorts] ytd-rich-shelf-renderer[is-shorts],

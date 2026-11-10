@@ -583,7 +583,7 @@ function savedLine(waiting) {
   if (mode && waiting.some((k) => MODE_KEYS.includes(k)) && mode !== Drip.modeOf(state.settings)) {
     return `Saved. ${modeName(mode)} starts at ${resetLabel()}.`;
   }
-  return `Saved. ${plural(waiting.length, 'change starts', 'changes start')} at ${resetLabel()}.`;
+  return `Saved. ${plural(Drip.waitingCount(waiting), 'change starts', 'changes start')} at ${resetLabel()}.`;
 }
 
 async function save() {
@@ -955,7 +955,10 @@ function renderChannels(force = false) {
   if (!channelsEl || !state) return;
   const { h, icon } = DripPage;
   const firstDay = Drip.firstDayUntil(state, Date.now()) > 0;
-  const key = JSON.stringify([state.channels, state.channelsPending, state.settings.resetHour, firstDay, channelsNote, channelTab, justUnblocked]);
+  // With watch time off no video uses minutes, so the allow list does nothing. The tab stays, for removing channels and
+  // for setting the list up ahead, and says so (Jesse, 2026-11-10). The channel page hides its Allow button then.
+  const clockOff = state.settings.clock === false;
+  const key = JSON.stringify([state.channels, state.channelsPending, state.settings.resetHour, firstDay, channelsNote, channelTab, justUnblocked, clockOff]);
   if (!force && key === channelsKey) return;
   channelsKey = key;
   const p = state.channelsPending;
@@ -1035,6 +1038,7 @@ function renderChannels(force = false) {
   };
   /** @param {'allow' | 'block'} list @param {HTMLElement[]} tiles */
   const paneOf = (list, tiles) => h('div', { class: 'channel-pane', role: 'tabpanel', id: `channels-${list}`, 'aria-labelledby': `channels-tab-${list}`, hidden: channelTab !== list },
+    list === 'allow' && clockOff && h('p', { class: 'muted channel-off' }, "Watch time is off, so no video uses minutes. This list does nothing until it's on."),
     tiles.length ? h('ul', { class: 'channel-tiles' }, ...tiles)
       : h('div', { class: 'channel-empty' }, h('span', { class: 'channel-ava' }), h('span', {}, list === 'allow' ? 'No channels allowed yet.' : 'No channels blocked yet.')),
     adder(list, list === 'allow' && Drip.allowCount(state) >= Drip.ALLOW_MAX),
@@ -1061,7 +1065,13 @@ function renderChannels(force = false) {
       tabButton('block', 'Blocked', String(blocked.length))),
     pane('allow', allowed),
     pane('block', blocked));
-  if (focused) /** @type {HTMLElement | null} */ (pad.querySelector(`[data-k="${focused}"]:not([disabled])`) || pad.querySelector(`[data-k="${focused.split('-')[0]}-input"]:not([disabled])`))?.focus();
+  if (focused) {
+    const list = focused.split('-')[0];
+    // The 5th allowed channel disables the field and its button, so focus on them goes to the list's tab, which says
+    // 5/5. Not the new tile's x, where a second Enter would cancel the channel just added.
+    /** @type {HTMLElement | null} */ (pad.querySelector(`[data-k="${focused}"]:not([disabled])`)
+      || pad.querySelector(`[data-k="${list}-input"]:not([disabled])`) || pad.querySelector(`[data-k="tab-${list}"]`))?.focus();
+  }
 }
 
 // Your data (RELEASE-PLAN.md, item 5): export, import, and reset. Import and reset go through the worker's rules, so a
@@ -1105,9 +1115,12 @@ function dataDone(title, lines = [], failed = false, chips = []) {
   box.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
-/** "2 changes start at 4:00am.", or '' when nothing waits. @param {Record<string, any> | undefined} pending */
+/**
+ * "2 changes start at 4:00am.", or '' when nothing waits. Dry hours count once, as their one chip does.
+ * @param {Record<string, any> | undefined} pending
+ */
 function waitsLine(pending) {
-  const n = Object.keys(pending || {}).length;
+  const n = Drip.waitingCount(Object.keys(pending || {}));
   return n ? `${plural(n, 'change starts', 'changes start')} at ${resetLabel()}.` : '';
 }
 
@@ -1168,11 +1181,14 @@ async function importFile() {
   if (!res || !res.ok || !res.state) {
     if (res && res.error === 'bad-format') return refuse([`${which} is from a newer version of drip.`, 'Update drip, then import it again.', 'Nothing changed.']);
     if (res && res.error === 'not-drip') return refuse([`${which} isn't a drip export.`, wanted, 'Nothing changed.']);
+    if (res && res.error === 'storage-full') return refuse([`${which} didn't fit in drip's storage.`, 'Nothing changed.']);
     return refuse(["drip didn't answer.", 'Try again in a moment.']);
   }
   afterData(res, kept);
   dataDone('Imported', [
     ...(res.stashSkipped ? [`${plural(res.stashSkipped, "video didn't", "videos didn't")} fit in the stash.`] : []),
+    ...(res.allowSkipped ? [`${plural(res.allowSkipped, "channel didn't", "channels didn't")} fit in the allow list.`] : []),
+    ...(res.blockSkipped ? [`${plural(res.blockSkipped, "channel didn't", "channels didn't")} fit in the block list.`] : []),
     ...(waitsLine(res.pending) ? [waitsLine(res.pending)] : []),
   ], false, [
     ...(res.stashAdded ? [dataChip(`+${res.stashAdded} in stash`)] : []),

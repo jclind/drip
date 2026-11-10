@@ -4,6 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 
@@ -24,17 +25,19 @@ function sortKeys(value) {
 /**
  * Loads background.js in a fresh context with in-memory storage.
  * @param {any} [initial]
- * @param {{dev?: boolean, panel?: boolean, stores?: {local: Record<string, any>, session: Record<string, any>}}} [opts]
- *   dev: the checkout has dev/ENABLED. panel: false for a store build, which has no dev panel. stores: storage kept
- *   from an earlier worker, as when Chrome stops the worker and starts it again.
+ * @param {{dev?: boolean, panel?: boolean, stores?: {local: Record<string, any>, session: Record<string, any>}, src?: string}} [opts]
+ *   dev: the checkout has dev/ENABLED. panel: false for a manifest without the dev panel. stores: storage kept from an
+ *   earlier worker, as when Chrome stops the worker and starts it again. src: the src folder to load, such as a store
+ *   build's.
  */
-function worker(initial = undefined, { dev = false, panel = true, stores = undefined, contexts = [] } = {}) {
+function worker(initial = undefined, { dev = false, panel = true, stores = undefined, contexts = [], src = SRC } = {}) {
   /** @type {Record<string, any>} */
   const store = stores ? stores.local : initial === undefined ? {} : { drip: structuredClone(initial) };
   /** @type {Record<string, any>} */
   const session = stores ? stores.session : {};
   let writes = 0;
   let failNext = 0;
+  let failMessage = 'write failed';
   let failSession = 0;
   let failIcon = 0;
   let failDraw = 0;
@@ -46,6 +49,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   const icons = [];
   /** @type {Function | null} */
   let onMessage = null;
+  let externalListeners = 0;
   /** @type {Function | null} */
   let onInstalled = null;
   /** @type {Function | null} */
@@ -65,7 +69,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
         content_scripts: panel ? [{ js: ['src/devpanel/panel.js'] }] : [],
       }),
       onMessage: { addListener: (/** @type {Function} */ fn) => { onMessage = fn; } },
-      onMessageExternal: { addListener() {} },
+      onMessageExternal: { addListener: () => { externalListeners++; } },
       onInstalled: { addListener: (/** @type {Function} */ fn) => { onInstalled = fn; } },
       onStartup: { addListener: (/** @type {Function} */ fn) => { onStartup = fn; } },
       reload() {},
@@ -80,7 +84,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
         set: async (/** @type {Record<string, any>} */ items) => {
           if (failNext > 0) {
             failNext--;
-            throw new Error('write failed');
+            throw new Error(failMessage);
           }
           writes++;
           Object.assign(store, structuredClone(items));
@@ -131,16 +135,16 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
       : { ok: dev }),
     OffscreenCanvas: FakeCanvas, Path2D: class { constructor(d) { this.d = d; } } };
   context.globalThis = context;
-  context.importScripts = (/** @type {string} */ file) => vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
+  context.importScripts = (/** @type {string} */ file) => vm.runInContext(fs.readFileSync(path.join(src, file), 'utf8'), context);
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(path.join(SRC, 'background.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(src, 'background.js'), 'utf8'), context);
   /** @param {any} msg @param {any} [sender] @returns {Promise<any>} */
   const send = (msg, sender = YT) => new Promise((resolve) => {
     const async = /** @type {Function} */ (onMessage)(msg, sender, resolve);
     if (async !== true) setTimeout(() => resolve(undefined), 0);
   });
   const install = (/** @type {string} */ reason) => /** @type {Function} */ (onInstalled)({ reason });
-  const restart = () => worker(undefined, { dev, panel, stores: { local: store, session } });
+  const restart = () => worker(undefined, { dev, panel, stores: { local: store, session }, src });
   const advance = async (ms) => {
     elapsed += ms;
     for (const [id, timer] of timers) {
@@ -149,10 +153,10 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
     await vm.runInContext('queue', context);
   };
   return { send, install, restart, opened, created, calls, store, session, icons,
-    advance,
+    advance, externalListeners: () => externalListeners,
     startup: () => /** @type {Function} */ (onStartup)(), idle: () => vm.runInContext('queue', context),
     failIcons: (n) => { failIcon = n; }, failDrawing: (n) => { failDraw = n; },
-    writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
+    writes: () => writes, failWrites: (/** @type {number} */ n, message = 'write failed') => { failNext = n; failMessage = message; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
 }
 
 test('toolbar shows the drop while idle, draws on fresh ticks, and skips unchanged glass levels', async () => {
@@ -462,6 +466,22 @@ test('a tick whose write fails is charged by the next tick that resends it', asy
   assert.ok(w.store.drip.watchSecondsLeft <= 890, `left ${w.store.drip.watchSecondsLeft}`);
 });
 
+test("an import over storage's quota says storage-full, and storage and the next reply keep the state from before", async () => {
+  const w = worker();
+  await w.send({ type: 'addBacklog', video: { id: 'mine', title: 'Mine', channel: 'C', length: '1:00' } }, PAGE);
+  const before = structuredClone(w.store.drip);
+  // The error Chrome 157 throws from chrome.storage.local.set past QUOTA_BYTES.
+  w.failWrites(1, 'Resource::kQuotaBytes quota exceeded');
+  const res = await w.send({ type: 'importData', data: { app: 'drip', format: 1, backlog: [{ id: 'theirs', title: 'Theirs' }] } }, PAGE);
+  assert.deepEqual([res.ok, res.error, 'state' in res], [false, 'storage-full', false]);
+  assert.deepEqual(w.store.drip, before);
+  const next = await w.send({ type: 'get' }, PAGE);
+  assert.deepEqual(next.state.backlog.map((/** @type {any} */ v) => v.id), ['mine']);
+  // Any other failure still says what it was.
+  w.failWrites(1);
+  assert.equal((await w.send({ type: 'importData', data: { app: 'drip', format: 1, backlog: [{ id: 'theirs' }] } }, PAGE)).error, 'Error: write failed');
+});
+
 test('a new install opens the welcome page once, and an update does not', () => {
   const w = worker();
   w.install('install');
@@ -535,6 +555,30 @@ test('a store build has no developer mode, even with the toggle stored as on', a
   assert.equal(status.enabled, false);
   assert.equal((await w.send({ type: 'setDevMode', on: true }, PAGE)).error, 'dev-off');
   assert.equal((await w.send({ type: 'devAction', action: 'minutes+5' })).error, 'dev-off');
+});
+
+test("the store build's worker has no dev tools: their messages are unknown, and the rest still works", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drip-store-'));
+  try {
+    for (const p of ['manifest.json', 'src', 'icons']) fs.cpSync(path.join(SRC, '..', p), path.join(dir, p), { recursive: true });
+    require('../bin/release-tree').strip(dir);
+    const w = worker(undefined, { dev: true, panel: false, src: path.join(dir, 'src') });
+    w.store.dripDev = true;
+    assert.equal(w.externalListeners(), 0, 'no onMessageExternal listener');
+    assert.equal(w.Drip.devAction, undefined);
+    // Settings asks for devStatus, and an answer without ok keeps its Developer mode section hidden.
+    for (const msg of [{ type: 'devStatus' }, { type: 'setDevMode', on: true }, { type: 'devAction', action: 'minutes+5' }]) {
+      const res = await w.send(msg, PAGE);
+      assert.equal(res.ok, false, msg.type);
+      assert.equal(res.error, 'unknown-message', msg.type);
+    }
+    assert.equal((await w.send({ type: 'get' }, PAGE)).state.watchSecondsLeft, 0);
+    assert.equal((await w.send({ type: 'spendWatch' })).state.watchSecondsLeft, 15 * 60);
+    assert.equal(w.store.dripDevClock, undefined);
+    assert.equal(worker(undefined, { dev: true }).externalListeners(), 1, 'the unpacked tree keeps the localhost route');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('dev/ENABLED keeps developer mode on whatever the toggle says', async () => {
@@ -649,6 +693,16 @@ test('needThis refuses an id that is not a video id', async () => {
   assert.deepEqual([...w.store.drip.unlocked], []);
   const ok = await w.send({ type: 'needThis', videoId: 'abc', reason: 42 });
   assert.equal(ok.error, 'reason-required');
+});
+
+test('a pasted reason of megabytes is stored at the cap, not whole (B2)', async () => {
+  const w = worker();
+  const res = await w.send({ type: 'needThis', videoId: 'abc', title: 'T'.repeat(3e6), reason: `for school ${'r'.repeat(3e6)}` });
+  assert.equal(res.ok, true);
+  const [use] = Object.values(w.store.drip.log).flatMap((/** @type {any} */ day) => day.needThis);
+  assert.equal(use.reason.length, 300);
+  assert.equal(use.title.length, 200);
+  assert.ok(JSON.stringify(w.store.drip).length < 10000);
 });
 
 test('a message that is not an object is refused', async () => {

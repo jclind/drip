@@ -6,6 +6,8 @@ process.env.TZ = 'America/New_York';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../src/lib/state.js');
+// The dev panel's actions, for its Apply pending test below.
+require('../src/devpanel/actions.js');
 const D = /** @type {any} */ (globalThis).Drip;
 
 /** @param {number} day @param {number} [hour] @param {number} [minute] */
@@ -30,7 +32,8 @@ test('the three settings default to off, 11pm to 6am, and clean like the rest', 
   assert.equal(D.DEFAULT_SETTINGS.dryHours, false);
   assert.equal(D.DEFAULT_SETTINGS.dryFrom, 23);
   assert.equal(D.DEFAULT_SETTINGS.dryTo, 6);
-  assert.deepEqual(D.cleanSettings({ dryHours: 1, dryFrom: 30, dryTo: -1 }), { dryHours: true, dryFrom: 23, dryTo: 0 });
+  assert.deepEqual(D.cleanSettings({ dryHours: true, dryFrom: 30, dryTo: -1 }), { dryHours: true, dryFrom: 23, dryTo: 0 });
+  assert.deepEqual(D.cleanSettings({ dryHours: 1 }), {}, 'only true or false');
   assert.deepEqual(D.cleanSettings({ dryFrom: 2.6, dryTo: '5' }), { dryFrom: 3 });
 });
 

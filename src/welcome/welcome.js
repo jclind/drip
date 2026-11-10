@@ -1273,7 +1273,7 @@
       const needBack = Drip.needThisBack(sand, now);
       const canBuy = sand.tokens.watch > 0;
       /** @type {HTMLTextAreaElement} */
-      const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?' }));
+      const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?', maxlength: Drip.REASON_MAX }));
       const unlock = () => {
         const res = Drip.needThis(sand, playing().id, playing().title, reason.value, Date.now());
         if (res.ok) {
@@ -1424,8 +1424,12 @@
   }
 
   drawLadder();
-  retour(Math.max(0, hashStep()));
+  // The screen shows before the step draws, since a hidden stage measures 0. A reload on the lock step gave the water
+  // no depth, so +15m and Done for now drained it from nowhere. With step set first, showScreen leaves the drawing to
+  // retour.
+  step = Math.max(0, hashStep());
   showScreen();
+  retour(step);
   // A reopened page shows the mode that's saved. A new install has the defaults, which are Full drip.
   chrome.runtime.sendMessage({ type: 'get' }).then((/** @type {any} */ res) => {
     const saved = res && res.state && res.state.settings;

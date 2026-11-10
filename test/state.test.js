@@ -5,6 +5,9 @@ const assert = require('node:assert/strict');
 require('../src/lib/state.js');
 require('../src/lib/glass.js');
 const D = globalThis.Drip;
+// What state.js exports, before the dev panel's actions add devAction for the first-day test below.
+const STATE_API = Object.keys(D);
+require('../src/devpanel/actions.js');
 const G = globalThis.DripGlass;
 
 /** @param {number} day @param {number} [hour] @param {number} [minute] */
@@ -21,15 +24,15 @@ function refusesUnchanged(state, call, error) {
 }
 
 test('API contains every contract name, and defaults are frozen', () => {
-  assert.deepEqual(Object.keys(D).sort(), [
+  assert.deepEqual(STATE_API.sort(), [
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'planned', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'swapFollow', 'editsSince', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUses', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
-    'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
-    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
-    'exportData', 'importData', 'resetData', 'isOlder', 'newer',
+    'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'waitingCount', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
+    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'upNextIsPick', 'earlyLocked', 'toolbarGlass', 'toolbarPlaying',
+    'exportData', 'importData', 'resetData', 'REASON_MAX', 'isOlder', 'newer',
     'ALLOW_MAX', 'channelId', 'cleanChannel', 'sameChannel', 'allowChannel', 'removeAllowed', 'blockChannel', 'unblockChannel',
-    'cancelChannelPending', 'seenChannel', 'channelFromPage', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels', 'allowCount', 'isAllowedOrWaiting',
+    'cancelChannelPending', 'applyChannelsPending', 'seenChannel', 'channelFromPage', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels', 'allowCount', 'isAllowedOrWaiting',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {
@@ -623,6 +626,37 @@ test('cleanVideo keeps valid optional fields and drops bad ones', () => {
   assert.equal(state.backlog[0].resumeSec, 12);
 });
 
+test('cleanVideo drops a length or position no video has, and a stash time past what a date can hold', () => {
+  // From a tester's import: History and the stash printed numbers like 1e+16.
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 1e16, durationSec: 1e15 }), video('a'));
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 1e20 }), video('a'));
+  // A week is the most either may be. YouTube keeps at most 12 hours of a video or a stream.
+  const week = 7 * 24 * 3600;
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: week, durationSec: week }), { ...video('a'), resumeSec: week, durationSec: week });
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 60, durationSec: week + 1 }), { ...video('a'), resumeSec: 60 });
+  assert.deepEqual(D.cleanVideo({ ...video('a'), addedAt: 1e20 }), video('a'));
+  assert.deepEqual(D.cleanVideo({ ...video('a'), addedAt: time(5) }), { ...video('a'), addedAt: time(5) });
+  // A length that isn't a real time goes, since the stash adds lengths up. Real times and text like LIVE stay.
+  assert.equal(D.cleanVideo({ ...video('a'), length: '9:99:99' })?.length, '');
+  assert.equal(D.cleanVideo({ ...video('a'), length: '5' })?.length, '');
+  for (const length of ['0:45', '14:02', '1:02:03', '120:00', 'LIVE']) assert.equal(D.cleanVideo({ ...video('a'), length })?.length, length);
+});
+
+test('cleanVideo keeps at most 200 characters of each text field, on one line, so the stash and card stay small', () => {
+  const long = 'w'.repeat(1e6);
+  const clean = D.cleanVideo({ id: 'a', title: `A\n  title ${long}`, channel: long, length: long, views: long, age: long });
+  assert.ok(clean);
+  assert.equal(clean.title, `A title ${'w'.repeat(192)}`);
+  for (const key of /** @type {const} */ (['channel', 'length', 'views', 'age'])) assert.equal(clean[key], 'w'.repeat(200), key);
+  const state = fresh();
+  D.addBacklog(state, { ...video('s'), title: long }, undefined, time(5));
+  assert.equal(state.backlog[0].title.length, 200);
+  D.reveal(state, [{ ...video('c'), channel: long }]);
+  assert.equal(state.current?.channel.length, 200);
+  D.swapBacklog(state, { ...video('n'), title: long }, 's', undefined, time(5));
+  assert.equal(state.backlog.find((v) => v.id === 'n')?.title.length, 200);
+});
+
 test('charge drains seconds, floors at zero, logs actual watched time, and reports lock status', () => {
   const state = fresh();
   assert.deepEqual(D.watchStatus(state, 'a'), { secondsLeft: 0, unlocked: false, allowed: false, locked: true });
@@ -670,6 +704,21 @@ test('needThis validates a trimmed reason, logs its text and time, and enforces 
   assert.deepEqual(state.unlocked, []);
   refusesUnchanged(state, () => D.needThis(state, 'd', 'D', 'Homework', time(6)), 'need-this-limit');
   refusesUnchanged(state, () => D.needThis(state, 'a', 'A', 'Homework', time(6)), 'need-this-limit');
+});
+
+// B2: a pasted reason or a page's title rode along in every save and every state message, with no cap.
+test('needThis keeps at most 300 characters of reason and 200 of title, on one line', () => {
+  const state = fresh();
+  assert.equal(D.REASON_MAX, 300);
+  assert.deepEqual(D.needThis(state, 'a', `  ${'t'.repeat(5e6)}`, `  For\n\nwork ${'r'.repeat(5e6)}`, time(5)), { ok: true });
+  const [use] = D.logDay(state).needThis;
+  assert.equal(use.reason.length, 300);
+  assert.ok(use.reason.startsWith('For work rrr'), 'line breaks and runs of spaces become one space');
+  assert.equal(use.title, 't'.repeat(200));
+  refusesUnchanged(state, () => D.needThis(state, 'b', 'B', ' \n\t a \n ', time(5)), 'reason-required');
+  // A cut that would split an emoji drops the whole emoji.
+  D.needThis(state, 'b', 'B', `${'x'.repeat(299)}😀 more`, time(5));
+  assert.equal(D.logDay(state).needThis[1].reason, 'x'.repeat(299));
 });
 
 test('needThis allows again once the oldest use in the week ages out', () => {
@@ -792,15 +841,20 @@ test('the old daily setting drops away from stored state, waiting changes, and i
 test('cleanSettings rounds and clamps every numeric range, drops unknown and invalid values', () => {
   assert.deepEqual(D.cleanSettings({ minutesPerToken: 0, recTokensPerDay: 500, watchTokensPerDay: 2.6, rolloverDays: 0, resetHour: 30, needThisPerWeek: -1, stashMax: 0, unknown: 5, feedSource: 'bad', graceMode: 1 }), {
     minutesPerToken: 1, recTokensPerDay: 100, watchTokensPerDay: 3,
-    rolloverDays: 1, resetHour: 23, needThisPerWeek: 0, stashMax: 1, graceMode: true,
+    rolloverDays: 1, resetHour: 23, needThisPerWeek: 0, stashMax: 1,
   });
-  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerWeek: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: 0 }), {
+  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerWeek: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: false }), {
     minutesPerToken: 120, recTokensPerDay: 0, watchTokensPerDay: 48,
     rolloverDays: 7, resetHour: 0, needThisPerWeek: 20, stashMax: 50, feedSource: 'subscriptions', graceMode: false,
   });
   assert.deepEqual(D.cleanSettings({ recTokensPerDay: NaN, minutesPerToken: Infinity, resetHour: '5', watchTokensPerDay: null }), {});
   assert.deepEqual(D.cleanSettings({ streams: true }), { streams: true });
   assert.deepEqual(D.cleanSettings({ streams: 'yes' }), {});
+  // Grace mode and Dry hours take only true or false, like every other switch: "false" and "no" are strings, which
+  // Boolean() turned on.
+  assert.deepEqual(D.cleanSettings({ graceMode: 'false', dryHours: 'no' }), {});
+  assert.deepEqual(D.cleanSettings({ graceMode: 0, dryHours: null }), {});
+  assert.deepEqual(D.cleanSettings({ graceMode: true, dryHours: false }), { graceMode: true, dryHours: false });
   assert.deepEqual(D.cleanSettings(undefined), {});
 });
 
@@ -1255,6 +1309,28 @@ test('hydrate drops malformed backlog entries and bad numbers from storage', () 
   assert.equal(state.watchSecondsLeft, 0);
   assert.deepEqual(state.seen, ['a']);
   assert.deepEqual(state.unlocked, ['b']);
+});
+
+test('hydrate loads state saved before the text caps, and cuts its long text down to them', () => {
+  const long = 'z'.repeat(1e6);
+  const at = time(5, 9);
+  const uses = Array.from({ length: 25 }, (_, n) => ({ videoId: `v${n}`, title: '', reason: 'Class', at: at + n }));
+  uses[24] = { videoId: 'v24', title: long, reason: `Long\n${long}`, at: at + 24, extra: 'kept' };
+  const state = D.hydrate({
+    day: '2026-10-05', current: { ...video('c'), title: long }, backlog: [{ ...video('s'), channel: long }],
+    log: { '2026-10-05': { watchedSec: 60, needThis: uses } },
+  }, time(5));
+  assert.equal(state.current?.title.length, 200);
+  assert.equal(state.backlog[0].channel.length, 200);
+  const kept = state.log['2026-10-05'].needThis;
+  assert.equal(kept.length, 20, 'a day keeps its latest 20 uses, the most a week allows');
+  assert.equal(kept[0].videoId, 'v5');
+  assert.deepEqual(kept[19], { videoId: 'v24', title: 'z'.repeat(200), reason: `Long ${'z'.repeat(295)}`, at: at + 24, extra: 'kept' });
+  assert.equal(state.log['2026-10-05'].watchedSec, 60);
+  assert.equal(D.needThisUsed(state, time(5)), 20);
+  // Uses under the caps load exactly as stored.
+  const small = { videoId: 'a', title: 'A', reason: 'For work', at };
+  assert.deepEqual(D.hydrate({ day: '2026-10-05', log: { '2026-10-05': { needThis: [small] } } }, time(5)).log['2026-10-05'].needThis, [small]);
 });
 
 test('chargeTick places held-back time where it was played, so it does not overlap newer time', () => {

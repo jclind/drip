@@ -1,6 +1,7 @@
 // @ts-check
 // The Allow button on a channel page (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md call 12). An allowed channel's
-// videos cost no minutes. Allowing waits for the reset (Q6); pressing it again takes the channel off at once.
+// videos cost no minutes. Allowing waits for the reset (Q6); pressing it again takes the channel off at once. The
+// button shows only while watch time is on.
 
 (function () {
   /** @type {any} */
@@ -93,6 +94,15 @@
       view = '';
       return;
     }
+    // With watch time off nothing costs minutes, so allowing a channel would change nothing and the button hides
+    // (Jesse, 2026-11-10). The page still tells the worker the channel's name and picture, since a blocked channel
+    // matters in every mode.
+    if (state.settings.clock === false) {
+      tellSeen(channel);
+      old?.remove();
+      view = '';
+      return;
+    }
     const at = where(channel);
     const firstDay = Drip.firstDayUntil(state, Date.now()) > 0;
     const label = {
@@ -141,13 +151,20 @@
     if (hadFocus) button.focus();
   }
 
-  /** A list entry added by handle learns the channel's name here, for matching home cards. @param {any} channel */
+  /**
+   * A list entry added by handle learns the channel's name here, for matching home cards. The entries hold what
+   * cleanChannel kept, so the page's sighting is compared cleaned the same way. Raw, a name with a no-break space or
+   * U+3000, common in Japanese names, never matched and went to the worker every second (release review, 2026-11-10).
+   * @param {any} channel
+   */
   function tellSeen(channel) {
     if (!state || !state.channels || !channel.name) return;
+    const seen = Drip.cleanChannel(channel);
+    if (!seen) return;
     const p = state.channelsPending;
     const entries = [...state.channels.allow, ...state.channels.block, ...(p ? [...p.allow, ...p.unblock] : [])];
-    const stale = entries.some((/** @type {any} */ e) => Drip.sameChannel(e, channel) && (e.name !== channel.name
-      || (!!channel.avatar && e.avatar !== channel.avatar) || channel.ids.some((/** @type {string} */ id) => !e.ids.includes(id))));
+    const stale = entries.some((/** @type {any} */ e) => Drip.sameChannel(e, seen) && (e.name !== seen.name
+      || (!!seen.avatar && e.avatar !== seen.avatar) || seen.ids.some((/** @type {string} */ id) => !e.ids.includes(id))));
     if (stale) send({ type: 'seenChannel', channel });
   }
 
