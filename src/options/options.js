@@ -583,7 +583,7 @@ function savedLine(waiting) {
   if (mode && waiting.some((k) => MODE_KEYS.includes(k)) && mode !== Drip.modeOf(state.settings)) {
     return `Saved. ${modeName(mode)} starts at ${resetLabel()}.`;
   }
-  return `Saved. ${plural(waiting.length, 'change starts', 'changes start')} at ${resetLabel()}.`;
+  return `Saved. ${plural(Drip.waitingCount(waiting), 'change starts', 'changes start')} at ${resetLabel()}.`;
 }
 
 async function save() {
@@ -1105,9 +1105,12 @@ function dataDone(title, lines = [], failed = false, chips = []) {
   box.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
-/** "2 changes start at 4:00am.", or '' when nothing waits. @param {Record<string, any> | undefined} pending */
+/**
+ * "2 changes start at 4:00am.", or '' when nothing waits. Dry hours count once, as their one chip does.
+ * @param {Record<string, any> | undefined} pending
+ */
 function waitsLine(pending) {
-  const n = Object.keys(pending || {}).length;
+  const n = Drip.waitingCount(Object.keys(pending || {}));
   return n ? `${plural(n, 'change starts', 'changes start')} at ${resetLabel()}.` : '';
 }
 

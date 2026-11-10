@@ -268,6 +268,30 @@ test('reset results show removed counts, keep balances and history, and omit zer
   assert.equal(p.get('dataResult').textContent, 'Reset');
 });
 
+test('Saved. and Reset count Dry hours once, as their one chip does', async () => {
+  const p = page();
+  p.run('state.settings.dryHours = true; draft = Drip.planned(state); renderForm()');
+  // Ends at an hour sooner: one edit, and Dry hours wait as a range of three keys.
+  p.run('draft.dryTo = 5; draftChanged()');
+  assert.equal(p.get('result').textContent, '1 change not saved');
+  await p.run('save()');
+  assert.equal(p.run('Object.keys(state.pending.changes).sort().join()'), 'dryFrom,dryHours,dryTo', 'state still keeps all three');
+  assert.equal(p.get('result').textContent, 'Saved. 1 change starts at 4:00am.');
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 1);
+  // A second save names only what it left waiting, though Dry hours still wait too.
+  p.run('draft.minutesPerToken = 20; draftChanged()');
+  await p.run('save()');
+  assert.equal(p.get('result').textContent, 'Saved. 1 change starts at 4:00am.');
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 2);
+  p.run('state.pending = null; state.settings.watchTokensPerDay = 2; draft = Drip.planned(state); renderForm()');
+  await p.get('resetYes').click();
+  assert.equal(p.run('Object.keys(state.pending.changes).sort().join()'), 'dryFrom,dryHours,dryTo,watchTokensPerDay');
+  assert.match(p.get('dataResult').textContent, /2 changes start at 4:00am\./);
+  assert.equal(p.document.body.querySelectorAll('.rows .chip').length, 2);
+  assert.equal(p.run('Drip.waitingCount([])'), 0);
+  assert.equal(p.run('Drip.waitingCount(["dryHours", "dryFrom", "dryTo", "stashMax"])'), 2);
+});
+
 test('export is only the check and title; import errors keep the existing explanation panel', async () => {
   const p = page();
   await p.get('exportData').click();
