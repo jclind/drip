@@ -717,6 +717,17 @@ test('a lock left open past midnight turns "tomorrow" into "today" (Codex, 2026-
   assert.match(tab.lockText(), /Unlock back today 9:14am/);
 });
 
+test('the reason box stops at the rules\' cap, on the lock and on the welcome tour\'s demo lock (B2)', async () => {
+  const { world, tab } = await setup(3);
+  await play(world, tab, 5);
+  await tab.press('need');
+  const box = tab.document.getElementById('drip-lock')?.all().find((/** @type {any} */ el) => el.tagName === 'TEXTAREA');
+  assert.equal(box?.getAttribute('maxlength'), String(world.D.REASON_MAX));
+  // welcome.js draws its own lock, with no harness here, so this checks its source.
+  const welcome = fs.readFileSync(path.join(SRC, 'welcome/welcome.js'), 'utf8');
+  assert.match(welcome, /h\('textarea', \{[^}]*maxlength: Drip\.REASON_MAX[^}]*\}\)/);
+});
+
 test("a failed unlock says the week's unlocks are used", async () => {
   const { world, tab } = await setup(3);
   await play(world, tab, 5);

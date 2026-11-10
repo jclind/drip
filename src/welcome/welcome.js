@@ -1273,7 +1273,7 @@
       const needBack = Drip.needThisBack(sand, now);
       const canBuy = sand.tokens.watch > 0;
       /** @type {HTMLTextAreaElement} */
-      const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?' }));
+      const reason = /** @type {any} */ (h('textarea', { rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?', maxlength: Drip.REASON_MAX }));
       const unlock = () => {
         const res = Drip.needThis(sand, playing().id, playing().title, reason.value, Date.now());
         if (res.ok) {
