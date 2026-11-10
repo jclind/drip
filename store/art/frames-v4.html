@@ -89,7 +89,8 @@
       #drip-pill, #drip-pill * { font-family: Roboto, Arial, sans-serif !important; }
       .co-layer, .co-ring, .co-chip, .co-said, .co-head, .co-count, .tour-player-play { display: none !important; }
       .tour-player { background: url(/store/art/thumbs/store-trail.svg) center / cover !important; border-radius: 0 !important; }
-      .tour-player { background-size: 130% auto !important; background-position: 55% 95% !important; }`,
+      /* The whole picture: the 130% crop was tuned for the old thumbnail's small rider (design-thumb, 2026-11-09). */
+      .tour-player { background-size: cover !important; background-position: center !important; }`,
     /** @param {Document} d */
     step: (d) => setTimeout(() => {
       const m = d.querySelector('#drip-pill .drip-pill-minutes');
