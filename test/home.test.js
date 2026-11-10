@@ -1971,3 +1971,63 @@ for (const cards of ['unlimited', 'off']) {
     assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
   });
 }
+
+/**
+ * Runs `fn` and returns the first lines of every promise rejection nobody handled meanwhile.
+ * @param {() => Promise<void>} fn
+ */
+async function unhandled(fn) {
+  /** @type {string[]} */
+  const seen = [];
+  const onRejection = (/** @type {any} */ err) => seen.push(String(err && err.stack || err).split('\n').slice(0, 2).join(' | '));
+  process.on('unhandledRejection', onRejection);
+  try {
+    await fn();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    process.off('unhandledRejection', onRejection);
+  }
+  return seen;
+}
+
+// Reveal pressed as the connection drops (release review, 2026-11-10). onReveal redraws first, the redraw puts the
+// offline note where the empty page's buttons were, and reveal.js read the missing buttons and threw a TypeError.
+const offlineReveals = [
+  { name: 'Reveal, pressed before the half-second check redraws the page', setup: async (/** @type {any} */ _tab) => {} },
+  { name: 'Reveal next on a blocked card', setup: async (/** @type {any} */ tab) => { await blockCard(tab); await tab.advance(500); } },
+];
+for (const { name, setup } of offlineReveals) {
+  test(`${name}, while offline, spends nothing, shows the offline note, and throws nothing (animated)`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced: false, realReveal: true });
+    await setup(tab);
+    const cards = world.state.tokens.rec;
+    const asked = world.count('reveal');
+    const rejections = await unhandled(async () => {
+      tab.offline = true;
+      await tab.click(tab.button('next') ? 'next' : 'reveal');
+      await tab.advance(2000);
+    });
+    assert.deepEqual(rejections, []);
+    assert.deepEqual(tab.errors, []);
+    assert.equal(world.state.tokens.rec, cards, 'no card spent');
+    assert.equal(world.count('reveal'), asked, 'the worker was not asked');
+    assert.ok(tab.root().querySelector('.drip-offline'), 'the offline note is up');
+  });
+}
+
+test('Reveal on a signed-out home page, as the connection drops, spends nothing and throws nothing (animated)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { reduced: false, realReveal: true, grid: [] });
+  addFeedNudge(tab.browse.querySelector('#primary'));
+  const rejections = await unhandled(async () => {
+    tab.offline = true;
+    await tab.click('reveal');
+    await tab.advance(2000);
+  });
+  assert.deepEqual(tab.reveals, ['revealEmpty'], 'the empty feed\'s reveal ran');
+  assert.deepEqual(rejections, []);
+  assert.deepEqual(tab.errors, []);
+  assert.equal(world.state.tokens.rec, 10);
+  assert.ok(tab.root().querySelector('.drip-offline'), 'the offline note is up');
+});
