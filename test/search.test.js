@@ -181,9 +181,8 @@ class FakeElement {
   matches(sel) { return parseList(sel).some((cx) => matchComplex(this, cx)); }
 }
 
-/** Parses the captured row the way home.test.js parses its fixture. @param {(row: string) => string} [edit] */
-function searchRow(edit = (html) => html) {
-  const html = edit(fs.readFileSync(path.join(__dirname, 'fixtures', 'youtube-search-row.html'), 'utf8'));
+/** Parses captured markup the way home.test.js parses its fixture, and returns its first element. @param {string} html */
+function parse(html) {
   const holder = new FakeElement('div');
   const stack = [holder];
   for (const token of html.replace(/<!--[\s\S]*?-->/g, '').match(/<[^>]+>|[^<]+/g) || []) {
@@ -201,11 +200,27 @@ function searchRow(edit = (html) => html) {
   return holder.children[0];
 }
 
+/** The captured search row. @param {(row: string) => string} [edit] */
+function searchRow(edit = (html) => html) {
+  return parse(edit(fs.readFileSync(path.join(__dirname, 'fixtures', 'youtube-search-row.html'), 'utf8')));
+}
+
+/**
+ * Search's filter row, as YouTube wrote it logged out on 2026-11-10 (signed in, Ask YouTube comes first), with style
+ * classes and the touch feedback trimmed.
+ * @param {string[]} words
+ */
+function chipRow(words) {
+  const chip = (/** @type {string} */ word) => `<yt-chip-cloud-chip-renderer chip-style="STYLE_HOME_FILTER"><div id="chip-shape-container"> <chip-shape class="ytChipShapeHost" role="presentation"><button class="ytChipShapeButtonReset" role="tab" aria-selected="false"><div class="ytChipShapeChip ytChipShapeInactive ytChipShapeOnlyTextPadding"><div class="ytChipShapeText">${word}</div><yt-touch-feedback-shape aria-hidden="true"></yt-touch-feedback-shape></div></button></chip-shape> </div></yt-chip-cloud-chip-renderer>`;
+  return parse(`<div id="header"><ytd-search-header-renderer><div id="chip-bar"><yt-chip-cloud-renderer><div id="container"><div id="scroll-container"><iron-selector id="chips" role="tablist">${words.map(chip).join('')}</iron-selector></div></div></yt-chip-cloud-renderer></div></ytd-search-header-renderer></div>`);
+}
+
 /**
  * A search page holding one row, running search.js, with a worker that runs the real rules.
  * @param {FakeElement} row
+ * @param {FakeElement} [header] The filter row above the results.
  */
-function makeSearch(row) {
+function makeSearch(row, header) {
   require('../src/lib/state.js');
   const D = /** @type {any} */ (globalThis).Drip;
   let state = D.initialState(NOW);
@@ -221,8 +236,11 @@ function makeSearch(row) {
   contents.append(row);
   section.append(contents);
   primary.append(section);
+  if (header) search.append(header);
   search.append(primary);
   root.append(search);
+  /** search.js's half-second check. @type {Function} */
+  let check = () => {};
   const document = {
     documentElement: root,
     /** @param {string} sel */
@@ -263,11 +281,12 @@ function makeSearch(row) {
     getComputedStyle: () => ({ display: 'block' }),
     MutationObserver: class { observe() {} disconnect() {} },
     requestAnimationFrame: () => 0,
-    setInterval: () => 0,
+    setInterval: (/** @type {Function} */ fn) => { check = fn; return 0; },
   });
   vm.runInContext(fs.readFileSync(path.join(SRC, 'content/search.js'), 'utf8'), context);
   return {
     D, sent,
+    check: () => check(),
     get state() { return state; },
     /** Presses the row's Stash and returns the video it sent. */
     async stash() {
@@ -317,4 +336,36 @@ test('a channel blocked by name from a home card matches a video read from searc
   const state = page.D.initialState(NOW);
   assert.equal(page.D.blockChannel(state, blocked).ok, true);
   assert.equal(page.D.canDeal(state, video), false, 'a reveal skips it');
+});
+
+// The Shorts chip in search's filter row led to a spinner and "No more results" with Hide Shorts on, since early.css
+// hides the Shorts it finds (signed in, 2026-11-10).
+
+/** @param {FakeElement} header */
+const marked = (header) => header.querySelectorAll('yt-chip-cloud-chip-renderer')
+  .filter((c) => c.hasAttribute('data-drip-shorts-chip')).map((c) => c.textContent.replace(/\s+/g, ' ').trim());
+
+test('search marks its Shorts chip and no other, Ask YouTube included', () => {
+  const header = chipRow(['Ask YouTube', 'All', 'Shorts', 'Unwatched', 'Watched', 'Videos', 'Recently uploaded', 'Live']);
+  makeSearch(searchRow(), header);
+  assert.deepEqual(marked(header), ['Shorts']);
+});
+
+test('a chip YouTube reuses for another word loses or gains the mark', () => {
+  const header = chipRow(['All', 'Shorts', 'Videos']);
+  const page = makeSearch(searchRow(), header);
+  const [all, shorts] = header.querySelectorAll('.ytChipShapeText');
+  shorts.textContent = 'Videos';
+  all.textContent = 'Shorts';
+  page.check();
+  assert.deepEqual(marked(header), ['Shorts']);
+  assert.equal(header.querySelectorAll('yt-chip-cloud-chip-renderer')[0].hasAttribute('data-drip-shorts-chip'), true);
+});
+
+test('early.css hides the marked chip only while Hide Shorts is on (Q2)', () => {
+  const css = fs.readFileSync(path.join(SRC, 'content/early.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const rule = /([^{}]+)\{([^}]*)\}/g;
+  const hiding = [...css.matchAll(rule)].filter((m) => /display:\s*none/.test(m[2])).flatMap((m) => m[1].split(',').map((s) => s.trim()));
+  assert.ok(hiding.includes('html[data-drip-hide-shorts] ytd-search yt-chip-cloud-chip-renderer[data-drip-shorts-chip]'));
+  assert.ok(!hiding.some((s) => s.includes('data-drip-shorts-chip') && !s.startsWith('html[data-drip-hide-shorts]')));
 });

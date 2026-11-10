@@ -135,7 +135,9 @@ ytd-miniplayer,
 
 /* Shorts: the shelves on home, search, and channel pages, and the sidebar links, while the "Hide Shorts" setting is on
    (Q2, menu.js). /shorts/ URLs redirect in redirect.js whatever the setting. Search's Shorts shelves are
-   grid-shelf-view-models of Shorts lockups (checked 2026-11-02). A shown one counts as one of search's 10 results. */
+   grid-shelf-view-models of Shorts lockups (checked 2026-11-02). A shown one counts as one of search's 10 results.
+   search.js marks search's Shorts filter chip, which only finds what this hides (2026-11-10). */
+html[data-drip-hide-shorts] ytd-search yt-chip-cloud-chip-renderer[data-drip-shorts-chip],
 html[data-drip-hide-shorts] ytd-reel-shelf-renderer,
 html[data-drip-hide-shorts] grid-shelf-view-model:has(ytm-shorts-lockup-view-model),
 html[data-drip-hide-shorts] ytd-rich-shelf-renderer[is-shorts],

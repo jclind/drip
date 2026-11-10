@@ -31,7 +31,11 @@
     saveSlot: '#meta, .text-wrapper',
     // "Did you mean" and "Showing results for" sit above results. On their own they mean nothing was found.
     hint: 'yt-did-you-mean-renderer, ytd-showing-results-for-renderer',
+    // The filter row's chips. Only its word tells the Shorts chip apart: no link, id, or attribute does (checked
+    // 2026-11-10). In another language it stays.
+    chip: 'ytd-search-header-renderer yt-chip-cloud-chip-renderer',
   };
+  const SHORTS_CHIP = 'Shorts';
   // The shelves, ads, and promos in the list are hidden by early.css, so any other row that's on screen is a result.
   // Rows this script hid itself keep their mark so they stay counted.
   /** @param {Element} el */
@@ -192,6 +196,13 @@
       emptyNote?.remove();
       emptyNote = null;
       return;
+    }
+    // The Shorts chip searches only Shorts, which early.css hides while Hide Shorts is on, so it led to a spinner and
+    // "No more results" (signed in, 2026-11-10). early.css hides the chip it marks. YouTube reuses chip elements when
+    // the row changes, so every chip is checked each time.
+    for (const chip of document.querySelectorAll(SEL.chip)) {
+      const shorts = (chip.textContent || '').replace(/\s+/g, ' ').trim() === SHORTS_CHIP;
+      if (chip.hasAttribute('data-drip-shorts-chip') !== shorts) chip.toggleAttribute('data-drip-shorts-chip', shorts);
     }
     if (location.search !== query) {
       query = location.search;
