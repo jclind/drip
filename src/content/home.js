@@ -37,14 +37,17 @@
     channelLink: 'ytd-channel-name a[href^="/@"], ytd-channel-name a[href^="/channel/"]',
     length: '.ytBadgeShapeText, .yt-badge-shape__text, .badge-shape-wiz__text, ytd-thumbnail-overlay-time-status-renderer #text',
     // The line after the title: channel, views, and age. Late 2026 writes "184K" and "3d ago", the older markup
-    // "184K views" and "3 days ago". The parts are told apart by VIEWS and AGE, so the age is English only (checked 2026-10-14).
+    // "184K views" and "3 days ago". In English the parts are told apart by VIEWS and AGE (checked 2026-10-14). In
+    // another language the views and age are the line's last two parts. A video by two channels names the second one
+    // before them, "Saturday Night Live · und Druski · 5,3 Mio. · vor 2 Tagen" (home in German, 2026-11-10).
     metaPart: '.ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, #metadata-line span',
     watched: 'ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHost',
     ad: 'ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer',
     // What kind of video an item is, for what a reveal may deal (Q30). Read on air on 2026-10-16 from channel pages,
     // which use the home grid's markup. An upcoming video has a "Notify me" button under the card and no length. The
     // holder has no name of its own, so it only counts on a card without a length. The older markup marked upcoming
-    // and live on the length overlay, and members-only with its own badge.
+    // and live on the length overlay, and members-only with its own badge. On 2026-11-10 an upcoming card had no
+    // button, only a word where the length goes, "Upcoming" or "Anstehend", which kindOf reads in any language.
     notify: 'lockup-attachments-view-model',
     upcoming: 'ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"]',
     live: '.ytBadgeShapeThumbnailLive, ytd-thumbnail-overlay-time-status-renderer[overlay-style="LIVE"]',
@@ -57,11 +60,13 @@
   };
   const AGE = /\bago$/i;
   const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
-  // A past stream's markup is a normal video's, except its age reads "Streamed 23h ago". English only, like AGE.
+  // A past stream's markup is a normal video's, except its age reads "Streamed 23h ago". English only, like AGE. No
+  // class, attribute, link, or thumbnail marks one in any of YouTube's 83 languages (checked 2026-11-10).
   const STREAMED = /^streamed\b/i;
-  // An upcoming video's line under the title, for when its "Notify me" button hasn't rendered. English only too.
+  // An upcoming video's line under the title. English only too, but kindOf also knows one by its badge.
   const SCHEDULED = /^(scheduled for|premieres)\b/i;
-  const DURATION = /^\d+(:\d\d)+$/;
+  // A video's length. Six of YouTube's 83 languages write it with dots, Finnish "4.03.56" among them (2026-11-10).
+  const DURATION = /^\d+([:.]\d\d)+$/;
 
   /** @typedef {{id: string, title: string, channel: string, length: string, views: string, age: string, kind: string, channelIds?: string[]}} Candidate */
   /** @typedef {{pool: Candidate[], noRecommendations: boolean}} FeedRead */
@@ -87,16 +92,33 @@
   }
 
   /**
+   * Whether a grid item's page is in English, so its line under the title can be read by its words. A page without a
+   * lang counts as English, which is how drip read every page before 2026-11-10.
+   * @param {Element} item
+   */
+  function inEnglish(item) {
+    return /^en\b/i.test(item.ownerDocument.documentElement.getAttribute('lang') || 'en');
+  }
+
+  /**
    * The views and age from a grid item's line under the title, as YouTube writes them, or '' for a part it lacks.
+   * English is read by its words, so a bare "184K" gets "views" and the age is the part ending in "ago". In another
+   * language they're the line's last two parts, kept as YouTube wrote them, "2,2 Mio." and "vor 23 Std.". A line of
+   * one part, like a live stream's "189 aktive Zuschauer", gives neither, as "193 watching" does in English.
    * @param {Element} item
    * @param {string} channel Left out, in case a channel's name is a number or ends in "ago" (Codex, 2026-10-14).
    */
   function viewsAndAge(item, channel) {
-    let views = '';
-    let age = '';
+    /** @type {string[]} */
+    const parts = [];
     for (const el of item.querySelectorAll(SEL.metaPart)) {
       const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      if (text === channel) continue;
+      if (text && text !== channel) parts.push(text);
+    }
+    if (!inEnglish(item)) return parts.length < 2 ? { views: '', age: '' } : { views: parts[parts.length - 2], age: parts[parts.length - 1] };
+    let views = '';
+    let age = '';
+    for (const text of parts) {
       if (!views && VIEWS.test(text)) views = /views?$/i.test(text) ? text : `${text} views`;
       else if (!age && AGE.test(text)) age = text;
     }
@@ -120,6 +142,9 @@
     }
     if (item.querySelector(SEL.members)) return 'members';
     if (item.querySelector(SEL.live)) return 'live';
+    // A badge that isn't a length, on a card that isn't live, is an upcoming video's "Upcoming". It was in all 83 of
+    // YouTube's languages on 2026-11-10, so this catches what SCHEDULED misses outside English.
+    if (length && !DURATION.test(length)) return 'upcoming';
     return STREAMED.test(age) ? 'streamed' : 'video';
   }
 

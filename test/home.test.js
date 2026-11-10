@@ -450,7 +450,57 @@ function gridMarks(document, item, kind) {
     old.textContent = 'Members only';
     item.append(old);
     meta('3d ago');
+  } else if (kind === 'video-de') {
+    // Other languages, as headless Chrome showed them logged out on 2026-11-10 with hl=de, ja, or fi: Linus Tech Tips'
+    // videos tab for videos and members-only, NASASpaceflight's streams tab for the rest.
+    badge('ytBadgeShapeThumbnailDefault', '17:57');
+    meta('2,2 Mio.');
+    meta('vor 23 Std.');
+  } else if (kind === 'upcoming-de') {
+    // No "Notify me" button that day, only a word where the length goes.
+    badge('ytBadgeShapeThumbnailDefault', 'Anstehend');
+    meta('27 warten');
+    meta('Geplant für: 13.11.26, 11:45');
+  } else if (kind === 'upcoming-ja') {
+    badge('ytBadgeShapeThumbnailDefault', '配信予定');
+    meta('26 人が待機中');
+    meta('2026/11/13 11:45 に公開予定');
+  } else if (kind === 'live-de') {
+    badge('ytBadgeShapeThumbnailLive', 'LIVE');
+    meta('189 aktive Zuschauer');
+  } else if (kind === 'streamed-de') {
+    badge('ytBadgeShapeThumbnailDefault', '4:03:56');
+    meta('155.534');
+    meta('vor 18 Std. gestreamt');
+  } else if (kind === 'members-de') {
+    badge('ytBadgeShapeThumbnailDefault', '22:28');
+    badge('ytBadgeShapeCommerce', 'Nur für Kanalmitglieder');
+    meta('vor 5 Tagen');
+  } else if (kind === 'video-fi') {
+    // Finnish writes the length with dots.
+    badge('ytBadgeShapeThumbnailDefault', '17.57');
+    meta('2,2 milj.');
+    meta('23 t sitten');
+  } else if (kind === 'attached-fi') {
+    gridMarks(document, item, 'video-fi');
+    item.append(new FakeElement(document, 'lockup-attachments-view-model'));
   } else throw new Error(`no markup for ${kind}`);
+}
+
+/**
+ * Puts channel names first on a grid item's line, as home and Subscriptions write it. A video by two channels names
+ * both, "Saturday Night Live · und Druski · 5,3 Mio. · vor 2 Tagen" (home in German, 2026-11-10).
+ * @param {any} tab @param {string} id @param {string[]} names
+ */
+function lineStartsWith(tab, id, ...names) {
+  const item = tab.browse.querySelectorAll('ytd-rich-item-renderer').find((/** @type {any} */ el) => el.querySelector('a').getAttribute('href') === `/watch?v=${id}`);
+  const first = item.querySelector('.ytContentMetadataViewModelMetadataText');
+  for (const name of names) {
+    const el = new FakeElement(tab.document, 'span');
+    el.className = 'ytContentMetadataViewModelMetadataText';
+    el.textContent = name;
+    item.insertBefore(el, first);
+  }
 }
 
 /** Loads the captured empty-feed fixture into the fake DOM. @param {FakeElement} root */
@@ -474,12 +524,13 @@ function addFeedNudge(root) {
 /**
  * One YouTube tab on the home page, running home.js.
  * @param {ReturnType<typeof makeWorld>} world
- * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string, realReveal?: boolean, offline?: boolean}} [opts] reduced: the browser asks for
+ * @param {{reduced?: boolean, grid?: string[], inView?: boolean, kept?: string, realReveal?: boolean, offline?: boolean, lang?: string}} [opts] reduced: the browser asks for
  *   reduced motion, so nothing animates. grid: the ids in YouTube's hidden home grid. An id written "kind:id" gets that
  *   kind's markup (gridMarks). inView: drip's home page is on screen, so drops land in the counter, and tab.landings
  *   records each landing. kept: what "Done for now" left in sessionStorage, "N" or "N:dryUntil" (watch.js onDone).
+ *   lang: the page's lang, as YouTube sets it for its language ("de-DE"). Left out, the page has none.
  */
-async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '', realReveal = false, offline = false } = {}) {
+async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inView = false, kept = '', realReveal = false, offline = false, lang = '' } = {}) {
   let now = 0;
   world.time = () => EPOCH + now;
   /** @type {Map<number, {fn: Function, at: number, every: number}>} */
@@ -514,6 +565,7 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
     dispatchEvent: (event) => { for (const fn of document.listeners[event.type] || []) fn(event); return true; },
   };
   document.documentElement = new FakeElement(document, 'html');
+  if (lang) document.documentElement.setAttribute('lang', lang);
   if (inView) document.documentElement.setAttribute('data-drip-shown', '');
   document.body = new FakeElement(document, 'body');
   /** @type {Map<string, string>} */
@@ -1593,6 +1645,72 @@ test('a card with a length is not upcoming, a premiere is upcoming by its text, 
   assert.deepEqual(Array.from(sent.candidates, (/** @type {any} */ v) => `${v.kind}:${v.id}`), ['upcoming:s1', 'members:m1', 'video:v1']);
   assert.equal(world.state.current.id, 'v1');
 });
+
+/** Each candidate the reveal sent, as "kind:id". @param {any} world */
+const sentKinds = (world) => Array.from(world.sent.find((/** @type {any} */ msg) => msg.type === 'reveal').candidates, (/** @type {any} */ v) => `${v.kind}:${v.id}`);
+
+test('in another language, upcoming, live, and members-only videos are told apart by markup, not words (Q30, 2026-11-10)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { lang: 'de-DE', grid: ['upcoming-de:s1', 'upcoming-ja:s2', 'live-de:l1', 'members-de:m1', 'video-de:v1', 'streamed-de:p1'] });
+  await tab.click('reveal');
+  await tab.advance(100);
+  // A past stream has no markup of its own, only "gestreamt" in its age, so outside English it reads as a video.
+  assert.deepEqual(sentKinds(world), ['upcoming:s1', 'upcoming:s2', 'live:l1', 'members:m1', 'video:v1', 'video:p1']);
+  assert.equal(world.state.current.id, 'v1', 'the upcoming videos before it are not dealt');
+});
+
+test('a length written with dots is a length, so Finnish videos are dealt (Q30, 2026-11-10)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { lang: 'fi-FI', grid: ['attached-fi:v1', 'video-fi:v2'] });
+  await tab.click('reveal');
+  await tab.advance(100);
+  assert.deepEqual(sentKinds(world), ['video:v1', 'video:v2']);
+  assert.equal(world.state.current.id, 'v1');
+});
+
+test('in another language the card shows the views and age as YouTube wrote them (2026-11-10)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { lang: 'de-DE', grid: ['video-de:v1', 'video-de:v2', 'live-de:l1', 'streamed-de:p1'] });
+  lineStartsWith(tab, 'v1', 'Linus Tech Tips');
+  lineStartsWith(tab, 'v2', 'Saturday Night Live', 'und Druski');
+  lineStartsWith(tab, 'l1', 'NASASpaceflight');
+  lineStartsWith(tab, 'p1', 'NASASpaceflight');
+  await tab.click('reveal');
+  await tab.advance(100);
+  const sent = world.sent.find((msg) => msg.type === 'reveal');
+  assert.deepEqual(Array.from(sent.candidates, (/** @type {any} */ v) => [v.id, v.channel, v.views, v.age]), [
+    ['v1', 'Linus Tech Tips', '2,2 Mio.', 'vor 23 Std.'],
+    // The second channel's name isn't taken for the views.
+    ['v2', 'Saturday Night Live', '2,2 Mio.', 'vor 23 Std.'],
+    // A line of one part is neither, as "193 watching" isn't in English.
+    ['l1', 'NASASpaceflight', '', ''],
+    // A number English's VIEWS would match gets no English word added.
+    ['p1', 'NASASpaceflight', '155.534', 'vor 18 Std. gestreamt'],
+  ]);
+  await loadPicture(tab);
+  await tab.advance(100);
+  assert.equal(tab.root().querySelector('.drip-meta-rest').textContent, ' · 2,2 Mio. · vor 23 Std.');
+});
+
+for (const lang of ['', 'en', 'en-GB']) {
+  test(`in English the views and age are read by their words as before, lang "${lang}" (2026-11-10)`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { lang, grid: ['video:v1', 'video:v2', 'live:l1', 'streamed:p1'] });
+    lineStartsWith(tab, 'v1', 'Some Channel');
+    lineStartsWith(tab, 'v2', 'Ubonga', 'and Animated Subtitles');
+    lineStartsWith(tab, 'l1', 'NASASpaceflight');
+    lineStartsWith(tab, 'p1', 'NASASpaceflight');
+    await tab.click('reveal');
+    await tab.advance(100);
+    const sent = world.sent.find((msg) => msg.type === 'reveal');
+    assert.deepEqual(Array.from(sent.candidates, (/** @type {any} */ v) => [v.id, v.kind, v.views, v.age]), [
+      ['v1', 'video', '184K views', '3d ago'],
+      ['v2', 'video', '184K views', '3d ago'],
+      ['l1', 'live', '', ''],
+      ['p1', 'streamed', '60K views', 'Streamed 23h ago'],
+    ]);
+  });
+}
 
 test('with streams allowed, a live stream can be dealt (Q30)', async () => {
   const world = makeWorld();
