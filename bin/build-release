@@ -1,6 +1,7 @@
 #!/bin/sh
-# Builds the zip for the Chrome Web Store: manifest.json, src/, and icons/ only, with the localhost dev route and
-# the dev panel (src/devpanel) taken out. Refuses on uncommitted changes or a version that already has a git tag.
+# Builds the zip for the Chrome Web Store: manifest.json, src/, and icons/ only, with the dev tools taken out by
+# bin/release-tree, which also checks the result. Refuses on uncommitted changes or a version that already has a git
+# tag.
 # Usage: bin/build-release    Output: dist/drip-<version>.zip
 set -eu
 cd "$(dirname "$0")/.."
@@ -19,29 +20,9 @@ node --test >/dev/null 2>&1 || { echo "build-release: node --test fails" >&2; ex
 out="dist/drip-$version"
 rm -rf "$out" "$out.zip"
 mkdir -p "$out"
-git archive HEAD src icons | tar -x -C "$out"
-rm -rf "$out/src/devpanel"
-node - "$out" <<'NODE'
-const fs = require('node:fs');
-const out = process.argv[2];
-const m = require('./manifest.json');
-delete m.externally_connectable;
-m.content_scripts = m.content_scripts.filter((c) => !c.js?.some((f) => f.startsWith('src/devpanel/')));
-fs.writeFileSync(`${out}/manifest.json`, JSON.stringify(m, null, 2) + '\n');
-const worker = `${out}/src/background.js`;
-const source = fs.readFileSync(worker, 'utf8');
-// Remove the dev clock import and its comment from the copied worker only.
-const shipping = source
-  .replace(/\/\/ The dev clock[^\n]*\ntry \{\n  importScripts\('devpanel\/clock\.js'\);\n\} catch \{\n  \/\/ Store build: real time\.\n\}\n/, '')
-  .replace(' (src/devpanel/panel.js)', '')
-  // The release manifest has no panel scripts, so this check is always false in the store build.
-  .replace(/^const shipsPanel = .*;$/m, 'const shipsPanel = false;');
-fs.writeFileSync(worker, shipping);
-NODE
-if grep -q -e localhost -e devpanel "$out/manifest.json" || grep -q devpanel "$out/src/background.js" || [ -e "$out/dev" ] || [ -e "$out/src/devpanel" ]; then
-  echo "build-release: the dev route is still in the build" >&2
-  exit 1
-fi
+git archive HEAD manifest.json src icons | tar -x -C "$out"
+# Takes the dev tools out and checks what's left. It says why and exits 1 on any problem.
+bin/release-tree "$out" || { rm -rf "$out"; exit 1; }
 (cd "$out" && zip -qr "../drip-$version.zip" .)
 rm -rf "$out"
 echo "dist/drip-$version.zip"

@@ -5,6 +5,9 @@ const assert = require('node:assert/strict');
 require('../src/lib/state.js');
 require('../src/lib/glass.js');
 const D = globalThis.Drip;
+// What state.js exports, before the dev panel's actions add devAction for the first-day test below.
+const STATE_API = Object.keys(D);
+require('../src/devpanel/actions.js');
 const G = globalThis.DripGlass;
 
 /** @param {number} day @param {number} [hour] @param {number} [minute] */
@@ -21,15 +24,15 @@ function refusesUnchanged(state, call, error) {
 }
 
 test('API contains every contract name, and defaults are frozen', () => {
-  assert.deepEqual(Object.keys(D).sort(), [
+  assert.deepEqual(STATE_API.sort(), [
     'DEFAULT_SETTINGS', 'MODES', 'modeOf', 'planned', 'settingsToSave', 'dayKey', 'addDays', 'daysBetween', 'initialState', 'hydrate',
     'rollDay', 'logDay', 'spendWatch', 'reveal', 'resolveCurrent', 'revealNext', 'buyIfOut', 'addBacklog',
     'firstDayUntil', 'removeBacklog', 'swapBacklog', 'swapFollow', 'editsSince', 'markProgress', 'charge', 'chargeTick', 'watchStatus', 'needThis', 'needThisUses', 'needThisUsed', 'needThisLeft', 'needThisBack', 'dryUntil', 'drySoon', 'enterDry', 'dryBackSeen', 'cleanSettings',
     'isLoosening', 'mayReveal', 'canDeal', 'updateSettings', 'cancelPending', 'refillSeen', 'caps', 'formatMinutes', 'stashedAgo', 'cleanVideo',
-    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'devAction', 'toolbarGlass', 'toolbarPlaying',
+    'watchedSummary', 'weekView', 'cardsLine', 'redirectTarget', 'earlyLocked', 'toolbarGlass', 'toolbarPlaying',
     'exportData', 'importData', 'resetData', 'isOlder', 'newer',
     'ALLOW_MAX', 'channelId', 'cleanChannel', 'sameChannel', 'allowChannel', 'removeAllowed', 'blockChannel', 'unblockChannel',
-    'cancelChannelPending', 'seenChannel', 'channelFromPage', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels', 'allowCount', 'isAllowedOrWaiting',
+    'cancelChannelPending', 'applyChannelsPending', 'seenChannel', 'channelFromPage', 'allowedVideo', 'isFree', 'freeToStart', 'plannedChannels', 'allowCount', 'isAllowedOrWaiting',
   ].sort());
   assert.ok(Object.isFrozen(D.DEFAULT_SETTINGS));
   assert.deepEqual(D.DEFAULT_SETTINGS, {

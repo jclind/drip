@@ -4,6 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 
@@ -24,11 +25,12 @@ function sortKeys(value) {
 /**
  * Loads background.js in a fresh context with in-memory storage.
  * @param {any} [initial]
- * @param {{dev?: boolean, panel?: boolean, stores?: {local: Record<string, any>, session: Record<string, any>}}} [opts]
- *   dev: the checkout has dev/ENABLED. panel: false for a store build, which has no dev panel. stores: storage kept
- *   from an earlier worker, as when Chrome stops the worker and starts it again.
+ * @param {{dev?: boolean, panel?: boolean, stores?: {local: Record<string, any>, session: Record<string, any>}, src?: string}} [opts]
+ *   dev: the checkout has dev/ENABLED. panel: false for a manifest without the dev panel. stores: storage kept from an
+ *   earlier worker, as when Chrome stops the worker and starts it again. src: the src folder to load, such as a store
+ *   build's.
  */
-function worker(initial = undefined, { dev = false, panel = true, stores = undefined, contexts = [] } = {}) {
+function worker(initial = undefined, { dev = false, panel = true, stores = undefined, contexts = [], src = SRC } = {}) {
   /** @type {Record<string, any>} */
   const store = stores ? stores.local : initial === undefined ? {} : { drip: structuredClone(initial) };
   /** @type {Record<string, any>} */
@@ -46,6 +48,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   const icons = [];
   /** @type {Function | null} */
   let onMessage = null;
+  let externalListeners = 0;
   /** @type {Function | null} */
   let onInstalled = null;
   /** @type {Function | null} */
@@ -65,7 +68,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
         content_scripts: panel ? [{ js: ['src/devpanel/panel.js'] }] : [],
       }),
       onMessage: { addListener: (/** @type {Function} */ fn) => { onMessage = fn; } },
-      onMessageExternal: { addListener() {} },
+      onMessageExternal: { addListener: () => { externalListeners++; } },
       onInstalled: { addListener: (/** @type {Function} */ fn) => { onInstalled = fn; } },
       onStartup: { addListener: (/** @type {Function} */ fn) => { onStartup = fn; } },
       reload() {},
@@ -131,16 +134,16 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
       : { ok: dev }),
     OffscreenCanvas: FakeCanvas, Path2D: class { constructor(d) { this.d = d; } } };
   context.globalThis = context;
-  context.importScripts = (/** @type {string} */ file) => vm.runInContext(fs.readFileSync(path.join(SRC, file), 'utf8'), context);
+  context.importScripts = (/** @type {string} */ file) => vm.runInContext(fs.readFileSync(path.join(src, file), 'utf8'), context);
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(path.join(SRC, 'background.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(src, 'background.js'), 'utf8'), context);
   /** @param {any} msg @param {any} [sender] @returns {Promise<any>} */
   const send = (msg, sender = YT) => new Promise((resolve) => {
     const async = /** @type {Function} */ (onMessage)(msg, sender, resolve);
     if (async !== true) setTimeout(() => resolve(undefined), 0);
   });
   const install = (/** @type {string} */ reason) => /** @type {Function} */ (onInstalled)({ reason });
-  const restart = () => worker(undefined, { dev, panel, stores: { local: store, session } });
+  const restart = () => worker(undefined, { dev, panel, stores: { local: store, session }, src });
   const advance = async (ms) => {
     elapsed += ms;
     for (const [id, timer] of timers) {
@@ -149,7 +152,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
     await vm.runInContext('queue', context);
   };
   return { send, install, restart, opened, created, calls, store, session, icons,
-    advance,
+    advance, externalListeners: () => externalListeners,
     startup: () => /** @type {Function} */ (onStartup)(), idle: () => vm.runInContext('queue', context),
     failIcons: (n) => { failIcon = n; }, failDrawing: (n) => { failDraw = n; },
     writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
@@ -535,6 +538,30 @@ test('a store build has no developer mode, even with the toggle stored as on', a
   assert.equal(status.enabled, false);
   assert.equal((await w.send({ type: 'setDevMode', on: true }, PAGE)).error, 'dev-off');
   assert.equal((await w.send({ type: 'devAction', action: 'minutes+5' })).error, 'dev-off');
+});
+
+test("the store build's worker has no dev tools: their messages are unknown, and the rest still works", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drip-store-'));
+  try {
+    for (const p of ['manifest.json', 'src', 'icons']) fs.cpSync(path.join(SRC, '..', p), path.join(dir, p), { recursive: true });
+    require('../bin/release-tree').strip(dir);
+    const w = worker(undefined, { dev: true, panel: false, src: path.join(dir, 'src') });
+    w.store.dripDev = true;
+    assert.equal(w.externalListeners(), 0, 'no onMessageExternal listener');
+    assert.equal(w.Drip.devAction, undefined);
+    // Settings asks for devStatus, and an answer without ok keeps its Developer mode section hidden.
+    for (const msg of [{ type: 'devStatus' }, { type: 'setDevMode', on: true }, { type: 'devAction', action: 'minutes+5' }]) {
+      const res = await w.send(msg, PAGE);
+      assert.equal(res.ok, false, msg.type);
+      assert.equal(res.error, 'unknown-message', msg.type);
+    }
+    assert.equal((await w.send({ type: 'get' }, PAGE)).state.watchSecondsLeft, 0);
+    assert.equal((await w.send({ type: 'spendWatch' })).state.watchSecondsLeft, 15 * 60);
+    assert.equal(w.store.dripDevClock, undefined);
+    assert.equal(worker(undefined, { dev: true }).externalListeners(), 1, 'the unpacked tree keeps the localhost route');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('dev/ENABLED keeps developer mode on whatever the toggle says', async () => {

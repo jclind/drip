@@ -6,6 +6,8 @@ process.env.TZ = 'America/New_York';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../src/lib/state.js');
+// The dev panel's actions, for its Apply pending test below.
+require('../src/devpanel/actions.js');
 const D = /** @type {any} */ (globalThis).Drip;
 
 /** @param {number} day @param {number} [hour] @param {number} [minute] */

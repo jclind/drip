@@ -5,6 +5,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../src/lib/state.js');
+// The dev panel's actions, for its Apply pending and first-day tests below.
+require('../src/devpanel/actions.js');
 const D = globalThis.Drip;
 
 /** @param {number} day @param {number} [hour] */

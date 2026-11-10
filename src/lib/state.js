@@ -1222,59 +1222,6 @@
   }
 
   /**
-   * The dev panel's actions, for testing in a checkout with dev/ENABLED. The worker refuses them anywhere else, and
-   * bin/build-release leaves the panel out of the store build. Not a feature: nothing in DESIGN.md's rules applies.
-   * @param {State} state
-   * @param {string} action
-   * @param {number} now
-   */
-  function devAction(state, action, now) {
-    /** @param {'watch' | 'rec'} kind @param {number} n */
-    const setTokens = (kind, n) => { state.tokens[kind] = Math.max(0, n); };
-    switch (action) {
-      case 'minutes-0': state.watchSecondsLeft = 0; break;
-      case 'seconds-10': state.watchSecondsLeft = 10; break;
-      case 'minutes-1': state.watchSecondsLeft = 60; break;
-      case 'minutes+5': state.watchSecondsLeft += 5 * 60; break;
-      case 'minutes+15': state.watchSecondsLeft += 15 * 60; break;
-      case 'watch+1': setTokens('watch', state.tokens.watch + 1); break;
-      case 'watch-0': setTokens('watch', 0); break;
-      case 'rec+1': setTokens('rec', state.tokens.rec + 1); break;
-      case 'rec-0': setTokens('rec', 0); break;
-      case 'reset-now':
-        // Moves drip back a day without rolling it over, so the next message rolls it over the way a real reset
-        // does, and an open token page notices on its own 1-second check. A pending change moves back with it.
-        state.day = addDays(state.day, -1);
-        if (state.pending) state.pending.effectiveDay = addDays(state.pending.effectiveDay, -1);
-        if (state.channelsPending) state.channelsPending.effectiveDay = addDays(state.channelsPending.effectiveDay, -1);
-        break;
-      case 'apply-pending':
-        if (state.pending) Object.assign(state.settings, state.pending.changes);
-        state.pending = null;
-        applyChannelsPending(state);
-        break;
-      case 'grace-toggle':
-        state.settings.graceMode = !state.settings.graceMode;
-        cancelPending(state, 'graceMode');
-        break;
-      case 'clear-unlocks':
-        state.unlocked = [];
-        state.allowedToday = [];
-        // The week's count comes from the log (Q20), so its uses go too, or the lock would still say 0 left.
-        for (const entry of Object.values(state.log)) entry.needThis = entry.needThis.filter((use) => !(use.at > 0 && now - Math.min(use.at, now) < WEEK_MS));
-        break;
-      case 'first-day-off': state.firstDayOff = true; break;
-      case 'first-day-on': state.firstDayOff = false; break;
-      case 'clear-backlog': state.backlog = []; break;
-      case 'clear-seen': state.seen = []; state.current = null; break;
-      case 'clear-log': delete state.log[state.day]; break;
-      case 'fresh': Object.assign(state, initialState(now)); break;
-      default: return { ok: false, error: 'unknown-dev-action' };
-    }
-    return { ok: true };
-  }
-
-  /**
    * The tick's explicit playing flag says whether playback is ongoing.
    * The toolbar forgets playback after 12 seconds without a fresh tick, including when a tab closes.
    * @param {{at: number, playing?: boolean} | null} tick
@@ -1597,7 +1544,7 @@
     if (p && !p.allow.length && !p.unblock.length) state.channelsPending = null;
   }
 
-  /** @param {State} state */
+  /** Puts the channel changes waiting for the reset into the lists. rollDay does it at the reset. @param {State} state */
   function applyChannelsPending(state) {
     const p = state.channelsPending;
     if (!p) return;
@@ -1827,9 +1774,10 @@
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUses, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
-    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
+    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,
     ALLOW_MAX, channelId, cleanChannel, sameChannel, allowChannel, removeAllowed, blockChannel, unblockChannel,
-    cancelChannelPending, seenChannel, channelFromPage, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
+    cancelChannelPending, applyChannelsPending, seenChannel, channelFromPage, allowedVideo, isFree, freeToStart, plannedChannels, allowCount,
+    isAllowedOrWaiting,
   };
 })();
