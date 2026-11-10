@@ -21,7 +21,10 @@
     video: 'ytd-video-renderer',
     link: 'a#video-title, a[href*="/watch?v="]',
     title: '#video-title',
-    channel: 'ytd-channel-name a, #channel-name a, #channel-name',
+    // The channel's link, or its name's text where it has no link. Never ytd-channel-name itself: its tooltip repeats
+    // the name, so it read "Wood and Shop Wood and Shop" (signed in, 2026-11-10).
+    channel: 'ytd-channel-name a, #channel-name a',
+    channelText: 'ytd-channel-name #text, #channel-name #text',
     // Its href is the channel's /@handle (checked on air, 2026-11-03).
     channelLink: 'ytd-channel-name a[href]',
     length: 'ytd-thumbnail-overlay-time-status-renderer, .ytBadgeShapeText, .yt-badge-shape__text',
@@ -64,7 +67,7 @@
     const length = /\d+(?::\d\d)+/.exec(text(row, SEL.length));
     const channelId = Drip.channelId(row.querySelector(SEL.channelLink)?.getAttribute('href') || '');
     return id ? {
-      id, title: text(row, SEL.title) || link?.getAttribute('title') || '', channel: text(row, SEL.channel), length: length ? length[0] : '',
+      id, title: text(row, SEL.title) || link?.getAttribute('title') || '', channel: text(row, SEL.channel) || text(row, SEL.channelText), length: length ? length[0] : '',
       ...(channelId ? { channelIds: [channelId] } : {}),
     } : null;
   }
