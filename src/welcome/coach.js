@@ -463,9 +463,19 @@
     const mx = (fx + tx) / 2 + (vertical ? 12 : 0);
     const my = (fy + ty) / 2 + (vertical ? 0 : 10);
     const ang = Math.atan2(ty - my, tx - mx);
-    const head = (/** @type {number} */ turn) => `${tx - 7 * Math.cos(ang + turn)},${ty - 7 * Math.sin(ang + turn)}`;
-    line.setAttribute('d', `M${fx},${fy} Q${mx},${my} ${tx},${ty}`);
-    tip.setAttribute('d', `M${head(0.5)} L${tx},${ty} L${head(-0.5)}`);
+    // The svg covers only the line's own box, so nothing in the layer reaches past what it points at. A window-sized
+    // svg on the page made it longer when the window grew while scrolled to the bottom (Codex, PR 110).
+    const pad = 12;
+    const bx = Math.min(fx, tx, mx) - pad;
+    const by = Math.min(fy, ty, my) - pad;
+    Object.assign(svg.style, {
+      left: `${bx}px`, top: `${by}px`,
+      width: `${Math.max(fx, tx, mx) + pad - bx}px`, height: `${Math.max(fy, ty, my) + pad - by}px`,
+    });
+    const at = (/** @type {number} */ x, /** @type {number} */ y) => `${x - bx},${y - by}`;
+    const head = (/** @type {number} */ turn) => at(tx - 7 * Math.cos(ang + turn), ty - 7 * Math.sin(ang + turn));
+    line.setAttribute('d', `M${at(fx, fy)} Q${at(mx, my)} ${at(tx, ty)}`);
+    tip.setAttribute('d', `M${head(0.5)} L${at(tx, ty)} L${head(-0.5)}`);
     comeIn();
   }
 
