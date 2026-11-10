@@ -24,7 +24,7 @@ These decisions came from a grill-me session with Jesse on 2026-10-05.
 | Q14 | Backlog videos cost no rec token. Save button on watch pages and search results. Backlog is a text list (title, channel, length), no thumbnails. It holds at most "Stash holds" videos (Q28). |
 | Q15 | Search: remove injected shelves, stop at 10 results, free "more" button. |
 | Q16 | Replace subscriptions and Explore with the token page. So does the bare Shorts feed, `/shorts` with no video (Jesse, 2026-10-15), and hashtag pages like `/hashtag/ludwig`, feeds of anyone's videos and Shorts linked from descriptions (Claude's call, which Jesse left to Claude, 2026-10-15). Channel pages stay as they are. The bell is hidden by default, with a "Hide the notification bell" switch in Customize and Settings (Jesse, 2026-10-15; until then it stayed). Watch page comments are hidden behind a "Show comments" button that lasts for that video (Jesse, 2026-10-06). |
-| Q17 | Name: `drip` (tentative). |
+| Q17 | Name: `drip`. The store and the manifest carry it as `drip: YouTube without the feed`, with `drip` as the short name (Jesse, 2026-11-10). |
 | Q18 | Home layout: balances, Reveal and Add 15 min buttons, one card, collapsed backlog. Expect tweaks. While a card is up, Watch is free if minutes are left. At 0 minutes it reads "Watch · -1 drop", and clicking it buys one watch token's minutes and starts the video. "+15 min" shows only when no card is up (Jesse, 2026-10-07; built 2026-10-10). |
 | Q19 | Background audio counts like any watching. `music.youtube.com` is out of scope. |
 | Q20 | "I need this one" on the overlay: typed reason, unlocks that one video for the day without draining minutes, every use logged. 3 a week, over the last 7 days (Jesse, 2026-11-04; it was 2 per day). |
