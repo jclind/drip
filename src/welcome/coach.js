@@ -239,6 +239,9 @@
   let lastStopKey = '';
   /** What the ring is on and where, so a frame only writes on a change. */
   let ringPlaced = '';
+  // Whether the hidden note, and the hidden ring, have been moved out of the way (park()).
+  let notesParked = false;
+  let ringParked = false;
 
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -557,9 +560,32 @@
     if (!ring.classList.contains('is-on')) ring.classList.add('is-on');
   }
 
+  /**
+   * Once a hidden note or ring has faded out, moves it to the page's corner with no size. They sit on the page, not
+   * over the window, so one left where it last showed made the page scroll sideways after the window narrowed (Codex,
+   * PR 110). The next show places it again from scratch.
+   */
+  function park() {
+    const noteHidden = !layer.classList.contains('is-on') || layer.classList.contains('is-away');
+    if (!noteHidden) notesParked = false;
+    else if (!notesParked && getComputedStyle(layer).opacity === '0') {
+      notesParked = true;
+      chip.style.transform = '';
+      Object.assign(svg.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
+      placed = '';
+    }
+    if (ring.classList.contains('is-on')) ringParked = false;
+    else if (!ringParked && getComputedStyle(ring).opacity === '0') {
+      ringParked = true;
+      Object.assign(ring.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
+      ringPlaced = '';
+    }
+  }
+
   function loop() {
     frame();
     ringFrame();
+    park();
     requestAnimationFrame(loop);
   }
 
