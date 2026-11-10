@@ -1,6 +1,7 @@
 // @ts-check
 // The Allow button on a channel page (RELEASE-PLAN.md item 4, CHANNEL-LISTS-PLAN.md call 12). An allowed channel's
-// videos cost no minutes. Allowing waits for the reset (Q6); pressing it again takes the channel off at once.
+// videos cost no minutes. Allowing waits for the reset (Q6); pressing it again takes the channel off at once. The
+// button shows only while watch time is on.
 
 (function () {
   /** @type {any} */
@@ -89,6 +90,15 @@
     const channel = pageChannel();
     const actions = document.querySelector(SEL.actions);
     if (!channel || !actions || !state) {
+      old?.remove();
+      view = '';
+      return;
+    }
+    // With watch time off nothing costs minutes, so allowing a channel would change nothing and the button hides
+    // (Jesse, 2026-11-10). The page still tells the worker the channel's name and picture, since a blocked channel
+    // matters in every mode.
+    if (state.settings.clock === false) {
+      tellSeen(channel);
       old?.remove();
       view = '';
       return;

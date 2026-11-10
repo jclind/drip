@@ -370,6 +370,19 @@ test('the 5th allowed channel moves focus from the full field and button to the 
   }
 });
 
+test('the Allowed tab says the list does nothing while watch time is off, and the Blocked tab does not', () => {
+  const p = page();
+  p.run('renderForm()');
+  const note = () => p.document.querySelector('#channels-allow .channel-off');
+  assert.equal(note(), null);
+  p.run('state.settings.clock = false; renderChannels()');
+  assert.equal(note().textContent, "Watch time is off, so no video uses minutes. This list does nothing until it's on.");
+  assert.equal(p.document.querySelector('#channels-block .channel-off'), null);
+  assert.ok(p.document.querySelector('[data-k="allow-input"]'));
+  p.run('state.settings.clock = true; renderChannels()');
+  assert.equal(note(), null);
+});
+
 test('page panels keep the form mounted, preserve drafts, and save from Channels and History', async () => {
   const p = page();
   p.run('renderForm()');

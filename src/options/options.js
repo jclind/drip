@@ -955,7 +955,10 @@ function renderChannels(force = false) {
   if (!channelsEl || !state) return;
   const { h, icon } = DripPage;
   const firstDay = Drip.firstDayUntil(state, Date.now()) > 0;
-  const key = JSON.stringify([state.channels, state.channelsPending, state.settings.resetHour, firstDay, channelsNote, channelTab, justUnblocked]);
+  // With watch time off no video uses minutes, so the allow list does nothing. The tab stays, for removing channels and
+  // for setting the list up ahead, and says so (Jesse, 2026-11-10). The channel page hides its Allow button then.
+  const clockOff = state.settings.clock === false;
+  const key = JSON.stringify([state.channels, state.channelsPending, state.settings.resetHour, firstDay, channelsNote, channelTab, justUnblocked, clockOff]);
   if (!force && key === channelsKey) return;
   channelsKey = key;
   const p = state.channelsPending;
@@ -1035,6 +1038,7 @@ function renderChannels(force = false) {
   };
   /** @param {'allow' | 'block'} list @param {HTMLElement[]} tiles */
   const paneOf = (list, tiles) => h('div', { class: 'channel-pane', role: 'tabpanel', id: `channels-${list}`, 'aria-labelledby': `channels-tab-${list}`, hidden: channelTab !== list },
+    list === 'allow' && clockOff && h('p', { class: 'muted channel-off' }, "Watch time is off, so no video uses minutes. This list does nothing until it's on."),
     tiles.length ? h('ul', { class: 'channel-tiles' }, ...tiles)
       : h('div', { class: 'channel-empty' }, h('span', { class: 'channel-ava' }), h('span', {}, list === 'allow' ? 'No channels allowed yet.' : 'No channels blocked yet.')),
     adder(list, list === 'allow' && Drip.allowCount(state) >= Drip.ALLOW_MAX),

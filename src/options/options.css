@@ -1512,6 +1512,12 @@ a.channel-link:focus-visible {
   font-size: 13px;
 }
 
+/* Above the allowed tiles while watch time is off. */
+.channel-off {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
 /* The first day's note under the title (renderFirstDay): small and tinted, apart from the settings text. The clock
    sits centered on the text, however many lines it wraps to (Jesse, 2026-11-05). */
 .first-day {
