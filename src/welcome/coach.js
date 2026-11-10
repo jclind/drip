@@ -247,6 +247,9 @@
   let lastStopKey = '';
   /** What the ring is on and where, so a frame only writes on a change. */
   let ringPlaced = '';
+  // Whether the hidden note, and the hidden ring, have been moved out of the way (park()).
+  let notesParked = false;
+  let ringParked = false;
 
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -441,12 +444,19 @@
     const key = [r.left, r.top, r.width, r.height, s.left, s.top, s.width, s.height, w, h, pointRect?.left ?? 0, pointRect?.top ?? 0].map(Math.round).join();
     if (key === placed) return comeIn();
     placed = key;
+    // The layer sits on the page, so it scrolls with it. Moving it to the scroll offset keeps the window's coordinates,
+    // which every rect here is in, right inside it.
+    const sx = window.scrollX;
+    const sy = window.scrollY;
+    const shift = `translate(${sx}px, ${sy}px)`;
+    if (layer.style.transform !== shift) layer.style.transform = shift;
     // A shown note ignores its target creeping a few pixels (the pill's minutes changing width), so it never twitches.
-    if (!revealing && held && held.at === shown.at && Math.abs(p.x - held.x) <= 12 && Math.abs(p.y - held.y) <= 12) {
-      p.x = held.x;
-      p.y = held.y;
+    // held is in page coordinates, so a scroll alone never counts as creeping.
+    if (!revealing && held && held.at === shown.at && Math.abs(p.x + sx - held.x) <= 12 && Math.abs(p.y + sy - held.y) <= 12) {
+      p.x = held.x - sx;
+      p.y = held.y - sy;
     }
-    held = { at: shown.at, x: p.x, y: p.y };
+    held = { at: shown.at, x: p.x + sx, y: p.y + sy };
     chip.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
     chip.dataset.side = p.side;
     // The line: from the chip's near edge to just short of the part it points at, bowed a little.
@@ -464,9 +474,19 @@
     const mx = (fx + tx) / 2 + (vertical ? 12 : 0);
     const my = (fy + ty) / 2 + (vertical ? 0 : 10);
     const ang = Math.atan2(ty - my, tx - mx);
-    const head = (/** @type {number} */ turn) => `${tx - 7 * Math.cos(ang + turn)},${ty - 7 * Math.sin(ang + turn)}`;
-    line.setAttribute('d', `M${fx},${fy} Q${mx},${my} ${tx},${ty}`);
-    tip.setAttribute('d', `M${head(0.5)} L${tx},${ty} L${head(-0.5)}`);
+    // The svg covers only the line's own box, so nothing in the layer reaches past what it points at. A window-sized
+    // svg on the page made it longer when the window grew while scrolled to the bottom (Codex, PR 110).
+    const pad = 12;
+    const bx = Math.min(fx, tx, mx) - pad;
+    const by = Math.min(fy, ty, my) - pad;
+    Object.assign(svg.style, {
+      left: `${bx}px`, top: `${by}px`,
+      width: `${Math.max(fx, tx, mx) + pad - bx}px`, height: `${Math.max(fy, ty, my) + pad - by}px`,
+    });
+    const at = (/** @type {number} */ x, /** @type {number} */ y) => `${x - bx},${y - by}`;
+    const head = (/** @type {number} */ turn) => at(tx - 7 * Math.cos(ang + turn), ty - 7 * Math.sin(ang + turn));
+    line.setAttribute('d', `M${at(fx, fy)} Q${at(mx, my)} ${at(tx, ty)}`);
+    tip.setAttribute('d', `M${head(0.5)} L${at(tx, ty)} L${head(-0.5)}`);
     comeIn();
   }
 
@@ -537,17 +557,45 @@
     }
     const r = el.getBoundingClientRect();
     const radius = getComputedStyle(el).borderTopLeftRadius;
-    const key = [r.left, r.top, r.width, r.height].map(Math.round).join() + radius;
+    // In page coordinates: the ring is absolute, so it scrolls with the page and only a real move rewrites it.
+    const left = r.left + window.scrollX;
+    const top = r.top + window.scrollY;
+    const key = [left, top, r.width, r.height].map(Math.round).join() + radius;
     if (key !== ringPlaced) {
       ringPlaced = key;
-      Object.assign(ring.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: radius });
+      Object.assign(ring.style, { left: `${left}px`, top: `${top}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: radius });
     }
     if (!ring.classList.contains('is-on')) ring.classList.add('is-on');
+  }
+
+  /**
+   * Once a hidden note or ring has faded out, moves it to the page's corner with no size. They sit on the page, not
+   * over the window, so one left where it last showed made the page scroll sideways after the window narrowed (Codex,
+   * PR 110). The next show places it again from scratch.
+   */
+  function park() {
+    const noteHidden = !layer.classList.contains('is-on') || layer.classList.contains('is-away');
+    if (!noteHidden) notesParked = false;
+    else if (!notesParked && getComputedStyle(layer).opacity === '0') {
+      notesParked = true;
+      // The layer too: frame() sets its scroll offset again before the next note shows.
+      layer.style.transform = '';
+      chip.style.transform = '';
+      Object.assign(svg.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
+      placed = '';
+    }
+    if (ring.classList.contains('is-on')) ringParked = false;
+    else if (!ringParked && getComputedStyle(ring).opacity === '0') {
+      ringParked = true;
+      Object.assign(ring.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
+      ringPlaced = '';
+    }
   }
 
   function loop() {
     frame();
     ringFrame();
+    park();
     requestAnimationFrame(loop);
   }
 
