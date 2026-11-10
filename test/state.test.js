@@ -822,15 +822,20 @@ test('the old daily setting drops away from stored state, waiting changes, and i
 test('cleanSettings rounds and clamps every numeric range, drops unknown and invalid values', () => {
   assert.deepEqual(D.cleanSettings({ minutesPerToken: 0, recTokensPerDay: 500, watchTokensPerDay: 2.6, rolloverDays: 0, resetHour: 30, needThisPerWeek: -1, stashMax: 0, unknown: 5, feedSource: 'bad', graceMode: 1 }), {
     minutesPerToken: 1, recTokensPerDay: 100, watchTokensPerDay: 3,
-    rolloverDays: 1, resetHour: 23, needThisPerWeek: 0, stashMax: 1, graceMode: true,
+    rolloverDays: 1, resetHour: 23, needThisPerWeek: 0, stashMax: 1,
   });
-  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerWeek: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: 0 }), {
+  assert.deepEqual(D.cleanSettings({ minutesPerToken: 999, recTokensPerDay: -1, watchTokensPerDay: 99, rolloverDays: 99, resetHour: -1, needThisPerWeek: 99, stashMax: 99, feedSource: 'subscriptions', graceMode: false }), {
     minutesPerToken: 120, recTokensPerDay: 0, watchTokensPerDay: 48,
     rolloverDays: 7, resetHour: 0, needThisPerWeek: 20, stashMax: 50, feedSource: 'subscriptions', graceMode: false,
   });
   assert.deepEqual(D.cleanSettings({ recTokensPerDay: NaN, minutesPerToken: Infinity, resetHour: '5', watchTokensPerDay: null }), {});
   assert.deepEqual(D.cleanSettings({ streams: true }), { streams: true });
   assert.deepEqual(D.cleanSettings({ streams: 'yes' }), {});
+  // Grace mode and Dry hours take only true or false, like every other switch: "false" and "no" are strings, which
+  // Boolean() turned on.
+  assert.deepEqual(D.cleanSettings({ graceMode: 'false', dryHours: 'no' }), {});
+  assert.deepEqual(D.cleanSettings({ graceMode: 0, dryHours: null }), {});
+  assert.deepEqual(D.cleanSettings({ graceMode: true, dryHours: false }), { graceMode: true, dryHours: false });
   assert.deepEqual(D.cleanSettings(undefined), {});
 });
 

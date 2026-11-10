@@ -989,11 +989,9 @@
         if (typeof value !== 'number' || !Number.isFinite(value)) continue;
         const [min, max] = ranges[key];
         Object.assign(cleaned, { [key]: Math.min(max, Math.max(min, Math.round(value))) });
-      } else if (key === 'graceMode' || key === 'dryHours') {
-        cleaned[key] = Boolean(value);
       } else if (key === 'feedSource' && (value === 'home' || value === 'subscriptions')) {
         cleaned.feedSource = value;
-      } else if ((key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell' || key === 'hideShorts' || key === 'streams') && typeof value === 'boolean') {
+      } else if ((key === 'graceMode' || key === 'dryHours' || key === 'searchCap' || key === 'clock' || key === 'stash' || key === 'hideBell' || key === 'hideShorts' || key === 'streams') && typeof value === 'boolean') {
         cleaned[key] = value;
       } else if (key === 'cards' && (value === 'off' || value === 'unlimited' || value === 'limited')) {
         cleaned.cards = value;

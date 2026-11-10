@@ -30,7 +30,8 @@ test('the three settings default to off, 11pm to 6am, and clean like the rest', 
   assert.equal(D.DEFAULT_SETTINGS.dryHours, false);
   assert.equal(D.DEFAULT_SETTINGS.dryFrom, 23);
   assert.equal(D.DEFAULT_SETTINGS.dryTo, 6);
-  assert.deepEqual(D.cleanSettings({ dryHours: 1, dryFrom: 30, dryTo: -1 }), { dryHours: true, dryFrom: 23, dryTo: 0 });
+  assert.deepEqual(D.cleanSettings({ dryHours: true, dryFrom: 30, dryTo: -1 }), { dryHours: true, dryFrom: 23, dryTo: 0 });
+  assert.deepEqual(D.cleanSettings({ dryHours: 1 }), {}, 'only true or false');
   assert.deepEqual(D.cleanSettings({ dryFrom: 2.6, dryTo: '5' }), { dryFrom: 3 });
 });
 

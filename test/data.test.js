@@ -248,6 +248,13 @@ test('import keeps at most the uses the weekly allowance could log in the 90 day
   assert.ok(days.every((day) => state.log[day].watchedSec === 60), 'a day past the limit still keeps its numbers');
 });
 
+test('an imported "no" or "false" turns neither Dry hours nor grace mode on', () => {
+  const state = D.initialState(NOW);
+  const res = D.importData(state, { app: 'drip', format: 1, settings: { dryHours: 'no', graceMode: 'false', hideBell: 0 } }, NOW);
+  assert.deepEqual([res.applied, res.pending], [{}, {}]);
+  assert.deepEqual([state.settings.dryHours, state.settings.graceMode, state.settings.hideBell], [false, false, true]);
+});
+
 test('reset keeps the week of "I need this one" uses', () => {
   const state = settled();
   D.needThis(state, 'a', 'A', 'Study', NOW);
