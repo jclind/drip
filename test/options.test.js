@@ -296,6 +296,19 @@ test('successful channel adds clear stale notes; invalid handles keep error note
   assert.match(p.run('channelsNote.allow'), /isn't a channel handle or link/);
 });
 
+test('the Allowed tab says the list does nothing while watch time is off, and the Blocked tab does not', () => {
+  const p = page();
+  p.run('renderForm()');
+  const note = () => p.document.querySelector('#channels-allow .channel-off');
+  assert.equal(note(), null);
+  p.run('state.settings.clock = false; renderChannels()');
+  assert.equal(note().textContent, "Watch time is off, so no video uses minutes. This list does nothing until it's on.");
+  assert.equal(p.document.querySelector('#channels-block .channel-off'), null);
+  assert.ok(p.document.querySelector('[data-k="allow-input"]'));
+  p.run('state.settings.clock = true; renderChannels()');
+  assert.equal(note(), null);
+});
+
 test('page panels keep the form mounted, preserve drafts, and save from Channels and History', async () => {
   const p = page();
   p.run('renderForm()');
