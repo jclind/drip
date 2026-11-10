@@ -1143,7 +1143,7 @@
     const selectionEnd = oldReason?.selectionEnd ?? 0;
     /** @type {HTMLTextAreaElement} */
     const reason = /** @type {any} */ (h('textarea', {
-      rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?',
+      rows: 3, placeholder: 'Why do you need this one?', 'aria-label': 'Why do you need this one?', maxlength: Drip.REASON_MAX,
       oninput: (/** @type {Event} */ e) => { reasonText = /** @type {HTMLTextAreaElement} */ (e.target).value; },
     }));
     reason.value = reasonText;

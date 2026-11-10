@@ -186,6 +186,26 @@ test('imported "I need this one" uses from the last 7 days count against the wee
   assert.equal(D.needThisLeft(to, NOW), 1);
 });
 
+test('import caps the text and the number of uses it brings in, like a click would (B2)', () => {
+  const long = 'q'.repeat(1e6);
+  const day = D.addDays(settled().day, -2);
+  const uses = Array.from({ length: 30 }, (_, n) => ({ videoId: `v${n}`, title: long, reason: long, at: time(3) + n }));
+  uses.push({ videoId: 'x'.repeat(1e6), title: 'X', reason: 'Class', at: time(3, 13) });
+  const state = settled();
+  const res = D.importData(state, {
+    app: 'drip', format: 1, backlog: [{ ...video('a'), title: long, channel: long, views: long }],
+    log: { [day]: { watchedSec: 60, needThis: uses } },
+    channels: { block: [{ ids: ['@long'], name: long }] },
+  }, NOW);
+  assert.equal(res.stashAdded, 1);
+  assert.deepEqual([state.backlog[0].title.length, state.backlog[0].channel.length, state.backlog[0].views?.length], [200, 200, 200]);
+  const kept = state.log[day].needThis;
+  assert.equal(kept.length, 20, 'at most 20 uses a day, the latest, and none with a made-up video id');
+  assert.equal(kept[0].videoId, 'v10');
+  assert.ok(kept.every((use) => use.title.length === 200 && use.reason.length === 300));
+  assert.equal(state.channels.block[0].name.length, 200);
+});
+
 test('reset keeps the week of "I need this one" uses', () => {
   const state = settled();
   D.needThis(state, 'a', 'A', 'Study', NOW);

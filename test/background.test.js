@@ -651,6 +651,16 @@ test('needThis refuses an id that is not a video id', async () => {
   assert.equal(ok.error, 'reason-required');
 });
 
+test('a pasted reason of megabytes is stored at the cap, not whole (B2)', async () => {
+  const w = worker();
+  const res = await w.send({ type: 'needThis', videoId: 'abc', title: 'T'.repeat(3e6), reason: `for school ${'r'.repeat(3e6)}` });
+  assert.equal(res.ok, true);
+  const [use] = Object.values(w.store.drip.log).flatMap((/** @type {any} */ day) => day.needThis);
+  assert.equal(use.reason.length, 300);
+  assert.equal(use.title.length, 200);
+  assert.ok(JSON.stringify(w.store.drip).length < 10000);
+});
+
 test('a message that is not an object is refused', async () => {
   const w = worker();
   for (const msg of [null, 'get', 7]) assert.equal((await w.send(msg, PAGE)).error, 'unknown-message');

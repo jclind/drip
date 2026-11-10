@@ -244,6 +244,14 @@ test('a reveal never deals a blocked channel, by id or by name', () => {
   assert.equal(res.video.id, 'c');
 });
 
+test("a channel name keeps 200 characters on one line, and a card's name matches a block entry the same way", () => {
+  assert.deepEqual(D.cleanChannel({ ids: ['@long'], name: `  Long\n  name ${'n'.repeat(1e6)}` }), { ids: ['@long'], name: `Long name ${'n'.repeat(190)}` });
+  const state = settled();
+  D.blockChannel(state, { ids: [], name: 'Two  Spaces' });
+  assert.deepEqual(state.channels.block, [{ ids: [], name: 'Two Spaces' }]);
+  assert.equal(D.canDeal(state, { id: 'a', title: 'A', channel: 'Two  Spaces' }), false, "the card's name is cleaned the same way");
+});
+
 test('Block on the card blocks its channel and passes it, with no card back', () => {
   const state = settled();
   D.reveal(state, [{ id: 'b', title: 'B', channel: '3Blue1Brown' }]);

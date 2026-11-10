@@ -190,6 +190,47 @@
     return { watchedSec: 0, watchSpent: 0, recSpent: 0, saved: 0, passed: 0, watched: 0, needThis: [] };
   }
 
+  // Text from a page or a person goes into state, which every save and every state message carries whole, and
+  // chrome.storage.local holds 10 MB. So each piece has a cap, and the rules apply it where the text comes in.
+
+  /**
+   * The longest a title, channel name, or feed label may be. YouTube stops titles at 100 characters, so 200 cuts only
+   * what didn't come from YouTube. Channel lists use the same cap.
+   */
+  const TEXT_MAX = 200;
+  /**
+   * The longest an "I need this one" reason may be: a few sentences, which the Settings list shows in full. The lock's
+   * textarea has this as its maxlength, so the person sees the limit and nothing typed is cut.
+   */
+  const REASON_MAX = 300;
+  /** The most "I need this one" uses one log day keeps: the highest weekly allowance Settings offers. */
+  const USES_MAX = ranges.needThisPerWeek[1];
+
+  /**
+   * Text on one line, at most `max` characters: runs of whitespace become one space, and the ends are trimmed. A cut
+   * never splits a character in two, like an emoji. '' for anything that isn't a string.
+   * @param {unknown} x @param {number} max
+   */
+  function line(x, max) {
+    if (typeof x !== 'string') return '';
+    let text = x.replace(/\s+/g, ' ').trim();
+    if (text.length > max) text = text.slice(0, /[\uD800-\uDBFF]/.test(text[max - 1]) ? max - 1 : max).trimEnd();
+    return text;
+  }
+
+  /**
+   * A copy of a stored "I need this one" use with its video id, title, and reason cut to their caps. Other fields stay.
+   * @param {any} use
+   */
+  function capUse(use) {
+    if (!use || typeof use !== 'object') return use;
+    const out = { ...use };
+    if (typeof out.videoId === 'string') out.videoId = out.videoId.slice(0, 64);
+    if (typeof out.title === 'string') out.title = line(out.title, TEXT_MAX);
+    if (typeof out.reason === 'string') out.reason = line(out.reason, REASON_MAX);
+    return out;
+  }
+
   /**
    * A video record with string fields, or null when there's no usable id. Messages and storage both pass through this.
    * @param {unknown} raw
@@ -200,7 +241,7 @@
     const v = /** @type {Record<string, unknown>} */ (raw);
     if (typeof v.id !== 'string' || !/^[\w-]{1,64}$/.test(v.id)) return null;
     /** @param {unknown} x */
-    const str = (x) => (typeof x === 'string' ? x : '');
+    const str = (x) => line(x, TEXT_MAX);
     /** @type {Video} */
     const video = { id: v.id, title: str(v.title), channel: str(v.channel), length: str(v.length) };
     if (str(v.views)) video.views = str(v.views);
@@ -273,7 +314,9 @@
       .map((e) => ({ id: e.id, ids: cleanIds(e.ids) })).filter((e) => e.ids.length).slice(-ALLOWED_TODAY_MAX) : [];
     if (stored.log && typeof stored.log === 'object') {
       for (const [day, entry] of Object.entries(stored.log)) {
-        state.log[day] = { ...emptyLog(), ...entry, needThis: Array.isArray(entry?.needThis) ? entry.needThis.map(use => ({ ...use })) : [] };
+        // Old uses keep their shape, but a reason or title stored before the caps is cut down to them here, and the
+        // next save stores it that way.
+        state.log[day] = { ...emptyLog(), ...entry, needThis: Array.isArray(entry?.needThis) ? entry.needThis.map(capUse).slice(-USES_MAX) : [] };
       }
     }
     return state;
@@ -705,8 +748,8 @@
   /** @param {State} state @param {string} videoId @param {string} title @param {string} reason @param {number} now */
   function needThis(state, videoId, title, reason, now) {
     if (typeof videoId !== 'string' || !/^[\w-]{1,64}$/.test(videoId)) return { ok: false, error: 'bad-video' };
-    const trimmed = String(reason).trim();
-    title = String(title);
+    const trimmed = line(String(reason), REASON_MAX);
+    title = line(String(title), TEXT_MAX);
     if (trimmed.length < 3) return { ok: false, error: 'reason-required' };
     if (state.unlocked.includes(videoId)) return { ok: true };
     if (needThisLeft(state, now) < 1) return { ok: false, error: 'need-this-limit' };
@@ -1381,11 +1424,12 @@
     for (const key of /** @type {const} */ (['watchedSec', 'watchSpent', 'recSpent', 'saved', 'passed', 'watched'])) day[key] = count(d[key], 0);
     if (Array.isArray(d.needThis)) {
       for (const use of d.needThis) {
-        if (use && typeof use.videoId === 'string' && typeof use.reason === 'string') {
-          day.needThis.push({ videoId: use.videoId, title: typeof use.title === 'string' ? use.title : '', reason: use.reason, at: count(use.at, 0) });
+        if (use && typeof use.videoId === 'string' && VIDEO_ID.test(use.videoId) && typeof use.reason === 'string') {
+          day.needThis.push({ videoId: use.videoId, title: line(use.title, TEXT_MAX), reason: line(use.reason, REASON_MAX), at: count(use.at, 0) });
         }
       }
     }
+    day.needThis = day.needThis.slice(-USES_MAX);
     return day;
   }
 
@@ -1541,7 +1585,7 @@
     if (!raw || typeof raw !== 'object') return null;
     const c = /** @type {Record<string, unknown>} */ (raw);
     const ids = cleanIds(c.ids);
-    const name = typeof c.name === 'string' ? c.name.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    const name = line(c.name, TEXT_MAX);
     if (!ids.length && !name) return null;
     return typeof c.avatar === 'string' && AVATAR.test(c.avatar) ? { ids, name, avatar: c.avatar } : { ids, name };
   }
@@ -1828,7 +1872,7 @@
     firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUses, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
     watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
-    exportData, importData, resetData,
+    exportData, importData, resetData, REASON_MAX,
     ALLOW_MAX, channelId, cleanChannel, sameChannel, allowChannel, removeAllowed, blockChannel, unblockChannel,
     cancelChannelPending, seenChannel, channelFromPage, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
   };
