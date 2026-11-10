@@ -623,6 +623,22 @@ test('cleanVideo keeps valid optional fields and drops bad ones', () => {
   assert.equal(state.backlog[0].resumeSec, 12);
 });
 
+test('cleanVideo drops a length or position no video has, and a stash time past what a date can hold', () => {
+  // From a tester's import: History and the stash printed numbers like 1e+16.
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 1e16, durationSec: 1e15 }), video('a'));
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 1e20 }), video('a'));
+  // A week is the most either may be. YouTube keeps at most 12 hours of a video or a stream.
+  const week = 7 * 24 * 3600;
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: week, durationSec: week }), { ...video('a'), resumeSec: week, durationSec: week });
+  assert.deepEqual(D.cleanVideo({ ...video('a'), resumeSec: 60, durationSec: week + 1 }), { ...video('a'), resumeSec: 60 });
+  assert.deepEqual(D.cleanVideo({ ...video('a'), addedAt: 1e20 }), video('a'));
+  assert.deepEqual(D.cleanVideo({ ...video('a'), addedAt: time(5) }), { ...video('a'), addedAt: time(5) });
+  // A length that isn't a real time goes, since the stash adds lengths up. Real times and text like LIVE stay.
+  assert.equal(D.cleanVideo({ ...video('a'), length: '9:99:99' })?.length, '');
+  assert.equal(D.cleanVideo({ ...video('a'), length: '5' })?.length, '');
+  for (const length of ['0:45', '14:02', '1:02:03', '120:00', 'LIVE']) assert.equal(D.cleanVideo({ ...video('a'), length })?.length, length);
+});
+
 test('cleanVideo keeps at most 200 characters of each text field, on one line, so the stash and card stay small', () => {
   const long = 'w'.repeat(1e6);
   const clean = D.cleanVideo({ id: 'a', title: `A\n  title ${long}`, channel: long, length: long, views: long, age: long });

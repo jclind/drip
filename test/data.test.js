@@ -255,6 +255,25 @@ test('an imported "no" or "false" turns neither Dry hours nor grace mode on', ()
   assert.deepEqual([state.settings.dryHours, state.settings.graceMode, state.settings.hideBell], [false, false, true]);
 });
 
+test('import holds each log number to what one day can hold', () => {
+  const state = settled();
+  const day = D.addDays(state.day, -1);
+  const huge = { watchedSec: 1e308, watchSpent: 1e300, recSpent: 1e300, saved: 1e300, passed: 1e300, watched: 1e300 };
+  D.importData(state, { app: 'drip', format: 1, log: {
+    [day]: { ...huge, needThis: [{ videoId: 'x', title: 'X', reason: 'Class', at: 1e300 }] },
+    [D.addDays(state.day, -2)]: { watchedSec: 3600, watchSpent: 4, recSpent: 10, saved: 2, passed: 7, watched: 1 },
+  } }, NOW);
+  // The longest day is 47 hours (Q12). The most drops a day can spend is the most a balance holds: 48 a day, kept 7
+  // days. Cards in Curated cost nothing, so their counts get one a second for the longest day.
+  const longest = 47 * 3600;
+  assert.deepEqual({ ...state.log[day], needThis: undefined }, { watchedSec: longest, watchSpent: 336, recSpent: longest, saved: longest, passed: longest, watched: longest, needThis: undefined });
+  assert.equal(D.formatMinutes(state.log[day].watchedSec), '47h');
+  assert.equal(state.log[day].needThis[0].at, NOW, 'a use from the future counts as made at the import');
+  assert.deepEqual(state.log[D.addDays(state.day, -2)], { watchedSec: 3600, watchSpent: 4, recSpent: 10, saved: 2, passed: 7, watched: 1, needThis: [] });
+  // A future time counted as now for as long as the day stayed in the log. Now it counts for a week.
+  assert.equal(D.needThisUsed(state, NOW + 7 * 86400e3), 0);
+});
+
 test('reset keeps the week of "I need this one" uses', () => {
   const state = settled();
   D.needThis(state, 'a', 'A', 'Study', NOW);
