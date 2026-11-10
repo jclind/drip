@@ -131,7 +131,11 @@
   // listens for the click itself, not pointerdown: the home page rebuilds when the list closes, and a rebuild between
   // pointerdown and click would lose the click on whatever button was pressed (Codex, 2026-10-13). By the time a click
   // is dispatched its path is fixed, so the pressed button's handler runs even if the page is rebuilt now.
+  // Only the user's clicks count. Scripts click too: watch.js clicked YouTube's hidden autoplay switch every second in a
+  // new profile, and the list closed by itself (release review, 2026-11-10). A test's plain event object has no
+  // isTrusted, so it counts as the user's.
   document.addEventListener('click', (e) => {
+    if (e.isTrusted === false) return;
     const target = /** @type {Element} */ (e.target);
     for (const entry of shown()) {
       if (entry.el.contains(target) || target.closest?.('[data-swap-anchor]')) continue;
