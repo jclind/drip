@@ -2332,6 +2332,12 @@ html[dark] #drip-home .drip-menu {
     outline: none;
   }
 
+  /* The pill's own shimmer, which the rule for what's inside it below doesn't reach. It rests off the pill's left
+     edge, clipped (release review, 2026-11-10). */
+  #drip-pill.is-low::after {
+    animation: none;
+  }
+
   /* No rise, so no animationend to add is-full (common.js): the mask and clip come off here instead. */
   #drip-lock,
   #drip-lock.is-draining,
@@ -2769,5 +2775,6 @@ html[dark] #drip-menu {
   100% { transform: none; opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .drip-allow.is-changed, .drip-allow.is-changed .drip-allow-icon { animation: none; }
+  /* The ring too: without its animation it has no shadow, so nothing shows (release review, 2026-11-10). */
+  .drip-allow.is-changed, .drip-allow.is-changed::after, .drip-allow.is-changed .drip-allow-icon { animation: none; }
 }
