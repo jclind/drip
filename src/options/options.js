@@ -1061,7 +1061,13 @@ function renderChannels(force = false) {
       tabButton('block', 'Blocked', String(blocked.length))),
     pane('allow', allowed),
     pane('block', blocked));
-  if (focused) /** @type {HTMLElement | null} */ (pad.querySelector(`[data-k="${focused}"]:not([disabled])`) || pad.querySelector(`[data-k="${focused.split('-')[0]}-input"]:not([disabled])`))?.focus();
+  if (focused) {
+    const list = focused.split('-')[0];
+    // The 5th allowed channel disables the field and its button, so focus on them goes to the list's tab, which says
+    // 5/5. Not the new tile's x, where a second Enter would cancel the channel just added.
+    /** @type {HTMLElement | null} */ (pad.querySelector(`[data-k="${focused}"]:not([disabled])`)
+      || pad.querySelector(`[data-k="${list}-input"]:not([disabled])`) || pad.querySelector(`[data-k="tab-${list}"]`))?.focus();
+  }
 }
 
 // Your data (RELEASE-PLAN.md, item 5): export, import, and reset. Import and reset go through the worker's rules, so a
