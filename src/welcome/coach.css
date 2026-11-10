@@ -1,9 +1,14 @@
-/* The welcome tour's callouts (coach.js). One fixed layer over the page that never takes a click: drip's gray chip, a
-   thin blue line, and a ring on the one thing to press. */
+/* The welcome tour's callouts (coach.js). One window-sized layer over the page that never takes a click: drip's gray
+   chip, a thin blue line, and a ring on the one thing to press. The layer and the ring are absolute, not fixed, so they
+   scroll with the page on the browser's own thread; fixed, they lagged a frame behind and slid while scrolling. coach.js
+   moves the layer to the scroll offset each time it places a note. */
 
 .co-layer {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
   z-index: 100;
   pointer-events: none;
   font-family: "Roboto", "Arial", sans-serif;
@@ -108,7 +113,7 @@ html[dark] .co-ring {
 /* The ring on the one thing to press. It pulses softly, so it reads as "here" without flashing. */
 
 .co-ring {
-  position: fixed;
+  position: absolute;
   z-index: 99;
   pointer-events: none;
   opacity: 0;

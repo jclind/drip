@@ -433,12 +433,19 @@
     const key = [r.left, r.top, r.width, r.height, s.left, s.top, s.width, s.height, w, h, pointRect?.left ?? 0, pointRect?.top ?? 0].map(Math.round).join();
     if (key === placed) return comeIn();
     placed = key;
+    // The layer sits on the page, so it scrolls with it. Moving it to the scroll offset keeps the window's coordinates,
+    // which every rect here is in, right inside it.
+    const sx = window.scrollX;
+    const sy = window.scrollY;
+    const shift = `translate(${sx}px, ${sy}px)`;
+    if (layer.style.transform !== shift) layer.style.transform = shift;
     // A shown note ignores its target creeping a few pixels (the pill's minutes changing width), so it never twitches.
-    if (!revealing && held && held.at === shown.at && Math.abs(p.x - held.x) <= 12 && Math.abs(p.y - held.y) <= 12) {
-      p.x = held.x;
-      p.y = held.y;
+    // held is in page coordinates, so a scroll alone never counts as creeping.
+    if (!revealing && held && held.at === shown.at && Math.abs(p.x + sx - held.x) <= 12 && Math.abs(p.y + sy - held.y) <= 12) {
+      p.x = held.x - sx;
+      p.y = held.y - sy;
     }
-    held = { at: shown.at, x: p.x, y: p.y };
+    held = { at: shown.at, x: p.x + sx, y: p.y + sy };
     chip.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
     chip.dataset.side = p.side;
     // The line: from the chip's near edge to just short of the part it points at, bowed a little.
@@ -529,10 +536,13 @@
     }
     const r = el.getBoundingClientRect();
     const radius = getComputedStyle(el).borderTopLeftRadius;
-    const key = [r.left, r.top, r.width, r.height].map(Math.round).join() + radius;
+    // In page coordinates: the ring is absolute, so it scrolls with the page and only a real move rewrites it.
+    const left = r.left + window.scrollX;
+    const top = r.top + window.scrollY;
+    const key = [left, top, r.width, r.height].map(Math.round).join() + radius;
     if (key !== ringPlaced) {
       ringPlaced = key;
-      Object.assign(ring.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: radius });
+      Object.assign(ring.style, { left: `${left}px`, top: `${top}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: radius });
     }
     if (!ring.classList.contains('is-on')) ring.classList.add('is-on');
   }
