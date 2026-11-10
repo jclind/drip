@@ -162,7 +162,7 @@ function check(dir) {
   return problems;
 }
 
-module.exports = { strip, check, files, LEFT_OUT, DEV_ANYWHERE, DEV_IN_CORE };
+module.exports = { strip, check, files, cssUrls, LEFT_OUT, DEV_ANYWHERE, DEV_IN_CORE };
 
 if (require.main === module) {
   const dir = process.argv[2];

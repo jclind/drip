@@ -77,6 +77,22 @@ test('the store build leaves out the icon art, which nothing references, and kee
   }
 });
 
+test('YouTube pages load no file from the package, so the manifest exposes none to them', () => {
+  // icons.js paints icons as data: URLs from SVG text the worker sends (test/icons.test.js), and the two getURL
+  // fallbacks run only where icons.js isn't loaded, on the welcome page and in Node.
+  const manifest = JSON.parse(read(ROOT, 'manifest.json'));
+  assert.equal(manifest.web_accessible_resources, undefined);
+  for (const entry of manifest.content_scripts) {
+    for (const file of entry.css || []) {
+      for (const url of release.cssUrls(read(ROOT, file))) assert.match(url, /^(data:|#)/, `${file}: url(${url.slice(0, 60)})`);
+    }
+    for (const file of [...(entry.js || []), ...(entry.css || [])]) {
+      const code = read(ROOT, file).split('\n').filter((l) => !/^\s*(\/\/|\/?\*)/.test(l)).join('\n');
+      assert.ok(!code.includes('chrome-extension://') && !code.includes('@@extension_id'), `${file} names an extension URL`);
+    }
+  }
+});
+
 test('the unpacked tree keeps the dev tools, so the build has something to take out', () => {
   const worker = read(ROOT, 'src/background.js');
   assert.deepEqual([...worker.matchAll(/importScripts\('([^']+)'\)/g)].map((m) => m[1]),
