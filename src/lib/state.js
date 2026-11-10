@@ -1193,6 +1193,25 @@
   }
 
   /**
+   * Whether YouTube's next video, from Shift+N or the player's Next button, is YouTube's own pick and not a playlist's
+   * next video. Playlists and mixes play on (Q2), so a next video with a list is allowed. The Next button's link says
+   * where it goes. Without one, a page with a list counts as a playlist.
+   * @param {string} pageUrl
+   * @param {string} nextHref The player's Next button's href, or '' when there's none.
+   */
+  function upNextIsPick(pageUrl, nextHref) {
+    /** @param {string} href */
+    const hasList = (href) => {
+      try {
+        return !!new URL(href, 'https://www.youtube.com/').searchParams.get('list');
+      } catch {
+        return false;
+      }
+    };
+    return nextHref ? !hasList(nextHref) : !hasList(pageUrl);
+  }
+
+  /**
    * Whether a watch page that's still loading must hold its video, read from raw storage before the worker answers.
    * Nothing is playing yet, so grace mode doesn't apply (Q3). A day that has rolled over counts as 0 minutes and no unlocks.
    * @param {unknown} raw
@@ -1827,7 +1846,7 @@
     rollDay, logDay, spendWatch, reveal, resolveCurrent, revealNext, buyIfOut, addBacklog,
     firstDayUntil, removeBacklog, swapBacklog, swapFollow, editsSince, markProgress, charge, chargeTick, watchStatus, needThis, needThisUses, needThisUsed, needThisLeft, needThisBack, dryUntil, drySoon, enterDry, dryBackSeen, cleanSettings,
     isLoosening, mayReveal, canDeal, updateSettings, cancelPending, refillSeen, caps, formatMinutes, stashedAgo, cleanVideo,
-    watchedSummary, weekView, cardsLine, redirectTarget, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
+    watchedSummary, weekView, cardsLine, redirectTarget, upNextIsPick, earlyLocked, devAction, toolbarGlass, toolbarPlaying,
     exportData, importData, resetData,
     ALLOW_MAX, channelId, cleanChannel, sameChannel, allowChannel, removeAllowed, blockChannel, unblockChannel,
     cancelChannelPending, seenChannel, channelFromPage, allowedVideo, isFree, freeToStart, plannedChannels, allowCount, isAllowedOrWaiting,
