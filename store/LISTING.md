@@ -1,6 +1,6 @@
 # Chrome Web Store listing answers
 
-Draft, 2026-10-06, checked against the 1.0 fix branches on 2026-11-10. The images are planned in `ART-PLAN.md`. The final set to upload is `store/images-v2/` (`screenshot-1.png` to `-5.png`, and `tile-c2.png` as the small promo tile).
+Draft, 2026-10-06, checked against `main` on 2026-11-10 (d9fd578). The images are planned in `ART-PLAN.md`. The final set to upload is `store/images-v2/` (`screenshot-1.png` to `-5.png`, and `tile-c2.png` as the small promo tile).
 
 ## Name
 
