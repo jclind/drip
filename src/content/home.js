@@ -338,8 +338,8 @@
    * @param {boolean} [emptyAtClick] The home grid had no videos and already showed YouTube's feed nudge.
    */
   async function findWith(msg, emptyAtClick = false) {
-    // A slow read (Subscriptions can take 15 seconds) says so on the loading card. The animation holds redraws, so the
-    // text changes in place.
+    // A slow read says so on the loading card. Subscriptions can take about 30 seconds, up to 15 for the hidden frame to
+    // load and 15 more to read it. The animation holds redraws, so the text changes in place.
     slow = false;
     const timer = setTimeout(() => {
       slow = true;
@@ -1131,10 +1131,13 @@
     }, icon('clock'), h('span', {}, `+${Drip.formatMinutes(s.minutesPerToken * 60)}`), price('drop'));
   }
 
-  /** What the loading card says, which changes once the read has taken SLOW_MS. */
+  /**
+   * What the loading card says, which changes once the read has taken SLOW_MS. The Subscriptions line names no number,
+   * so it stays true when the frame's timeouts change (it said 15 seconds while the worst case was about 30).
+   */
   function loadingText() {
     const subs = state.settings.feedSource === 'subscriptions';
-    if (slow) return subs ? 'Still checking. Subscriptions can take 15 seconds.' : 'Still looking…';
+    if (slow) return subs ? 'Still checking. Subscriptions can take a while.' : 'Still looking…';
     return subs ? 'Checking your subscriptions…' : 'Finding a video…';
   }
 

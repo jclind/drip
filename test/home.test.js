@@ -1634,7 +1634,9 @@ test('Subscriptions that never load end within about 30 seconds with nothing spe
   const tab = await makeTab(world, { reduced: true });
   await tab.click('reveal');
   await tab.advance(5500);
-  assert.match(tab.root().textContent, /Still checking/);
+  // No number of seconds: the read can take about 30, and the old text promised 15 (AUDIT.md, 2026-10-16).
+  assert.match(tab.root().textContent, /Still checking\. Subscriptions can take a while\./);
+  assert.doesNotMatch(tab.root().textContent, /\d+ seconds/);
   await tab.advance(26000);
   assert.equal(world.state.tokens.rec, 10);
   assert.match(tab.message(), /Nothing new from your subscriptions\. No card spent\./);
