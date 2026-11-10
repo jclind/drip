@@ -570,6 +570,8 @@
     if (!noteHidden) notesParked = false;
     else if (!notesParked && getComputedStyle(layer).opacity === '0') {
       notesParked = true;
+      // The layer too: frame() sets its scroll offset again before the next note shows.
+      layer.style.transform = '';
       chip.style.transform = '';
       Object.assign(svg.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
       placed = '';
