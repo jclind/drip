@@ -1656,7 +1656,11 @@
       send({ type: 'dryBackSeen' }).then(absorb);
       return;
     }
-    if (behind && clockOn()) {
+    // Like the day's refill, they land only where both counters are, and are only marked seen anywhere else (Q29). land()
+    // needs both, so with cards off or unlimited they were never marked seen, and with cards off the tag covered +15m
+    // (release review, 2026-11-10).
+    const lands = clockOn() && cardsMode() === 'limited';
+    if (behind && lands) {
       // Kept drops the lock counted after the drops came back hold them already, so they're taken out here. Both stay
       // held back, so the count only rises (Codex, 2026-11-05).
       const back = counted ? Math.min(b.watch, arriving.watch) : b.watch;
@@ -1665,7 +1669,7 @@
       rendered = '';
       return;
     }
-    if (!clockOn()) {
+    if (!lands) {
       send({ type: 'dryBackSeen' }).then(absorb);
       return;
     }

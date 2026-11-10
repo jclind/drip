@@ -1929,3 +1929,45 @@ test('with no minutes in the 5 minutes before Dry hours, the out page says when 
   assert.match(text, /Drops work again at 3:00pm\./);
   assert.doesNotMatch(text, /out for today/);
 });
+
+// Drops back with the clock on and the card counter gone (release review, 2026-11-10). land() needs both counters, so
+// with cards off or unlimited they were never marked seen, and every home page after drew the count 2 short and rolled
+// it up. Like the day's refill, they land only beside both counters and are only marked seen anywhere else (Q29).
+for (const cards of ['limited', 'unlimited', 'off']) {
+  test(`drops back are marked seen with the clock on and cards ${cards}, and the next page shows them at once`, async () => {
+    const world = makeWorld();
+    dryAtNoon(world);
+    world.state.settings.cards = cards;
+    world.state.watchSecondsLeft = 40 * 60;
+    world.state.tokens.watch = 2;
+    const tab = await makeTab(world, { inView: true });
+    await tab.advance(4000);
+    assert.equal(world.state.dryBack, null, 'marked seen');
+    assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), cards === 'limited' ? [['back', 2]] : []);
+    assert.equal(tab.drops(), 4);
+    assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+    const next = await makeTab(world, { inView: true });
+    await next.advance(4000);
+    assert.deepEqual(next.landings, []);
+    assert.equal(next.drops(), 4);
+    assert.ok(next.dropsShown.every((/** @type {number} */ n) => n === 4), `the next page went ${next.dropsShown.join(', ')}`);
+  });
+}
+
+for (const cards of ['unlimited', 'off']) {
+  test(`"Done for now" into Dry hours with cards ${cards}: drops back marked seen, the count ends right`, async () => {
+    const world = makeWorld();
+    dryAtNoon(world);
+    world.state.settings.cards = cards;
+    world.state.watchSecondsLeft = 40 * 60;
+    world.state.tokens.watch = 2;
+    const until = world.D.dryUntil(world.state, world.time());
+    const tab = await makeTab(world, { inView: true, kept: `4:${until}` });
+    await tab.advance(4000);
+    // As before, nothing falls into the counter without the card counter beside it.
+    assert.deepEqual(tab.landings, []);
+    assert.equal(world.state.dryBack, null, 'marked seen');
+    assert.equal(tab.drops(), 4);
+    assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+  });
+}
