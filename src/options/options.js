@@ -92,14 +92,14 @@ const PARTS = [
     ],
   },
   {
-    id: 'search', title: 'Search', icon: 'search',
+    id: 'search', title: 'Search', icon: 'search-fill',
     toggle: { key: 'searchCap', label: 'Search', kind: 'toggle' },
     summary: (d) => (d.searchCap ? 'Stops at 10 results' : ''),
     fields: [],
   },
   {
     // Not mode parts: the same in every mode, so the picker leaves them alone.
-    id: 'day', title: 'Every day', icon: 'clock',
+    id: 'day', title: 'Every day', icon: 'clock-fill',
     fields: [
       { key: 'resetHour', label: 'New day starts at', kind: 'hour' },
       { key: 'rolloverDays', label: 'Balance cap', kind: 'stepper', min: 1, max: 7,
@@ -108,7 +108,7 @@ const PARTS = [
     ],
   },
   {
-    id: 'youtube', title: 'YouTube', icon: 'square-play',
+    id: 'youtube', title: 'YouTube', icon: 'square-play-fill',
     fields: [
       // Q16.
       { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle' },

@@ -388,7 +388,7 @@ test('Dry hours folds inert child rows and retains one range chip, and YouTube h
   assert.deepEqual(p.get('day').querySelectorAll('[data-field]').map((el) => el.dataset.field), ['resetHour', 'rolloverDays']);
   assert.deepEqual(p.get('youtube').querySelectorAll('[data-field]').map((el) => el.dataset.field), ['hideBell', 'hideShorts']);
   assert.equal(p.get('youtube').querySelector('.toggle').getAttribute('id'), 'field-hideBell');
-  assert.ok(p.get('youtube').querySelector('.drip-i-square-play'));
+  assert.ok(p.get('youtube').querySelector('.drip-i-square-play-fill'));
   const family = p.document.querySelector('.dry-family');
   assert.equal(family.querySelectorAll('.chip').length, 1);
   assert.match(family.querySelector('.chip').textContent, /Off until 4:00am/);

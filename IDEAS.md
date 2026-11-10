@@ -93,6 +93,7 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 - A "Reduce motion" switch that overrides the system setting.
 - A page Chrome opens on uninstall (`chrome.runtime.setUninstallURL`) with one question, "Why are you leaving?". It needs a small hosted page (Claude's suggestion, 2026-10-16, with the Settings feedback link).
 - Not worth it yet: syncing across devices, and notifications like "5 minutes left".
+- Remaster all the icons in one hand-drawn set (Jesse, 2026-11-10: "down the line I might remaster all the icons"). Settings' section headers already use his cartoon search, clock, and YouTube icons (`search-fill`, `clock-fill`, `square-play-fill`); the menu, the +15m buttons, and the search buttons still use the lucide and solid ones.
 
 ## Found while testing 2026-11-06
 

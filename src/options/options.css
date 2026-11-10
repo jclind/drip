@@ -123,6 +123,11 @@
   height: 20px;
 }
 
+/* The YouTube icon is wider than tall, so at 18px wide it looked smaller than the others. */
+.part-icon .drip-i-square-play-fill {
+  width: 22px;
+}
+
 .part-text {
   flex: 1;
   min-width: 0;
