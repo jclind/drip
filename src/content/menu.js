@@ -90,7 +90,8 @@
 
   /**
    * A plain link would load a whole new page and lose the watch time watch.js hasn't sent yet, so guard.js hands
-   * YouTube's links to its in-page navigation. A new-tab click, or Studio's link, goes the plain way.
+   * YouTube's links to its in-page navigation. A new-tab click, Studio's link, and Downloads, which guard.js leaves alone,
+   * go the plain way.
    * @param {MouseEvent} e
    */
   function follow(e) {
