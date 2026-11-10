@@ -17,7 +17,7 @@ A fresh pass on the round-19 set, judged against 13 top Chrome Web Store extensi
 
 ## Current
 
-- Closed by Jesse on 2026-11-09 after round 5: "I think this is as good as we will get it with the current amount of effort we want to use." The set in `store/images-v2/` (screenshot 2 shot from `frames-v4.html?v=b`) is final; 4's crop stays. The cyclist question went to `/design-variants` (thumbnail ideas) instead of another round.
+- Closed by Jesse on 2026-11-09 after round 5: "I think this is as good as we will get it with the current amount of effort we want to use." The set in `store/images-v2/` (screenshot 2 shot from `frames-v4.html?v=b`) is final; 4's crop stays. The cyclist question went to `/design-variants` instead of another round: of five thumbnail ideas Jesse picked A, the same scene with the rider about four times the size, then OK'd a helmet and a trail that runs over the crest. Screenshot 2's player shows the whole picture since (its 130% crop was tuned for the old small rider).
 - Round: 5 done.
 - Goal: not met, and within the seats' noise. Claude puts 3 and 4 below the middle; Codex puts only 1 below (the cyclist). Both say ship, no blocking fixes. Images that didn't change between rounds 4 and 5 moved a point either way (Claude 3 and 4 down, Codex 3 and the tile up), so one point is each seat's noise, and every image sits within it of the middle.
 - Base: every frame on the 480px panel, with round 5's note cut on 4 (this commit).
