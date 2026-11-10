@@ -626,8 +626,10 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
     document, location, world, errors, browse, runtime,
     flights: () => document.motions.filter((m) => m.classes.includes('drip-deal is-flying')),
     morphs: () => document.motions.filter((m) => m.el.parentElement?.classList.contains('drip-blobs')),
-    /** What home.js logged with console.error. @type {any[][]} */
+    /** What home.js logged with console.error or console.warn, which chrome://extensions lists under Errors. @type {any[][]} */
     logged: [],
+    /** What home.js logged with console.debug. @type {any[][]} */
+    debugged: [],
     /** @type {any[]} */
     reveals: [],
     /** The card the animation stub dealt, which home.js draws for real once the animation is done. @type {any} */
@@ -646,7 +648,12 @@ async function makeTab(world, { reduced = true, grid = ['v1', 'v2', 'v3'], inVie
 
   /** @type {any} */
   const context = {
-    document, location, console: { ...console, error: (/** @type {any[]} */ ...args) => tab.logged.push(args) }, JSON, Math, Number, String, Boolean, Set, Map, WeakMap, Array, Object, Promise, Error,
+    document, location, console: {
+      ...console,
+      error: (/** @type {any[]} */ ...args) => tab.logged.push(args),
+      warn: (/** @type {any[]} */ ...args) => tab.logged.push(args),
+      debug: (/** @type {any[]} */ ...args) => tab.debugged.push(args),
+    }, JSON, Math, Number, String, Boolean, Set, Map, WeakMap, Array, Object, Promise, Error,
     URL, URLSearchParams, structuredClone, navigator: { userAgent: 'test', get onLine() { return !tab.offline; }, clipboard: { writeText: async () => {} } },
     CSS: { escape: (/** @type {string} */ s) => s.replace(/["\\]/g, '\\$&') },
     innerHeight: 900,
@@ -1575,7 +1582,10 @@ for (const reduced of [true, false]) {
     assert.equal(world.count('reveal'), 0, 'nothing sent');
     assert.match(tab.message(), /Something went wrong/);
     assert.deepEqual(tab.errors, [], 'no error escapes');
-    assert.equal(tab.logged.length, 1, 'the error is logged');
+    // The page says what went wrong, so drip's card in chrome://extensions gets no entry under Errors (2026-11-10).
+    assert.equal(tab.logged.length, 0, 'nothing at error or warning level');
+    assert.equal(tab.debugged.length, 1, 'the error is in the debug log');
+    assert.match(String(tab.debugged[0][1]), /Invalid URL/);
     assert.ok(tab.button('reveal') && !tab.button('reveal').hasAttribute('disabled'), 'Reveal works again');
   });
 

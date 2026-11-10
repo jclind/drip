@@ -416,8 +416,10 @@
       } catch (err) {
         // A read that throws never got as far as asking the worker, so nothing was spent. Without this the reveal ended
         // with no message, and Reveal next's half-dealt card stayed on the old thumbnail (Codex, 2026-10-16). In a tab
-        // whose drip was reloaded, the page asks for a refresh instead.
-        console.error('drip: reading the feed failed', err);
+        // whose drip was reloaded, the page asks for a refresh instead. The page says what went wrong, so the error goes
+        // to the debug log, which DevTools shows under Verbose. console.error and console.warn both put an entry under
+        // Errors on drip's card in chrome://extensions, which reads as drip being broken (headless Chrome, 2026-11-10).
+        console.debug('drip: reading the feed failed', err);
         if (!alive()) disconnected = true;
         message = errorText('');
         return null;
