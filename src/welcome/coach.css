@@ -1,9 +1,15 @@
-/* The welcome tour's callouts (coach.js). One fixed layer over the page that never takes a click: drip's gray chip, a
-   thin blue line, and a ring on the one thing to press. */
+/* The welcome tour's callouts (coach.js). One layer over the page that never takes a click: drip's gray chip, a thin
+   blue line, and a ring on the one thing to press. The layer and the ring are absolute, not fixed, so they scroll with
+   the page on the browser's own thread; fixed, they lagged a frame behind and slid while scrolling. coach.js moves the
+   layer to the scroll offset each time it places a note. The layer has no size, and the line's svg covers only the
+   line, so nothing here makes the page longer. */
 
 .co-layer {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
   z-index: 100;
   pointer-events: none;
   font-family: "Roboto", "Arial", sans-serif;
@@ -34,6 +40,8 @@ html[dark] .co-ring {
   position: absolute;
   top: 0;
   left: 0;
+  /* The layer has no width, so the chip sizes to its text up to 240px instead of shrinking to its longest word. */
+  width: max-content;
   max-width: 240px;
   padding: 7px 12px;
   border: 1px solid color-mix(in srgb, var(--text) 14%, var(--bg));
@@ -70,11 +78,9 @@ html[dark] .co-ring {
 
 /* The line, drawn from the chip each time a note comes in. */
 
+/* coach.js sets its box around the line. */
 .co-line {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
   overflow: visible;
 }
 
@@ -108,7 +114,7 @@ html[dark] .co-ring {
 /* The ring on the one thing to press. It pulses softly, so it reads as "here" without flashing. */
 
 .co-ring {
-  position: fixed;
+  position: absolute;
   z-index: 99;
   pointer-events: none;
   opacity: 0;
