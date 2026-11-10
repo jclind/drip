@@ -205,6 +205,12 @@
   const REASON_MAX = 300;
   /** The most "I need this one" uses one log day keeps: the highest weekly allowance Settings offers. */
   const USES_MAX = ranges.needThisPerWeek[1];
+  /**
+   * The most uses an import leaves in the whole log: the highest weekly allowance for each of the 13 weeks in the 90
+   * days the log keeps. Chrome counts some characters as six bytes, so 20 uses on each of 89 days could fill half of
+   * storage from a file of 1 MB.
+   */
+  const LOG_USES_MAX = USES_MAX * 13;
 
   /**
    * Text on one line, at most `max` characters: runs of whitespace become one space, and the ends are trimmed. A cut
@@ -1471,12 +1477,16 @@
     }
     let days = 0;
     if (file.log && typeof file.log === 'object' && !Array.isArray(file.log)) {
-      for (const [day, entry] of Object.entries(file.log)) {
+      let room = LOG_USES_MAX - Object.values(state.log).reduce((n, entry) => n + (Array.isArray(entry?.needThis) ? entry.needThis.length : 0), 0);
+      // Newest first, so the uses that stay are the ones the weekly allowance counts.
+      for (const [day, entry] of Object.entries(file.log).sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))) {
         // A real calendar date, since History's week math throws on one like 2026-00-01, and within the 90 days the
         // log keeps, as rollDay would prune it (Codex, 2026-11-03).
         if (!realDay(day) || day >= state.day || day < addDays(state.day, -89) || state.log[day]) continue;
         const cleaned = cleanLogDay(entry);
         if (!cleaned) continue;
+        cleaned.needThis = room > 0 ? cleaned.needThis.slice(-room) : [];
+        room -= cleaned.needThis.length;
         state.log[day] = cleaned;
         days++;
       }
