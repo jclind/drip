@@ -1,8 +1,8 @@
 # drip
 
-A Chrome extension that takes away YouTube's home page grid. You get a daily allowance of tokens. A rec token reveals one recommended video. A watch token buys 15 minutes of watching. Videos you save go in a backlog you can open for free.
+A Chrome extension that takes away YouTube's home page grid. You get a daily allowance of cards and drops. A card reveals one recommended video. A drop buys 15 minutes of watching. Videos you save go in the Stash, which you can open for free.
 
-It comes in three modes, Quiet, Curated, and Full drip, picked on the welcome page and changed in Settings. The tokens and the clock belong to Full drip.
+It comes in three modes, Quiet, Curated, and Full drip, picked on the welcome page and changed in Settings. The cards, the drops, and the clock belong to Full drip.
 
 This is the 1.0 release, headed for the Chrome Web Store. The listing isn't live yet, so for now you install from a clone, below. `DESIGN.md` has the decisions and `IDEAS.md` has ideas that aren't built.
 

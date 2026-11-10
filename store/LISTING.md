@@ -4,7 +4,9 @@ Draft, 2026-10-06, checked against `main` on 2026-11-09 (97fc18e). The images ar
 
 ## Name
 
-drip (tentative, Q17). Google's branding rules don't allow "YouTube" in the name. Search the store for clashes before submitting; nobody has recorded that search yet.
+drip (tentative, Q17). Google's branding rules don't allow "YouTube" in the name.
+
+Jesse searched the store for "drip" on 2026-11-10 and got 15 results. Two share the name exactly: "Drip", a design token inspector, and "DRIP", a Twitter thread manager. Neither has a rating. The other 13 have "drip" inside a longer name, such as Textdrip, Sku Drip Fetcher, and Water Reminder Buddy - Drip. None of the 15 has anything to do with YouTube, video, or screen time. The store doesn't require a unique name, so the two matches don't block the upload.
 
 ## Category
 
