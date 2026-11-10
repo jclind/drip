@@ -1,10 +1,11 @@
 // @ts-check
-// The dev panel's state changes (devAction). Test tooling, so these check that each action does what its button says,
+// The dev panel's state changes (devAction, src/devpanel/actions.js). Test tooling, so these check that each action does what its button says,
 // and that "Run reset now" leads into the real rollover.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../src/lib/state.js');
+require('../src/devpanel/actions.js');
 const D = globalThis.Drip;
 
 /** @param {number} day @param {number} [hour] */
