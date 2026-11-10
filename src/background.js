@@ -496,7 +496,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ...result, state });
       if ((msg.type === 'allowChannel' || msg.type === 'blockChannel') && result && result.ok) lookUpChannel(msg.channel);
     })
-    .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    // A write past chrome.storage.local's quota throws "Resource::kQuotaBytes quota exceeded" (Chrome 157). Nothing was
+    // saved, and the next message reads the stored state again, so the page can say the change didn't fit.
+    .catch((err) => sendResponse({ ok: false, error: /quota/i.test(String(err)) ? 'storage-full' : String(err) }));
   return true;
 });
 

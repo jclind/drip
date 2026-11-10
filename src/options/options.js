@@ -1168,6 +1168,7 @@ async function importFile() {
   if (!res || !res.ok || !res.state) {
     if (res && res.error === 'bad-format') return refuse([`${which} is from a newer version of drip.`, 'Update drip, then import it again.', 'Nothing changed.']);
     if (res && res.error === 'not-drip') return refuse([`${which} isn't a drip export.`, wanted, 'Nothing changed.']);
+    if (res && res.error === 'storage-full') return refuse([`${which} didn't fit in drip's storage.`, 'Nothing changed.']);
     return refuse(["drip didn't answer.", 'Try again in a moment.']);
   }
   afterData(res, kept);

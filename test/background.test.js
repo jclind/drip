@@ -35,6 +35,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
   const session = stores ? stores.session : {};
   let writes = 0;
   let failNext = 0;
+  let failMessage = 'write failed';
   let failSession = 0;
   let failIcon = 0;
   let failDraw = 0;
@@ -80,7 +81,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
         set: async (/** @type {Record<string, any>} */ items) => {
           if (failNext > 0) {
             failNext--;
-            throw new Error('write failed');
+            throw new Error(failMessage);
           }
           writes++;
           Object.assign(store, structuredClone(items));
@@ -152,7 +153,7 @@ function worker(initial = undefined, { dev = false, panel = true, stores = undef
     advance,
     startup: () => /** @type {Function} */ (onStartup)(), idle: () => vm.runInContext('queue', context),
     failIcons: (n) => { failIcon = n; }, failDrawing: (n) => { failDraw = n; },
-    writes: () => writes, failWrites: (/** @type {number} */ n) => { failNext = n; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
+    writes: () => writes, failWrites: (/** @type {number} */ n, message = 'write failed') => { failNext = n; failMessage = message; }, failSessionWrites: (/** @type {number} */ n) => { failSession = n; }, Drip: context.Drip };
 }
 
 test('toolbar shows the drop while idle, draws on fresh ticks, and skips unchanged glass levels', async () => {
@@ -460,6 +461,22 @@ test('a tick whose write fails is charged by the next tick that resends it', asy
   assert.equal(w.store.drip.watchSecondsLeft, 900);
   await w.send({ type: 'tick', seconds: 10, videoId: 'abc' });
   assert.ok(w.store.drip.watchSecondsLeft <= 890, `left ${w.store.drip.watchSecondsLeft}`);
+});
+
+test("an import over storage's quota says storage-full, and storage and the next reply keep the state from before", async () => {
+  const w = worker();
+  await w.send({ type: 'addBacklog', video: { id: 'mine', title: 'Mine', channel: 'C', length: '1:00' } }, PAGE);
+  const before = structuredClone(w.store.drip);
+  // The error Chrome 157 throws from chrome.storage.local.set past QUOTA_BYTES.
+  w.failWrites(1, 'Resource::kQuotaBytes quota exceeded');
+  const res = await w.send({ type: 'importData', data: { app: 'drip', format: 1, backlog: [{ id: 'theirs', title: 'Theirs' }] } }, PAGE);
+  assert.deepEqual([res.ok, res.error, 'state' in res], [false, 'storage-full', false]);
+  assert.deepEqual(w.store.drip, before);
+  const next = await w.send({ type: 'get' }, PAGE);
+  assert.deepEqual(next.state.backlog.map((/** @type {any} */ v) => v.id), ['mine']);
+  // Any other failure still says what it was.
+  w.failWrites(1);
+  assert.equal((await w.send({ type: 'importData', data: { app: 'drip', format: 1, backlog: [{ id: 'theirs' }] } }, PAGE)).error, 'Error: write failed');
 });
 
 test('a new install opens the welcome page once, and an update does not', () => {

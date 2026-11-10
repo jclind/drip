@@ -281,6 +281,19 @@ test('export is only the check and title; import errors keep the existing explan
   assert.ok(result.querySelector('.drip-i-x'));
 });
 
+test("an import the worker couldn't save says the file didn't fit and nothing changed", async () => {
+  const p = page();
+  p.run(`send = async () => ({ ok: false, error: 'storage-full' })`);
+  await p.importData({ app: 'drip', format: 1, backlog: [{ id: 'a', title: 'A' }] });
+  const result = p.get('dataResult');
+  assert.equal(result.classList.contains('is-failed'), true);
+  assert.deepEqual(result.querySelectorAll('li').map((c) => c.textContent), ['"drip-test.json" didn\'t fit in drip\'s storage.', 'Nothing changed.']);
+  // No answer at all still says so.
+  p.run('send = async () => undefined');
+  await p.importData({ app: 'drip', format: 1 });
+  assert.deepEqual(result.querySelectorAll('li').map((c) => c.textContent), ["drip didn't answer.", 'Try again in a moment.']);
+});
+
 test('successful channel adds clear stale notes; invalid handles keep error notes', async () => {
   const p = page();
   p.run('renderForm()');
