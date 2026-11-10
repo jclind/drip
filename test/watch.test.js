@@ -190,6 +190,19 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
   };
   /** @param {string} sel */
   page.querySelector = (sel) => (sel === '.ytp-size-button' ? theaterButton : null);
+  // YouTube's autoplay switch, off unless a test turns it on. With `works` false it ignores clicks, like the hidden
+  // player's switch off the watch page. Its click goes through the document as a script's does, not trusted.
+  const autoplay = {
+    on: false,
+    works: true,
+    clicks: 0,
+    el: new FakeElement('div'),
+    click() {
+      this.clicks++;
+      document.dispatchEvent({ type: 'click', target: this.el, isTrusted: false });
+      if (this.works) this.on = false;
+    },
+  };
   const document = {
     title: 'Test video - YouTube',
     documentElement: root,
@@ -209,6 +222,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
       if (sel === '#movie_player') return tab.noPlayer ? null : playerEl;
       if (sel === '#movie_player .ytp-play-button') return tab.noPlayer ? null : playButton;
       if (sel === 'ytd-watch-metadata ytd-channel-name a, #owner ytd-channel-name a') return tab.owner;
+      if (sel === '.ytp-autonav-toggle-button[aria-checked="true"]') return autoplay.on ? autoplay : null;
       return null;
     },
     /** @param {string} sel */
@@ -251,7 +265,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     noVideo: false,
     /** @type {FakeElement | null} */
     owner: null,
-    player, page, theaterButton, playButton,
+    player, page, theaterButton, playButton, autoplay,
     /** Starts or ends an ad, the way YouTube flips the player's class. @param {boolean} on */
     setAd: (on) => { player.ad = on; for (const fn of [...classWatchers]) fn(); },
     /** Runs every timer once, as one second passing would. */
@@ -1293,6 +1307,81 @@ test("a Stash answered after moving to the next video doesn't open the list over
   await pending;
   await settle();
   assert.equal(swapText(tab), '', 'no list over the next video');
+});
+
+test('a watch page turns YouTube\'s autoplay switch off with one click (Q2)', async () => {
+  const { world, tab } = await setup();
+  tab.autoplay.on = true;
+  await play(world, tab, 5);
+  assert.equal(tab.autoplay.clicks, 1);
+  assert.equal(tab.autoplay.on, false);
+});
+
+test('off the watch page the hidden player\'s autoplay switch is never clicked (release review, 2026-11-10)', async () => {
+  const { world, tab } = await setup();
+  tab.autoplay.on = true;
+  tab.autoplay.works = false;
+  for (const [pathname, search] of [['/', ''], ['/results', '?search_query=cats'], ['/@channel', '']]) {
+    tab.location.pathname = pathname;
+    tab.location.search = search;
+    await play(world, tab, 5);
+  }
+  assert.equal(tab.autoplay.clicks, 0);
+});
+
+test('an autoplay switch that ignores clicks gets 5 a video, not one every second (release review, 2026-11-10)', async () => {
+  const { world, tab } = await setup();
+  tab.autoplay.on = true;
+  tab.autoplay.works = false;
+  await play(world, tab, 20);
+  assert.equal(tab.autoplay.clicks, 5);
+  await tab.navigate('bbb');
+  await play(world, tab, 20);
+  assert.equal(tab.autoplay.clicks, 10, 'the next video tries again');
+  // Turned off at last, then on again: drip turns it off again.
+  tab.autoplay.works = true;
+  tab.autoplay.on = false;
+  await play(world, tab, 1);
+  tab.autoplay.on = true;
+  await play(world, tab, 3);
+  assert.equal(tab.autoplay.clicks, 11);
+  assert.equal(tab.autoplay.on, false);
+});
+
+test('the autoplay switch waits out an ad', async () => {
+  const { world, tab } = await setup();
+  tab.autoplay.on = true;
+  tab.setAd(true);
+  await play(world, tab, 10);
+  assert.equal(tab.autoplay.clicks, 0);
+  tab.setAd(false);
+  await play(world, tab, 1);
+  assert.equal(tab.autoplay.clicks, 1);
+  assert.equal(tab.autoplay.on, false);
+});
+
+/**
+ * swap.js forgets a list that isn't in the page, and the fake page has no isConnected, so this gives the open list
+ * one: in the page while it's still under the player. @param {any} tab
+ */
+function connectSwap(tab) {
+  const list = tab.pill().parentElement.all().find((/** @type {any} */ el) => el.classList.contains('drip-swap'));
+  const top = (/** @type {any} */ el) => { while (el.parent) el = el.parent; return el; };
+  const page = top(list);
+  Object.defineProperty(list, 'isConnected', { get: () => top(list) === page });
+}
+
+test('an open full-stash list stays open through a script\'s click, and closes on the user\'s (release review, 2026-11-10)', async () => {
+  const { world, tab } = await fullStashOpen();
+  connectSwap(tab);
+  tab.autoplay.on = true;
+  tab.autoplay.works = false;
+  await play(world, tab, 3);
+  assert.ok(tab.autoplay.clicks > 0, 'drip clicked the switch');
+  assert.match(swapText(tab), /Old stashed video/, 'still open after the switch was clicked');
+  tab.document.dispatchEvent({ type: 'click', target: tab.body, isTrusted: true });
+  await settle();
+  assert.equal(swapText(tab), '', 'a click of the user\'s closes it');
 });
 
 test('a watch page with no player for 10 seconds says drip is broken and locks nothing (Q25)', async () => {

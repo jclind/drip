@@ -2074,3 +2074,105 @@ test('with no minutes in the 5 minutes before Dry hours, the out page says when 
   assert.match(text, /Drops work again at 3:00pm\./);
   assert.doesNotMatch(text, /out for today/);
 });
+
+// Drops back with the clock on and the card counter gone (release review, 2026-11-10). land() needs both counters, so
+// with cards off or unlimited they were never marked seen, and every home page after drew the count 2 short and rolled
+// it up. Like the day's refill, they land only beside both counters and are only marked seen anywhere else (Q29).
+for (const cards of ['limited', 'unlimited', 'off']) {
+  test(`drops back are marked seen with the clock on and cards ${cards}, and the next page shows them at once`, async () => {
+    const world = makeWorld();
+    dryAtNoon(world);
+    world.state.settings.cards = cards;
+    world.state.watchSecondsLeft = 40 * 60;
+    world.state.tokens.watch = 2;
+    const tab = await makeTab(world, { inView: true });
+    await tab.advance(4000);
+    assert.equal(world.state.dryBack, null, 'marked seen');
+    assert.deepEqual(tab.landings.map((/** @type {any} */ l) => [l.kind, l.drops]), cards === 'limited' ? [['back', 2]] : []);
+    assert.equal(tab.drops(), 4);
+    assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+    const next = await makeTab(world, { inView: true });
+    await next.advance(4000);
+    assert.deepEqual(next.landings, []);
+    assert.equal(next.drops(), 4);
+    assert.ok(next.dropsShown.every((/** @type {number} */ n) => n === 4), `the next page went ${next.dropsShown.join(', ')}`);
+  });
+}
+
+for (const cards of ['unlimited', 'off']) {
+  test(`"Done for now" into Dry hours with cards ${cards}: drops back marked seen, the count ends right`, async () => {
+    const world = makeWorld();
+    dryAtNoon(world);
+    world.state.settings.cards = cards;
+    world.state.watchSecondsLeft = 40 * 60;
+    world.state.tokens.watch = 2;
+    const until = world.D.dryUntil(world.state, world.time());
+    const tab = await makeTab(world, { inView: true, kept: `4:${until}` });
+    await tab.advance(4000);
+    // As before, nothing falls into the counter without the card counter beside it.
+    assert.deepEqual(tab.landings, []);
+    assert.equal(world.state.dryBack, null, 'marked seen');
+    assert.equal(tab.drops(), 4);
+    assert.ok(neverDown(tab.dropsShown), `the count went ${tab.dropsShown.join(', ')}`);
+  });
+}
+
+/**
+ * Runs `fn` and returns the first lines of every promise rejection nobody handled meanwhile.
+ * @param {() => Promise<void>} fn
+ */
+async function unhandled(fn) {
+  /** @type {string[]} */
+  const seen = [];
+  const onRejection = (/** @type {any} */ err) => seen.push(String(err && err.stack || err).split('\n').slice(0, 2).join(' | '));
+  process.on('unhandledRejection', onRejection);
+  try {
+    await fn();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    process.off('unhandledRejection', onRejection);
+  }
+  return seen;
+}
+
+// Reveal pressed as the connection drops (release review, 2026-11-10). onReveal redraws first, the redraw puts the
+// offline note where the empty page's buttons were, and reveal.js read the missing buttons and threw a TypeError.
+const offlineReveals = [
+  { name: 'Reveal, pressed before the half-second check redraws the page', setup: async (/** @type {any} */ _tab) => {} },
+  { name: 'Reveal next on a blocked card', setup: async (/** @type {any} */ tab) => { await blockCard(tab); await tab.advance(500); } },
+];
+for (const { name, setup } of offlineReveals) {
+  test(`${name}, while offline, spends nothing, shows the offline note, and throws nothing (animated)`, async () => {
+    const world = makeWorld();
+    const tab = await makeTab(world, { reduced: false, realReveal: true });
+    await setup(tab);
+    const cards = world.state.tokens.rec;
+    const asked = world.count('reveal');
+    const rejections = await unhandled(async () => {
+      tab.offline = true;
+      await tab.click(tab.button('next') ? 'next' : 'reveal');
+      await tab.advance(2000);
+    });
+    assert.deepEqual(rejections, []);
+    assert.deepEqual(tab.errors, []);
+    assert.equal(world.state.tokens.rec, cards, 'no card spent');
+    assert.equal(world.count('reveal'), asked, 'the worker was not asked');
+    assert.ok(tab.root().querySelector('.drip-offline'), 'the offline note is up');
+  });
+}
+
+test('Reveal on a signed-out home page, as the connection drops, spends nothing and throws nothing (animated)', async () => {
+  const world = makeWorld();
+  const tab = await makeTab(world, { reduced: false, realReveal: true, grid: [] });
+  addFeedNudge(tab.browse.querySelector('#primary'));
+  const rejections = await unhandled(async () => {
+    tab.offline = true;
+    await tab.click('reveal');
+    await tab.advance(2000);
+  });
+  assert.deepEqual(tab.reveals, ['revealEmpty'], 'the empty feed\'s reveal ran');
+  assert.deepEqual(rejections, []);
+  assert.deepEqual(tab.errors, []);
+  assert.equal(world.state.tokens.rec, 10);
+  assert.ok(tab.root().querySelector('.drip-offline'), 'the offline note is up');
+});

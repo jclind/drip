@@ -109,8 +109,12 @@
     if (!root.hasAttribute('data-drip-menu') || !(e.target instanceof Element)) return;
     const button = e.target.closest(SEL.guideButton);
     if (!button) {
-      if (menu && !menu.contains(e.target)) close();
-      else if (menu) follow(e);
+      if (!menu) return;
+      if (menu.contains(e.target)) follow(e);
+      // Only the user's click outside closes it. Scripts click too: watch.js clicked YouTube's hidden autoplay switch
+      // every second in a new profile, and the menu closed by itself (release review, 2026-11-10). A test's plain
+      // event object has no isTrusted, so it counts as the user's.
+      else if (e.isTrusted !== false) close();
       return;
     }
     e.preventDefault();

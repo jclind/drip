@@ -151,10 +151,31 @@
     attempt();
   }
 
-  /** Keeps YouTube's autoplay switch off, so a finished video doesn't roll into the next one (decision Q2). */
+  /** The video drip last clicked the autoplay switch for, and how many of those clicks left it on. */
+  let autoplayFor = '';
+  let autoplayTries = 0;
+  /** Clicks per video before drip stops trying. One that works turns the switch off before the next tick. */
+  const AUTOPLAY_TRIES = 5;
+
+  /**
+   * Keeps YouTube's autoplay switch off, so a finished video doesn't roll into the next one (decision Q2). Only on a
+   * watch page: YouTube keeps a hidden player on every page with a switch that ignores clicks, and clicking it every
+   * second closed drip's menu and the full-stash list in a new profile (release review, 2026-11-10). In a narrow
+   * window the switch is hidden and a click still works, so it's clicked shown or not, at most AUTOPLAY_TRIES times a
+   * video.
+   */
   function autoplayOff() {
+    const id = location.pathname === '/watch' ? new URLSearchParams(location.search).get('v') || '' : '';
     const toggle = /** @type {HTMLElement | null} */ (document.querySelector(SEL.autoplayToggle));
-    toggle?.click();
+    // Off, or a new video: the next time it reads on, drip tries again.
+    if (!toggle || id !== autoplayFor) {
+      autoplayFor = id;
+      autoplayTries = 0;
+    }
+    // An ad may ignore the click too, so it waits for the video.
+    if (!id || !toggle || adShowing || autoplayTries >= AUTOPLAY_TRIES) return;
+    autoplayTries += 1;
+    toggle.click();
   }
 
   function miniplayerActive() {
