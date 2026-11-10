@@ -99,7 +99,7 @@ const PARTS = [
   },
   {
     // Not mode parts: the same in every mode, so the picker leaves them alone.
-    id: 'day', title: 'Every day', icon: 'clock',
+    id: 'day', title: 'Every day', icon: 'clock-fill',
     fields: [
       { key: 'resetHour', label: 'New day starts at', kind: 'hour' },
       { key: 'rolloverDays', label: 'Balance cap', kind: 'stepper', min: 1, max: 7,

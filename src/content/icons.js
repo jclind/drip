@@ -16,7 +16,7 @@
   // Every file in src/icons. test/icons.test.js checks the two match.
   const NAMES = [
     'arrow-right', 'arrow-up-right', 'arrow', 'ban', 'card', 'check', 'chevron-down', 'chevron-left', 'chevron-right',
-    'circle-arrow-down', 'circle-arrow-up', 'clock-line', 'clock', 'download', 'drop', 'ellipsis-vertical', 'history',
+    'circle-arrow-down', 'circle-arrow-up', 'clock-fill', 'clock-line', 'clock', 'download', 'drop', 'ellipsis-vertical', 'history',
     'house', 'list-video', 'menu', 'minus', 'pause', 'play-line', 'play', 'plus', 'save-outline', 'save', 'search-fill', 'search',
     'settings', 'smartphone', 'square-play-fill', 'square-play', 'thumbs-up', 'unlock', 'users', 'x',
   ];
