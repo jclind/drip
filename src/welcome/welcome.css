@@ -766,6 +766,13 @@ html[dark] .rung:not([aria-checked="true"]) .mini {
   animation-name: tour-water-drain, drip-crest;
 }
 
+/* drip.css stops YouTube's page scrolling while its lock is up, and the tour's lock has the same id. Here the page has
+   to scroll, or Next, Back, and the footer stay below the fold on a short window until the lock goes. */
+html:has(.tour-stage #drip-lock) {
+  overflow: visible !important;
+  scrollbar-gutter: auto;
+}
+
 .tour-stage #drip-lock .drip-lock-panel {
   max-width: 380px;
   padding: 30px 28px 24px;
