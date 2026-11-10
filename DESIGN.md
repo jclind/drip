@@ -207,6 +207,15 @@ Tour callouts as built (2026-11-02). Jesse picked H from three rounds of design 
 - Back from a step's first stop lands on the previous step's last one. Steps 1 and 2 remember what was done on them; the player and the lock start over, since they redraw fresh.
 - A note sits inside the stage or wholly outside it, never across its dashed edge. On a phone the card's notes sit over the picture and the lock's under its panel, so they don't cover the title, Watch, or "Time for a breather."
 
+Tour player as built (2026-11-09). Jesse picked A, "Sinking boat", from one round of design variants: "I think A is the winner." The others were B (a drop falls from the pill's glass for each minute watched and pools at the bottom of the player) and C (a short loop for the card watched, with a "90× speed" tag and a running timecode). The code is `seaScene` in `src/welcome/welcome.js` and the `.tour-scene` rules in `welcome.css`.
+
+- The player shows a small sea at dusk: waves rolling, clouds drifting, a boat bobbing. It's the same scene for every sample video.
+- As the glass drains, the sea rises and the sun sets. In the last 40% of the glass the boat starts to list. At 0 it sinks while the pill's last drop falls, before the lock rises, because under the lock it would be hidden by the blur and the panel. The paused player under the lock shows it already sunk.
+- The scene moves only while the player plays, so pause freezes it and the lock rises over a still frame.
+- After +15m on the lock the sea drops back and the boat floats again. An unlocked video keeps the sea calm, since it costs nothing.
+- The progress bar stays YouTube's red (Jesse, 2026-11-09: "the bottom bar should look like the youtube red player progress bar still"). A small, dim "×90" sits over the bar's right end while it plays, and the coach note's "90 times faster here" stays too (Jesse: "Let's keep both").
+- Reduced motion shows a still scene, with the boat already down at 0.
+
 Home page as built (2026-10-10). Built from the mockups in `drip-page-demos/`. Where they were silent Claude made the call below, and every one is open to Jesse's review:
 
 - Colors and sizes are CSS custom properties at the top of the home block in `drip.css`, so tuning is mostly editing those. Dark or light comes from YouTube's `html[dark]`.

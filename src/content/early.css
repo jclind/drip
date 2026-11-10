@@ -62,6 +62,13 @@ ytd-browse[page-subtype="home"] ytd-rich-grid-renderer {
   z-index: -1 !important;
 }
 
+/* Offline, YouTube's home page has no grid, only its "Connect to the internet" message, which sat under drip's page
+   and off the bottom of the screen. drip's page shows its own note instead (home.js offlineNote), and its Retry
+   presses the hidden one here (Jesse, 2026-11-10). home.js has the same selector. */
+ytd-browse[page-subtype="home"]:has(#drip-home) ytd-background-promo-renderer[icon-name*="OFFLINE"] {
+  display: none !important;
+}
+
 ytd-browse[page-subtype="home"] #chips-wrapper,
 ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer {
   display: none !important;

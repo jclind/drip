@@ -23,7 +23,7 @@ Things that came up while designing drip and didn't make v1. Nothing here is pro
 - Arrows with a short label in the tour, pointing at what to watch. In the watching step, one could point at the glass's water draining while the "video" plays, so the step shows something happening instead of a still frame through the whole countdown. Jesse, 2026-10-12.
 - Planned for 1.0 (RELEASE-PLAN.md, 2026-10-16). Jesse wants arrows or text that show what to look for, like the time counting down while the video plays, and more feeling that a video is playing. Three to mock up, which can mix: callouts that appear when the thing they point at moves and then go ("Your time drains while a video plays" at the pill), one or two per step; a player that looks like it's playing, with a moving progress bar, a running timecode, a picture with some motion, and a "90× speed" tag so the fast drain reads as on purpose; and a spotlight that dims the rest of the stage. Claude's guess is the first two together.
 
-- A small animation in the tour's player while its video plays, so it feels like something is playing (Jesse, 2026-11-02, after the callouts round). Round 1's B of the tour callouts built one: the picture pans, soft lights drift, and a "90× speed" tag shows. The mockups are deleted; its CSS is the `.lv-` rules in `git show cdf07e5:designs/tour-callouts/variants.css`, and the markup is in `variants.js` at the same commit.
+- A small animation in the tour's player while its video plays, so it feels like something is playing (Jesse, 2026-11-02, after the callouts round). Round 1's B of the tour callouts built one: the picture pans, soft lights drift, and a "90× speed" tag shows. The mockups are deleted; its CSS is the `.lv-` rules in `git show cdf07e5:designs/tour-callouts/variants.css`, and the markup is in `variants.js` at the same commit. Built 2026-11-09 as a sinking boat, A of three (DESIGN.md "Tour player as built").
 
 ## Watching
 
@@ -93,16 +93,17 @@ From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0.
 - A "Reduce motion" switch that overrides the system setting.
 - A page Chrome opens on uninstall (`chrome.runtime.setUninstallURL`) with one question, "Why are you leaving?". It needs a small hosted page (Claude's suggestion, 2026-10-16, with the Settings feedback link).
 - Not worth it yet: syncing across devices, and notifications like "5 minutes left".
+- Remaster all the icons in one hand-drawn set (Jesse, 2026-11-10: "down the line I might remaster all the icons"). Settings' section headers already use his cartoon search, clock, and YouTube icons (`search-fill`, `clock-fill`, `square-play-fill`); the menu, the +15m buttons, and the search buttons still use the lucide and solid ones.
 
 ## Found while testing 2026-11-06
 
-- Hover previews play whole videos. On search results (and likely History and channel pages), hovering a video starts YouTube's inline preview, and it can be unmuted and keeps playing, at 0 minutes too. Jesse found it on 2026-11-06 and wants it closed later. The PR 70 to 73 reviews flagged it as a hand check (71's hover-preview item, browser check 3 in `.second-opinion/reviews-70-73/merged.md`). Likely fix: hide or stop YouTube's inline preview player outside the watch page, or meter it like the watch page. Check Dry hours too.
-- The empty Home feed note ("YouTube has no recommendations for you yet", PR 87) looks thrown in, not designed (Jesse, 2026-11-06). Redo it through /design-variants.
+- Hover previews play whole videos. On search results (and likely History and channel pages), hovering a video starts YouTube's inline preview, and it can be unmuted and keeps playing, at 0 minutes too. Jesse found it on 2026-11-06 and wants it closed later. The PR 70 to 73 reviews flagged it as a hand check (71's hover-preview item, browser check 3 in `.second-opinion/reviews-70-73/merged.md`). Likely fix: hide or stop YouTube's inline preview player outside the watch page, or meter it like the watch page. Check Dry hours too. Built 2026-11-06 in PR 93: hover previews are hidden, and nothing plays off the watch page while the clock runs.
+- The empty Home feed note ("YouTube has no recommendations for you yet", PR 87) looks thrown in, not designed (Jesse, 2026-11-06). Redo it through /design-variants. Built 2026-11-06 in PR 94: the card goes back, and a dashed space says why.
 - In an incognito window, Reveal once showed a feed that looked like Jesse's own. A fresh incognito window showed the empty-feed note as expected, so it was likely YouTube's logged-out feed from earlier activity in that incognito session. Watch for it again.
 
 ## Known races
 
-- An older worker reply can overwrite newer saved state on a page (Codex, 2026-11-04). Tab A's status request is answered from a snapshot with 0 minutes, tab B buys minutes, A hears B's storage change and drops its lock, then A's older reply lands and `state = res.state` puts the 0-minute snapshot back, so the lock rises again. Every `state = res.state` in watch.js has it, and it predates Dry hours. The fix is a revision number the worker bumps on each save, and pages keep whichever state is newest.
+- An older worker reply can overwrite newer saved state on a page (Codex, 2026-11-04). Tab A's status request is answered from a snapshot with 0 minutes, tab B buys minutes, A hears B's storage change and drops its lock, then A's older reply lands and `state = res.state` puts the 0-minute snapshot back, so the lock rises again. Every `state = res.state` in watch.js has it, and it predates Dry hours. The fix is a revision number the worker bumps on each save, and pages keep whichever state is newest. Fixed 2026-11-09: `rev` in the saved state, and `Drip.isOlder` and `Drip.newer` on every page that takes a reply or a storage change.
 
 ## Efficiency
 

@@ -5,7 +5,7 @@
   /** @type {any} */
   const Drip = /** @type {any} */ (globalThis).Drip;
   /** @type {any} */
-  const { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, reportBroken, watchFor } = /** @type {any} */ (globalThis).DripUI;
+  const { send, h, onState, hourLabel, watchUrl, icon, price, cardMenu, updateCardMenu, blockedCardView, KEPT_KEY, reportBroken, watchFor, alive } = /** @type {any} */ (globalThis).DripUI;
   const DripMorph = /** @type {any} */ (globalThis).DripMorph;
   /** @type {any} */
   const DripGlass = /** @type {any} */ (globalThis).DripGlass;
@@ -51,6 +51,9 @@
     members: '.ytBadgeShapeCommerce, .badge-style-type-members-only',
     // The top bar's search box and voice search, which Quiet's home page moves into the middle of the page (Q29).
     searchBox: 'ytd-masthead #center',
+    // YouTube's "Connect to the internet" message. Offline, the home page has no grid, only this, in the column drip's
+    // page goes in (headless Chrome 157, 2026-11-10). early.css has the same selector.
+    offline: 'ytd-background-promo-renderer[icon-name*="OFFLINE"]',
   };
   const AGE = /\bago$/i;
   const VIEWS = /^[\d.,]+\s?[KMB]?(\s+views?)?$/i;
@@ -238,7 +241,7 @@
   /** @param {any} res */
   function absorb(res) {
     if (res && res.error === 'disconnected') disconnected = true;
-    if (res && res.state) state = res.state;
+    if (res && res.state) state = Drip.newer(state, res.state);
     return res;
   }
 
@@ -345,6 +348,12 @@
     try {
       let pool;
       try {
+        // Offline, YouTube builds no grid, so an empty read looked like a markup change and drip asked for a report
+        // (Jesse, 2026-11-10).
+        if (offline()) {
+          message = "You're offline. No card spent.";
+          return null;
+        }
         const feed = emptyAtClick ? { pool: [], noRecommendations: true } : await readCandidates();
         pool = feed.pool;
         if (pool.length === 0 && feed.noRecommendations) {
@@ -369,6 +378,12 @@
         // No videos and no empty-feed nudge: the grid's markup changed (Q25).
         const homeFeed = !state || state.settings.feedSource !== 'subscriptions';
         if (homeFeed && pool.length === 0 && !document.querySelector(`${SEL.homeBrowse} :is(${SEL.item})`)) {
+          // In a tab whose drip was reloaded, the page asks for a refresh instead of reporting a break.
+          if (!alive()) {
+            disconnected = true;
+            message = errorText('');
+            return null;
+          }
           reportBroken('grid', SEL.item);
           message = errorText('pool-empty');
           return null;
@@ -376,9 +391,9 @@
       } catch (err) {
         // A read that throws never got as far as asking the worker, so nothing was spent. Without this the reveal ended
         // with no message, and Reveal next's half-dealt card stayed on the old thumbnail (Codex, 2026-10-16). In a tab
-        // whose drip was reloaded, reportBroken is what throws, and the page asks for a refresh instead.
+        // whose drip was reloaded, the page asks for a refresh instead.
         console.error('drip: reading the feed failed', err);
-        if (!chrome.runtime?.id) disconnected = true;
+        if (!alive()) disconnected = true;
         message = errorText('');
         return null;
       }
@@ -1039,6 +1054,8 @@
 
   /** What the page last drew for Dry hours (dryKey), so mount() can redraw an idle page when it changes. */
   let drawnDry = '';
+  /** Whether the page was last drawn offline. */
+  let drawnOffline = false;
 
   /** Set when Pass on the last card leaves the page out for the day, so the sea rises in where the card dropped. */
   let seaRises = false;
@@ -1127,6 +1144,24 @@
       h('div', { class: 'drip-thumb' }),
       h('div', { class: 'drip-card-title' }, h('span', { class: 'drip-skel' }), h('span', { class: 'drip-skel drip-skel-short' })),
       h('div', { class: 'drip-card-meta-row' }, h('span', { class: 'drip-meta' }, loadingText())));
+  }
+
+  /**
+   * drip's own "You're offline" note, in place of YouTube's message, which sat under drip's page and off the bottom of
+   * the screen (Jesse, 2026-11-10). Retry presses YouTube's hidden Retry, which brings the grid back in place.
+   */
+  function offlineNote() {
+    return h('section', { class: 'drip-offline', 'data-k': 'offline', 'aria-labelledby': 'drip-offline-title' },
+      h('h2', { id: 'drip-offline-title' }, "You're offline."),
+      h('p', {}, 'Check your connection, then retry.'),
+      h('button', {
+        class: 'drip-feed-action', 'data-k': 'retry',
+        onclick: () => {
+          const retry = /** @type {HTMLElement | null} */ (document.querySelector(`${SEL.homeBrowse} ${SEL.offline} button`));
+          if (retry) retry.click();
+          else location.reload();
+        },
+      }, 'Retry'));
   }
 
   /** The loading body reserves the same space after the card returns, at every column width. */
@@ -1361,7 +1396,9 @@
     if (disconnected) return h('div', { class: 'drip-message' }, 'drip was updated. Refresh this page.');
     if (!state) return h('div', { class: 'drip-loading', 'aria-busy': 'true' });
     const current = shownCard();
-    const showCard = current || busy === 'reveal' || (emptyFeed && cardsMode() !== 'off');
+    // Offline, the note takes the place of Reveal and +15m. A card already up stays, and so does the out view.
+    const off = !current && busy !== 'reveal' && !outForDay() && offline();
+    const showCard = !off && (current || busy === 'reveal' || (emptyFeed && cardsMode() !== 'off'));
     const out = !showCard && outForDay();
     const note = out ? '' : outNote();
     // With a card up, the page is open: the stats sit a little higher (drip.css), as the reveal animation left them.
@@ -1372,7 +1409,7 @@
       stats(),
       // YouTube's search box goes in here (placeSearch), so a redraw keeps what's in it.
       search && h('div', { class: 'drip-search-slot', 'data-k': 'search-slot', 'data-morph-keep': true }),
-      !showCard && (out ? outSea() : actions()),
+      off ? offlineNote() : !showCard && (out ? outSea() : actions()),
       current ? card(current) : showCard && feedSpace(),
       !current && showCard && actions(),
       (message || note) && h('div', { class: 'drip-message', role: 'status' }, message || note),
@@ -1499,13 +1536,14 @@
       state.settings.clock, state.settings.cards, state.settings.stash, dryKey(), state.dryBack,
       state.backlog.map((/** @type {any} */ v) => [v.id, v.title, v.channel, DripSwap.meta(v), DripSwap.fraction(v) > 0]),
       Drip.formatMinutes(state.backlog.reduce((/** @type {number} */ sum, /** @type {any} */ v) => sum + DripSwap.leftSec(v), 0)),
-    ], message, emptyFeed, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, blockedCard]);
+    ], offline(), message, emptyFeed, busy, disconnected, savedOpen, savedShowAll, [...removed.keys()], heldLeft, pouring, arriving, swapFor, swapped && swapped.newId, blockedCard]);
     if (root.firstChild && key === rendered) {
       placeSearch(root);
       return freshen(root);
     }
     rendered = key;
     drawnDry = state ? dryKey() : '';
+    drawnOffline = offline();
     // Keep keyboard focus on the same control across the rebuild.
     const focused = /** @type {HTMLElement | null} */ (document.activeElement)?.closest?.('[data-k]')?.getAttribute('data-k');
     root.classList.add('drip-ui');
@@ -1569,6 +1607,11 @@
   /** When the lock's water last started falling away (watch.js onDone). */
   let lockFellAt = 0;
   document.addEventListener('drip-lock-falling', () => { lockFellAt = Date.now(); });
+
+  /** The browser is offline, or YouTube's home page says it is. */
+  function offline() {
+    return navigator.onLine === false || !!document.querySelector(`${SEL.homeBrowse} ${SEL.offline}`);
+  }
 
   /** drip's home page is on screen. */
   function homeInView() {
@@ -1745,6 +1788,8 @@
       takeRefill();
       // An idle page changes to its dry form at the start of Dry hours and back at the end (DRY-HOURS-PLAN.md B9).
       if (state && dryKey() !== drawnDry) render();
+      // YouTube's offline message comes and goes without a navigation: Retry swaps the grid back in place.
+      if (state && offline() !== drawnOffline) render();
       // A page left open past the reset asks once for the new day's balances.
       if (state && !refreshing && Drip.dayKey(Date.now(), state.settings.resetHour) > state.day) {
         refreshing = true;
@@ -1784,6 +1829,7 @@
   }
 
   onState((next) => {
+    if (Drip.isOlder(next, state)) return;
     state = next;
     // The stash turned off with its full-stash list open: the list goes with its button (Codex, 2026-10-15).
     if (state && state.settings.stash === false) swapFor = '';

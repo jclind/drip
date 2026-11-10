@@ -114,10 +114,20 @@ const youtubeButton = /** @type {HTMLElement} */ (document.getElementById('youtu
 youtubeButton.append('Open YouTube', DripPage.icon('arrow-up-right'));
 youtubeButton.addEventListener('click', openYouTube);
 
+// The newest state shown so far. The first reply can land after a save it predates (Drip.isOlder).
+/** @type {any} */
+let newest = null;
+/** @param {any} state */
+function showNewest(state) {
+  if (Drip.isOlder(state, newest)) return;
+  newest = state;
+  show(state);
+}
+
 chrome.runtime.sendMessage({ type: 'get' }).then((res) => {
-  if (res && res.state) show(res.state);
+  if (res && res.state) showNewest(res.state);
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.drip) show(Drip.hydrate(changes.drip.newValue, Date.now()));
+  if (area === 'local' && changes.drip) showNewest(Drip.hydrate(changes.drip.newValue, Date.now()));
 });

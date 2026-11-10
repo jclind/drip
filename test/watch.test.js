@@ -257,6 +257,7 @@ function makeTab(world, videoId, { hasPage = false, theater = false, ready = fal
     /** Runs every timer once, as one second passing would. */
     second: async () => { for (const fn of [...intervals.values()]) await fn(); await settle(); },
     broken: () => document.getElementById('drip-broken'),
+    runtime: context.chrome.runtime,
     video, root, body, location, document,
     media: [video],
     pill: () => document.getElementById('drip-pill'),
@@ -337,6 +338,8 @@ function makeWorld() {
       else if (msg.type === 'allowedVideo') result = D.allowedVideo(world.state, msg.videoId, msg.channel);
       else result = { ok: true };
       D.enterDry(world.state, now);
+      // As background.js does on every save.
+      world.state.rev += 1;
       const saved = structuredClone(world.state);
       for (const fn of world.listeners) fn({ drip: { newValue: saved } }, 'local');
       return { ...result, state: saved };
@@ -976,6 +979,32 @@ test('a tick answered just before Dry hours but arriving after them leaves the l
   assert.equal(tab.lockRemovals(), 0);
 });
 
+test('an older status reply that lands after another tab bought minutes leaves the lock down (Codex, 2026-11-04)', async () => {
+  const { world, tab } = await setup(0);
+  assert.ok(tab.locked());
+  // The worker answers this tab's status from the state with 0 minutes, and the reply is slow to arrive.
+  const handle = world.handle;
+  /** @type {(v?: any) => void} */
+  let release = () => {};
+  const gate = new Promise((resolve) => { release = resolve; });
+  world.handle = async (/** @type {any} */ msg) => {
+    const res = await handle(msg);
+    if (msg.type === 'status') await gate;
+    return res;
+  };
+  const second = tab.second();
+  await settle();
+  // Meanwhile another tab buys 15 minutes. Its save reaches this tab first, and the lock drains.
+  await handle({ type: 'spendWatch' });
+  await settle();
+  assert.equal(tab.locked(), false);
+  // The old reply lands. Before the revision number, its 0-minute state brought the lock back.
+  release();
+  await second;
+  await settle();
+  assert.equal(tab.locked(), false);
+});
+
 test('an unlocked video plays on when Dry hours start', async () => {
   const world = dryWorld(22, 59, 57);
   world.state.watchSecondsLeft = 600;
@@ -1273,6 +1302,22 @@ test('a watch page with no player for 10 seconds says drip is broken and locks n
   assert.match(tab.broken().textContent, /video player/);
   assert.equal(tab.locked(), false);
   assert.ok(tab.root.hasAttribute('data-drip-broken'), 'guard.js lets play() through');
+});
+
+test('a tab whose drip was reloaded stops watching for a broken player instead of throwing', async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, 'aaa');
+  tab.noPlayer = true;
+  await settle();
+  // What Chrome does to a content script whose extension was reloaded: the id goes, and its APIs throw. Before the
+  // fix, reportBroken's getManifest threw out of this timer, and Chrome listed it under Errors on drip's card.
+  tab.runtime.id = undefined;
+  tab.runtime.getManifest = () => { throw new Error('Extension context invalidated.'); };
+  for (let i = 0; i < 12; i++) {
+    world.advance(1);
+    await tab.second();
+  }
+  assert.equal(tab.broken(), null);
 });
 
 test('a slow load with no player yet waits for the page to finish loading before it says drip is broken', async () => {

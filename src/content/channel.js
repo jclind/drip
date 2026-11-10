@@ -76,7 +76,7 @@
       // Set first: the storage event may redraw the button before this reply comes back.
       changed = type !== 'openSettings';
       const res = await send(type === 'openSettings' ? { type, section: 'channels' } : { type, channel });
-      if (res && res.ok && res.state) state = res.state;
+      if (res && res.ok && res.state) state = Drip.newer(state, res.state);
       else changed = false;
     } finally {
       busy = false;
@@ -152,13 +152,14 @@
   }
 
   onState((/** @type {any} */ next) => {
+    if (Drip.isOlder(next, state)) return;
     state = next;
     draw();
   });
   document.addEventListener('yt-navigate-finish', draw);
   setInterval(draw, 1000);
   send({ type: 'get' }).then((/** @type {any} */ res) => {
-    if (res && res.ok && res.state) state = res.state;
+    if (res && res.ok && res.state) state = Drip.newer(state, res.state);
     draw();
   });
 })();

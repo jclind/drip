@@ -92,14 +92,14 @@ const PARTS = [
     ],
   },
   {
-    id: 'search', title: 'Search', icon: 'search',
+    id: 'search', title: 'Search', icon: 'search-fill',
     toggle: { key: 'searchCap', label: 'Search', kind: 'toggle' },
     summary: (d) => (d.searchCap ? 'Stops at 10 results' : ''),
     fields: [],
   },
   {
     // Not mode parts: the same in every mode, so the picker leaves them alone.
-    id: 'day', title: 'Every day', icon: 'clock',
+    id: 'day', title: 'Every day', icon: 'clock-fill',
     fields: [
       { key: 'resetHour', label: 'New day starts at', kind: 'hour' },
       { key: 'rolloverDays', label: 'Balance cap', kind: 'stepper', min: 1, max: 7,
@@ -108,7 +108,7 @@ const PARTS = [
     ],
   },
   {
-    id: 'youtube', title: 'YouTube', icon: 'square-play',
+    id: 'youtube', title: 'YouTube', icon: 'square-play-fill',
     fields: [
       // Q16.
       { key: 'hideBell', label: 'Hide the notification bell', kind: 'toggle' },
@@ -557,7 +557,7 @@ function draftChanged() {
 
 /** @param {any} res */
 function absorb(res) {
-  if (res && res.state) state = res.state;
+  if (res && res.state) state = Drip.newer(state, res.state);
   return res;
 }
 
@@ -1237,7 +1237,7 @@ window.addEventListener('beforeunload', (e) => {
 
 // Another tab or the day reset changed the state. Keep everything current without wiping an edit in progress.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes.drip || !state || sample) return;
+  if (area !== 'local' || !changes.drip || !state || sample || Drip.isOlder(changes.drip.newValue, state)) return;
   const before = JSON.stringify([state.settings, state.pending]);
   const kept = edits();
   const today = state.day;

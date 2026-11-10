@@ -253,7 +253,7 @@
     }
     const res = await send({ type: 'allowedVideo', videoId: id, channel });
     if (res && res.ok && !disconnected) {
-      state = res.state;
+      state = Drip.newer(state, res.state);
       if (id === videoId()) applyStatus(Drip.watchStatus(state, id, Date.now()));
       renderPill();
     }
@@ -568,7 +568,7 @@
         // Time that played while the tick was out is new, so it goes under a new key.
         entry.key = crypto.randomUUID();
         if (entry.seconds <= 0.001 && unsent[0] === entry) unsent.shift();
-        state = res.state;
+        state = Drip.newer(state, res.state);
         if (id === videoId()) {
           // From the reply's state at the time it arrives, not the worker's lock: a tick answered just before Dry hours
           // can land after the page locked for them, and its "not locked" would drop the lock (Codex, 2026-11-04).
@@ -587,7 +587,7 @@
     const id = videoId();
     const res = await send({ type: 'status', videoId: id });
     if (res && res.ok && !disconnected) {
-      state = res.state;
+      state = Drip.newer(state, res.state);
       applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
     }
     renderPill();
@@ -887,7 +887,7 @@
     if (landing) await landing;
     if (disconnected) return;
     if (res && res.ok) {
-      state = res.state;
+      state = Drip.newer(state, res.state);
       applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
       drainNext = false;
       // The draining water clears the pill near the top of the window about this long in.
@@ -897,7 +897,7 @@
       drainNext = false;
       // Dry hours, or the 5 minutes before them, began between the draw and the click: the lock redraws without +15m.
       if (res && (res.error === 'dry-hours' || res.error === 'dry-soon')) {
-        if (res.state) state = res.state;
+        if (res.state) state = Drip.newer(state, res.state);
         lockMessage = '';
       } else lockMessage = 'No drops left.';
       showLock();
@@ -1073,7 +1073,7 @@
     const res = await send({ type: 'needThis', videoId: id, title, reason });
     if (disconnected) return;
     if (res && res.ok) {
-      state = res.state;
+      state = Drip.newer(state, res.state);
       applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
       drainNext = false;
       video?.play();
@@ -1081,7 +1081,7 @@
     }
     drainNext = false;
     // A refusal's state shows the count now, which another tab may have used up.
-    if (res && res.state) state = res.state;
+    if (res && res.state) state = Drip.newer(state, res.state);
     lockMessage = res && res.error === 'reason-required' ? 'Write a few words about why.' : "You've used this week's unlocks.";
     showLock();
   }
@@ -1192,7 +1192,7 @@
     if (state.backlog.some((/** @type {any} */ v) => v.id === id)) res = await send({ type: 'removeBacklog', id });
     else res = await send({ type: 'addBacklog', video: thisVideo(id) });
     if (res && !res.ok && res.error === 'stash-full' && !disconnected) {
-      state = res.state;
+      state = Drip.newer(state, res.state);
       // Moved on to another video while the worker answered: the list would be for this one (Codex, 2026-11-05).
       if (videoId() === id) openSwap(keyboard);
       else renderPill();
@@ -1204,7 +1204,7 @@
   /** Takes the worker's answer to a stash change and redraws. @param {any} res */
   function took(res) {
     if (res && res.ok && !disconnected) {
-      state = res.state;
+      state = Drip.newer(state, res.state);
       applyStatus(Drip.watchStatus(state, videoId(), Date.now()));
     }
     renderPill();
@@ -1297,7 +1297,7 @@
     const res = await send({ type: 'swapBacklog', video: thisVideo(id), dropId: drop.id });
     // The video picked went from the stash in the meantime: the list comes back with what's there now.
     if (res && !res.ok && res.error === 'not-stashed' && res.state && !disconnected) {
-      state = res.state;
+      state = Drip.newer(state, res.state);
       if (videoId() === id && Drip.swapFollow([], state, id) !== 'close') openSwap(false);
       else {
         // Room now, or moved on: the list that was up goes (Codex, 2026-11-05).
@@ -1539,7 +1539,7 @@
   document.addEventListener('drip-grace', () => { Promise.resolve().then(renderPill); });
 
   onState((next) => {
-    if (disconnected) return;
+    if (disconnected || Drip.isOlder(next, state)) return;
     const id = videoId();
     const wasFunded = !!state && !!id && !Drip.watchStatus(state, id, Date.now()).locked;
     const clockWasOff = !!state && state.settings.clock === false;
