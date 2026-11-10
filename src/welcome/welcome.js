@@ -404,8 +404,12 @@
     if (step === STEPS.length - 1) location.href = 'https://www.youtube.com/';
     else go(step + 1);
   });
-  $('tour').addEventListener('keydown', (e) => {
-    if (/** @type {Element} */ (e.target).closest('textarea, input')) return;
+  // On the page, not the tour section: opening the tour focuses its title, which sits in the top bar outside the
+  // section, so the arrows have to work from there too (Codex, PR 111).
+  document.addEventListener('keydown', (e) => {
+    const target = /** @type {Element} */ (e.target);
+    if ($('tour').hidden || !target.closest?.('#tour, .hero .tour-head')) return;
+    if (target.closest('textarea, input')) return;
     if (e.key === 'ArrowRight' && !coach.next() && !lockBack() && step < STEPS.length - 1) go(step + 1);
     else if (e.key === 'ArrowLeft' && !coach.back() && step > 0) {
       backing = true;
