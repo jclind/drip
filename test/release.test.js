@@ -93,6 +93,42 @@ test('YouTube pages load no file from the package, so the manifest exposes none 
   }
 });
 
+// Three entries list state.js, but a youtube.com tab runs it twice, once per run_at. Chrome runs a file once per run_at
+// in a frame even when two entries list it. In Chrome 157 (2026-11-10) state.js ran once at document_start, though
+// early.js's and redirect.js's entries both list it. So the second copy costs nothing. Dropping early.js's copy would
+// work only with the two entries swapped, and redirect.js needs its own on m.youtube.com and youtube-nocookie.com.
+test('every content script that uses Drip gets state.js first, and the idle entry keeps its own copy', () => {
+  const manifest = JSON.parse(read(ROOT, 'manifest.json'));
+  const entries = manifest.content_scripts.filter((/** @type {any} */ c) => c.js);
+  // Chrome runs the entries for one run_at in manifest order, in one isolated world per frame. These keys would
+  // change which frames and pages an entry reaches, and the check below doesn't follow them.
+  for (const c of entries) {
+    for (const key of ['all_frames', 'match_about_blank', 'match_origin_as_fallback', 'exclude_matches', 'include_globs', 'exclude_globs']) {
+      assert.equal(c[key], undefined, `${c.js.join(', ')} has ${key}`);
+    }
+  }
+  const isolated = (/** @type {any} */ c) => (c.world || 'ISOLATED') === 'ISOLATED';
+  entries.forEach((/** @type {any} */ entry, /** @type {number} */ i) => {
+    if (!isolated(entry)) return;
+    const own = entry.js.indexOf('src/lib/state.js');
+    entry.js.forEach((/** @type {string} */ file, /** @type {number} */ j) => {
+      if (file === 'src/lib/state.js' || !/\bDrip\b/.test(read(ROOT, file).replace(/^\s*(\/\/|\*).*$/gm, ''))) return;
+      if (own >= 0 && own < j) return;
+      // Or an earlier entry with the same run_at, in the same world, on every page this one runs on, has loaded it.
+      // Chrome injects those together, in manifest order. One with an earlier run_at doesn't count. In a tab that was
+      // loading when drip was installed or updated, Chrome runs only the document_idle entries, so an idle entry
+      // leaning on a document_start copy would find no Drip there.
+      const runAt = entry.run_at || 'document_idle';
+      const before = entries.slice(0, i).some((/** @type {any} */ c) => isolated(c) && (c.run_at || 'document_idle') === runAt
+        && c.js.includes('src/lib/state.js') && entry.matches.every((/** @type {string} */ m) => c.matches.includes(m)));
+      assert.ok(before, `${file} uses Drip before state.js loads at ${runAt}`);
+    });
+  });
+  const idle = entries.find((/** @type {any} */ c) => c.js.includes('src/content/home.js'));
+  assert.equal(idle.run_at, 'document_idle');
+  assert.equal(idle.js[0], 'src/lib/state.js');
+});
+
 test('the unpacked tree keeps the dev tools, so the build has something to take out', () => {
   const worker = read(ROOT, 'src/background.js');
   assert.deepEqual([...worker.matchAll(/importScripts\('([^']+)'\)/g)].map((m) => m[1]),
