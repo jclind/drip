@@ -14,6 +14,7 @@ A fresh pass on the round-19 set, judged against 13 top Chrome Web Store extensi
 - Pace: up to 4 rounds without asking, then ask. Stop sooner at the goal or a stall.
 - Reviewed: `store/images-v2/screenshot-1.png` to `-5.png` and `tile-c2.png`.
 - Files: briefs `reviews/ref-N-prompt.md`, reports `reviews/ref-N-<seat>.md`, images `rounds/ref-N/`.
+- `rounds/` is local only, on air (2026-11-10: 21 MB of working images, kept out of git through `.git/info/exclude`). The final set is `store/images-v2/`.
 
 ## Current
 
