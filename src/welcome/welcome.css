@@ -38,6 +38,39 @@ main {
   font-size: 17px;
 }
 
+/* On the tour screen the brand, the mode, and Change are one slim bar, and the tagline goes, so the stage and Next
+   stay above the fold with room to breathe (design D, 2026-11-10). The mode's title lives in the hero for that. */
+.hero .tour-head {
+  display: none;
+}
+
+main:has(#tour:not([hidden])) .hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+main:has(#tour:not([hidden])) .hero .tour-head {
+  display: flex;
+}
+
+main:has(#tour:not([hidden])) .tagline {
+  display: none;
+}
+
+main:has(#tour:not([hidden])) .brand {
+  font-size: 22px;
+  line-height: 28px;
+}
+
+main:has(#tour:not([hidden])) .brand .drip-i {
+  width: 16px;
+  height: 22px;
+}
+
 /* The mode (Q29, DESIGN.md "Modes"), design J. A list lightest first; the picked row gets a blue border and Customize. */
 .modes {
   margin-top: 48px;
@@ -430,19 +463,18 @@ html[dark] .rung:not([aria-checked="true"]) .mini {
 
 /* The tour: its title, one sentence, a stage with a working copy of one of drip's screens, then the step controls. */
 .tour {
-  margin-top: 24px;
+  margin-top: 28px;
 }
 
 .tour-head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 16px;
+  align-items: center;
+  gap: 10px;
 }
 
 .tour-title {
   margin: 0;
-  font-size: 22px;
+  color: var(--muted);
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -451,12 +483,13 @@ html[dark] .rung:not([aria-checked="true"]) .mini {
   outline: none;
 }
 
-/* Two lines for every step, since the first steps' sentences wrap, so the stage never moves. */
+/* The step's name, the only thing above the stage. It changes only on Next; the notes on the stage say what to do
+   (design D, 2026-11-10). One line, so the stage never moves. */
 .tour-say {
-  min-height: 42px;
-  margin: 0 0 12px;
-  font-size: 15px;
-  font-weight: 500;
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 28px;
 }
 
 /* One height for every step, so the buttons under the stage never move (Jesse, 2026-10-12). 500px holds the tallest
@@ -525,7 +558,8 @@ html[dark] .rung:not([aria-checked="true"]) .mini {
   width: 100%;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  /* The player's corners, so the ring on it is rounded like the picture (Jesse, 2026-11-10). */
+  border-radius: inherit;
   background: none;
   color: #fff;
   filter: drop-shadow(0 1px 3px rgba(0,0,0,.4));
@@ -721,6 +755,9 @@ html[dark] .rung:not([aria-checked="true"]) .mini {
 .tour-stage #drip-lock {
   position: absolute;
   z-index: 2;
+  /* The stage's own corners, inside its 1.5px border. The stage's clip doesn't round the lock's blur, so its square
+     corners covered the dotted edge (Jesse, 2026-11-10). */
+  border-radius: 14.5px;
   animation-name: tour-water-rise, drip-crest;
 }
 
@@ -936,12 +973,18 @@ a.tour-btn.is-primary:hover {
 }
 
 .foot {
-  margin-top: 56px;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  column-gap: 56px;
+  margin-top: 64px;
 }
 
-.foot-links {
+.foot-col {
   display: flex;
-  gap: 24px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 a.foot-link,
@@ -952,8 +995,8 @@ button.foot-link {
   padding: 0;
   border-radius: 6px;
   background: none;
-  color: var(--muted);
-  font-size: 14px;
+  color: var(--text);
+  font-size: 15px;
   font-weight: 500;
   text-decoration: none;
 }
@@ -961,7 +1004,7 @@ button.foot-link {
 a.foot-link:hover,
 button.foot-link:hover {
   background: none;
-  color: var(--text);
+  text-decoration: underline;
 }
 
 .foot-link .drip-i-arrow-up-right {
@@ -970,7 +1013,8 @@ button.foot-link:hover {
 }
 
 .foot-note {
-  margin: 12px 0 0;
+  max-width: 240px;
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
 }
@@ -1010,9 +1054,9 @@ button.foot-link:hover {
     padding-top: 10px;
   }
 
-  /* Two of the sentences wrap here, so every step keeps room for two lines and the stage stays put. */
-  .tour-say {
-    min-height: 44px;
+  .foot {
+    grid-template-columns: 1fr;
+    row-gap: 20px;
   }
 }
 

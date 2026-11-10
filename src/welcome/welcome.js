@@ -277,21 +277,18 @@
     // The first steps say the day's drops and cards, which had tiles of their own above the tour until 2026-10-15.
     {
       id: 'home', show: showHome, needs: () => parts.clock,
-      say: () => `You get ${plural(settings.watchTokensPerDay, 'drop')} a day, and each one is ${dropTime} of watching. Try +${dropTime}.`,
+      say: () => 'Drops',
     },
     {
       id: 'reveal', show: showReveal, needs: () => parts.cards !== 'off',
-      say: () => `${parts.cards === 'limited' ? `You get ${plural(settings.recTokensPerDay, 'card')} a day, and each one reveals a video.` : 'Reveal video shows one video at a time.'} ${parts.stash ? 'Watch it, stash it, or pass.' : 'Watch it or pass.'}`,
+      say: () => (parts.cards === 'limited' ? 'Cards' : 'One video at a time'),
     },
-    { id: 'player', say: () => 'Minutes only drain while a video plays. Press play.', show: showPlayer, needs: () => parts.clock },
-    { id: 'lock', say: () => 'When the glass runs dry, the lock comes up. Done for now takes you home.', show: showLock, needs: () => parts.clock },
-    { id: 'changes', say: () => (STEPS.length > 1 ? 'What else changes on YouTube.' : 'What changes on YouTube.'), show: showChanges, needs: () => true },
+    { id: 'player', say: () => 'Watching', show: showPlayer, needs: () => parts.clock },
+    { id: 'lock', say: () => 'The lock', show: showLock, needs: () => parts.clock },
+    { id: 'changes', say: () => (STEPS.length > 1 ? 'What else changes' : 'What changes on YouTube'), show: showChanges, needs: () => true },
   ];
   /** @type {Step[]} */
   let STEPS = ALL_STEPS.filter((s) => s.needs());
-  const dropTime = Drip.formatMinutes(settings.minutesPerToken * 60);
-  /** @param {number} n @param {string} word */
-  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   /** Where a step is in this tour, or the last step if the mode skips it. @param {string} id */
   const at = (id) => {
     const i = STEPS.findIndex((s) => s.id === id);
@@ -447,6 +444,8 @@
     dropTime: () => Drip.formatMinutes(sand.settings.minutesPerToken * 60),
     drops: () => sand.tokens.watch,
     cards: () => sand.tokens.rec,
+    dropsPerDay: () => sand.settings.watchTokensPerDay,
+    cardsPerDay: () => sand.settings.recTokensPerDay,
     counted: () => parts.cards === 'limited',
     clock: () => parts.clock,
     stash: () => parts.stash,
