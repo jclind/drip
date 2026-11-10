@@ -141,13 +141,20 @@
     if (hadFocus) button.focus();
   }
 
-  /** A list entry added by handle learns the channel's name here, for matching home cards. @param {any} channel */
+  /**
+   * A list entry added by handle learns the channel's name here, for matching home cards. The entries hold what
+   * cleanChannel kept, so the page's sighting is compared cleaned the same way. Raw, a name with a no-break space or
+   * U+3000, common in Japanese names, never matched and went to the worker every second (release review, 2026-11-10).
+   * @param {any} channel
+   */
   function tellSeen(channel) {
     if (!state || !state.channels || !channel.name) return;
+    const seen = Drip.cleanChannel(channel);
+    if (!seen) return;
     const p = state.channelsPending;
     const entries = [...state.channels.allow, ...state.channels.block, ...(p ? [...p.allow, ...p.unblock] : [])];
-    const stale = entries.some((/** @type {any} */ e) => Drip.sameChannel(e, channel) && (e.name !== channel.name
-      || (!!channel.avatar && e.avatar !== channel.avatar) || channel.ids.some((/** @type {string} */ id) => !e.ids.includes(id))));
+    const stale = entries.some((/** @type {any} */ e) => Drip.sameChannel(e, seen) && (e.name !== seen.name
+      || (!!seen.avatar && e.avatar !== seen.avatar) || seen.ids.some((/** @type {string} */ id) => !e.ids.includes(id))));
     if (stale) send({ type: 'seenChannel', channel });
   }
 
