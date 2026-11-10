@@ -4,9 +4,11 @@ Draft, 2026-10-06, checked against `main` on 2026-11-09 (97fc18e). The images ar
 
 ## Name
 
-drip (tentative, Q17). Google's branding rules don't allow "YouTube" in the name.
+`drip: YouTube without the feed` (Q17, Jesse, 2026-11-10). The manifest's `name` holds it, and `short_name` is `drip`. Every page inside the extension still says drip alone.
 
-Jesse searched the store for "drip" on 2026-11-10 and got 15 results. Two share the name exactly: "Drip", a design token inspector, and "DRIP", a Twitter thread manager. Neither has a rating. The other 13 have "drip" inside a longer name, such as Textdrip, Sku Drip Fetcher, and Water Reminder Buddy - Drip. None of the 15 has anything to do with YouTube, video, or screen time. The store doesn't require a unique name, so the two matches don't block the upload.
+The YouTube API branding guidelines (https://developers.google.com/youtube/branding) say not to use YouTube "in conjunction with the overall name" of an app, and allow saying an app is for YouTube. They bind apps that call the YouTube API, which drip doesn't, and the store has many names of this kind, such as "Enhancer for YouTube". If a reviewer objects anyway, fall back to `drip` and resubmit.
+
+Jesse searched the store for "drip" on 2026-11-10 and got 15 results. Two share the name exactly: "Drip", a design token inspector, and "DRIP", a Twitter thread manager. Neither has a rating. The other 13 have "drip" inside a longer name, such as Textdrip, Sku Drip Fetcher, and Water Reminder Buddy - Drip. None of the 15 has anything to do with YouTube, video, or screen time. The store doesn't require a unique name, so the two matches don't block the upload, and the longer name sets drip apart from both.
 
 ## Category
 
