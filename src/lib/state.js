@@ -1523,6 +1523,9 @@
     // The lists go through the same rules as a click: an allow waits, a block applies now, and nothing is removed.
     let channelsAdded = 0;
     let channelsWaiting = 0;
+    // Channels a full list turned away, so Import can say so, as it does for the stash.
+    let allowSkipped = 0;
+    let blockSkipped = 0;
     const lists = file.channels && typeof file.channels === 'object' ? file.channels : {};
     for (const raw of Array.isArray(lists.allow) ? lists.allow : []) {
       const channel = cleanChannel(raw);
@@ -1530,12 +1533,19 @@
       const allowed = allowChannel(state, channel, now);
       if (allowed.ok) channelsAdded++;
       if (allowed.ok && allowed.waits) channelsWaiting++;
+      if (allowed.error === 'allow-full') allowSkipped++;
     }
     for (const raw of Array.isArray(lists.block) ? lists.block : []) {
       const channel = cleanChannel(raw);
-      if (channel && !findChannel(state.channels.block, channel) && blockChannel(state, channel).ok) channelsAdded++;
+      if (!channel || findChannel(state.channels.block, channel)) continue;
+      const blocked = blockChannel(state, channel);
+      if (blocked.ok) channelsAdded++;
+      if (blocked.error === 'block-full') blockSkipped++;
     }
-    return { ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days, channelsAdded, channelsWaiting };
+    return {
+      ok: true, applied: settings.applied, pending: settings.pending, stashAdded: added, stashSkipped: skipped, daysAdded: days,
+      channelsAdded, channelsWaiting, allowSkipped, blockSkipped,
+    };
   }
 
   /**

@@ -236,6 +236,15 @@ test('import results use nonzero pills, a channel clock tag, overflow and settin
   await p.importData({ app: 'drip', format: 1 });
   assert.equal(result.textContent, 'Imported');
   assert.equal(result.querySelector('.data-chip'), null);
+  // Channels past a list's size get the same line as the stash. One allow waits from the first import, so 4 more fit.
+  await p.importData({ app: 'drip', format: 1, channels: {
+    allow: Array.from({ length: 6 }, (_, n) => ({ ids: [`@allow${n}`], name: `Allow ${n}` })),
+    block: Array.from({ length: 103 }, (_, n) => ({ ids: [`@block${n}`], name: `Block ${n}` })),
+  } });
+  const lines = result.querySelectorAll('.muted').map((c) => c.textContent);
+  assert.deepEqual(lines.filter((line) => /didn't fit/.test(line)), [
+    "2 channels didn't fit in the allow list.", "3 channels didn't fit in the block list.",
+  ]);
 });
 
 test('import plural counts have no clock when channels apply at once', async () => {

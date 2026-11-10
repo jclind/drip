@@ -338,6 +338,22 @@ test('import adds the lists under the same rules, and an old file without them s
   assert.equal(old.channelsAdded, 0);
 });
 
+test('import counts the channels that did not fit in each list, and not the ones already there or refused', () => {
+  const state = settled();
+  D.blockChannel(state, { ids: ['@mine'], name: 'Mine' });
+  const allow = Array.from({ length: 14 }, (_, n) => ({ ids: [`@allow${n}`], name: `Allow ${n}` }));
+  const block = Array.from({ length: 300 }, (_, n) => ({ ids: [`@block${n}`], name: `Block ${n}` }));
+  const res = D.importData(state, { app: 'drip', format: 1, channels: {
+    // One already blocked, so it can't be allowed, and one with no id, which an allow needs.
+    allow: [...allow, { ids: ['@mine'], name: 'Mine' }, { ids: [], name: 'No id' }],
+    block: [{ ids: ['@mine'], name: 'Mine' }, ...block],
+  } }, NOW);
+  assert.deepEqual([state.channelsPending?.allow.length, state.channels.block.length], [5, 100]);
+  assert.deepEqual([res.channelsAdded, res.allowSkipped, res.blockSkipped], [104, 9, 201]);
+  const none = D.importData(settled(), { app: 'drip', format: 1, channels: { allow: [VERI], block: [BLUE] } }, NOW);
+  assert.deepEqual([none.allowSkipped, none.blockSkipped], [0, 0]);
+});
+
 test('reset empties the allow list and the block list at once', () => {
   const state = settled();
   state.channels.allow.push({ ...VERI });

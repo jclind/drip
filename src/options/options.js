@@ -1174,6 +1174,8 @@ async function importFile() {
   afterData(res, kept);
   dataDone('Imported', [
     ...(res.stashSkipped ? [`${plural(res.stashSkipped, "video didn't", "videos didn't")} fit in the stash.`] : []),
+    ...(res.allowSkipped ? [`${plural(res.allowSkipped, "channel didn't", "channels didn't")} fit in the allow list.`] : []),
+    ...(res.blockSkipped ? [`${plural(res.blockSkipped, "channel didn't", "channels didn't")} fit in the block list.`] : []),
     ...(waitsLine(res.pending) ? [waitsLine(res.pending)] : []),
   ], false, [
     ...(res.stashAdded ? [dataChip(`+${res.stashAdded} in stash`)] : []),
