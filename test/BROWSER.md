@@ -10,7 +10,7 @@ Start from a reloaded extension and refreshed YouTube tabs. The dev panel's Cloc
 2. Click Reveal video. A gray placeholder holds the card's place, then one card appears with a thumbnail, title, channel, and length, and cards drop by 1. +15m and Reveal video go, and Stash collapses to its header.
 3. Click Stash. The card stays up, the button says Stashed, and the Stash list's count goes up by 1. Click Stashed and it comes back out. Click Reveal next. A new card takes this one's place, cards drop by 1, and the first card is gone for good. Click ×. The card goes and the empty page comes back.
 4. In Settings, set Reveal from to Subscriptions, then click Reveal video on the home page. "Checking your subscriptions…" shows, then a card from a subscribed channel, or "Nothing new from your subscriptions" with no card spent.
-5. Open a second YouTube tab and play a video in it. Back on the home page, hover a button and click it a few times. Every click works, and the button doesn't flicker. Double-click +15m: it buys one drop, not two. Double-click × on a card: the card goes, with no error. With reduced motion on (System Settings, Accessibility, Display), Tab to +15m and hold Enter for two seconds: it buys one drop. Do the same on the lock screen's +15m.
+5. Open a second YouTube tab and play a video in it. Back on the home page, hover a button and click it a few times. Every click works, and the button doesn't flicker. Double-click +15m: it buys one drop, not two. Double-click × on a card: the card goes, with no error. With reduced motion on (System Settings, Accessibility, Display), Tab to +15m and hold Enter for two seconds: it buys one drop. Do the same on the lock screen's +15m, with reduced motion on and then off: it buys one drop each time, the lock drains away, and it stays down.
 6. With 0 minutes and a card up, Watch reads "Watch · -1" with a drop. Clicking it spends a drop and the video plays. Stash rows show "-1" and a drop by their play icon, and work the same way.
 7. Hover a Stash row and click its ×. The row reads "Removed · Undo" for 5 seconds. Undo puts it back where it was.
 8. With YouTube in light mode and in dark mode, the page reads well: the glass outline is visible, Watch is black in light and white in dark, and Reveal video stays gold.
@@ -35,7 +35,7 @@ Start from a reloaded extension and refreshed YouTube tabs. The dev panel's Cloc
 
 22. Open a `/shorts/` link. It opens as a normal watch page.
 23. Open `/feed/subscriptions`, `/feed/explore`, and `/gaming`. Each lands on the token page.
-24. Open `m.youtube.com`. It moves to `www.youtube.com`.
+24. Open `m.youtube.com`. It moves to `www.youtube.com`. Then open DevTools, turn on the device toolbar with any phone picked, and reload youtube.com: the desktop site loads once with the token page and `app=desktop` in the address, and doesn't reload in a loop.
 25. Open a YouTube embed on another site, such as a news article. It plays without drip.
 26. Search for something. At most 10 results show, with no Shorts or "People also watched" shelves, each has a Stash button, and More results shows the next 10.
 
@@ -53,7 +53,7 @@ Start from a reloaded extension and refreshed YouTube tabs. The dev panel's Cloc
 
 ## After a day boundary
 
-33. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh.
+33. Leave a token page open past the reset hour. Within a second of the reset, its balances update without a refresh. To skip the wait, press +1h and +1m on the dev panel's Clock row until its clock reads a minute before the reset, then leave the page alone for that minute.
 
 ## Top bar and menu
 
@@ -62,7 +62,7 @@ Start from a reloaded extension and refreshed YouTube tabs. The dev panel's Cloc
 36. In Settings, turn off Hide the notification bell and save. It waits for the reset with a gray chip; after Run reset now, the bell is back. Turning it on again hides the bell at once.
 37. In Settings, turn off Watch time. Its rows fold away under the header, which reads "Off. Videos play with no clock.", and Tab skips them. A bar at the bottom says "1 change not saved" with Undo all and Save. Scroll the page: the bar stays in view. Try to close the tab, and Chrome asks first. Click Undo all: the rows come back and the bar goes.
 38. In Settings at a phone width (DevTools, 390px), Cards per day with Counted puts its two controls on a line under the label, and nothing runs off the right edge. With Unlimited, the picker sits beside the label.
-39. A week after install, in Settings on Full drip, pick Quiet and save. The four switches stay off and their sections stay folded, each header has "On until 4:00am · Undo" (Cards: "Counted until 4:00am"), the mode row says "Quiet from 4:00am. Until then, Full drip.", and the save bar says "Saved. Quiet starts at 4:00am." YouTube still runs Full drip until the reset. Undo on Watch time turns its switch back on and the mode row reads "Your own mix from 4:00am". Pick Curated and save: Search and Stash come back on at once, and the line reads "Curated from 4:00am."
+39. On an install more than a day old (the first day has no waits), in Settings on Full drip, pick Quiet and save. The four switches stay off and their sections stay folded, each header has "On until 4:00am · Undo" (Cards: "Counted until 4:00am"), the mode row says "Quiet from 4:00am. Until then, Full drip.", and the save bar says "Saved. Quiet starts at 4:00am." YouTube still runs Full drip until the reset. Undo on Watch time turns its switch back on and the mode row reads "Your own mix from 4:00am". Pick Curated and save: Search and Stash come back on at once, and the line reads "Curated from 4:00am."
 
 ## Channel lists (Q31)
 

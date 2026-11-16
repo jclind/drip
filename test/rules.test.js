@@ -80,8 +80,37 @@ test('pages people go to on purpose stay put (Q16)', () => {
   }
 });
 
-test('the mobile site moves to the desktop site, keeping the path', () => {
-  assert.equal(D.redirectTarget('https://m.youtube.com/watch?v=abc&t=10'), 'https://www.youtube.com/watch?v=abc&t=10');
+test('the mobile site moves to the desktop site, keeping the path and asking for the desktop site', () => {
+  assert.equal(D.redirectTarget('https://m.youtube.com/watch?v=abc&t=10'), 'https://www.youtube.com/watch?v=abc&t=10&app=desktop');
+  assert.equal(D.redirectTarget('https://m.youtube.com/'), 'https://www.youtube.com/?app=desktop');
+  // A mobile Short or feed goes to where the desktop one would, in one move.
+  assert.equal(D.redirectTarget('https://m.youtube.com/shorts/abc123'), 'https://www.youtube.com/watch?v=abc123&app=desktop');
+  assert.equal(D.redirectTarget('https://m.youtube.com/feed/subscriptions'), 'https://www.youtube.com/?app=desktop');
+  // A link that asks for the mobile site doesn't keep asking.
+  assert.equal(D.redirectTarget('https://m.youtube.com/watch?app=m&v=abc'), 'https://www.youtube.com/watch?app=desktop&v=abc');
+});
+
+test("a phone browser doesn't loop between the two sites (Jesse, 2026-11-16)", () => {
+  // To a phone's user agent, www.youtube.com answers 302 to m.youtube.com unless the link says app=desktop.
+  /** @param {string} href */
+  const youtube = (href) => {
+    const url = new URL(href);
+    if (url.hostname === 'www.youtube.com' && url.searchParams.get('app') !== 'desktop') url.hostname = 'm.youtube.com';
+    return url.href;
+  };
+  for (const start of ['https://www.youtube.com/', 'https://m.youtube.com/watch?v=abc', 'https://www.youtube.com/shorts/abc', 'https://m.youtube.com/feed/subscriptions']) {
+    let href = start;
+    let hops = 0;
+    for (; hops < 10; hops++) {
+      const next = D.redirectTarget(youtube(href)) || youtube(href);
+      if (next === href) break;
+      href = next;
+    }
+    assert.ok(hops < 10, `${start} never settles`);
+    assert.equal(new URL(href).hostname, 'www.youtube.com', start);
+  }
+  // If YouTube ever sends app=desktop back to the mobile site, drip leaves that page alone.
+  assert.equal(D.redirectTarget('https://m.youtube.com/watch?v=abc&app=desktop'), '');
 });
 
 test('an embed opened as its own page becomes a watch page with its start time (Q7)', () => {

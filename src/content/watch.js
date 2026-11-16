@@ -758,6 +758,20 @@
   }
 
   /**
+   * A held Enter presses the focused button again on every key repeat. One press is one purchase, as on the home page.
+   * The reason box keeps its repeats, which are new lines.
+   * @param {KeyboardEvent} e
+   */
+  function holdEnter(e) {
+    if (e.repeat && e.key === 'Enter' && /** @type {Element | null} */ (e.target)?.localName !== 'textarea') e.preventDefault();
+  }
+
+  /** @param {HTMLElement} panel */
+  function newLock(panel) {
+    return h('div', { id: 'drip-lock', class: 'drip-ui', onkeydown: holdEnter }, frozenFrame(), sea(), panel);
+  }
+
+  /**
    * Puts a panel in the lock overlay. A new overlay plays the water rising and then the panel surfacing. A panel swapped
    * into an overlay that's already up just replaces the old one, so the water doesn't rise again.
    * @param {HTMLElement} panel
@@ -781,7 +795,7 @@
     // Only running out drops the last of the water. The "drip was updated" notice goes up at once.
     const glass = locked && !disconnected ? lastDropGlass() : null;
     if (!glass) {
-      document.body.append(h('div', { id: 'drip-lock', class: 'drip-ui' }, frozenFrame(), sea(), panel));
+      document.body.append(newLock(panel));
       return;
     }
     // The pill's last water falls as a drop, and the lock's water rises from where it lands (pour.js).
@@ -792,7 +806,7 @@
       if (falling !== fall) return;
       falling = null;
       if (!locked || location.pathname !== '/watch') return;
-      const lock = h('div', { id: 'drip-lock', class: 'drip-ui' }, frozenFrame(), sea(), fall.panel);
+      const lock = newLock(fall.panel);
       document.body.append(lock);
       if (x !== null) DripPour.riseFrom(lock, x);
     });
@@ -886,7 +900,9 @@
   /** @param {Event} e */
   async function onAddTime(e) {
     // A double-click buys one drop, as home's +15m does. Without the drop's fall, nothing else holds the second click.
-    if (landing || buying || /** @type {MouseEvent} */ (e).detail > 1) return;
+    // A lock draining away keeps its button and the focus for DRAIN_MS, and the stylesheet only stops the mouse there,
+    // so a second Enter bought another drop (Jesse, 2026-11-16).
+    if (!liveLock() || landing || buying || /** @type {MouseEvent} */ (e).detail > 1) return;
     // The worker's storage change can lift the lock before this reply arrives, so the drain is asked for up front.
     drainNext = true;
     const button = /** @type {HTMLElement} */ (e.currentTarget);
@@ -916,11 +932,16 @@
       video?.play();
     } else {
       drainNext = false;
+      // A refusal's state shows the drops and minutes now, which another tab may have changed.
+      if (res && res.state) state = Drip.newer(state, res.state);
+      // That tab bought minutes with the last drop: the video plays, and no lock goes up to say "No drops left."
+      const status = state ? Drip.watchStatus(state, videoId(), Date.now()) : null;
+      if (status && !status.locked) {
+        applyStatus(status);
+        return;
+      }
       // Dry hours, or the 5 minutes before them, began between the draw and the click: the lock redraws without +15m.
-      if (res && (res.error === 'dry-hours' || res.error === 'dry-soon')) {
-        if (res.state) state = Drip.newer(state, res.state);
-        lockMessage = '';
-      } else lockMessage = 'No drops left.';
+      lockMessage = res && (res.error === 'dry-hours' || res.error === 'dry-soon') ? '' : 'No drops left.';
       showLock();
     }
   }
