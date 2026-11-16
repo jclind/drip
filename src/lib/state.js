@@ -1238,14 +1238,21 @@
 
   /**
    * Where a top-level YouTube URL should go instead, or '' to leave it. Shorts, live links, and embeds become watch
-   * pages, so the clock applies (Q2, Q7). Feeds go to the token page (Q16). The mobile site moves to the desktop site.
+   * pages, so the clock applies (Q2, Q7). Feeds go to the token page (Q16). The mobile site moves to the desktop site,
+   * with app=desktop: to a phone browser, www.youtube.com without it answers with a redirect back to the mobile site,
+   * and the two redirects looped (Jesse in Chrome's phone view, 2026-11-16; checked with curl the same day).
    * @param {string} href
    */
   function redirectTarget(href) {
     const url = new URL(href);
     if (url.hostname === 'm.youtube.com') {
+      // A mobile page that already says app=desktop stays, so nothing loops if YouTube stops honouring it.
+      if (url.searchParams.get('app') === 'desktop') return '';
       url.hostname = 'www.youtube.com';
-      return url.href;
+      // A mobile Short or feed goes to its desktop target in one move.
+      const target = new URL(redirectTarget(url.href) || url.href);
+      target.searchParams.set('app', 'desktop');
+      return target.href;
     }
     const embed = /^\/embed\/([^/]+)\/?$/.exec(url.pathname);
     if (embed && (url.hostname === 'www.youtube.com' || url.hostname === 'www.youtube-nocookie.com')) {

@@ -1152,6 +1152,83 @@ test('a +15m refused because the warning began redraws the lock without it', asy
   assert.equal(world.state.tokens.watch, 4, 'no drop spent');
 });
 
+/** The lock's button with this data-k, draining lock or not. @param {any} tab @param {string} k */
+function lockButton(tab, k) {
+  const button = tab.document.getElementById('drip-lock')?.all().find((/** @type {any} */ el) => el.getAttribute('data-k') === k);
+  assert.ok(button, `no lock button ${k}`);
+  return button;
+}
+
+test("a held Enter on the lock's +15m buys one drop, with the lock still draining away (Jesse, 2026-11-16)", async () => {
+  const { world, tab } = await setup(0);
+  assert.equal(world.state.tokens.watch, 4);
+  const add = lockButton(tab, 'add');
+  // Enter's click has detail 0. The button keeps the focus while the water drains, so each repeat clicks it again.
+  for (let i = 0; i < 6; i++) {
+    add.listeners.click({ detail: 0, currentTarget: add });
+    await settle();
+  }
+  assert.equal(world.state.tokens.watch, 3, 'one drop spent');
+  assert.equal(world.state.watchSecondsLeft, 900);
+  assert.equal(world.sent.filter((/** @type {any} */ m) => m.type === 'spendWatch').length, 1);
+});
+
+test('a held Enter on +15m with one drop left leaves the lock down, with no "No drops left." (Jesse, 2026-11-16)', async () => {
+  const world = makeWorld();
+  world.state.watchSecondsLeft = 0;
+  world.state.tokens.watch = 1;
+  const tab = makeTab(world, 'aaa');
+  await settle();
+  await tab.video.play();
+  await tab.tick();
+  const add = lockButton(tab, 'add');
+  for (let i = 0; i < 4; i++) {
+    add.listeners.click({ detail: 0, currentTarget: add });
+    await settle();
+  }
+  assert.equal(world.state.tokens.watch, 0);
+  assert.doesNotMatch(tab.lockText(), /No drops left/);
+  // The drain takes 600 ms, and then the lock is gone for good.
+  await new Promise((r) => setTimeout(r, 700));
+  assert.equal(tab.locked(), false);
+  assert.equal(tab.video.paused, false);
+});
+
+test('the lock swallows a held Enter\'s repeats on its buttons, and leaves them to the reason box', async () => {
+  const { tab } = await setup(0);
+  const lock = tab.document.getElementById('drip-lock');
+  /** @param {any} e */
+  const stopped = (e) => {
+    let prevented = false;
+    lock.listeners.keydown({ ...e, preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  const add = lockButton(tab, 'add');
+  assert.equal(stopped({ key: 'Enter', repeat: true, target: add }), true);
+  assert.equal(stopped({ key: 'Enter', repeat: false, target: add }), false, 'the first press goes through');
+  assert.equal(stopped({ key: ' ', repeat: true, target: add }), false);
+  await tab.press('need');
+  const box = lock.all().find((/** @type {any} */ el) => el.tagName === 'TEXTAREA');
+  assert.equal(stopped({ key: 'Enter', repeat: true, target: box }), false);
+});
+
+test('a +15m refused because another tab spent the last drop on minutes lifts the lock (2026-11-16)', async () => {
+  const { world, tab } = await setup(0);
+  world.state.tokens.watch = 1;
+  // The other tab's purchase is saved, but the news reaches this tab only with the refusal.
+  const listeners = world.listeners;
+  world.listeners = [];
+  await world.handle({ type: 'spendWatch' });
+  world.listeners = listeners;
+  assert.ok(tab.locked());
+  await tab.press('add');
+  assert.equal(world.state.tokens.watch, 0);
+  // The lock drains away over 600 ms. Before, the refusal put a new one up in its place.
+  assert.doesNotMatch(tab.lockText(), /No drops left/);
+  await new Promise((r) => setTimeout(r, 700));
+  assert.equal(tab.locked(), false);
+});
+
 test('the locked page brings +15m back when Dry hours end', async () => {
   const world = dryWorld(5, 59, 40);
   world.state.watchSecondsLeft = 3;
