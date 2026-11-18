@@ -1,13 +1,15 @@
-drip takes YouTube's home feed away.
+drip takes YouTube's home feed away. Subscriptions, Explore, and the Shorts feed go with it.
 
-In its place you get a search box, or one recommended video at a time. The recommendations beside the video and the end screens are gone too, and autoplay is off. Search still works, minus the shelves YouTube slips into it.
+In their place you get a search box, or one recommended video at a time. End screens and the recommendations beside videos are gone too, and autoplay is off.
 
 Pick how much YouTube you want when you install:
 
 Quiet: a search box where the home feed was. No recommendations, no limits.
-Curated: reveal as many recommendations as you want, one at a time. Save the ones worth watching to Stash.
-Full drip: Curated with daily limits. By default you get 10 cards, each revealing one video, and 4 drops, each worth 15 minutes of watching. When the minutes run out, the video pauses.
 
-You can switch modes or change the numbers later. Loosening a limit waits for the next day, so a late-night "just one more" can't raise it.
+Curated: reveal as many recommendations as you want, one at a time. Save the ones worth watching to Stash for later. No watch-time limit.
+
+Full drip: Curated with daily limits. By default that's 10 cards, one video each, and 4 drops, 15 minutes of watching each. When the minutes run out, the video pauses.
+
+You can switch modes or change the numbers later. Looser limits take effect the next day, so a late-night "just one more" can't raise them.
 
 drip has no server, no account, and no tracking. Everything stays in your browser.
