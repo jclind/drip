@@ -8,7 +8,7 @@ Quiet: a search box where the home feed was. No recommendations, no limits.
 
 Curated: reveal as many recommendations as you want, one at a time. Save the ones worth watching to Stash for later. No watch-time limit.
 
-Full drip: Curated with daily limits. By default that's 10 cards, one video each, and 4 drops, 15 minutes of watching each. When the minutes run out, the video pauses.
+Full drip: Curated with daily limits. By default that's 10 cards and 4 drops a day. A card reveals one video. A drop buys 15 minutes. When the minutes run out, the video pauses.
 
 You can switch modes or change the numbers later. Looser limits take effect the next day, so a late-night "just one more" can't raise them.
 
