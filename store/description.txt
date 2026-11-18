@@ -1,4 +1,4 @@
-drip takes YouTube's home feed away. Subscriptions, Explore, and the Shorts feed go with it.
+drip takes YouTube's home feed away. The Subscriptions, Explore, and Shorts feeds go with it.
 
 In their place you get a search box, or one recommended video at a time. End screens and the recommendations beside videos are gone too, and autoplay is off.
 
