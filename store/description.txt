@@ -1,41 +1,41 @@
 drip takes YouTube's home feed away.
 
-In its place you get a search box, or one recommended video at a time. No grid, no recommendations beside the video, no end screens. Autoplay is off. Playlists and mixes can keep playing. Search still works, minus the shelves YouTube slips into it.
+In its place you get a search box, or one recommended video at a time. The grid is gone. So are the recommendations beside the video and the end screens. Autoplay is off. Playlists and mixes can keep playing. Search still works, minus the shelves YouTube slips into it.
 
-Pick how much you want when you install:
+Pick how much YouTube you want when you install:
 
 Quiet: a search box where the home feed was. No recommendations, no limits.
 Curated: reveal as many recommendations as you want, one at a time. Save the ones worth watching to Stash, a keep-for-later list. No watch-time limit.
-Full drip: Curated with daily limits. By default you get 10 cards, each revealing one video, and 4 drops, each worth 15 minutes of watching. You can change both numbers. When your minutes run out, the video pauses behind a lock.
+Full drip: Curated with daily limits. By default you get 10 cards, each revealing one video, and 4 drops, each worth 15 minutes of watching. You can change all three numbers. When your minutes run out, the video pauses behind a lock.
 
-You can switch modes later, and each part has its own switch in Settings.
+You can switch modes later. Watch time, cards, Stash, and the search cap each have their own switch in Settings.
 
-Loosening a limit waits for the next day, so a late-night "just one more" can't raise it. Tightening one is immediate.
+Loosening a limit in Settings waits for the next day, so a late-night "just one more" can't raise it. Tightening one is immediate.
 
 drip has no server, no account, and no tracking. Everything stays in your browser.
 
 What drip changes on YouTube
 
-Home, Subscriptions, Explore, bare Shorts feeds, and hashtag feeds all lead to drip's home page.
+Home, Subscriptions, Explore, hashtag feeds, and the Shorts feed all lead to drip's home page. A single Short opens as a regular video.
 
-On a watch page, drip hides the recommendations, end screens, and in-video recommendation cards. Each new video opens in theater mode. Comments wait behind a Show comments button. The miniplayer is gone, and playback pauses when you leave the page. drip hides Join, merchandise, Clip, Thanks, and Ask. It also hides game and channel cards in the video's description.
+On a watch page, drip hides the recommendations, end screens, and in-video recommendation cards. Each new video opens in theater mode. Comments wait behind a Show comments button. The miniplayer is gone, and playback pauses when you leave the page. Under the video, drip hides the Join, Clip, Thanks, and Ask buttons and the merchandise shelf. It also hides game and channel cards in the video's description.
 
 In search, drip hides ads, injected recommendation shelves, and "people also" rows. With the search cap on, you see 10 results at a time, then a More results button.
 
-The sidebar becomes a short menu. Create and Ask YouTube are hidden. The notification bell and Shorts shelves and links are hidden by default, with switches to bring them back. Shorts always open as regular videos.
+The sidebar becomes a short menu. Create and Ask YouTube are hidden. The notification bell and Shorts shelves and links are hidden by default, with switches to bring them back.
 
 drip doesn't cover embeds on other websites or music.youtube.com.
 
 What drip adds
 
-With watch time on, a playing video uses minutes bought with drops. Background audio counts and ads don't. When the minutes run out, the video pauses behind the lock. The lock offers more time for another drop, "I need this one", and Done for now.
+Spending a drop adds minutes, and they count down while a video plays. Background audio counts and ads don't. When the minutes run out, the video pauses behind the lock. The lock offers more time for another drop, "I need this one", and Done for now.
 
 "I need this one" unlocks one video for the rest of the day after you type a reason. You get 3 a week by default.
 
-Dry hours are an optional daily range, such as 11pm to 6am, when you can't spend drops.
+Dry hours are an optional daily range, such as 11pm to 6am, when you can't spend drops. Minutes you haven't used go back as drops when it starts. Allowed channels and "I need this one" unlocks still play.
 
-With Stash on, you can save videos for later from reveal cards, search, and watch pages. It holds 10 by default.
+Stash lets you save videos for later from reveal cards, search, and watch pages. It holds 10 by default.
 
-You can allow or block channels. An allowed channel's videos play without using minutes, and a blocked channel never comes up in a reveal. Allow one from Settings, or from its page while watch time is on. Block one from a reveal card's menu or Settings.
+You can allow or block channels. An allowed channel's videos play without using minutes, and a blocked channel never comes up in a reveal. Allow a channel from Settings, or from that channel's page while watch time is on. Block one from a reveal card's menu or Settings.
 
-History shows today's use, a week's chart, and the reason you typed for each unlock. Settings has Export and Import.
+In Settings, History shows today's use, a week's chart, and the reason you typed for each unlock. Settings also has Export and Import.
