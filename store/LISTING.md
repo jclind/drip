@@ -1,5 +1,7 @@
 # Chrome Web Store listing answers
 
+Submitted for review on 2026-11-20 as 1.0.0, tag `v1.0.0`.
+
 Draft, 2026-10-06, checked against `main` on 2026-11-10 (d9fd578). The images are planned in `ART-PLAN.md`. The final set to upload is `store/images-v2/` (`screenshot-1.png` to `-5.png`, and `tile-c2.png` as the small promo tile).
 
 ## Name
@@ -49,21 +51,9 @@ Installing drip opens a welcome page with a mode picker and a tour.
 
 ## Description
 
-The store's Description field is plain text. Paste this, then the "What drip changes on YouTube" list above, reworded as plain lines.
+The store's Description field is plain text, and line breaks are the only formatting it keeps. The text is `store/description.txt`, 163 words, submitted with 1.0.0 on 2026-11-20. Paste it as is, with its blank lines.
 
-> YouTube's home page is built to keep you scrolling. drip takes it away.
->
-> In its place you get a search box, or one recommended video at a time. No grid, no recommendations beside the video, no autoplay, no end screens. Search still works, minus the shelves YouTube slips into it.
->
-> Pick how much you want when you install:
->
-> Quiet: a search box where the home feed was. Nothing else.
-> Curated: reveal one recommendation at a time, and stash the ones worth watching later.
-> Full drip: a daily allowance. Drops buy 15 minutes of watching, cards reveal videos. When the glass is empty, the video stops.
->
-> Loosening a limit waits for the next day, so a late-night "just one more" can't raise it. Tightening one is immediate.
->
-> drip has no server, no account, and no tracking. Everything stays in your browser.
+Keep it at 200 words or fewer: what drip takes away, the three modes, the next-day rule, and privacy. Jesse, 2026-11-18: "concise and conveying only what is important to know, it should be easy to skim". The "What drip changes on YouTube" list above is the full record and stays in this file, out of the store description. Six council rounds settled the wording, and the run's record is `.council/store-description/STATE.md` on beacon.
 
 ## Short description (132 characters max)
 
