@@ -4,24 +4,25 @@ A Chrome extension that takes away YouTube's home page grid. You get a daily all
 
 It comes in three modes, Quiet, Curated, and Full drip, picked on the welcome page and changed in Settings. The cards, the drops, and the clock belong to Full drip.
 
-This is the 1.0 release, headed for the Chrome Web Store. The listing isn't live yet, so for now you install from a clone, below. `DESIGN.md` has the decisions and `IDEAS.md` has ideas that aren't built.
+drip 1.0.0 is on the [Chrome Web Store](https://chromewebstore.google.com/detail/drip-youtube-without-the/kfmmpkmfaoppoibioohgkfgfljfahdfj). `DESIGN.md` has the decisions and `IDEAS.md` has ideas that aren't built.
 
-## Install from a clone
+## Install
+
+1. Open [drip on the Chrome Web Store](https://chromewebstore.google.com/detail/drip-youtube-without-the/kfmmpkmfaoppoibioohgkfgfljfahdfj) and click "Add to Chrome".
+2. On drip's Details page in `chrome://extensions`, turn on "Allow in Incognito", because otherwise an Incognito window skips drip.
+
+Chrome updates drip on its own. Your tokens and backlog live in Chrome's storage for the extension, so an update keeps them. Removing the extension deletes them.
+
+## Develop
+
+Run drip from a clone:
 
 1. `git clone git@github.com:jclind/drip.git ~/drip`
 2. Open `chrome://extensions` and turn on Developer mode, top right.
-3. Click "Load unpacked" and pick the `~/drip` folder.
-4. On drip's Details page, turn on "Allow in Incognito", because otherwise an Incognito window skips drip.
+3. If the store copy is installed, turn it off. Two copies both run on every YouTube page, and each keeps its own tokens and backlog.
+4. Click "Load unpacked" and pick the `~/drip` folder.
 
-## Update
-
-1. `cd ~/drip && git pull`
-2. Click the reload arrow on drip's card in `chrome://extensions`.
-3. Refresh any open YouTube tabs.
-
-Your tokens and backlog live in Chrome's storage for the extension, so updating keeps them. Removing the extension deletes them.
-
-## Develop
+To update the clone, run `cd ~/drip && git pull`, click the reload arrow on drip's card in `chrome://extensions`, and refresh any open YouTube tabs.
 
 - `node --test` runs the unit tests. There's nothing to install.
 - Edit, reload the extension, refresh YouTube.

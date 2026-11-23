@@ -1,6 +1,6 @@
 # Chrome Web Store listing answers
 
-Submitted for review on 2026-11-20 as 1.0.0, tag `v1.0.0`.
+Submitted for review on 2026-11-20 as 1.0.0, tag `v1.0.0`. Live since 2026-11-21: https://chromewebstore.google.com/detail/drip-youtube-without-the/kfmmpkmfaoppoibioohgkfgfljfahdfj
 
 Draft, 2026-10-06, checked against `main` on 2026-11-10 (d9fd578). The images are planned in `ART-PLAN.md`. The final set to upload is `store/images-v2/` (`screenshot-1.png` to `-5.png`, and `tile-c2.png` as the small promo tile).
 
