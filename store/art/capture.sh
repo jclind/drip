@@ -1,9 +1,12 @@
 #!/bin/sh
 # Screenshots every store frame into store/images/, at the sizes the Chrome Web Store asks for. Runs headless Chrome on
-# air against a local server of this checkout. Usage: store/art/capture.sh [v2] [port]
+# air against a local server of this checkout. Usage: store/art/capture.sh [v2|v3|v4|v5] [port]
 # Without v2 it shoots frames.html (rounds 0 to 4) into store/images/; with v2, frames-v2.html into store/images-v2/;
 # with v3, both layouts of frames-v3.html (the council's divergent round 17) into store/images-v3/, as a-* and b-*;
 # with v4, frames-v4.html's two screenshot 2 layouts (ref round 4) into store/images-v4/, as screenshot-2a and -2b.
+# with v5, frames-v5.html (the store set since 2026-11-23) into store/images-v5/, as screenshot-1 to -5
+# and tile. Its pictures of drip are store/art/pieces/, which store/art/pieces.js takes. Run that first after a change
+# to anything the five show.
 set -eu
 cd "$(dirname "$0")/../.."
 page=frames.html out=store/images tiles="c d d2 d3 e"
@@ -12,6 +15,8 @@ dsf=1
 if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c c2 c3 g p" dsf=2; shift; fi
 v3=; if [ "${1:-}" = v3 ]; then page=frames-v3.html out=store/images-v3 dsf=2 v3=1; shift; fi
 v4=; if [ "${1:-}" = v4 ]; then page=frames-v4.html out=store/images-v4 dsf=2 v4=1; shift; fi
+# v5 has no scaled iframes: its type is the page's own and its pictures are images, so 1x is sharp.
+v5=; if [ "${1:-}" = v5 ]; then page=frames-v5.html out=store/images-v5 v5=1; shift; fi
 port=${1:-8078}
 chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 profile=$(mktemp -d)
@@ -54,6 +59,11 @@ shoot() { # name width height query [motion]
   echo "$out/$1.png"
 }
 
+if [ -n "$v5" ]; then
+  for n in 1 2 3 4 5; do shoot "screenshot-$n" 1280 800 "shot=$n"; done
+  shoot tile 440 280 tile=1
+  exit 0
+fi
 if [ -n "$v4" ]; then
   for v in a b; do shoot "screenshot-2$v" 1280 800 "v=$v" motion; done
   exit 0

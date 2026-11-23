@@ -13,8 +13,8 @@ The letters are outlines of Inter (800 for the name, 700 for the line), so the f
 
 ## Where it shows
 
-- The store's small promo tile, `store/images-v2/tile-g.png`: the logo on paper (`#ebe4d6`) over the water strip.
-- The corner of the five store screenshots: the wordmark, 27px high.
+- The store's small promo tile, `store/images-v5/tile.png`: the logo on pale blue (`#e5f1fc`) over the water strip.
+- The five store screenshots: the wordmark above each headline, 34px high.
 - The welcome page: the page's own drop icon beside `src/welcome/wordmark.svg`, a mask of the letters that takes the text color in both themes.
 
 ## Rebuild

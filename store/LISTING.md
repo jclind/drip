@@ -2,7 +2,11 @@
 
 Submitted for review on 2026-11-20 as 1.0.0, tag `v1.0.0`. Live since 2026-11-21: https://chromewebstore.google.com/detail/drip-youtube-without-the/kfmmpkmfaoppoibioohgkfgfljfahdfj
 
-Draft, 2026-10-06, checked against `main` on 2026-11-10 (d9fd578). The images are planned in `ART-PLAN.md`. The final set to upload is `store/images-v2/` (`screenshot-1.png` to `-5.png`, and `tile-g.png` as the small promo tile). `tile-g.png` is the logo from `store/logo/`, Jesse's pick on 2026-11-23. It replaces `tile-c2.png`, the tile 1.0.0 went live with, whose line wrapped. The same day the corner mark on the five screenshots became the logo's letters, and nothing else in them changed.
+Draft, 2026-10-06, checked against `main` on 2026-11-10 (d9fd578).
+
+The images to upload are in `store/images-v5/`: `screenshot-1.png` to `-5.png`, and `tile.png` as the small promo tile. Jesse picked this set on 2026-11-23. Each screenshot has a headline and at most one line under it on the left, and one piece of drip in a white panel on the right, on a pale blue (`#e5f1fc`). The tile is the logo from `store/logo/` on the same blue. `store/art/pieces.js` takes the pictures of drip from the dev pages, and `store/art/capture.sh v5` shoots `store/art/frames-v5.html`.
+
+1.0.0 went live with `store/images-v2/`, planned in `ART-PLAN.md`: a dark capture of drip beside a paper panel with a serif headline and notes. Jesse on 2026-11-23: "ours now just seems like there is too much going on". Its tile was `tile-c2.png`, then `tile-g.png` once the logo changed that day.
 
 ## Name
 
