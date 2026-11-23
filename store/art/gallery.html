@@ -100,7 +100,7 @@
     const v3 = (await list('../images-v3/')).filter((h) => h.endsWith('.png')).sort((a, b) => rank(a) - rank(b));
     if (v3.length) rounds.push({ key: 'r17', title: 'Round 17', sub: ABOUT[17], dir: '../images-v3/', files: v3,
       reports: reviews.filter((h) => h.startsWith('round-17-')) });
-    const now = (await list('../images-v2/')).filter((h) => /^(screenshot-\d|tile-c2)\.png$/.test(h)).sort((a, b) => rank(a) - rank(b));
+    const now = (await list('../images-v2/')).filter((h) => /^(screenshot-\d|tile-g)\.png$/.test(h)).sort((a, b) => rank(a) - rank(b));
     rounds.push({ key: 'now', title: 'Now', sub: 'the current set, with every fix so far', dir: '../images-v2/', files: now, reports: [] });
     const num = (/** @type {Round} */ r) => (r.key === 'now' ? 999 : Number(r.key.slice(1)));
     return rounds.sort((a, b) => num(b) - num(a));

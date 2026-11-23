@@ -17,20 +17,32 @@ main {
   padding: 32px 16px 64px;
 }
 
+/* The logo without its line. Its sizes are in em of the wordmark, the same numbers as store/art/build-logo.py, so
+   the font size alone scales it. */
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.15em;
+  min-height: 40px;
   margin: 0;
   font-size: 34px;
-  font-weight: 600;
-  line-height: 40px;
-  letter-spacing: -0.01em;
 }
 
-.brand .drip-i {
-  width: 24px;
-  height: 32px;
+.brand .drip-token-drop {
+  width: auto;
+  height: 0.93em;
+  aspect-ratio: 600 / 893;
+}
+
+/* "drip" in the logo's letters, a mask like every icon, so it takes the text color in both themes. It isn't in
+   src/icons, whose files all go to YouTube's pages. build-logo.py writes wordmark.svg and prints this box. */
+.brand-word {
+  flex: none;
+  width: 1.796em;
+  height: 1.136em;
+  background: currentColor;
+  -webkit-mask: url(wordmark.svg) center / contain no-repeat;
+  mask: url(wordmark.svg) center / contain no-repeat;
 }
 
 .tagline {
@@ -62,13 +74,8 @@ main:has(#tour:not([hidden])) .tagline {
 }
 
 main:has(#tour:not([hidden])) .brand {
+  min-height: 28px;
   font-size: 22px;
-  line-height: 28px;
-}
-
-main:has(#tour:not([hidden])) .brand .drip-i {
-  width: 16px;
-  height: 22px;
 }
 
 /* The mode (Q29, DESIGN.md "Modes"), design J. A list lightest first; the picked row gets a blue border and Customize. */
