@@ -16,8 +16,8 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: Roboto, Arial, sans-serif; overflow: clip; }
   .shot { position: relative; width: 1280px; height: 800px; overflow: clip; background: var(--paper); }
-  .brand { position: absolute; left: 72px; top: 44px; display: flex; align-items: center; gap: 9px; font-size: 24px;
-    font-weight: 700; letter-spacing: -0.5px; }
+  /* The logo without its line (store/logo, 2026-11-23). */
+  .brand { position: absolute; left: 72px; top: 44px; height: 27px; }
   .mask { display: inline-block; background: currentColor; -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
   .drop { --src: url(/src/icons/drop.svg); color: var(--drop); aspect-ratio: 600 / 893; height: 27px; }
   h1 { position: absolute; left: 72px; top: 112px; margin: 0; font-family: Newsreader, Georgia, serif; font-weight: 500;
@@ -197,7 +197,7 @@
 
   const root = /** @type {HTMLElement} */ (document.createElement('div'));
   root.className = 'shot';
-  root.innerHTML = '<div class="brand"><span class="mask drop"></span>drip</div><h1></h1>';
+  root.innerHTML = '<img class="brand" src="/store/logo/drip-wordmark.svg" alt="drip"><h1></h1>';
   document.body.append(root);
   const svg = /** @type {SVGSVGElement} */ (document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
   svg.setAttribute('class', 'lines');

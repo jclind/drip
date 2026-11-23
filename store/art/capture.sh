@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 page=frames.html out=store/images tiles="c d d2 d3 e"
 dsf=1
 # v2 renders at 2x and sips scales it down: the scaled iframes' text came out soft at 1x (Codex, round 7).
-if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c c2 c3 p" dsf=2; shift; fi
+if [ "${1:-}" = v2 ]; then page=frames-v2.html out=store/images-v2 tiles="c c2 c3 g p" dsf=2; shift; fi
 v3=; if [ "${1:-}" = v3 ]; then page=frames-v3.html out=store/images-v3 dsf=2 v3=1; shift; fi
 v4=; if [ "${1:-}" = v4 ]; then page=frames-v4.html out=store/images-v4 dsf=2 v4=1; shift; fi
 port=${1:-8078}
