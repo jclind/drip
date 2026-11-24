@@ -1,5 +1,7 @@
 # Council state: drip store images
 
+Since 2026-11-23 the store set is `store/images-v5/`, which Jesse picked from mockups outside the council (`store/LISTING.md` has the details). Everything below is the record of the set before it, `store/images-v2/`.
+
 Two runs. The current one, `store-images-ref`, comes first; `/council continue` picks it up from its Current section. The first run (rounds 14 to 19) follows it and is closed. The rounds before the council (0 to 13, two judges) are in `HILL-CLIMB.md`.
 
 # Run 2: store-images-ref (started 2026-11-09)
