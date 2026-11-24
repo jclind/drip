@@ -9,7 +9,7 @@
      ?tile=1. The words are on the left in the logo's Inter, and one piece of drip sits in a white panel on the right,
      on a pale blue. Jesse picked the layout (A of round 1) and the color (F of round 2).
      pieces.js takes the pictures of drip, and capture.sh v5 shoots these frames into store/images-v5/. */
-  :root { --mist: #e5f1fc; --ink: #1c1b19; --sub: #4a5968; --water: rgb(74, 150, 200); --shade: 20, 50, 90; }
+  :root { --mist: #e5f1fc; --ink: #1c1b19; --sub: #4a5968; --water: #42a5f6; --shade: 20, 50, 90; }
   html, body { margin: 0; background: var(--mist); }
   h1, p { margin: 0; }
   img { display: block; }
@@ -52,9 +52,9 @@
     <div class="words"><img class="mark" src="../logo/drip-wordmark.svg" alt="drip"><h1>${s.h}</h1>${s.p ? `<p>${s.p}</p>` : ''}</div>
     <div class="stage"><div class="panel${s.pad ? '' : ' is-bare'}" style="padding:${s.pad}px"><img src="pieces/${s.piece}.png" width="${s.w}" alt=""></div></div>
   </div>`;
-  // The tile is the logo over the same strip of water as the tiles in frames-v2.html.
+  // The tile is the logo over the strip of water from the tiles in frames-v2.html, in the drop's blue so the set has one blue.
   const tile = `<div class="tile">
-    <svg width="440" height="30" viewBox="0 0 440 30" preserveAspectRatio="none"><path d="M0 14C70 5 150 5 220 12S370 22 440 13V30H0Z" fill="rgb(74, 150, 200)"/></svg>
+    <svg width="440" height="30" viewBox="0 0 440 30" preserveAspectRatio="none"><path d="M0 14C70 5 150 5 220 12S370 22 440 13V30H0Z" style="fill: var(--water)"/></svg>
     <img src="../logo/drip-logo.svg" alt="drip: YouTube without the feed">
   </div>`;
   document.body.innerHTML = q.has('tile') ? tile : frame;
