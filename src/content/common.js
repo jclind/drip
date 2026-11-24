@@ -1,5 +1,6 @@
 // @ts-check
-// Helpers shared by home.js and watch.js. Content scripts share one global scope, so this sets globalThis.DripUI.
+// Helpers shared by drip's content scripts (home.js, watch.js, search.js, channel.js, and the rest) and the welcome
+// tour. Content scripts share one global scope, so this sets globalThis.DripUI.
 
 (function () {
   // YouTube selectors. These break when YouTube changes its markup.

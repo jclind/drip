@@ -43,14 +43,14 @@ Decided 2026-10-14 as Quiet and Curated, beside Full drip. See "Modes" in DESIGN
 
 ## Publishing
 
-- Chrome Web Store listing. Google's branding rules don't allow "YouTube" in the name.
+- Chrome Web Store listing. Done: 1.0.0 has been live since 2026-11-21 as "drip: YouTube without the feed". `store/LISTING.md` says why the name can hold "YouTube".
 - A Firefox build.
 - Move to WXT for TypeScript, hot reload, a React settings page, and store zips. Do it when settings outgrow one page or publishing gets serious.
 
 ## Feed sources
 
 - Explore as a third reveal source. On 2026-10-06, `/feed/explore` loaded in a frame came back titled "Home - YouTube" with the home grid, so there's no separate Explore feed to read. Topic pages like `/gaming` might work as sources, one at a time.
-- Put the feed source back on the Settings page if the toggle on the token page isn't enough. Removed 2026-10-06.
+- Put the feed source back on the Settings page if the toggle on the token page isn't enough. Removed 2026-10-06. Done 2026-10-10: it's "Reveal from" in Settings, and the token page has no toggle.
 
 ## Playlists
 
@@ -87,7 +87,7 @@ Claude's brainstorm, 2026-10-10, after Jesse asked where else subtle animation c
 From the Settings review on 2026-10-16. Jesse liked these but put them past 1.0. Quiet hours, the channel lists, and export/import/reset went into 1.0 instead (RELEASE-PLAN.md).
 
 - A different allowance on weekends. Same as "Different allowances per weekday" under Earning tokens.
-- Switches for what drip hides: comments, Shorts, the sidebar menu, the end screen. Unhook is built on these. Each one is a leak someone can turn on at 1am, so maybe only "always show comments".
+- Switches for what drip hides: comments, Shorts, the sidebar menu, the end screen. Unhook is built on these. Each one is a leak someone can turn on at 1am, so maybe only "always show comments". Shorts has its switch since 1.0: Hide Shorts in Settings, on by default.
 - Comments open when the video ends (Jesse, 2026-11-02: "I often find myself with such a bad attention span that I end up scrolling the comments while I am watching the video. I'm already on youtube, I should be able to give my full attention to a video."). Today's "Show comments" button would wait, in gray, saying "Comments open when the video ends", with no countdown. Claude's suggestions, not decided: it opens at the video's end or after about 90% watched, so credits don't hold it back; seeking to the end opens it too, a deliberate skip; a video already finished once opens at once; live streams are left alone. A switch, on by default, in every mode: on applies at once, and off waits for the reset (Q6), like the bell.
 - A cooldown and a typed reason before pausing drip (under Friction).
 - A "Reduce motion" switch that overrides the system setting.

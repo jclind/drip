@@ -66,7 +66,7 @@
  * @property {number} rolloverDays
  * @property {number} resetHour
  * @property {boolean} graceMode
- * @property {boolean} dryHours No new drops from dryFrom up to dryTo (Q32).
+ * @property {boolean} dryHours No watching on minutes from dryFrom up to dryTo, and drops stop selling (Q32).
  * @property {number} dryFrom The first dry hour, 0 to 23, local time.
  * @property {number} dryTo The first hour that isn't dry again.
  * @property {number} needThisPerWeek "I need this one" uses in any 7 × 24 hours (Q20).

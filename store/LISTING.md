@@ -22,7 +22,7 @@ Lifestyle > Well-being (Jesse, 2026-11-06). Feed-hiding extensions like UnDistra
 
 ## Privacy policy URL
 
-https://jesselind.com/projects/drip/privacy (jesselind PR 30). The page's text is `PRIVACY.md`. Change both together.
+https://jesselind.com/projects/drip/privacy (jesselind PR 30). `PRIVACY.md` is a copy of the page's text. Change both together.
 
 ## Single purpose
 
@@ -65,6 +65,6 @@ Replaces YouTube's endless home feed with a search box or one recommendation at 
 
 ## Before submitting
 
-1. Bump `version` in `manifest.json` to 1.0.0.
-2. `bin/build-release`, then load `dist/drip-1.0.0.zip` unzipped in Chrome and run `test/BROWSER.md`.
-3. Check that https://jesselind.com/projects/drip/privacy is live and matches `PRIVACY.md`. The contact email is `apps@jesselind.com` (forwards to Jesse's Gmail through ImprovMX), and the developer account should use it too.
+1. Bump `version` in `manifest.json`. 1.0.0 was the first upload.
+2. `bin/build-release`, then load `dist/drip-<version>.zip` unzipped in Chrome and run `test/BROWSER.md`.
+3. Check that https://jesselind.com/projects/drip/privacy is live and that `PRIVACY.md`'s copy still matches it. The contact email is `apps@jesselind.com` (forwards to Jesse's Gmail through ImprovMX), and the developer account should use it too.

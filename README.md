@@ -2,7 +2,7 @@
 
 A Chrome extension that takes away YouTube's home page grid. You get a daily allowance of cards and drops. A card reveals one recommended video. A drop buys 15 minutes of watching. Videos you save go in the Stash, which you can open for free.
 
-It comes in three modes, Quiet, Curated, and Full drip, picked on the welcome page and changed in Settings. The cards, the drops, and the clock belong to Full drip.
+It comes in three modes, Quiet, Curated, and Full drip, picked on the welcome page and changed in Settings. The daily limits on cards and drops, and the clock, belong to Full drip. Curated reveals cards without a count, and Quiet is a search box with no cards.
 
 drip 1.0.0 is on the [Chrome Web Store](https://chromewebstore.google.com/detail/drip-youtube-without-the/kfmmpkmfaoppoibioohgkfgfljfahdfj). `DESIGN.md` has the decisions and `IDEAS.md` has ideas that aren't built.
 
@@ -32,7 +32,7 @@ To update the clone, run `cd ~/drip && git pull`, click the reload arrow on drip
 
 ### Release
 
-`bin/build-release` runs `node --test`, then writes `dist/drip-<version>.zip` for the store: `manifest.json`, `src/`, and `icons/`, with the dev panel and the localhost route left out. It refuses uncommitted changes and a version that already has a tag. `RELEASE-PLAN.md` has the upload steps, and `store/` has the listing text, the privacy policy, and the images.
+`bin/build-release` runs `node --test`, then writes `dist/drip-<version>.zip` for the store: `manifest.json`, `src/`, and `icons/`, with the dev panel, the localhost route, and the icon art in `icons/source` left out. It refuses uncommitted changes and a version that already has a tag. `RELEASE-PLAN.md` has the upload steps, and `store/` has the listing text, the privacy policy, and the images.
 
 ### Screenshots
 
