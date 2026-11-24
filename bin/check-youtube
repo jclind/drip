@@ -155,9 +155,19 @@ async function main() {
     // Wait for Chrome to let go of its profile before deleting it, or each run leaves one behind.
     if (!launchError) {
       chrome.kill();
-      await Promise.race([exited, sleep(5000)]);
+      const done = await Promise.race([exited.then(() => true), sleep(5000).then(() => false)]);
+      if (!done) {
+        chrome.kill('SIGKILL');
+        await Promise.race([exited, sleep(2000)]);
+      }
     }
-    fs.rmSync(dir, { recursive: true, force: true });
+    // Chrome's helpers can still be writing for a moment after it exits. A leftover temp folder
+    // must never stop the result from being logged and posted, so retry, then only warn.
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+    } catch (err) {
+      console.error(`warning: couldn't remove ${dir}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   const when = new Date().toISOString();
