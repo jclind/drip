@@ -110,7 +110,7 @@ A code review of PR 51 found four more, fixed in the same PR: a second Watch whi
 
 ## Measured on the MacBook, 2026-10-16
 
-Jesse ran `test/PERF.md` on the MacBook (Chrome 154, plugged in, window visible). Claude summarized the captures with throwaway scripts, and Codex reviewed the scripts and conclusions from the numbers alone, without the raw captures, which come from Jesse's signed-in YouTube. The captures stay in `~/drip-perf/` on air, out of git.
+Jesse ran `test/PERF.md` on the MacBook (Chrome 154, plugged in, window visible). Claude summarized the captures with throwaway scripts, and Codex reviewed the scripts and conclusions from the numbers alone, without the raw captures, which come from Jesse's signed-in YouTube. The captures were in `~/drip-perf/` on air, out of git, and were deleted after this summary (2026-11-06).
 
 | What | drip on | drip off | So |
 |---|---|---|---|

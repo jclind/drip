@@ -1,6 +1,6 @@
 # drip 1.0 plan: functionally ready to publish
 
-Written 2026-10-06 on air, against `main` at `9555307`. Draft for Jesse to approve. Not committed.
+Written 2026-10-06 on air, against `main` at `9555307`, and kept as the record of the 1.0 work. 1.0.0 went to the Chrome Web Store on 2026-11-20 as tag `v1.0.0` and has been live since 2026-11-21 (`store/LISTING.md`). The upload steps below still fit a later version, with its own version number.
 
 "1.0" here means a build Jesse could put on the Chrome Web Store, minus the visual design, which comes after with his input. DESIGN.md calls the core loop "v1" (Q23), so this plan says "1.0" to keep the two apart.
 

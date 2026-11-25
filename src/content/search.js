@@ -1,6 +1,6 @@
 // @ts-check
-// Search results: shows 10 at a time with a free "More results" button, and adds a Save button to each video.
-// A search with nothing left to show gets a "No results found" note. The cap and the Save buttons are mode parts
+// Search results: shows 10 at a time with a free "More results" button, and adds a Stash button to each video.
+// A search with nothing left to show gets a "No results found" note. The cap and the Stash buttons are mode parts
 // (Q29), so Quiet shows every result with no buttons.
 // The injected shelves and ads are hidden in early.css.
 

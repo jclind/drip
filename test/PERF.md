@@ -6,7 +6,7 @@ Results go in `~/drip-perf/` on the MacBook, then get copied to air, where a ses
 
 ## Before you start
 
-1. Update drip to the branch with this checklist and `dev/perf-nav.js`: in drip's clone, `git fetch && git checkout test/reveal-failures && git pull`, then click reload on drip's card in `chrome://extensions`. Once PR 51 is merged, `git checkout main && git pull` instead.
+1. Update drip: in drip's clone, `git checkout main && git pull`, then click reload on drip's card in `chrome://extensions`.
 2. Run `mkdir -p ~/drip-perf`.
 3. In drip's Settings, turn on Developer mode. The dev panel shows at the bottom left of YouTube pages.
 4. Write down your minutes, drops, and cards now. Checks 2 and 3 change them through the dev panel, and the last step puts them back.
