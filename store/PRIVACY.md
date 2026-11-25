@@ -1,6 +1,6 @@
 # drip privacy policy
 
-A copy of the policy at https://jesselind.com/projects/drip/privacy/, the page the store listing links to. The page is the one that counts (Jesse, 2026-11-24). It's built from jesselind's `src/pages/projects/drip/privacy.astro` and says "Last updated: November 9, 2026". This copy matched it on 2026-11-24. Change the page and this copy together.
+A copy of the policy at https://jesselind.com/projects/drip/privacy/, the page the store listing links to. The page is the one that counts (Jesse, 2026-11-24). It's built from jesselind's `src/pages/projects/drip/privacy.astro` and says "Last updated: November 25, 2026". This copy matches the page as of jesselind PR 46. Change the page and this copy together.
 
 In short:
 
@@ -18,8 +18,9 @@ What it stores in your browser's extension storage (`chrome.storage.local`), all
 
 - Your settings and token balances.
 - The ids of videos you unlocked today with "I need this one", and of today's videos from allowed channels with that channel's ids. Both clear at the day's reset.
-- The videos you've revealed (their ids, so the same video doesn't come up twice) and your stash (id, title, channel, length, views and age as the feed showed them, how far you got, and when you stashed it).
+- The videos you've revealed (their ids, so the same video doesn't come up twice). The card showing on drip's home page and each video in your stash: id, title, channel, the channel's handle or id when the page showed one, length, views and age as the feed showed them, how far you got, and when you stashed it.
 - Your allowed and blocked channels: each one's name, handle or channel id, and the address of its picture.
+- The watch clock's last 8 tick keys, each a random id with the seconds counted under it, so a tab doesn't count the same seconds twice.
 - A log of the last 90 days: minutes watched, tokens spent, videos saved, watched, or passed, and the reasons you typed for "I need this one", with each video's title.
 
 Temporary storage, also on your computer:
